@@ -1,7 +1,6 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 
 import LoginPage from "@/features/auth/LoginPage";
-import RegisterPage from "@/features/auth/RegisterPage";
 import RequireAuth from "@/features/auth/RequireAuth";
 import PlayScenarioPage from "@/features/scenarios/PlayScenarioPage";
 import ScenarioListPage from "@/features/scenarios/ScenarioListPage";
@@ -17,8 +16,9 @@ export default function App() {
   return (
     <Routes>
       <Route path="/" element={<Navigate to="/scenarios" replace />} />
+      {/* /login 与 /register 走同一组件，组件内部按 pathname 切到对应 tab。 */}
       <Route path="/login" element={<LoginPage />} />
-      <Route path="/register" element={<RegisterPage />} />
+      <Route path="/register" element={<LoginPage />} />
       <Route
         path="/scenarios"
         element={

@@ -42,6 +42,12 @@ async def create_db_and_tables() -> None:
     For first runs without Alembic in place we fall back to ``Base.metadata
     .create_all``. Production deploys MUST run ``alembic upgrade head`` instead
     so schema evolution stays auditable.
+
+    We also run a tiny dev-only schema migration step so existing SQLite
+    files can pick up new columns added between commits without losing the
+    user data we already accumulated. SQLAlchemy's ``create_all`` is
+    idempotent at the *table* level but does NOT add new columns to existing
+    tables -- hence the explicit ``ALTER TABLE ADD COLUMN`` block below.
     """
     # Imported here to avoid circular imports when this module is reused by
     # the migration env.py. v1 keeps the schema flat: User + Scenario +
@@ -56,3 +62,45 @@ async def create_db_and_tables() -> None:
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        await _bootstrap_schema_migrations(conn)
+
+
+async def _bootstrap_schema_migrations(conn) -> None:
+    """Ad-hoc dev-only ALTER TABLE block.
+
+    SQLite supports ``ALTER TABLE ... ADD COLUMN`` natively (since 3.2),
+    and PostgreSQL supports it too, so the same SQL works on both backends
+    we target. Each entry below should:
+
+      - be idempotent (we check for the column first via PRAGMA / pg_attribute);
+      - default to a non-NULL value so existing rows pass NOT NULL;
+      - mirror the corresponding ``mapped_column`` declaration in models.py.
+
+    Once we ship Alembic this whole helper goes away and the migration moves
+    to a versioned revision file.
+    """
+    # We only know how to introspect SQLite cheaply right now. Postgres in
+    # prod will run alembic anyway, so noop here is the correct fallback.
+    backend = conn.engine.dialect.name
+    if backend != "sqlite":
+        return
+
+    from sqlalchemy import text
+
+    # Each row = (table, column, sql to add). Order matters only when one
+    # column references another (none today).
+    pending: list[tuple[str, str, str]] = [
+        (
+            "scenario",
+            "status",
+            "ALTER TABLE scenario ADD COLUMN status VARCHAR(16) "
+            "NOT NULL DEFAULT 'draft'",
+        ),
+    ]
+
+    for table, column, ddl in pending:
+        result = await conn.execute(text(f"PRAGMA table_info({table})"))
+        existing_cols = {row[1] for row in result.fetchall()}
+        if column in existing_cols:
+            continue
+        await conn.execute(text(ddl))

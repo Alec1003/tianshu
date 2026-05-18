@@ -63,6 +63,15 @@ class Scenario(Base):
 
     is_template: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
+    # 项目状态：草稿 / 推演中 / 已完成。
+    # - draft     : 刚创建、还未开始推演
+    # - running   : 用户进入过推演状态（点过「开始」但未结束）
+    # - completed : gameOutcome.ended === true
+    # MVP 阶段状态转换由前端在保存/归档时明示传入。
+    status: Mapped[str] = mapped_column(
+        String(16), default="draft", nullable=False
+    )
+
     owner_id: Mapped[str | None] = mapped_column(
         String(36),
         ForeignKey("user.id", ondelete="CASCADE"),

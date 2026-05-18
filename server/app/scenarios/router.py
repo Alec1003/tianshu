@@ -21,6 +21,7 @@ from app.auth.users import current_active_user
 from app.db.session import get_async_session
 from app.scenarios.models import AarRecord, Scenario
 from app.scenarios.schemas import (
+    VALID_STATUSES,
     AarRecordCreate,
     AarRecordRead,
     ScenarioCreate,
@@ -84,6 +85,7 @@ async def create_scenario(
         data=payload.data,
         is_template=False,
         owner_id=str(user.id),
+        status=payload.status if payload.status in VALID_STATUSES else "draft",
     )
     session.add(sc)
     await session.commit()
@@ -119,6 +121,13 @@ async def update_scenario(
     if payload.data is not None:
         sc.data = payload.data
         sc.version += 1
+    if payload.status is not None:
+        if payload.status not in VALID_STATUSES:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"invalid status; expected one of {sorted(VALID_STATUSES)}",
+            )
+        sc.status = payload.status
     await session.commit()
     await session.refresh(sc)
     return sc

@@ -7,11 +7,15 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+ScenarioStatus = str  # "draft" | "running" | "completed"
+VALID_STATUSES = {"draft", "running", "completed"}
+
 
 # ---------- Scenario ----------
 class ScenarioBase(BaseModel):
     name: str = Field(..., min_length=1, max_length=120)
     description: str = Field(default="", max_length=2000)
+    status: ScenarioStatus = Field(default="draft")
 
 
 class ScenarioCreate(ScenarioBase):
@@ -26,6 +30,7 @@ class ScenarioUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=120)
     description: str | None = Field(default=None, max_length=2000)
     data: dict[str, Any] | None = None
+    status: ScenarioStatus | None = None
 
 
 class ScenarioListItem(BaseModel):
@@ -37,6 +42,7 @@ class ScenarioListItem(BaseModel):
     is_template: bool
     owner_id: str | None
     version: int
+    status: ScenarioStatus
     created_at: datetime
     updated_at: datetime
 

@@ -15,6 +15,8 @@ export interface AuthTokenResponse {
   token_type: "bearer";
 }
 
+export type ScenarioStatus = "draft" | "running" | "completed";
+
 export interface ScenarioListItem {
   id: string;
   name: string;
@@ -22,6 +24,7 @@ export interface ScenarioListItem {
   is_template: boolean;
   owner_id: string | null;
   version: number;
+  status: ScenarioStatus;
   created_at: string;
   updated_at: string;
 }
@@ -35,12 +38,14 @@ export interface ScenarioDetail extends ScenarioListItem {
 export interface ScenarioCreatePayload {
   name: string;
   description?: string;
+  status?: ScenarioStatus;
   data: Record<string, unknown>;
 }
 
 export interface ScenarioUpdatePayload {
   name?: string;
   description?: string;
+  status?: ScenarioStatus;
   data?: Record<string, unknown>;
 }
 

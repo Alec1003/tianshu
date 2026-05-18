@@ -59,6 +59,22 @@ export default function PlayScenarioPage() {
       try {
         const sc = await getScenario(scenarioId);
         if (!cancelled) setScenario(sc);
+        // 项目状态自然演进：草稿 -> 推演中，一旦用户打开推演页。
+        // 仅限本人项目且状态为 draft 时升级；模板不在这里改。
+        if (
+          !cancelled &&
+          sc &&
+          !sc.is_template &&
+          sc.status === "draft"
+        ) {
+          try {
+            const promoted = await updateScenario(sc.id, { status: "running" });
+            if (!cancelled) setScenario(promoted);
+          } catch (err) {
+            // 状态推进失败不阻断进入，打个警告即可。
+            console.warn("[AICC] promote scenario to running failed", err);
+          }
+        }
       } catch (err) {
         if (!cancelled) {
           setError(err instanceof ApiError ? err.message : "加载失败");
@@ -139,6 +155,17 @@ export default function PlayScenarioPage() {
           summary: payload.summary,
           ended_at: payload.endedAt,
         });
+        // 一局结束 -> 项目状态 completed（仅本人项目）。
+        if (!scenario.is_template && scenario.status !== "completed") {
+          try {
+            const promoted = await updateScenario(scenario.id, {
+              status: "completed",
+            });
+            setScenario(promoted);
+          } catch (err) {
+            console.warn("[AICC] promote scenario to completed failed", err);
+          }
+        }
       } catch (err) {
         // AAR posting is best-effort; surface but don't block.
         console.warn("post aar failed", err);

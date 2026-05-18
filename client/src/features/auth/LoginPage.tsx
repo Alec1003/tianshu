@@ -1,16 +1,14 @@
-// AICC COMMAND -- Tactical Identity Terminal (Login + Register)
+// AICC COMMAND -- Tactical Identity Terminal (精简版)
 // =============================================================================
-// 设计目标：把入口页从「企业 SaaS 登录页」升级为「下一代 AI 指挥控制平台入口」。
-// 参考语言：Anduril Lattice / Palantir Gotham / Cursor / Windsurf 暗色科技风格。
+// 设计目标：在保留「AI 指挥控制平台」识别度的前提下大幅降低视觉密度。
 //
-// 布局：
-//   - lg+ : grid 55% / 45%  左侧战场态势展示 / 右侧 Tactical Identity Terminal
-//   - 移动端：单列堆叠
-//
-// 视觉：
-//   - 背景多层：tactical grid + 扫描带 + 雷达波纹 + 稀疏数据粒子
-//   - 玻璃拟态登录面板，多层 glow + 内 HUD 输入
-//   - 左侧大型 SVG 雷达 + 航线 + AI 节点 + 战术地图轮廓
+// 取舍（相对前一版）：
+//   - 删除：顶部时钟、底部 footer、双 status pill、底部状态条、CornerTicks
+//     四角、SystemRow 双行、三方 SSO chip、双层网格、38 粒子场、双 RadarPing、
+//     vignette。
+//   - 雷达精简到 3 同心圆 + 1 扫描扇形 + 3 blip + 1 航线，不再有标签。
+//   - 能力卡只有 3 张、横向一行，去掉 code / metric 副信息。
+//   - 全局动效降到 4 个：背景扫描线、雷达扫描、blip pulse、按钮 hover sweep。
 //
 // 技术：React + TS + Tailwind + framer-motion + lucide-react
 // =============================================================================
@@ -18,7 +16,6 @@
 import {
   useEffect,
   useMemo,
-  useRef,
   useState,
   type FormEvent,
   type ReactNode,
@@ -30,91 +27,45 @@ import {
 } from "react-router-dom";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
-  Activity,
   ArrowRight,
   Brain,
-  ChevronRight,
-  Crosshair,
   Eye,
   EyeOff,
-  Fingerprint,
-  Globe2,
   Hexagon,
   KeyRound,
-  Layers3,
   Lock,
   Network,
   Radar,
-  Radio,
-  Satellite,
   ShieldCheck,
-  Sparkles,
-  Target,
   Terminal,
   UserCog,
-  Zap,
 } from "lucide-react";
 
 import { ApiError } from "@/api/client";
 import { cn } from "@/lib/utils";
 import { useAuth } from "./AuthContext";
 
-// -----------------------------------------------------------------------------
-// 配置数据：左侧 AI 能力卡片 + 战术状态行
-// -----------------------------------------------------------------------------
-
 const CAPABILITIES: Array<{
   icon: typeof Radar;
-  code: string;
   title: string;
   desc: string;
-  metric: string;
 }> = [
   {
     icon: Radar,
-    code: "C-01",
     title: "实时态势感知",
-    desc: "多源传感器融合,战场全域目标跟踪与威胁评估",
-    metric: "1,284 TGT",
+    desc: "多源传感器融合 / 全域目标跟踪",
   },
   {
     icon: Brain,
-    code: "C-02",
     title: "AI 智能推演",
-    desc: "基于强化学习的对抗推演,毫秒级战术建议",
-    metric: "98.3% ACC",
+    desc: "毫秒级对抗推演 / 战术建议生成",
   },
   {
     icon: Network,
-    code: "C-03",
     title: "多域协同作战",
-    desc: "陆海空天电统一指挥,跨域力量自适应编组",
-    metric: "5 DOMAINS",
-  },
-  {
-    icon: Crosshair,
-    code: "C-04",
-    title: "自动战术规划",
-    desc: "目标分配 / 路径规划 / 火力优化端到端自动化",
-    metric: "< 240 ms",
+    desc: "陆海空天电统一指挥 / 自适应编组",
   },
 ];
-
-const STATUS_BAR: Array<{
-  icon: typeof Activity;
-  label: string;
-  value: string;
-  tone: "ok" | "warn" | "neutral";
-}> = [
-  { icon: ShieldCheck, label: "DEFCON", value: "LEVEL 3", tone: "ok" },
-  { icon: Activity, label: "AI LATENCY", value: "186 ms", tone: "ok" },
-  { icon: Radio, label: "LINK", value: "16 / 16", tone: "ok" },
-  { icon: Satellite, label: "SATCOM", value: "NOMINAL", tone: "ok" },
-];
-
-// -----------------------------------------------------------------------------
-// 主组件
-// -----------------------------------------------------------------------------
 
 type Tab = "login" | "register";
 type LocationState = { from?: { pathname?: string } } | null;
@@ -125,13 +76,13 @@ export default function LoginPage() {
   const { login, register } = useAuth();
   const reduceMotion = useReducedMotion();
 
-  const initialTab: Tab = location.pathname === "/register" ? "register" : "login";
+  const initialTab: Tab =
+    location.pathname === "/register" ? "register" : "login";
   const [tab, setTab] = useState<Tab>(initialTab);
   useEffect(() => {
     setTab(location.pathname === "/register" ? "register" : "login");
   }, [location.pathname]);
 
-  // 表单状态
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -150,14 +101,6 @@ export default function LoginPage() {
     const state = location.state as LocationState;
     return state?.from?.pathname ?? "/scenarios";
   }, [location.state]);
-
-  // 任务时钟（顶部 ID 行展示）
-  const [now, setNow] = useState(() => new Date());
-  useEffect(() => {
-    if (reduceMotion) return;
-    const t = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(t);
-  }, [reduceMotion]);
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
@@ -190,151 +133,76 @@ export default function LoginPage() {
 
   return (
     <div className="dark relative h-screen w-screen overflow-hidden bg-[#03070f] text-slate-100">
-      <TacticalBackground reduce={reduceMotion ?? false} />
-
-      {/* 顶部薄帧：模拟 HUD chrome */}
-      <header className="pointer-events-none absolute inset-x-0 top-0 z-30 flex items-center justify-between px-6 py-3 text-[10px] tracking-[0.32em] text-slate-500">
-        <div className="flex items-center gap-2">
-          <span className="size-1.5 rounded-full bg-cyan-300 shadow-[0_0_8px_#67e8f9]" />
-          AICC.COMMAND // TERMINAL
-        </div>
-        <div className="hidden items-center gap-3 md:flex">
-          <span>NODE: TX-7A</span>
-          <span className="text-slate-700">|</span>
-          <span>SECURE BOOT OK</span>
-          <span className="text-slate-700">|</span>
-          <span>{fmtClockUTC(now)}</span>
-        </div>
-      </header>
+      <Background reduce={reduceMotion ?? false} />
 
       <div className="relative z-10 grid h-full w-full grid-cols-1 lg:grid-cols-[55fr_45fr]">
-        {/* ========================= 左 : 战场态势展示 ========================= */}
-        <section className="relative hidden h-full min-h-0 flex-col justify-between overflow-hidden px-10 pb-8 pt-16 lg:flex xl:px-14">
-          {/* 顶部行：品牌 + 系统状态 pill */}
-          <div className="flex items-start justify-between">
-            <Brand />
-            <div className="flex flex-col items-end gap-2">
-              <StatusPill
-                dotColor="bg-emerald-400"
-                label="TACTICAL AI ONLINE"
-                sub="OPERATIONAL"
-              />
-              <StatusPill
-                dotColor="bg-cyan-300"
-                label="C2 LINK SECURED"
-                sub="TLS 1.3 · 256 AES"
-              />
+        {/* ============== 左侧：战场态势展示 ============== */}
+        <section className="relative hidden h-full flex-col justify-between overflow-hidden px-10 py-12 lg:flex xl:px-14">
+          <Brand />
+
+          <div className="relative my-auto flex flex-col">
+            <div className="mb-4 inline-flex items-center gap-2 self-start rounded-full border border-cyan-300/20 bg-cyan-300/[0.06] px-3 py-1 font-mono text-[10px] tracking-[0.32em] text-cyan-200/80">
+              <span className="size-1.5 animate-pulse rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]" />
+              TACTICAL AI ONLINE
+            </div>
+
+            <h1 className="font-semibold leading-[1.05] tracking-tight text-slate-50">
+              <span className="block text-[44px] xl:text-[52px]">
+                智能决策 ·{" "}
+                <span className="bg-gradient-to-r from-cyan-300 via-sky-300 to-blue-300 bg-clip-text text-transparent">
+                  精准指挥
+                </span>
+              </span>
+              <span className="mt-1 block text-[26px] font-light text-slate-300 xl:text-[30px]">
+                掌控战场每一个瞬间
+              </span>
+            </h1>
+            <p className="mt-4 max-w-md text-sm leading-relaxed text-slate-400">
+              下一代 AI 战术指挥控制平台 —— 把传感、决策、行动闭环压缩到秒级。
+            </p>
+
+            {/* 雷达可视化 */}
+            <div className="relative mt-8 h-[260px] w-full max-w-[560px] xl:h-[300px]">
+              <TacticalRadar reduce={reduceMotion ?? false} />
             </div>
           </div>
 
-          {/* 标题 + 雷达可视化 */}
-          <div className="relative mt-6 flex flex-1 items-center">
-            {/* 后景雷达 */}
-            <TacticalRadar reduce={reduceMotion ?? false} />
-
-            {/* 主标题（绝对定位在雷达左上） */}
-            <div className="relative z-10 max-w-[620px]">
-              <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-cyan-300/20 bg-cyan-300/[0.06] px-3 py-1 text-[11px] tracking-[0.32em] text-cyan-200/80">
-                <Sparkles className="size-3" /> NEXT-GEN AI COMMAND PLATFORM
-              </div>
-              <h1 className="font-semibold leading-[1.05] tracking-tight text-slate-50">
-                <span className="block text-[44px] xl:text-[52px]">
-                  智能决策 ·{" "}
-                  <span className="bg-gradient-to-r from-cyan-300 via-sky-300 to-blue-300 bg-clip-text text-transparent">
-                    精准指挥
-                  </span>
-                </span>
-                <span className="mt-1 block text-[28px] font-light text-slate-300 xl:text-[32px]">
-                  掌控战场每一个瞬间
-                </span>
-              </h1>
-              <p className="mt-4 max-w-md text-sm leading-relaxed text-slate-400">
-                AICC COMMAND
-                构建于多智能体推演引擎，将传感、决策、行动闭环压缩到秒级，
-                为联合指挥所提供战术级 AI 协同。
-              </p>
-            </div>
-          </div>
-
-          {/* AI 能力卡片 2x2 */}
-          <div className="relative z-10 mt-6 grid grid-cols-2 gap-3">
+          {/* 3 张能力卡，横向一行 */}
+          <div className="grid grid-cols-3 gap-3">
             {CAPABILITIES.map((c, idx) => (
-              <CapabilityCard key={c.code} {...c} delay={idx * 0.06} />
-            ))}
-          </div>
-
-          {/* 底部状态条 */}
-          <div className="relative z-10 mt-5 flex items-stretch gap-2 overflow-hidden rounded-xl border border-cyan-300/10 bg-[#06101f]/60 px-3 py-2 backdrop-blur-sm">
-            {STATUS_BAR.map((s, i) => (
-              <StatusCell key={s.label} {...s} divider={i !== STATUS_BAR.length - 1} />
+              <CapabilityCard key={c.title} {...c} delay={idx * 0.06} />
             ))}
           </div>
         </section>
 
-        {/* ========================= 右 : Identity Terminal ========================= */}
-        <section className="relative flex h-full min-h-0 items-center justify-center px-6 py-10 sm:px-10">
-          {/* 右侧专属背景：竖直扫描带 */}
-          {!reduceMotion && (
-            <motion.div
-              aria-hidden
-              className="pointer-events-none absolute inset-y-0 left-0 right-0 overflow-hidden"
-            >
-              <motion.div
-                className="absolute inset-x-0 h-[40%] bg-gradient-to-b from-transparent via-cyan-300/[0.06] to-transparent"
-                animate={{ y: ["-30%", "120%"] }}
-                transition={{ duration: 9, ease: "linear", repeat: Infinity }}
-              />
-            </motion.div>
-          )}
-
+        {/* ============== 右侧：Identity Terminal ============== */}
+        <section className="relative flex h-full items-center justify-center px-6 py-10 sm:px-10">
           <motion.div
-            initial={{ opacity: 0, y: 16 }}
+            initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-            className="relative z-10 w-full max-w-[440px]"
+            transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+            className="relative z-10 w-full max-w-[400px]"
           >
-            {/* 外层多边形发光描边 */}
-            <div className="pointer-events-none absolute -inset-px rounded-[28px] bg-gradient-to-b from-cyan-400/30 via-cyan-300/5 to-blue-500/20 opacity-80" />
-            <div className="pointer-events-none absolute -inset-[18px] rounded-[36px] bg-cyan-400/[0.04] blur-2xl" />
+            {/* 外层柔光描边 */}
+            <div className="pointer-events-none absolute -inset-px rounded-[24px] bg-gradient-to-b from-cyan-400/25 via-cyan-300/[0.05] to-blue-500/15 opacity-80" />
+            <div className="pointer-events-none absolute -inset-3 rounded-[28px] bg-cyan-400/[0.04] blur-2xl" />
 
             {/* 玻璃面板 */}
-            <div className="relative overflow-hidden rounded-[26px] border border-cyan-300/15 bg-[#070d18]/85 backdrop-blur-xl">
-              {/* 内部 HUD 角标 */}
-              <CornerTicks />
-
-              {/* 顶栏：身份认证终端 */}
-              <div className="flex items-center gap-2 border-b border-cyan-300/10 bg-gradient-to-r from-cyan-400/[0.06] via-transparent to-blue-500/[0.05] px-5 py-3">
-                <span className="grid size-7 place-items-center rounded-md border border-cyan-300/30 bg-cyan-300/10 text-cyan-200">
-                  <Fingerprint className="size-3.5" />
-                </span>
-                <div className="flex flex-1 items-baseline gap-2">
-                  <span className="text-xs font-semibold tracking-[0.28em] text-slate-100">
+            <div className="relative overflow-hidden rounded-[22px] border border-cyan-300/15 bg-[#070d18]/85 backdrop-blur-xl">
+              {/* 顶栏 */}
+              <div className="flex items-center justify-between gap-2 border-b border-cyan-300/10 bg-gradient-to-r from-cyan-400/[0.06] via-transparent to-blue-500/[0.05] px-5 py-3">
+                <div className="flex items-center gap-2">
+                  <span className="grid size-7 place-items-center rounded-md border border-cyan-300/30 bg-cyan-300/10 text-cyan-200">
+                    <ShieldCheck className="size-3.5" />
+                  </span>
+                  <span className="font-mono text-xs font-semibold tracking-[0.28em] text-slate-100">
                     IDENTITY TERMINAL
                   </span>
-                  <span className="text-[10px] tracking-[0.28em] text-slate-500">
-                    /{tab === "login" ? "AUTH" : "ENROLL"}
-                  </span>
                 </div>
-                <span className="flex items-center gap-1 text-[10px] tracking-[0.28em] text-emerald-300/90">
+                <span className="flex items-center gap-1.5 font-mono text-[10px] tracking-[0.24em] text-emerald-300/90">
                   <span className="size-1.5 animate-pulse rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]" />
-                  LINK · 99.97%
+                  SECURE LINK
                 </span>
-              </div>
-
-              {/* 系统状态 + 安全认证两行 */}
-              <div className="grid grid-cols-2 gap-2 border-b border-cyan-300/10 px-5 py-3 text-[10px] tracking-[0.22em] text-slate-400">
-                <SystemRow
-                  icon={<Zap className="size-3" />}
-                  label="SYSTEM STATUS"
-                  value="Tactical AI Online"
-                  ok
-                />
-                <SystemRow
-                  icon={<ShieldCheck className="size-3" />}
-                  label="SECURE ACCESS"
-                  value="Military Grade"
-                  ok
-                />
               </div>
 
               {/* Tab */}
@@ -343,30 +211,30 @@ export default function LoginPage() {
                   active={tab === "login"}
                   onClick={() => setTab("login")}
                   title="LOGIN"
-                  subtitle="授权进入"
                 />
                 <TabHead
                   active={tab === "register"}
                   onClick={() => setTab("register")}
                   title="ENROLL"
-                  subtitle="新建身份"
                 />
               </div>
 
-              <form onSubmit={handleSubmit} className="space-y-4 px-6 py-6 sm:px-7">
+              <form
+                onSubmit={handleSubmit}
+                className="space-y-4 px-6 py-6 sm:px-7"
+              >
                 <AnimatePresence mode="wait" initial={false}>
                   <motion.div
                     key={tab}
-                    initial={{ opacity: 0, y: 8 }}
+                    initial={{ opacity: 0, y: 6 }}
                     animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -8 }}
-                    transition={{ duration: 0.22, ease: "easeOut" }}
+                    exit={{ opacity: 0, y: -6 }}
+                    transition={{ duration: 0.2, ease: "easeOut" }}
                     className="space-y-4"
                   >
                     <HudInput
                       icon={<UserCog className="size-4" />}
                       label="COMMANDER ID"
-                      hint="01"
                     >
                       <input
                         type="email"
@@ -383,7 +251,6 @@ export default function LoginPage() {
                       <HudInput
                         icon={<Terminal className="size-4" />}
                         label="CALLSIGN (OPTIONAL)"
-                        hint="02"
                       >
                         <input
                           type="text"
@@ -400,7 +267,6 @@ export default function LoginPage() {
                     <HudInput
                       icon={<KeyRound className="size-4" />}
                       label="ACCESS KEY"
-                      hint={tab === "register" ? "03" : "02"}
                       trailing={
                         <button
                           type="button"
@@ -421,7 +287,9 @@ export default function LoginPage() {
                         required
                         minLength={tab === "register" ? 8 : undefined}
                         autoComplete={
-                          tab === "register" ? "new-password" : "current-password"
+                          tab === "register"
+                            ? "new-password"
+                            : "current-password"
                         }
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
@@ -438,7 +306,6 @@ export default function LoginPage() {
                       <HudInput
                         icon={<Lock className="size-4" />}
                         label="VERIFY KEY"
-                        hint="04"
                       >
                         <input
                           type={showPassword ? "text" : "password"}
@@ -454,7 +321,7 @@ export default function LoginPage() {
                     )}
 
                     {tab === "login" && (
-                      <div className="flex items-center justify-between text-[11px] tracking-wider text-slate-400">
+                      <div className="flex items-center justify-between font-mono text-[11px] tracking-wider text-slate-400">
                         <label className="flex select-none items-center gap-2">
                           <input
                             type="checkbox"
@@ -468,7 +335,7 @@ export default function LoginPage() {
                           onClick={() =>
                             setInfo("访问密钥重置请联系管理员或 v2 自助流程")
                           }
-                          className="font-mono uppercase tracking-[0.18em] text-cyan-300/80 hover:text-cyan-200"
+                          className="uppercase tracking-[0.18em] text-cyan-300/80 hover:text-cyan-200"
                         >
                           忘记密钥?
                         </button>
@@ -499,82 +366,33 @@ export default function LoginPage() {
                     <TacticalSubmit
                       submitting={submitting}
                       label={tab === "login" ? "AUTHORIZE" : "ENROLL"}
-                      sub={
-                        tab === "login"
-                          ? "进入战术指挥控制平台"
-                          : "创建并完成身份注册"
-                      }
                     />
                   </motion.div>
                 </AnimatePresence>
 
-                {/* 三方占位 */}
-                <div className="pt-1">
-                  <div className="relative my-1 flex items-center gap-3 text-[10px] tracking-[0.28em] text-slate-500">
-                    <span className="h-px flex-1 bg-cyan-300/10" />
-                    OR USE TRUSTED CHANNEL
-                    <span className="h-px flex-1 bg-cyan-300/10" />
-                  </div>
-                  <div className="grid grid-cols-3 gap-2 pt-2">
-                    <SsoChip
-                      icon={<ShieldCheck className="size-3.5" />}
-                      label="SSO"
-                      onClick={() => setInfo("企业 SSO 将在私有部署版开放")}
-                    />
-                    <SsoChip
-                      icon={<Globe2 className="size-3.5" />}
-                      label="DINGTALK"
-                      onClick={() => setInfo("钉钉扫码接入将在 v2 开放")}
-                    />
-                    <SsoChip
-                      icon={<Layers3 className="size-3.5" />}
-                      label="WECOM"
-                      onClick={() => setInfo("企业微信接入将在 v2 开放")}
-                    />
-                  </div>
-                </div>
-
-                {/* 协议 / 切换 */}
-                <div className="border-t border-cyan-300/10 pt-3 text-center text-[10px] leading-relaxed tracking-wider text-slate-500">
-                  {tab === "login" ? "登录" : "注册"}即表示您同意{" "}
-                  <button
-                    type="button"
-                    className="text-cyan-300/80 hover:text-cyan-200"
-                    onClick={() => setInfo("用户协议将在正式发布版本提供")}
-                  >
-                    《用户协议》
-                  </button>
-                  {" / "}
-                  <button
-                    type="button"
-                    className="text-cyan-300/80 hover:text-cyan-200"
-                    onClick={() => setInfo("隐私政策将在正式发布版本提供")}
-                  >
-                    《隐私政策》
-                  </button>
-                  <div className="pt-1.5">
-                    {tab === "login" ? (
-                      <>
-                        尚未持有指挥官身份?{" "}
-                        <RouterLink
-                          to="/register"
-                          className="font-mono uppercase tracking-[0.18em] text-cyan-300 hover:text-cyan-200"
-                        >
-                          申请注册
-                        </RouterLink>
-                      </>
-                    ) : (
-                      <>
-                        已有身份?{" "}
-                        <RouterLink
-                          to="/login"
-                          className="font-mono uppercase tracking-[0.18em] text-cyan-300 hover:text-cyan-200"
-                        >
-                          返回登录
-                        </RouterLink>
-                      </>
-                    )}
-                  </div>
+                {/* 协议 + 切换链接合并到一行 */}
+                <div className="border-t border-cyan-300/10 pt-3 text-center font-mono text-[10px] leading-relaxed tracking-wider text-slate-500">
+                  {tab === "login" ? (
+                    <>
+                      未持有指挥官身份?{" "}
+                      <RouterLink
+                        to="/register"
+                        className="uppercase tracking-[0.18em] text-cyan-300 hover:text-cyan-200"
+                      >
+                        申请注册
+                      </RouterLink>
+                    </>
+                  ) : (
+                    <>
+                      已有身份?{" "}
+                      <RouterLink
+                        to="/login"
+                        className="uppercase tracking-[0.18em] text-cyan-300 hover:text-cyan-200"
+                      >
+                        返回登录
+                      </RouterLink>
+                    </>
+                  )}
                 </div>
               </form>
 
@@ -582,7 +400,7 @@ export default function LoginPage() {
               <div className="flex items-center justify-between border-t border-cyan-300/10 bg-[#040912]/60 px-5 py-2 font-mono text-[10px] tracking-[0.22em] text-slate-500">
                 <span className="flex items-center gap-1.5">
                   <Lock className="size-3 text-emerald-300" />
-                  CONNECTION ENCRYPTED · TLS 1.3
+                  TLS 1.3 · MILITARY GRADE
                 </span>
                 <span>v0.2.0</span>
               </div>
@@ -590,335 +408,191 @@ export default function LoginPage() {
           </motion.div>
         </section>
       </div>
-
-      {/* 底部 footer 行（绝对定位，不影响主网格高度） */}
-      <footer className="pointer-events-none absolute inset-x-0 bottom-0 z-30 hidden items-center justify-between px-6 py-3 font-mono text-[10px] tracking-[0.22em] text-slate-600 lg:flex">
-        <span>© 2026 AICC COMMAND · ALL DOMAINS RESERVED</span>
-        <span>UNAUTHORIZED ACCESS WILL BE RECORDED</span>
-      </footer>
     </div>
   );
 }
 
 // =============================================================================
-// 子组件 -- 背景层
+// 背景层（精简）：tactical grid + 角落辉光 + 单条扫描线
 // =============================================================================
 
-function TacticalBackground({ reduce }: { reduce: boolean }) {
+function Background({ reduce }: { reduce: boolean }) {
   return (
     <>
-      {/* base color wash */}
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(120%_80%_at_30%_30%,rgba(34,135,180,0.16),transparent_60%),radial-gradient(80%_60%_at_85%_75%,rgba(72,98,239,0.12),transparent_55%),linear-gradient(180deg,#03070f_0%,#040a14_60%,#02060d_100%)]" />
-      {/* 网格 */}
-      <div className="pointer-events-none absolute inset-0 tactical-grid opacity-[0.55]" />
-      {/* 第二层细网格（45° 仅左侧） */}
       <div
-        className="pointer-events-none absolute inset-y-0 left-0 w-[55%] opacity-30"
+        aria-hidden
+        className="pointer-events-none absolute inset-0"
         style={{
           backgroundImage:
-            "linear-gradient(45deg, rgba(76,201,240,0.05) 1px, transparent 1px), linear-gradient(-45deg, rgba(76,201,240,0.05) 1px, transparent 1px)",
-          backgroundSize: "120px 120px",
-          maskImage:
-            "radial-gradient(80% 60% at 30% 50%, black 40%, transparent 80%)",
+            "radial-gradient(110% 80% at 25% 20%, rgba(34,135,180,0.16), transparent 60%), radial-gradient(80% 60% at 90% 85%, rgba(72,98,239,0.12), transparent 55%), linear-gradient(180deg,#03070f 0%, #040a14 60%, #02060d 100%)",
         }}
       />
-
-      {/* 角落雷达 ping */}
-      <RadarPing className="left-[-10%] top-[-10%]" delay={0} reduce={reduce} />
-      <RadarPing
-        className="bottom-[-10%] right-[-8%]"
-        delay={1.4}
-        reduce={reduce}
-      />
-
-      {/* 横向扫描带 */}
+      <div className="pointer-events-none absolute inset-0 tactical-grid opacity-50" />
       {!reduce && (
         <motion.div
           aria-hidden
           className="pointer-events-none absolute inset-x-0 top-0 h-[200%] [mask-image:linear-gradient(to_bottom,transparent,black_20%,black_80%,transparent)]"
         >
           <motion.div
-            className="absolute inset-x-0 h-px bg-gradient-to-r from-transparent via-cyan-300/40 to-transparent"
+            className="absolute inset-x-0 h-px bg-gradient-to-r from-transparent via-cyan-300/35 to-transparent"
             animate={{ y: ["0%", "100%"] }}
-            transition={{ duration: 6, ease: "linear", repeat: Infinity }}
+            transition={{ duration: 7, ease: "linear", repeat: Infinity }}
           />
         </motion.div>
       )}
-
-      {/* 散落数据粒子 */}
-      <ParticleField reduce={reduce} />
-
-      {/* vignette */}
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(120%_80%_at_50%_50%,transparent_55%,rgba(0,0,0,0.45)_100%)]" />
     </>
   );
 }
 
-function RadarPing({
-  className,
-  delay,
-  reduce,
-}: {
-  className?: string;
-  delay: number;
-  reduce: boolean;
-}) {
-  const rings = [0, 1, 2];
-  return (
-    <div
-      aria-hidden
-      className={cn(
-        "pointer-events-none absolute size-[36rem] rounded-full",
-        className
-      )}
-    >
-      {rings.map((i) => (
-        <motion.span
-          key={i}
-          className="absolute inset-0 rounded-full border border-cyan-300/15"
-          initial={{ scale: 0.4, opacity: 0.0 }}
-          animate={
-            reduce
-              ? { opacity: 0.18 }
-              : { scale: [0.4, 1.05], opacity: [0.0, 0.25, 0.0] }
-          }
-          transition={
-            reduce
-              ? undefined
-              : {
-                  duration: 5.5,
-                  delay: delay + i * 1.4,
-                  ease: "easeOut",
-                  repeat: Infinity,
-                }
-          }
-        />
-      ))}
-    </div>
-  );
-}
-
-function ParticleField({ reduce }: { reduce: boolean }) {
-  // 用确定性的伪随机点位，避免每次渲染抖动
-  const dots = useMemo(() => {
-    const arr: Array<{ x: number; y: number; r: number; d: number }> = [];
-    let seed = 17;
-    const rand = () => {
-      seed = (seed * 9301 + 49297) % 233280;
-      return seed / 233280;
-    };
-    for (let i = 0; i < 38; i += 1) {
-      arr.push({
-        x: rand() * 100,
-        y: rand() * 100,
-        r: rand() * 1.4 + 0.4,
-        d: rand() * 4,
-      });
-    }
-    return arr;
-  }, []);
-
-  return (
-    <svg
-      aria-hidden
-      className="pointer-events-none absolute inset-0 h-full w-full"
-    >
-      {dots.map((p, i) => (
-        <motion.circle
-          key={i}
-          cx={`${p.x}%`}
-          cy={`${p.y}%`}
-          r={p.r}
-          fill="rgba(125,211,252,0.55)"
-          initial={{ opacity: 0.2 }}
-          animate={
-            reduce
-              ? { opacity: 0.4 }
-              : { opacity: [0.2, 0.9, 0.2] }
-          }
-          transition={
-            reduce
-              ? undefined
-              : { duration: 3 + p.d, repeat: Infinity, ease: "easeInOut" }
-          }
-        />
-      ))}
-    </svg>
-  );
-}
-
 // =============================================================================
-// 子组件 -- 战术雷达
+// 战术雷达（精简）：3 同心圆 + 1 扫描扇形 + 3 blip + 1 航线
 // =============================================================================
 
 function TacticalRadar({ reduce }: { reduce: boolean }) {
-  // 五个固定 blip，避免随机抖动；带状态颜色
-  const blips: Array<{ x: number; y: number; tone: string; key: string; label?: string }> = [
-    { x: 220, y: 120, tone: "fill-cyan-300", key: "n1", label: "BLUE-A1" },
-    { x: 360, y: 220, tone: "fill-cyan-300", key: "n2", label: "BLUE-A2" },
-    { x: 480, y: 150, tone: "fill-amber-300", key: "n3", label: "UNK-3" },
-    { x: 540, y: 320, tone: "fill-red-400", key: "n4", label: "RED-7" },
-    { x: 280, y: 360, tone: "fill-emerald-300", key: "n5", label: "ALLY" },
-  ];
+  // 雷达中心 (cx, cy) 与最大半径 R，blip 用极坐标定义后转直角
+  const cx = 280;
+  const cy = 150;
+  const R = 130;
 
-  // 航线（贝塞尔虚线）
-  const routes = [
-    "M120,360 C 240,280 320,260 380,200",
-    "M520,400 C 460,330 420,310 380,280",
-  ];
+  const blips = [
+    { angle: -40, dist: 0.55, tone: "fill-cyan-300" },
+    { angle: 25, dist: 0.78, tone: "fill-amber-300" },
+    { angle: 110, dist: 0.62, tone: "fill-emerald-300" },
+  ].map((b, i) => {
+    const rad = (b.angle * Math.PI) / 180;
+    return {
+      ...b,
+      x: cx + Math.cos(rad) * R * b.dist,
+      y: cy + Math.sin(rad) * R * b.dist,
+      key: `b${i}`,
+    };
+  });
 
   return (
     <svg
       aria-hidden
-      viewBox="0 0 720 480"
-      className="pointer-events-none absolute inset-0 h-full w-full opacity-90"
+      viewBox="0 0 560 300"
+      className="absolute inset-0 h-full w-full"
     >
       <defs>
         <radialGradient id="radarGlow" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor="rgba(76,201,240,0.18)" />
-          <stop offset="60%" stopColor="rgba(76,201,240,0.04)" />
+          <stop offset="0%" stopColor="rgba(76,201,240,0.14)" />
           <stop offset="100%" stopColor="rgba(76,201,240,0)" />
         </radialGradient>
-        <linearGradient id="sweepGrad" x1="0" y1="0" x2="1" y2="0">
+        <linearGradient id="sweep" x1="0" y1="0" x2="1" y2="0">
           <stop offset="0%" stopColor="rgba(76,201,240,0)" />
-          <stop offset="100%" stopColor="rgba(76,201,240,0.65)" />
+          <stop offset="100%" stopColor="rgba(76,201,240,0.55)" />
         </linearGradient>
-        {/* 战术地图轮廓（极简虚拟海岸线） */}
-        <pattern id="hex" width="36" height="32" patternUnits="userSpaceOnUse">
-          <path
-            d="M18,0 L36,8 L36,24 L18,32 L0,24 L0,8 Z"
-            fill="none"
-            stroke="rgba(76,201,240,0.06)"
-            strokeWidth="0.6"
-          />
-        </pattern>
       </defs>
 
-      {/* 蜂窝纹理 */}
-      <rect width="720" height="480" fill="url(#hex)" />
-
-      {/* 雷达辉光圆 */}
-      <circle cx="430" cy="260" r="220" fill="url(#radarGlow)" />
+      {/* 辉光底圆 */}
+      <circle cx={cx} cy={cy} r={R} fill="url(#radarGlow)" />
 
       {/* 同心圆 */}
-      {[60, 120, 180, 220].map((r) => (
+      {[R * 0.4, R * 0.7, R].map((r, i) => (
         <circle
-          key={r}
-          cx="430"
-          cy="260"
+          key={i}
+          cx={cx}
+          cy={cy}
           r={r}
           fill="none"
           stroke="rgba(125,211,252,0.18)"
-          strokeWidth={r === 220 ? 1.2 : 0.8}
-          strokeDasharray={r === 220 ? undefined : "2 4"}
+          strokeWidth={i === 2 ? 1.1 : 0.8}
+          strokeDasharray={i === 2 ? undefined : "2 4"}
         />
       ))}
-      {/* 十字 */}
-      <line x1="210" y1="260" x2="650" y2="260" stroke="rgba(125,211,252,0.15)" />
-      <line x1="430" y1="40" x2="430" y2="480" stroke="rgba(125,211,252,0.15)" />
 
-      {/* 扫描扇形（旋转） */}
-      <g style={{ transformOrigin: "430px 260px" }}>
+      {/* 十字 */}
+      <line
+        x1={cx - R}
+        y1={cy}
+        x2={cx + R}
+        y2={cy}
+        stroke="rgba(125,211,252,0.14)"
+      />
+      <line
+        x1={cx}
+        y1={cy - R}
+        x2={cx}
+        y2={cy + R}
+        stroke="rgba(125,211,252,0.14)"
+      />
+
+      {/* 扫描扇形 */}
+      <g style={{ transformOrigin: `${cx}px ${cy}px` }}>
         <motion.g
           initial={{ rotate: 0 }}
           animate={reduce ? { rotate: 0 } : { rotate: 360 }}
           transition={
-            reduce ? undefined : { duration: 7.5, ease: "linear", repeat: Infinity }
+            reduce
+              ? undefined
+              : { duration: 7.5, ease: "linear", repeat: Infinity }
           }
         >
+          {/* 扇形：从 0° 到 -60°（顶部偏右） */}
           <path
-            d="M430,260 L650,260 A220,220 0 0 0 590,108 Z"
-            fill="url(#sweepGrad)"
-            opacity="0.45"
+            d={`M${cx},${cy} L${cx + R},${cy} A${R},${R} 0 0 0 ${cx + R * Math.cos((-60 * Math.PI) / 180)},${cy + R * Math.sin((-60 * Math.PI) / 180)} Z`}
+            fill="url(#sweep)"
+            opacity="0.5"
           />
-          {/* 扫描前沿亮线 */}
           <line
-            x1="430"
-            y1="260"
-            x2="650"
-            y2="260"
+            x1={cx}
+            y1={cy}
+            x2={cx + R}
+            y2={cy}
             stroke="rgba(125,211,252,0.85)"
             strokeWidth="1.2"
           />
         </motion.g>
       </g>
 
-      {/* 航线虚线 */}
-      {routes.map((d, i) => (
-        <motion.path
-          key={i}
-          d={d}
-          fill="none"
-          stroke={i === 0 ? "rgba(125,211,252,0.55)" : "rgba(248,113,113,0.45)"}
-          strokeWidth="1.1"
-          strokeDasharray="4 6"
-          initial={{ pathLength: 0, opacity: 0.2 }}
-          animate={reduce ? { pathLength: 1, opacity: 0.7 } : { pathLength: [0.2, 1], opacity: [0.4, 0.9, 0.4] }}
-          transition={
-            reduce ? undefined : { duration: 5 + i, ease: "easeInOut", repeat: Infinity }
-          }
-        />
-      ))}
+      {/* 单条航线虚线（从左下进入到中央上方目标点） */}
+      <motion.path
+        d={`M${cx - 180},${cy + 90} C ${cx - 90},${cy + 30} ${cx - 30},${cy - 60} ${blips[0].x},${blips[0].y}`}
+        fill="none"
+        stroke="rgba(125,211,252,0.5)"
+        strokeWidth="1.1"
+        strokeDasharray="4 6"
+        initial={{ pathLength: 0.2, opacity: 0.4 }}
+        animate={
+          reduce
+            ? { pathLength: 1, opacity: 0.7 }
+            : { pathLength: [0.3, 1], opacity: [0.4, 0.85, 0.4] }
+        }
+        transition={
+          reduce
+            ? undefined
+            : { duration: 5, ease: "easeInOut", repeat: Infinity }
+        }
+      />
 
       {/* blips */}
       {blips.map((b, i) => (
-        <g key={b.key}>
-          <motion.circle
-            cx={b.x}
-            cy={b.y}
-            r={3}
-            className={b.tone}
-            initial={{ opacity: 0.5 }}
-            animate={
-              reduce ? { opacity: 1 } : { opacity: [0.4, 1, 0.4] }
-            }
-            transition={
-              reduce ? undefined : { duration: 1.6 + i * 0.3, ease: "easeInOut", repeat: Infinity }
-            }
-          />
-          {/* 血统连线只画一对 */}
-          {i === 0 && (
-            <line
-              x1={b.x}
-              y1={b.y}
-              x2={b.x + 18}
-              y2={b.y - 10}
-              stroke="rgba(125,211,252,0.4)"
-            />
-          )}
-          {b.label && (
-            <text
-              x={b.x + 8}
-              y={b.y - 8}
-              fontSize="9"
-              letterSpacing="2"
-              fill="rgba(186,230,253,0.75)"
-              fontFamily="JetBrains Mono, monospace"
-            >
-              {b.label}
-            </text>
-          )}
-        </g>
+        <motion.circle
+          key={b.key}
+          cx={b.x}
+          cy={b.y}
+          r={3}
+          className={b.tone}
+          initial={{ opacity: 0.5 }}
+          animate={reduce ? { opacity: 1 } : { opacity: [0.4, 1, 0.4] }}
+          transition={
+            reduce
+              ? undefined
+              : {
+                  duration: 1.6 + i * 0.3,
+                  ease: "easeInOut",
+                  repeat: Infinity,
+                }
+          }
+        />
       ))}
-
-      {/* 网格坐标标签 */}
-      <g
-        fontSize="9"
-        letterSpacing="2"
-        fill="rgba(148,163,184,0.55)"
-        fontFamily="JetBrains Mono, monospace"
-      >
-        <text x="220" y="262">100</text>
-        <text x="340" y="262">200</text>
-        <text x="430" y="56">N</text>
-        <text x="430" y="476">S</text>
-      </g>
     </svg>
   );
 }
 
 // =============================================================================
-// 子组件 -- 表单 / UI 原子
+// 子组件：Brand / TabHead / HudInput / TacticalSubmit / CapabilityCard
 // =============================================================================
 
 function Brand() {
@@ -926,188 +600,16 @@ function Brand() {
     <div className="flex items-center gap-3">
       <div
         aria-hidden
-        className="relative grid size-12 place-items-center rounded-2xl border border-cyan-300/30 bg-gradient-to-br from-cyan-400/30 to-blue-500/20 text-cyan-50 shadow-[0_0_24px_rgba(76,201,240,0.25)]"
+        className="relative grid size-11 place-items-center rounded-xl border border-cyan-300/30 bg-gradient-to-br from-cyan-400/30 to-blue-500/20 text-cyan-50 shadow-[0_0_20px_rgba(76,201,240,0.22)]"
       >
-        <Hexagon className="size-6 text-cyan-100/90" strokeWidth={1.4} />
-        <Sparkles className="absolute size-3 text-cyan-200" />
+        <Hexagon className="size-5 text-cyan-100/90" strokeWidth={1.4} />
       </div>
       <div className="leading-tight">
-        <div className="text-base font-semibold tracking-[0.32em] text-slate-50">
+        <div className="font-mono text-sm font-semibold tracking-[0.28em] text-slate-50">
           AICC · COMMAND
         </div>
-        <div className="text-[11px] tracking-[0.32em] text-slate-400">
-          AI TACTICAL CONTROL // v0.2
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function StatusPill({
-  dotColor,
-  label,
-  sub,
-}: {
-  dotColor: string;
-  label: string;
-  sub: string;
-}) {
-  return (
-    <div className="inline-flex items-center gap-2 rounded-full border border-cyan-300/15 bg-[#06101f]/70 px-3 py-1 backdrop-blur-sm">
-      <span className={cn("size-1.5 animate-pulse rounded-full", dotColor)} />
-      <span className="font-mono text-[10px] tracking-[0.28em] text-slate-100">
-        {label}
-      </span>
-      <span className="font-mono text-[10px] tracking-[0.28em] text-slate-500">
-        · {sub}
-      </span>
-    </div>
-  );
-}
-
-function CapabilityCard({
-  icon: Icon,
-  code,
-  title,
-  desc,
-  metric,
-  delay,
-}: (typeof CAPABILITIES)[number] & { delay: number }) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: 0.2 + delay, duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-      whileHover={{ y: -2 }}
-      className="group relative overflow-hidden rounded-xl border border-cyan-300/12 bg-gradient-to-br from-[#091522]/85 to-[#040b16]/85 p-3 backdrop-blur-md transition-colors hover:border-cyan-300/30"
-    >
-      {/* 顶部细线 */}
-      <span className="pointer-events-none absolute inset-x-3 top-0 h-px bg-gradient-to-r from-transparent via-cyan-300/40 to-transparent opacity-60 group-hover:opacity-100" />
-      {/* 角标 ticks */}
-      <span className="pointer-events-none absolute right-2 top-2 font-mono text-[9px] tracking-[0.28em] text-slate-500">
-        {code}
-      </span>
-      {/* hover glow */}
-      <span
-        aria-hidden
-        className="pointer-events-none absolute -inset-px rounded-xl opacity-0 transition-opacity duration-300 group-hover:opacity-100"
-        style={{
-          background:
-            "radial-gradient(160px 90px at 20% 0%, rgba(76,201,240,0.18), transparent 60%)",
-        }}
-      />
-      <div className="relative flex items-start gap-3">
-        <span className="mt-0.5 grid size-9 shrink-0 place-items-center rounded-lg border border-cyan-300/20 bg-cyan-300/10 text-cyan-200 shadow-[0_0_18px_rgba(76,201,240,0.18)] transition-transform group-hover:scale-[1.04]">
-          <Icon className="size-4" />
-        </span>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-baseline gap-2">
-            <div className="text-[13px] font-semibold tracking-wide text-slate-100">
-              {title}
-            </div>
-            <span className="ml-auto font-mono text-[10px] tracking-[0.18em] text-cyan-200/80">
-              {metric}
-            </span>
-          </div>
-          <div className="mt-1 text-[11px] leading-relaxed text-slate-400">
-            {desc}
-          </div>
-        </div>
-      </div>
-    </motion.div>
-  );
-}
-
-function StatusCell({
-  icon: Icon,
-  label,
-  value,
-  tone,
-  divider,
-}: {
-  icon: typeof Activity;
-  label: string;
-  value: string;
-  tone: "ok" | "warn" | "neutral";
-  divider: boolean;
-}) {
-  const toneCls =
-    tone === "ok"
-      ? "text-emerald-300"
-      : tone === "warn"
-        ? "text-amber-300"
-        : "text-slate-200";
-  return (
-    <div
-      className={cn(
-        "relative flex flex-1 items-center gap-2 px-3 py-1.5",
-        divider && "after:absolute after:inset-y-2 after:right-0 after:w-px after:bg-cyan-300/10"
-      )}
-    >
-      <Icon className={cn("size-3.5", toneCls)} />
-      <div className="flex flex-col leading-tight">
-        <span className="font-mono text-[9px] tracking-[0.28em] text-slate-500">
-          {label}
-        </span>
-        <span className={cn("font-mono text-[11px] tracking-wider", toneCls)}>
-          {value}
-        </span>
-      </div>
-    </div>
-  );
-}
-
-function CornerTicks() {
-  // 玻璃面板四角小直角，呼应 HUD 视觉
-  const ticks = [
-    "left-2 top-2 border-l border-t",
-    "right-2 top-2 border-r border-t",
-    "left-2 bottom-2 border-l border-b",
-    "right-2 bottom-2 border-r border-b",
-  ];
-  return (
-    <>
-      {ticks.map((c) => (
-        <span
-          key={c}
-          aria-hidden
-          className={cn(
-            "pointer-events-none absolute size-3 border-cyan-300/40",
-            c
-          )}
-        />
-      ))}
-    </>
-  );
-}
-
-function SystemRow({
-  icon,
-  label,
-  value,
-  ok,
-}: {
-  icon: ReactNode;
-  label: string;
-  value: string;
-  ok?: boolean;
-}) {
-  return (
-    <div className="flex items-center gap-2">
-      <span className="grid size-6 place-items-center rounded-md border border-cyan-300/20 bg-cyan-300/[0.06] text-cyan-200">
-        {icon}
-      </span>
-      <div className="leading-tight">
-        <div className="font-mono text-[9px] tracking-[0.28em] text-slate-500">
-          {label}
-        </div>
-        <div
-          className={cn(
-            "font-mono text-[11px] tracking-wider",
-            ok ? "text-emerald-300" : "text-slate-100"
-          )}
-        >
-          {value}
+        <div className="font-mono text-[10px] tracking-[0.28em] text-slate-500">
+          AI TACTICAL CONTROL
         </div>
       </div>
     </div>
@@ -1118,30 +620,25 @@ function TabHead({
   active,
   onClick,
   title,
-  subtitle,
 }: {
   active: boolean;
   onClick: () => void;
   title: string;
-  subtitle: string;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
       className={cn(
-        "relative flex flex-col items-center justify-center gap-0.5 px-3 py-3 transition-colors",
+        "relative px-3 py-3 font-mono text-[12px] tracking-[0.32em] transition-colors",
         active ? "text-cyan-200" : "text-slate-500 hover:text-slate-300"
       )}
     >
-      <span className="font-mono text-[12px] tracking-[0.32em]">{title}</span>
-      <span className="text-[10px] tracking-[0.22em] text-slate-500">
-        {subtitle}
-      </span>
+      {title}
       {active && (
         <motion.span
           layoutId="auth-tab-underline"
-          className="absolute inset-x-6 -bottom-px h-[2px] rounded-full bg-gradient-to-r from-cyan-400 to-blue-400 shadow-[0_0_14px_rgba(76,201,240,0.7)]"
+          className="absolute inset-x-6 -bottom-px h-[2px] rounded-full bg-gradient-to-r from-cyan-400 to-blue-400 shadow-[0_0_12px_rgba(76,201,240,0.6)]"
         />
       )}
     </button>
@@ -1151,40 +648,25 @@ function TabHead({
 function HudInput({
   icon,
   label,
-  hint,
   trailing,
   children,
 }: {
   icon: ReactNode;
   label: string;
-  hint: string;
   trailing?: ReactNode;
   children: ReactNode;
 }) {
   return (
     <div>
-      <div className="mb-1 flex items-center justify-between font-mono text-[10px] tracking-[0.28em] text-slate-500">
-        <span>{label}</span>
-        <span className="text-slate-600">/{hint}</span>
+      <div className="mb-1.5 font-mono text-[10px] tracking-[0.28em] text-slate-500">
+        {label}
       </div>
-      <div className="group relative">
-        <span
-          aria-hidden
-          className="pointer-events-none absolute inset-0 rounded-xl bg-gradient-to-r from-cyan-300/0 via-cyan-300/0 to-blue-400/0 opacity-0 transition-opacity duration-300 group-focus-within:opacity-100"
-          style={{
-            background:
-              "linear-gradient(90deg, rgba(76,201,240,0.0), rgba(76,201,240,0.18), rgba(72,149,239,0.0))",
-            filter: "blur(8px)",
-          }}
-        />
-        <div className="relative flex items-center gap-3 rounded-xl border border-cyan-300/15 bg-[#040b16]/70 px-3 py-2.5 transition-colors duration-200 focus-within:border-cyan-300/55 focus-within:bg-[#040b16]/85 focus-within:shadow-[inset_0_0_0_1px_rgba(76,201,240,0.35),0_0_0_1px_rgba(76,201,240,0.15),0_0_22px_rgba(76,201,240,0.18)]">
-          <span className="grid size-7 place-items-center rounded-md border border-cyan-300/15 bg-cyan-300/[0.06] text-cyan-300">
-            {icon}
-          </span>
-          <div className="min-w-0 flex-1">{children}</div>
-          {trailing}
-          <span className="pointer-events-none ml-1 hidden h-[14px] w-px bg-cyan-300/30 group-focus-within:block group-focus-within:animate-pulse" />
-        </div>
+      <div className="group relative flex items-center gap-3 rounded-xl border border-cyan-300/15 bg-[#040b16]/70 px-3 py-2.5 transition-all duration-200 focus-within:border-cyan-300/55 focus-within:bg-[#040b16]/85 focus-within:shadow-[inset_0_0_0_1px_rgba(76,201,240,0.3),0_0_20px_rgba(76,201,240,0.18)]">
+        <span className="grid size-7 place-items-center rounded-md border border-cyan-300/15 bg-cyan-300/[0.06] text-cyan-300">
+          {icon}
+        </span>
+        <div className="min-w-0 flex-1">{children}</div>
+        {trailing}
       </div>
     </div>
   );
@@ -1193,39 +675,30 @@ function HudInput({
 function TacticalSubmit({
   submitting,
   label,
-  sub,
 }: {
   submitting: boolean;
   label: string;
-  sub: string;
 }) {
   return (
     <button
       type="submit"
       disabled={submitting}
       className={cn(
-        "group relative mt-2 flex w-full items-center justify-between overflow-hidden rounded-xl border border-cyan-300/35",
+        "group relative mt-1 flex w-full items-center justify-between overflow-hidden rounded-xl border border-cyan-300/35",
         "bg-[linear-gradient(135deg,rgba(76,201,240,0.95),rgba(72,149,239,0.95))]",
-        "px-4 py-3 text-left text-slate-950 shadow-[0_0_0_1px_rgba(76,201,240,0.5),0_12px_36px_-8px_rgba(76,201,240,0.55)]",
-        "transition-transform duration-200 hover:-translate-y-[1px] hover:shadow-[0_0_0_1px_rgba(76,201,240,0.7),0_18px_40px_-8px_rgba(76,201,240,0.7)]",
+        "px-4 py-3 text-slate-950",
+        "shadow-[0_0_0_1px_rgba(76,201,240,0.4),0_10px_30px_-8px_rgba(76,201,240,0.5)]",
+        "transition-all duration-200 hover:-translate-y-[1px] hover:shadow-[0_0_0_1px_rgba(76,201,240,0.65),0_16px_36px_-8px_rgba(76,201,240,0.65)]",
         "active:translate-y-0 disabled:opacity-70"
       )}
     >
-      {/* sweep highlight */}
+      {/* hover sweep */}
       <span
         aria-hidden
         className="pointer-events-none absolute inset-0 -translate-x-full bg-[linear-gradient(120deg,transparent,rgba(255,255,255,0.45),transparent)] transition-transform duration-700 group-hover:translate-x-full"
       />
-      <span className="relative flex items-center gap-2.5">
-        <Target className="size-4" />
-        <span className="flex flex-col leading-tight">
-          <span className="font-mono text-[13px] font-bold tracking-[0.28em]">
-            {submitting ? "AUTHORIZING…" : label}
-          </span>
-          <span className="text-[10px] font-medium tracking-[0.18em] text-slate-900/70">
-            {submitting ? "ESTABLISHING SECURE CHANNEL" : sub}
-          </span>
-        </span>
+      <span className="relative font-mono text-[13px] font-bold tracking-[0.32em]">
+        {submitting ? "AUTHORIZING…" : label}
       </span>
       <span className="relative flex items-center gap-1 font-mono text-[11px] tracking-[0.28em]">
         ENTER
@@ -1243,40 +716,41 @@ function TacticalSubmit({
   );
 }
 
-function SsoChip({
-  icon,
-  label,
-  onClick,
-}: {
-  icon: ReactNode;
-  label: string;
-  onClick: () => void;
-}) {
+function CapabilityCard({
+  icon: Icon,
+  title,
+  desc,
+  delay,
+}: (typeof CAPABILITIES)[number] & { delay: number }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="group flex items-center justify-between rounded-lg border border-cyan-300/15 bg-[#04101e]/60 px-3 py-2 font-mono text-[10px] tracking-[0.22em] text-slate-300 transition-all hover:border-cyan-300/40 hover:bg-[#04101e]/90 hover:text-cyan-100"
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.2 + delay, duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+      whileHover={{ y: -2 }}
+      className="group relative overflow-hidden rounded-xl border border-cyan-300/12 bg-[#091522]/70 p-3 backdrop-blur-md transition-colors hover:border-cyan-300/30"
     >
-      <span className="flex items-center gap-2">
-        <span className="text-cyan-300/90">{icon}</span>
-        {label}
-      </span>
-      <ChevronRight className="size-3 text-slate-500 group-hover:text-cyan-200" />
-    </button>
+      <span className="pointer-events-none absolute inset-x-3 top-0 h-px bg-gradient-to-r from-transparent via-cyan-300/35 to-transparent opacity-60 group-hover:opacity-100" />
+      <div className="flex items-start gap-2.5">
+        <span className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-lg border border-cyan-300/20 bg-cyan-300/10 text-cyan-200 shadow-[0_0_14px_rgba(76,201,240,0.15)] transition-transform group-hover:scale-105">
+          <Icon className="size-4" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="text-[13px] font-semibold tracking-wide text-slate-100">
+            {title}
+          </div>
+          <div className="mt-0.5 text-[11px] leading-relaxed text-slate-400">
+            {desc}
+          </div>
+        </div>
+      </div>
+    </motion.div>
   );
 }
 
 // =============================================================================
-// 工具
+// Helpers
 // =============================================================================
-
-function fmtClockUTC(d: Date): string {
-  const hh = String(d.getUTCHours()).padStart(2, "0");
-  const mm = String(d.getUTCMinutes()).padStart(2, "0");
-  const ss = String(d.getUTCSeconds()).padStart(2, "0");
-  return `${hh}:${mm}:${ss} UTC`;
-}
 
 function humanizeError(err: unknown, tab: Tab): string {
   if (!(err instanceof ApiError)) return "操作失败,请稍后重试";

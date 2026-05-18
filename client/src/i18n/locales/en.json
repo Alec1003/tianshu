@@ -1,0 +1,247 @@
+{
+  "brand": {
+    "name": "AICC",
+    "tagline": "AI Command & Control Platform"
+  },
+  "weaponTable": {
+    "headerName": "Name",
+    "headerRange": "Range",
+    "headerQuantity": "Quantity",
+    "empty": "No Weapons Available",
+    "add": "Add Weapon",
+    "delete": "Delete Weapon",
+    "increase": "Increase Quantity",
+    "decrease": "Decrease Quantity",
+    "launch": "Launch Weapon",
+    "tooltipSpeed": "Speed: {{value}} kts",
+    "tooltipMaxFuel": "Max Fuel: {{value}} lbs",
+    "tooltipFuelRate": "Fuel Consumption: {{value}} lbs/hr",
+    "tooltipLethality": "Lethality: {{value}}%"
+  },
+  "map": {
+    "coordinates": "Coordinates: {{lat}}, {{lon}}",
+    "currentTime": "Current time: {{time}}",
+    "baseLayer": {
+      "label": "Base Layer",
+      "lightVector": "Light Vector",
+      "darkMatter": "Dark Matter",
+      "satellite": "Satellite",
+      "sentinel": "Sentinel-2",
+      "sceneMode": {
+        "2D": "2D",
+        "3D": "3D"
+      }
+    }
+  },
+  "toolbar": {
+    "section": {
+      "scenario": "Scenario",
+      "side": "Side",
+      "units": "Units",
+      "time": "Time",
+      "modes": "Modes",
+      "view": "View"
+    },
+    "scenario": {
+      "new": "New Scenario",
+      "load": "Load Scenario",
+      "loadPreset": "Load Preset",
+      "loadFromFile": "Import from File",
+      "save": "Save Scenario",
+      "export": "Export JSON",
+      "rename": "Rename",
+      "editName": "Edit Scenario Name",
+      "name": "Scenario Name",
+      "saveCloudLogin": "Login to save scenario to cloud",
+      "saveCloud": "Save to cloud",
+      "saveCloudLimit": "Cloud save limit reached. Please delete a scenario first.",
+      "downloadLogin": "Login to download scenario",
+      "download": "Download Scenario",
+      "stepScenario": "Step Scenario",
+      "restartScenario": "Restart Scenario",
+      "toggleSpeed": "Toggle Scenario Speed"
+    },
+    "side": {
+      "select": "Select Side",
+      "create": "New Side",
+      "edit": "Edit Side"
+    },
+    "unit": {
+      "addAircraft": "Add Aircraft",
+      "addShip": "Add Ship",
+      "addFacility": "Add SAM",
+      "addAirbase": "Add Airbase",
+      "addReferencePoint": "Add Reference Point",
+      "addAirbaseFromDb": "Add airbase from database",
+      "addSam": "Add Sam",
+      "selectAircraft": "Select Aircraft",
+      "selectAirbase": "Select Airbase",
+      "selectSam": "Select Sam",
+      "selectShip": "Select Ship",
+      "dbTools": "Database Tools",
+      "filter": {
+        "aircraft": "Aircraft",
+        "airbase": "Airbase",
+        "facility": "Sam",
+        "ship": "Ship",
+        "referencePoint": "Reference Point"
+      }
+    },
+    "placement": {
+      "hint": "Click on map to drop, Esc to cancel",
+      "cancel": "Cancel"
+    },
+    "context": {
+      "title": "Unit Actions",
+      "select": "Select",
+      "clearRoute": "Clear Route",
+      "delete": "Delete Unit",
+      "hint": "Right-drag: plot route  ·  Right-click: menu"
+    },
+    "route": {
+      "plot": "Plot Route",
+      "finish": "Finish Route",
+      "clear": "Clear",
+      "hint": "Click map to add waypoints · Double-click to commit · Esc to cancel"
+    },
+    "weapons": {
+      "open": "Weapons",
+      "title": "Weapon Loadout",
+      "back": "Back"
+    },
+    "addAt": {
+      "title": "Drop at {{lat}}, {{lon}}",
+      "aircraft": "Add Aircraft",
+      "ship": "Add Ship",
+      "facility": "Add SAM",
+      "airbase": "Add Airbase",
+      "referencePoint": "Add Reference Point"
+    },
+    "recording": {
+      "label": "Recording",
+      "record": "Record",
+      "stop": "Stop Recording",
+      "every": "every {{value}}",
+      "upload": "Upload Recording"
+    },
+    "drawer": {
+      "open": "Open Drawer",
+      "close": "Close Drawer",
+      "featureControls": "Feature Controls",
+      "entities": "Entities",
+      "missions": "Missions",
+      "github": "GitHub"
+    },
+    "modes": {
+      "eraser": "Eraser",
+      "godMode": "God Mode",
+      "simulationLogs": "Simulation Logs"
+    },
+    "time": {
+      "play": "Play",
+      "pause": "Pause",
+      "playScenario": "Play Scenario",
+      "pauseScenario": "Pause Scenario",
+      "step": "Step",
+      "restart": "Restart",
+      "undo": "Undo",
+      "speed": "Speed"
+    },
+    "mission": {
+      "add": "Add Mission",
+      "empty": "No missions",
+      "name": "Name",
+      "side": "Side"
+    },
+    "db": {
+      "import": "Import Unit Database",
+      "empty": "No items available"
+    },
+    "validation": {
+      "scenarioName": "Must be alphanumeric, \":,-\" allowed, max 25"
+    },
+    "toast": {
+      "godModeOn": "God Mode: ON",
+      "godModeOff": "God Mode: OFF",
+      "eraserOn": "Eraser: ON",
+      "eraserOff": "Eraser: OFF"
+    },
+    "theme": {
+      "toggle": "Toggle Theme",
+      "dark": "Dark Mode",
+      "light": "Light Mode"
+    }
+  },
+  "sideEditor": {
+    "name": "Name",
+    "nameRequired": "Name is required",
+    "enemies": "Enemies",
+    "allies": "Allies",
+    "add": "Add",
+    "update": "Update",
+    "delete": "Delete",
+    "doctrine": {
+      "aircraftAttackHostile": "Aircraft attack hostiles",
+      "aircraftChaseHostile": "Aircraft chase hostiles",
+      "aircraftRtbWhenOutOfRange": "Aircraft RTB when out of range",
+      "aircraftRtbWhenStrikeComplete": "Aircraft RTB after strike mission",
+      "samAttackHostile": "SAM attack hostiles",
+      "shipAttackHostile": "Ship attack hostiles"
+    }
+  },
+  "entity": {
+    "side": {},
+    "callsign": {},
+    "class": {}
+  },
+  "common": {
+    "language": "Language",
+    "chinese": "中文",
+    "english": "English",
+    "close": "Close",
+    "yes": "Yes",
+    "no": "No",
+    "na": "N/A"
+  },
+  "unit": {
+    "type": {
+      "aircraft": "Aircraft",
+      "ship": "Ship",
+      "facility": "Facility",
+      "airbase": "Airbase",
+      "referencePoint": "Reference Point"
+    },
+    "field": {
+      "name": "Name",
+      "type": "Type",
+      "side": "Side",
+      "class": "Class",
+      "position": "Position",
+      "altitude": "Altitude",
+      "heading": "Heading",
+      "speed": "Speed",
+      "fuel": "Fuel",
+      "detectionRange": "Detection Range",
+      "weapons": "Weapons",
+      "weaponEngagementRange": "Weapon Range",
+      "homeBase": "Home Base",
+      "rtb": "RTB",
+      "target": "Target"
+    },
+    "unit": {
+      "knots": "kts",
+      "feet": "ft",
+      "nm": "nm",
+      "deg": "°",
+      "rounds": "rds"
+    }
+  },
+  "welcome": {
+    "title": "Welcome!",
+    "intro": "Select \"Build Scenario\" or close this popup to start building scenarios. Log in to get access to features like more base map layers and saving scenarios to the cloud.",
+    "classification": "All information on this system is Unclassified. Please do not add any classified or sensitive information into this system.",
+    "buildScenario": "Build Scenario",
+    "privacyAgreement": "By logging in you agree to our",
+    "privacyPolicy": "Privacy Policy"
+  }
+}

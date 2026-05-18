@@ -1,0 +1,61 @@
+# --- Node / Vite ---
+node_modules/
+dist/
+dist-ssr/
+.npm-cache/
+*.local
+*.tsbuildinfo
+
+# --- Logs ---
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# --- Env files ---
+.env
+.env.local
+.env.development
+.env.production
+.env.standalone
+!.env.example
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+.python312/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# --- IDE / Editor ---
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.windsurf/
+*.swp
+*.swo
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+
+# --- Project-specific runtime artifacts ---
+.docker-build.log
+client/.dev_server.pid
+client/.preview.pid
+client/.preview.check.txt

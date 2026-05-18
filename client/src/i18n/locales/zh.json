@@ -1,0 +1,435 @@
+{
+  "brand": {
+    "name": "AICC",
+    "tagline": "AI 指挥控制平台"
+  },
+  "unitClass": {
+    "aircraft": {
+      "F-35A Lightning II": "F-35A 闪电 II 战斗机",
+      "KC-135R Stratotanker": "KC-135R 加油机",
+      "A-10C Thunderbolt II": "A-10C 雷电 II 攻击机",
+      "B-2 Spirit": "B-2 幽灵隐形轰炸机",
+      "F-22 Raptor": "F-22 猛禽战斗机",
+      "C-130 Hercules": "C-130 大力神运输机",
+      "C-17 Globemaster III": "C-17 环球霸王 III 运输机",
+      "F-16 Fighting Falcon": "F-16 战隼战斗机",
+      "F-15 Eagle": "F-15 鹰式战斗机",
+      "F/A-18 Hornet": "F/A-18 大黄蜂战斗攻击机",
+      "B-52 Stratofortress": "B-52 同温层堡垒轰炸机",
+      "F-4 Phantom II": "F-4 鬼怪 II 战斗机",
+      "B-1B Lancer": "B-1B 枪骑兵轰炸机",
+      "C-12 Huron": "C-12 休伦运输机",
+      "F-14 Tomcat": "F-14 雄猫战斗机"
+    },
+    "ship": {
+      "Aircraft Carrier": "航空母舰",
+      "Destroyer": "驱逐舰",
+      "Frigate": "护卫舰",
+      "Corvette": "轻型护卫舰",
+      "Amphibious Assault Ship": "两栖攻击舰",
+      "Patrol Boat": "巡逻艇"
+    },
+    "facility": {
+      "S-400 Triumf": "S-400 凯旋防空系统",
+      "S-300V4": "S-300V4 防空系统",
+      "S-500 Prometey": "S-500 普罗米修斯防空系统",
+      "Buk-M3": "山毛榉-M3 防空系统",
+      "Tor-M2": "道尔-M2 防空系统",
+      "Pantsir-S1": "铠甲-S1 弹炮合一系统",
+      "HQ-9": "红旗-9 远程防空导弹",
+      "HQ-19": "红旗-19 反导系统",
+      "HQ-16": "红旗-16 中程防空导弹",
+      "HQ-17": "红旗-17 近程防空导弹",
+      "HQ-7": "红旗-7 近程防空导弹",
+      "MIM-104 Patriot": "MIM-104 爱国者防空系统",
+      "THAAD": "萨德末段高空区域防御系统",
+      "Aster 30": "紫菀-30 防空导弹",
+      "Barak 8": "巴拉克-8 防空导弹",
+      "NASAMS": "NASAMS 国家先进地空导弹系统"
+    },
+    "weapon": {
+      "AIM-120 AMRAAM": "AIM-120 先进中距空空导弹",
+      "AIM-9 Sidewinder": "AIM-9 响尾蛇空空导弹",
+      "AIM-54 Phoenix": "AIM-54 不死鸟空空导弹",
+      "AGM-65 Maverick": "AGM-65 小牛空地导弹",
+      "AGM-84 Harpoon": "AGM-84 鱼叉空射反舰导弹",
+      "AGM-86 ALCM": "AGM-86 空射巡航导弹",
+      "AGM-158 JASSM": "AGM-158 联合空对面防区外导弹",
+      "BGM-109 Tomahawk": "BGM-109 战斧巡航导弹",
+      "RIM-66 Standard SM-2": "RIM-66 标准 SM-2 舰空导弹",
+      "RIM-174 Standard SM-6": "RIM-174 标准 SM-6 舰空导弹",
+      "RGM-84 Harpoon": "RGM-84 鱼叉舰射反舰导弹",
+      "RIM-116 RAM": "RIM-116 拉姆近程防空导弹",
+      "48N6 (S-400 Triumf)": "48N6 防空导弹(S-400 凯旋)",
+      "9M96 (S-300V4)": "9M96 防空导弹(S-300V4)",
+      "77N6 (S-500 Prometey)": "77N6 反导导弹(S-500)",
+      "9M317 (Buk-M3)": "9M317 防空导弹(山毛榉-M3)",
+      "9M331 (Tor-M2)": "9M331 防空导弹(道尔-M2)",
+      "57E6E (Pantsir-S1)": "57E6E 防空导弹(铠甲-S1)",
+      "HQ-9": "红旗-9 防空导弹",
+      "HQ-19": "红旗-19 反导导弹",
+      "HQ-16": "红旗-16 防空导弹",
+      "HQ-17": "红旗-17 防空导弹",
+      "HQ-7": "红旗-7 防空导弹",
+      "Aster 30": "紫菀-30 防空导弹",
+      "Barak 8": "巴拉克-8 防空导弹"
+    }
+  },
+  "weaponTable": {
+    "headerName": "名称",
+    "headerRange": "射程",
+    "headerQuantity": "数量",
+    "empty": "暂无武器",
+    "add": "添加武器",
+    "delete": "删除武器",
+    "increase": "增加数量",
+    "decrease": "减少数量",
+    "launch": "发射武器",
+    "tooltipSpeed": "速度:{{value}} 节",
+    "tooltipMaxFuel": "最大燃油:{{value}} 磅",
+    "tooltipFuelRate": "燃油消耗:{{value}} 磅/小时",
+    "tooltipLethality": "杀伤力:{{value}}%"
+  },
+  "map": {
+    "coordinates": "坐标:{{lat}}, {{lon}}",
+    "currentTime": "当前时间:{{time}}",
+    "baseLayer": {
+      "label": "底图",
+      "lightVector": "浅色矢量",
+      "darkMatter": "深色作战图",
+      "satellite": "卫星影像",
+      "sentinel": "Sentinel-2 卫星",
+      "sceneMode": {
+        "2D": "2D",
+        "3D": "3D"
+      }
+    }
+  },
+  "toolbar": {
+    "section": {
+      "scenario": "想定",
+      "side": "阵营",
+      "units": "单位",
+      "time": "时间",
+      "modes": "模式",
+      "view": "视图"
+    },
+    "scenario": {
+      "new": "新建想定",
+      "load": "加载想定",
+      "loadPreset": "加载预置",
+      "loadFromFile": "从文件导入",
+      "save": "保存想定",
+      "export": "导出 JSON",
+      "rename": "重命名",
+      "editName": "编辑想定名称",
+      "name": "想定名称",
+      "saveCloudLogin": "登录后可保存到云端",
+      "saveCloud": "保存到云端",
+      "saveCloudLimit": "云端保存数已达上限,请先删除一个",
+      "downloadLogin": "登录后可下载",
+      "download": "下载想定",
+      "stepScenario": "单步推演",
+      "restartScenario": "重置想定",
+      "toggleSpeed": "切换推演倍速"
+    },
+    "side": {
+      "select": "选择阵营",
+      "create": "新建阵营",
+      "edit": "编辑阵营"
+    },
+    "unit": {
+      "addAircraft": "添加飞机",
+      "addShip": "添加舰艇",
+      "addFacility": "添加防空设施",
+      "addAirbase": "添加机场",
+      "addReferencePoint": "添加参考点",
+      "addAirbaseFromDb": "从数据库添加机场",
+      "addSam": "添加防空导弹",
+      "selectAircraft": "选择飞机",
+      "selectAirbase": "选择机场",
+      "selectSam": "选择防空导弹",
+      "selectShip": "选择舰艇",
+      "dbTools": "数据库工具",
+      "filter": {
+        "aircraft": "飞机",
+        "airbase": "机场",
+        "facility": "防空导弹",
+        "ship": "舰艇",
+        "referencePoint": "参考点"
+      }
+    },
+    "placement": {
+      "hint": "点击地图放置,Esc 取消",
+      "cancel": "取消"
+    },
+    "context": {
+      "title": "单位操作",
+      "select": "选中",
+      "clearRoute": "清除航线",
+      "delete": "删除单位",
+      "hint": "右键拖动: 画航线  ·  右键点击: 菜单"
+    },
+    "route": {
+      "plot": "画航线",
+      "finish": "完成航线",
+      "clear": "清除",
+      "hint": "点击地图加航点 · 双击完成 · Esc 取消"
+    },
+    "weapons": {
+      "open": "武器挂载",
+      "title": "武器挂载与库存",
+      "back": "返回"
+    },
+    "addAt": {
+      "title": "在 {{lat}}, {{lon}} 放置",
+      "aircraft": "加飞机",
+      "ship": "加舰舰",
+      "facility": "加防空",
+      "airbase": "加机场",
+      "referencePoint": "加参考点"
+    },
+    "recording": {
+      "label": "录制",
+      "record": "开始录制",
+      "stop": "停止录制",
+      "every": "每 {{value}}",
+      "upload": "上传录制"
+    },
+    "drawer": {
+      "open": "打开侧栏",
+      "close": "关闭侧栏",
+      "featureControls": "功能控制",
+      "entities": "实体",
+      "missions": "任务",
+      "github": "GitHub"
+    },
+    "modes": {
+      "eraser": "擦除模式",
+      "godMode": "上帝视角",
+      "simulationLogs": "仿真日志"
+    },
+    "time": {
+      "play": "开始推演",
+      "pause": "暂停推演",
+      "playScenario": "开始推演",
+      "pauseScenario": "暂停推演",
+      "step": "单步",
+      "restart": "重置",
+      "undo": "撤销",
+      "speed": "推演倍速"
+    },
+    "mission": {
+      "add": "新建任务",
+      "empty": "暂无任务",
+      "name": "名称",
+      "side": "阵营"
+    },
+    "db": {
+      "import": "导入单位数据库",
+      "empty": "暂无数据"
+    },
+    "validation": {
+      "scenarioName": "仅允许字母数字与 \":,-\",最长 25 字符"
+    },
+    "toast": {
+      "godModeOn": "上帝视角:开启",
+      "godModeOff": "上帝视角:关闭",
+      "eraserOn": "擦除模式:开启",
+      "eraserOff": "擦除模式:关闭"
+    },
+    "theme": {
+      "toggle": "切换主题",
+      "dark": "深色模式",
+      "light": "浅色模式"
+    }
+  },
+  "sideEditor": {
+    "name": "名称",
+    "nameRequired": "请输入名称",
+    "enemies": "敌方阵营",
+    "allies": "盟友阵营",
+    "add": "添加",
+    "update": "更新",
+    "delete": "删除",
+    "doctrine": {
+      "aircraftAttackHostile": "飞机攻击敌方",
+      "aircraftChaseHostile": "飞机追击敌方",
+      "aircraftRtbWhenOutOfRange": "飞机距基地超距时返航",
+      "aircraftRtbWhenStrikeComplete": "打击任务完成后返航",
+      "samAttackHostile": "防空攻击敌方",
+      "shipAttackHostile": "舰艇攻击敌方"
+    }
+  },
+  "entity": {
+    "side": {
+      "BLUE": "蓝方",
+      "RED": "红方",
+      "ALLY": "同盟",
+      "GREEN": "绿方",
+      "ORANGE": "橙方",
+      "PURPLE": "紫方",
+      "BLACK": "黑方"
+    },
+    "callsign": {
+      "Beaver": "海狸",
+      "Defender": "守卫",
+      "Domo": "多莫",
+      "Flanker": "侧卫",
+      "Raptor": "猛禽",
+      "Antelope": "羚羊",
+      "Carrier": "航母",
+      "Ship": "舰船",
+      "SAM": "防空",
+      "RP": "参考点",
+      "Patrol": "巡逻",
+      "CAP": "战巡",
+      "AFB": "空军基地",
+      "AB": "基地"
+    },
+    "class": {
+      "F-16C": "F-16C 战隼",
+      "J-16": "歼-16",
+      "SU-35": "苏-35",
+      "F-22A": "F-22A 猛禽",
+      "F-35A Lightning II": "F-35A 闪电Ⅱ",
+      "F-35B Lightning II": "F-35B 闪电Ⅱ",
+      "F-35C Lightning II": "F-35C 闪电Ⅱ",
+      "F-22 Raptor": "F-22 猛禽",
+      "F-15 Eagle": "F-15 鹰",
+      "F-14 Tomcat": "F-14 雄猫",
+      "F-4 Phantom II": "F-4 鬼怪Ⅱ",
+      "F/A-18 Hornet": "F/A-18 大黄蜂",
+      "F-16 Fighting Falcon": "F-16 战隼",
+      "B-2 Spirit": "B-2 幽灵",
+      "B-1B Lancer": "B-1B 枪骑兵",
+      "B-52 Stratofortress": "B-52 同温层堡垒",
+      "A-10C Thunderbolt II": "A-10C 雷电Ⅱ",
+      "C-130 Hercules": "C-130 大力神",
+      "C-17 Globemaster III": "C-17 环球霸王Ⅲ",
+      "C-12 Huron": "C-12 休伦",
+      "KC-135R Stratotanker": "KC-135R 同温层加油机",
+      "Aircraft Carrier": "航空母舰",
+      "Destroyer": "驱逐舰",
+      "Frigate": "护卫舰",
+      "Corvette": "轻型护卫舰",
+      "Amphibious Assault Ship": "两栖攻击舰",
+      "Patrol Boat": "巡逻艇",
+      "S-400 Triumf": "S-400 凯旋",
+      "S-300V4": "S-300V4",
+      "S-500 Prometey": "S-500 普罗米修斯",
+      "Buk-M3": "山毛榉-M3",
+      "Tor-M2": "道尔-M2",
+      "Pantsir-S1": "铠甲-S1",
+      "HQ-9": "红旗-9",
+      "HQ-19": "红旗-19",
+      "HQ-16": "红旗-16",
+      "HQ-17": "红旗-17",
+      "HQ-7": "红旗-7",
+      "MIM-104 Patriot": "爱国者 MIM-104",
+      "THAAD": "萨德",
+      "Aster 30": "紫菀-30",
+      "Barak 8": "巴拉克-8",
+      "NASAMS": "NASAMS"
+    },
+    "airbase": {
+      "Al Udeid Air Base": "乌代德空军基地",
+      "Andersen Air Force Base": "安德森空军基地",
+      "Andrews Air Force Base": "安德鲁斯空军基地",
+      "Aviano Air Base": "阿维亚诺空军基地",
+      "Beale Air Force Base": "比尔空军基地",
+      "Creech Air Force Base": "克里奇空军基地",
+      "Davis-Monthan Air Force Base": "戴维斯-蒙森空军基地",
+      "Eglin Air Force Base": "埃格林空军基地",
+      "Edwards Air Force Base": "爱德华兹空军基地",
+      "Elmendorf Air Force Base": "埃尔门多夫空军基地",
+      "Incirlik Air Base": "因吉尔利克空军基地",
+      "Joint Base Pearl Harbor-Hickam": "珍珠港-希卡姆联合基地",
+      "Kadena Air Base": "嘉手纳空军基地",
+      "Kunsan Air Base": "群山空军基地",
+      "Lackland Air Force Base": "拉克兰空军基地",
+      "Luke Air Force Base": "卢克空军基地",
+      "Marine Corps Air Station Cherry Point": "樱桃点海军陆战队航空站",
+      "Marine Corps Air Station Iwakuni": "岩国海军陆战队航空站",
+      "Marine Corps Air Station Miramar": "米拉马尔海军陆战队航空站",
+      "Marine Corps Base Camp Pendleton": "彭德尔顿营海军陆战队基地",
+      "McChord Air Force Base": "麦科德空军基地",
+      "Minot Air Force Base": "迈诺特空军基地",
+      "Misawa Air Base": "三泽空军基地",
+      "Moody Air Force Base": "穆迪空军基地",
+      "Nellis Air Force Base": "内利斯空军基地",
+      "Naval Air Facility Atsugi": "厚木海军航空设施",
+      "Naval Air Station Fallon": "法伦海军航空站",
+      "Naval Air Station Jacksonville": "杰克逊维尔海军航空站",
+      "Naval Air Station Oceana": "欧希纳海军航空站",
+      "Naval Air Station Patuxent River": "帕图森河海军航空站",
+      "Naval Air Station Pensacola": "彭萨科拉海军航空站",
+      "Naval Air Station Sigonella": "西戈内拉海军航空站",
+      "Naval Air Station Whidbey Island": "惠德比岛海军航空站",
+      "Naval Station Rota": "罗塔海军基地",
+      "Osan Air Base": "乌山空军基地",
+      "Patrick Air Force Base": "帕特里克空军基地",
+      "RAF Fairford": "费尔福德皇家空军基地",
+      "RAF Lakenheath": "莱肯希思皇家空军基地",
+      "RAF Mildenhall": "米尔登霍尔皇家空军基地",
+      "Ramstein Air Base": "拉姆施泰因空军基地",
+      "Royal Australian Air Force Base Amberley": "澳大利亚皇家空军安伯利基地",
+      "Seymour Johnson Air Force Base": "西摩·约翰逊空军基地",
+      "Spangdahlem Air Base": "斯潘达勒姆空军基地",
+      "Thule Air Base": "图勒空军基地",
+      "Travis Air Force Base": "特拉维斯空军基地",
+      "Tyndall Air Force Base": "廷德尔空军基地",
+      "Whiteman Air Force Base": "怀特曼空军基地"
+    }
+  },
+  "common": {
+    "language": "语言",
+    "chinese": "中文",
+    "english": "English",
+    "close": "关闭",
+    "yes": "是",
+    "no": "否",
+    "na": "不适用"
+  },
+  "unit": {
+    "type": {
+      "aircraft": "飞机",
+      "ship": "舰艇",
+      "facility": "设施",
+      "airbase": "机场",
+      "referencePoint": "参考点"
+    },
+    "field": {
+      "name": "名称",
+      "type": "类型",
+      "side": "阵营",
+      "class": "型号",
+      "position": "位置",
+      "altitude": "高度",
+      "heading": "航向",
+      "speed": "速度",
+      "fuel": "燃油",
+      "detectionRange": "探测距离",
+      "weapons": "武器",
+      "weaponEngagementRange": "武器射程",
+      "homeBase": "驻地",
+      "rtb": "返航中",
+      "target": "目标"
+    },
+    "unit": {
+      "knots": "节",
+      "feet": "英尺",
+      "nm": "海里",
+      "deg": "°",
+      "rounds": "枚"
+    }
+  },
+  "welcome": {
+    "title": "欢迎使用",
+    "intro": "点击\"创建想定\"或关闭此弹窗即可开始搭建想定。登录后可解锁更多底图图层并将想定保存到云端。",
+    "classification": "本系统所有信息均为非密。请勿在本系统中录入任何机密或敏感信息。",
+    "buildScenario": "创建想定",
+    "privacyAgreement": "登录即表示您同意我们的",
+    "privacyPolicy": "隐私政策"
+  }
+}

@@ -1,0 +1,9 @@
+*
+!server/
+!server/**
+!gym/
+!gym/**
+!client/
+!client/src/
+!client/src/scenarios/
+!client/src/scenarios/**

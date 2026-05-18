@@ -1,0 +1,96 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 216 29% 6%;
+    --foreground: 220 13% 91%;
+    --card: 219 31% 9%;
+    --card-foreground: 220 13% 91%;
+    --popover: 219 31% 9%;
+    --popover-foreground: 220 13% 91%;
+    --primary: 193 84% 62%;
+    --primary-foreground: 216 29% 6%;
+    --secondary: 217 33% 17%;
+    --secondary-foreground: 220 13% 91%;
+    --muted: 217 33% 17%;
+    --muted-foreground: 215 20% 65%;
+    --accent: 204 86% 61%;
+    --accent-foreground: 216 29% 6%;
+    --destructive: 353 86% 54%;
+    --destructive-foreground: 220 13% 91%;
+    --border: 202 52% 22%;
+    --input: 217 33% 17%;
+    --ring: 193 84% 62%;
+    color-scheme: dark;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  html,
+  body,
+  #root {
+    min-height: 100%;
+  }
+
+  body {
+    margin: 0;
+    overflow: hidden;
+    background:
+      radial-gradient(
+        circle at 22% 10%,
+        rgba(76, 201, 240, 0.12),
+        transparent 34%
+      ),
+      radial-gradient(
+        circle at 82% 26%,
+        rgba(72, 149, 239, 0.1),
+        transparent 30%
+      ),
+      #0b0f14;
+    color: #e5e7eb;
+    font-family:
+      Inter,
+      ui-sans-serif,
+      system-ui,
+      -apple-system,
+      BlinkMacSystemFont,
+      "Segoe UI",
+      sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  code,
+  kbd,
+  pre {
+    font-family:
+      "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+      "Liberation Mono", monospace;
+  }
+}
+
+@layer components {
+  .hud-panel {
+    @apply border border-cyan-300/10 bg-[#07111d]/78 shadow-[0_18px_80px_rgba(0,0,0,0.42)] backdrop-blur-xl;
+  }
+
+  .hud-divider {
+    @apply h-px bg-gradient-to-r from-transparent via-cyan-300/20 to-transparent;
+  }
+
+  .tactical-grid {
+    background-image:
+      linear-gradient(rgba(76, 201, 240, 0.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(76, 201, 240, 0.045) 1px, transparent 1px);
+    background-size: 34px 34px;
+  }
+
+  .cesium-credit-logoContainer,
+  .cesium-credit-textContainer {
+    display: none !important;
+  }
+}

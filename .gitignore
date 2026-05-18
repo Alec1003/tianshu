@@ -59,3 +59,10 @@ Thumbs.db
 client/.dev_server.pid
 client/.preview.pid
 client/.preview.check.txt
+
+# --- Local dev SQLite (when running outside Docker volume) ---
+server/data/
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3

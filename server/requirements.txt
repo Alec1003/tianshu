@@ -1,4 +1,14 @@
 fastapi==0.115.12
 uvicorn==0.30.6
 pydantic==2.9.2
+pydantic-settings==2.6.0
 gymnasium==0.29.1
+
+# --- S1+S2: auth + scenario persistence ---
+# fastapi-users 14 兼容 fastapi 0.115 / pydantic 2.9，含 SQLAlchemy 适配器
+fastapi-users[sqlalchemy]==14.0.1
+sqlalchemy[asyncio]==2.0.36
+alembic==1.14.0
+aiosqlite==0.20.0
+# fastapi-users 14 已切到 pwdlib，bcrypt 由 pwdlib[argon2,bcrypt] 间接拉取，
+# 此处不再单独锁定。如需 argon2，pwdlib 同名 extra 会自动安装 argon2-cffi。

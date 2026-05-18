@@ -8,13 +8,16 @@ import {
 } from "react";
 import { motion } from "framer-motion";
 import {
+  ArrowLeft,
   Boxes,
   ChevronLeft,
   ChevronRight,
   Command,
+  Copy,
   Crosshair,
   Layers3,
   Map,
+  Save,
   Settings,
   Shield,
 } from "lucide-react";
@@ -51,7 +54,11 @@ const railItems: Array<{
   { id: "assets", label: "单位", icon: Boxes },
 ];
 
-function createAiccGame() {
+// 从任意 scenario JSON 创建一个全新的 Game 实例。传 null/undefined 则走默认 SCS。
+// 独立出来是为了让 PlayScenarioPage 能传入远端拉取的 JSON。
+function createAiccGameFromJson(
+  scenarioJson: object | null | undefined
+): Game {
   const currentScenario = new Scenario({
     id: randomUUID(),
     name: "AICC Tactical Simulation",
@@ -59,7 +66,7 @@ function createAiccGame() {
     duration: 14400,
   });
   const game = new Game(currentScenario);
-  game.loadScenario(JSON.stringify(SCSScenarioJson));
+  game.loadScenario(JSON.stringify(scenarioJson ?? SCSScenarioJson));
   game.scenarioPaused = true;
   return game;
 }
@@ -128,8 +135,49 @@ function buildSimulationSnapshot(
   };
 }
 
-export default function AITacticalCommandPlatform() {
-  const [game] = useState(createAiccGame);
+// 路由层（PlayScenarioPage）传入的必要上下文。全部 optional，
+// 缺省时退化为原有 standalone 行为（SCS 默认内嵌、无保存按钮）。
+export interface ScenarioMeta {
+  id: string;
+  name: string;
+  isTemplate: boolean;
+  version: number;
+}
+
+export interface SaveAarPayload {
+  outcomeReason: string;
+  winnerSideId: string;
+  endedAt: string;
+  summary: Record<string, unknown>;
+}
+
+export interface AITacticalCommandPlatformProps {
+  scenarioMeta?: ScenarioMeta;
+  /** 远端 scenario JSON；路由实例变化时会重新 reload。 */
+  initialScenarioData?: Record<string, unknown> | null;
+  /** 保存到当前 scenario（仅非模板）。模板上下文会在上层弹出 another-as 对话框。 */
+  onSave?: (data: Record<string, unknown>) => Promise<void> | void;
+  /** 另存为新 scenario；平台仅负责报上当前 JSON，名称/跳转由上层处理。 */
+  onRequestSaveAs?: (data: Record<string, unknown>) => void;
+  /** 返回想定列表。 */
+  onExit?: () => void;
+  /** 推演结束时异步归档 AAR。可选；失败不阻断 UI。 */
+  onPostAar?: (payload: SaveAarPayload) => Promise<void> | void;
+}
+
+export default function AITacticalCommandPlatform({
+  scenarioMeta,
+  initialScenarioData,
+  onSave,
+  onRequestSaveAs,
+  onExit,
+  onPostAar,
+}: AITacticalCommandPlatformProps = {}) {
+  // game 是引用型，useState 仅初始化一次；实际切换想定走下面 useEffect
+  // 调 loadScenario，避免重建 Cesium。
+  const [game] = useState<Game>(() =>
+    createAiccGameFromJson(initialScenarioData ?? null)
+  );
   const setScenarioTime = useContext(SetScenarioTimeContext);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [activeRailItem, setActiveRailItem] =
@@ -146,6 +194,12 @@ export default function AITacticalCommandPlatform() {
   const [aarOpen, setAarOpen] = useState(false);
   // 仅在「未关闭过此局 AAR」时自动弹出；用户主动关闭后不再骚扰。
   const aarHandledOutcomeRef = useRef<string>("");
+  // 避免 onPostAar 重复提交同一局 AAR。
+  const aarPostedSignatureRef = useRef<string>("");
+  // 保存/另存状态提示，不依赖外部 toast。
+  const [savingState, setSavingState] = useState<
+    "idle" | "saving" | "saved" | "error"
+  >("idle");
   const [snapshot, setSnapshot] = useState<SimulationSnapshot>(() =>
     buildSimulationSnapshot(game, "idle")
   );
@@ -380,11 +434,35 @@ export default function AITacticalCommandPlatform() {
       aarHandledOutcomeRef.current = signature;
       setAarOpen(true);
     }
+    // 同时异步归档到后端（如果路由层提供了 onPostAar）。
+    if (onPostAar && aarPostedSignatureRef.current !== signature) {
+      aarPostedSignatureRef.current = signature;
+      void Promise.resolve(
+        onPostAar({
+          outcomeReason: snapshot.outcome.reason ?? "",
+          winnerSideId: snapshot.outcome.winnerSideId ?? "",
+          // game.gameOutcome.endedAt 是 scenario currentTime（unix 秒），
+          // 转 ISO 字符串以对齐后端 datetime 字段。
+          endedAt: snapshot.outcome.endedAt
+            ? new Date(snapshot.outcome.endedAt * 1000).toISOString()
+            : new Date().toISOString(),
+          summary: {
+            scenarioName: snapshot.scenarioName,
+            elapsedSeconds: snapshot.elapsedSeconds,
+            sides: snapshot.sideStats,
+          },
+        })
+      ).catch((err) => console.warn("[AICC] onPostAar failed", err));
+    }
   }, [
     snapshot.outcome.ended,
     snapshot.outcome.reason,
     snapshot.outcome.winnerSideId,
     snapshot.outcome.endedAt,
+    snapshot.scenarioName,
+    snapshot.elapsedSeconds,
+    snapshot.sideStats,
+    onPostAar,
   ]);
 
   const SIDEBAR_MIN = 240;
@@ -464,6 +542,41 @@ export default function AITacticalCommandPlatform() {
       : "clamp(18rem, 24vw, 26rem)";
   const rightSidebarTrack = "clamp(18rem, 24vw, 26rem)";
 
+  // 当前 game JSON 快照，供保存/另存为按钮提取。
+  // game.exportCurrentScenario() 返回字符串，这里再 parse 成 object 与后端契约对齐。
+  const captureCurrentScenarioData = useCallback((): Record<string, unknown> => {
+    const raw = game.exportCurrentScenario();
+    try {
+      return JSON.parse(raw) as Record<string, unknown>;
+    } catch (err) {
+      console.error("[AICC] export scenario JSON parse failed", err);
+      return {};
+    }
+  }, [game]);
+
+  const handleSaveClick = useCallback(async () => {
+    if (!onSave) return;
+    setSavingState("saving");
+    try {
+      await Promise.resolve(onSave(captureCurrentScenarioData()));
+      setSavingState("saved");
+      window.setTimeout(() => setSavingState("idle"), 1500);
+    } catch {
+      setSavingState("error");
+      window.setTimeout(() => setSavingState("idle"), 2000);
+    }
+  }, [onSave, captureCurrentScenarioData]);
+
+  const handleSaveAsClick = useCallback(() => {
+    if (!onRequestSaveAs) return;
+    onRequestSaveAs(captureCurrentScenarioData());
+  }, [onRequestSaveAs, captureCurrentScenarioData]);
+
+  // 是否需要渲染顶部 mini bar（路由模式才显示；standalone 兼容老入口）。
+  const showRouterChrome = Boolean(
+    scenarioMeta && (onSave || onRequestSaveAs || onExit)
+  );
+
   return (
     <div
       className="dark h-screen overflow-hidden bg-tactical-bg text-tactical-text lg:grid"
@@ -473,6 +586,74 @@ export default function AITacticalCommandPlatform() {
           : `64px ${sidebarTrack} minmax(0,1fr) ${rightSidebarTrack}`,
       }}
     >
+      {showRouterChrome && scenarioMeta && (
+        <div
+          className="pointer-events-none fixed inset-x-0 top-0 z-[10000] flex justify-center px-2 py-2"
+          style={{ paddingLeft: 72 /* leave room for the rail */ }}
+        >
+          <div className="pointer-events-auto flex items-center gap-2 rounded-full border border-cyan-300/20 bg-[#050914]/85 px-3 py-1.5 text-xs text-slate-200 shadow-hud-cyan backdrop-blur">
+            {onExit && (
+              <button
+                type="button"
+                onClick={onExit}
+                className="flex items-center gap-1 rounded-full px-2 py-0.5 text-slate-300 hover:bg-white/10 hover:text-slate-100"
+                title="返回想定列表"
+              >
+                <ArrowLeft className="size-3.5" /> 返回
+              </button>
+            )}
+            <span className="mx-1 h-3 w-px bg-cyan-300/20" />
+            <span className="font-medium text-slate-100">
+              {scenarioMeta.name}
+            </span>
+            {scenarioMeta.isTemplate && (
+              <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-medium text-amber-200">
+                模板·只读
+              </span>
+            )}
+            <span className="ml-1 text-[10px] text-slate-500">
+              v{scenarioMeta.version}
+            </span>
+            <span className="mx-1 h-3 w-px bg-cyan-300/20" />
+            {onSave && !scenarioMeta.isTemplate && (
+              <button
+                type="button"
+                onClick={handleSaveClick}
+                disabled={savingState === "saving"}
+                className={cn(
+                  "flex items-center gap-1 rounded-full px-2.5 py-0.5 font-medium transition-colors",
+                  savingState === "saved"
+                    ? "bg-emerald-500/25 text-emerald-200"
+                    : savingState === "error"
+                      ? "bg-red-500/25 text-red-200"
+                      : "bg-cyan-400/20 text-cyan-100 hover:bg-cyan-400/30"
+                )}
+                title="保存到当前想定"
+              >
+                <Save className="size-3.5" />
+                {savingState === "saving"
+                  ? "保存中…"
+                  : savingState === "saved"
+                    ? "已保存"
+                    : savingState === "error"
+                      ? "保存失败"
+                      : "保存"}
+              </button>
+            )}
+            {onRequestSaveAs && (
+              <button
+                type="button"
+                onClick={handleSaveAsClick}
+                className="flex items-center gap-1 rounded-full px-2.5 py-0.5 text-slate-200 hover:bg-white/10"
+                title="另存为新想定"
+              >
+                <Copy className="size-3.5" /> 另存为
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       <motion.nav
         animate={{ opacity: 1 }}
         className="hidden border-r border-cyan-300/10 bg-[#030912]/95 px-2 py-5 backdrop-blur-2xl lg:flex lg:flex-col"

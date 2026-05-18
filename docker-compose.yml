@@ -7,6 +7,13 @@ services:
       - "8000:8000"
     environment:
       PYTHONUNBUFFERED: "1"
+      # JWT secret should be overridden in real deployments.
+      AICC_JWT_SECRET: "aicc-dev-secret-change-me-in-production"
+      # SQLite file lives in the named volume mounted below so user data
+      # survives `docker compose down` and image rebuilds.
+      AICC_DATABASE_URL: "sqlite+aiosqlite:////app/server/data/aicc.db"
+    volumes:
+      - aicc_server_data:/app/server/data
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/health').status==200 else 1)"]
@@ -29,3 +36,8 @@ services:
     depends_on:
       server:
         condition: service_healthy
+
+volumes:
+  # Named volume for sqlite + future uploaded assets. Recreating the stack
+  # with `docker compose down` keeps the data; use `down -v` to wipe.
+  aicc_server_data: {}

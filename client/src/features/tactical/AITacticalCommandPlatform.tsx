@@ -66,7 +66,17 @@ function createAiccGameFromJson(
     duration: 14400,
   });
   const game = new Game(currentScenario);
-  game.loadScenario(JSON.stringify(scenarioJson ?? SCSScenarioJson));
+  const source = scenarioJson ?? SCSScenarioJson;
+  try {
+    game.loadScenario(JSON.stringify(source));
+  } catch (err) {
+    console.error("[AICC] createAiccGameFromJson: loadScenario failed, falling back to SCS", err);
+    game.loadScenario(JSON.stringify(SCSScenarioJson));
+    // Defer the alert so it doesn't block the synchronous useState initializer.
+    window.setTimeout(() => {
+      window.alert("场景数据格式无效，已加载默认 SCS 场景。请重新保存或联系管理员。");
+    }, 0);
+  }
   game.scenarioPaused = true;
   return game;
 }

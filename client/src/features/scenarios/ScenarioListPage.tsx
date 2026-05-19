@@ -48,26 +48,13 @@ import {
 import type { ScenarioListItem, ScenarioStatus } from "@/api/types";
 import { useAuth } from "@/features/auth/AuthContext";
 import { cn } from "@/lib/utils";
+import blankScenarioJson from "@/scenarios/blank_scenario.json";
 
-// 空白模板的最小有效骨架。当用户在「新建」对话框选了「空白」时直接用此结构
-// POST，避免再多一次 GET /tpl-blank_scenario。模板真实结构以 seed 为准；这里
-// 只是兜底，能跑通 Game.loadScenario 即可。
-const EMPTY_SCENARIO_DATA: Record<string, unknown> = {
-  id: "",
-  name: "",
-  startTime: 1699073110,
-  currentTime: 1699073110,
-  duration: 14400,
-  sides: [],
-  aircraft: [],
-  ships: [],
-  facilities: [],
-  airbases: [],
-  weapons: [],
-  referencePoints: [],
-  missions: [],
-  relationships: { hostiles: {}, allies: {} },
-};
+// Use the canonical blank_scenario.json so the stored data always has the
+// { currentScenario: {...}, currentSideId, ... } shape that Game.loadScenario
+// expects. The old inline object was missing the `currentScenario` wrapper and
+// caused an immediate crash when opening a newly-created blank project.
+const EMPTY_SCENARIO_DATA = blankScenarioJson as Record<string, unknown>;
 
 const STATUS_META: Record<
   ScenarioStatus,
@@ -808,11 +795,19 @@ function CreateScenarioDialog({
     }
     setSubmitting(true);
     try {
-      let data: Record<string, unknown> = EMPTY_SCENARIO_DATA;
+      // Deep-clone so we can set currentScenario.name without mutating the
+      // cached import. The internal game name must match the project name so
+      // the tactical HUD overlay doesn't show the template's original name.
+      let data: Record<string, unknown> = JSON.parse(
+        JSON.stringify(EMPTY_SCENARIO_DATA)
+      ) as Record<string, unknown>;
       if (templateId !== "__blank__") {
         const tpl = await getScenario(templateId);
-        data = { ...tpl.data, name: name.trim() };
+        data = JSON.parse(JSON.stringify(tpl.data)) as Record<string, unknown>;
       }
+      const cs = (data as { currentScenario?: Record<string, unknown> })
+        .currentScenario;
+      if (cs) cs.name = name.trim();
       const created = await createScenario({
         name: name.trim(),
         description: description.trim(),

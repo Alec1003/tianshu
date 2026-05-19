@@ -10,6 +10,8 @@ from app.ai.bridge import PanopticonOpenClawBridge
 from app.api.ai import router as ai_router
 from app.auth.router import router as auth_router
 from app.db.session import create_db_and_tables
+from app.mcp.http_auth import BearerAuthASGI
+from app.mcp.server import mcp, set_shared_runtime
 from app.scenarios.router import router as scenarios_router
 from app.scenarios.seed import seed_system_templates
 
@@ -18,11 +20,22 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Startup: ensure DB schema + seed system templates.
+    """Startup: DB schema + seed templates + MCP session manager.
 
-    For S1+S2 we use ``Base.metadata.create_all`` as a dev-friendly shortcut.
-    Once schema starts evolving we MUST flip to ``alembic upgrade head`` in
-    the entrypoint to keep changes auditable.
+    The MCP runtime intentionally piggy-backs on the FastAPI bridge:
+    ``set_shared_runtime`` makes ``app.mcp.server.mcp_lifespan`` skip its
+    own ``PanopticonRuntime`` boot and reuse the one driving
+    ``/api/ai/command``. That single shared instance is the whole reason
+    HTTP-mounted MCP can let an external LLM see / mutate the same live
+    scenario the browser front-end is looking at.
+
+    Order matters:
+        1. DB / templates (cheap, idempotent).
+        2. Bridge construction -> owns the runtime.
+        3. ``set_shared_runtime`` BEFORE we open ``mcp.session_manager.run()``
+           (mcp_lifespan reads the slot during enter).
+        4. ``async with session_manager.run()`` starts MCP's task group;
+           must wrap ``yield`` so it stays alive for the whole app lifetime.
     """
     await create_db_and_tables()
     try:
@@ -31,7 +44,20 @@ async def lifespan(app: FastAPI):
         # Seeding is best-effort; missing JSON files shouldn't take the API
         # down. We log so dev can spot the problem.
         logger.exception("seed_system_templates failed; continuing without templates")
-    yield
+
+    app.state.bridge = PanopticonOpenClawBridge.from_env()
+    set_shared_runtime(app.state.bridge.runtime)
+
+    # First call lazily creates ``mcp._session_manager``; we must trigger it
+    # before entering the run() context below.
+    mcp.streamable_http_app()
+    async with mcp.session_manager.run():
+        logger.info(
+            "mcp.http: mounted at /api/mcp (shared runtime; scenario=%s)",
+            app.state.bridge.runtime.game.current_scenario.name,
+        )
+        yield
+    set_shared_runtime(None)
 
 
 def create_app() -> FastAPI:
@@ -40,7 +66,7 @@ def create_app() -> FastAPI:
         version="0.2.0",
         description=(
             "FastAPI backend: AI skill bridge + user auth + scenario "
-            "persistence (S1+S2)."
+            "persistence + MCP HTTP transport (S1+S2+S3)."
         ),
         lifespan=lifespan,
     )
@@ -53,11 +79,16 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    app.state.bridge = PanopticonOpenClawBridge.from_env()
     # Order: existing AI routes first (kept untouched), then auth + scenarios.
     app.include_router(ai_router)
     app.include_router(auth_router)
     app.include_router(scenarios_router)
+
+    # Mount the MCP Streamable HTTP transport at /api/mcp behind a Bearer
+    # gate. We pull ``mcp.streamable_http_app()`` *after* ``include_router``
+    # so the auto-generated OpenAPI schema (which only walks include_router'd
+    # routers) stays clean -- mounted ASGI apps don't show up there anyway.
+    app.mount("/api/mcp", BearerAuthASGI(mcp.streamable_http_app()))
 
     @app.get("/health")
     def health() -> dict:

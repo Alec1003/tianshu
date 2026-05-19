@@ -1,14 +1,24 @@
 fastapi==0.115.12
-uvicorn==0.30.6
-pydantic==2.9.2
+uvicorn==0.31.1
+pydantic==2.11.7
 pydantic-settings==2.6.0
 gymnasium==0.29.1
 
 # --- S1+S2: auth + scenario persistence ---
-# fastapi-users 14 兼容 fastapi 0.115 / pydantic 2.9，含 SQLAlchemy 适配器
+# fastapi-users 14 兼容 fastapi 0.115 / pydantic 2.11，含 SQLAlchemy 适配器
 fastapi-users[sqlalchemy]==14.0.1
 sqlalchemy[asyncio]==2.0.36
 alembic==1.14.0
 aiosqlite==0.20.0
 # fastapi-users 14 已切到 pwdlib，bcrypt 由 pwdlib[argon2,bcrypt] 间接拉取，
 # 此处不再单独锁定。如需 argon2，pwdlib 同名 extra 会自动安装 argon2-cffi。
+
+# --- S3 (Sprint 1 / P0): MCP server ---
+# mcp 是官方 Model Context Protocol Python SDK，含 FastMCP 高层 API + stdio/HTTP
+# transport。锁 >=1.20,<2 保留兼容窗口；当前 PyPI 实际版本约 1.27。
+mcp>=1.20,<2
+
+# --- S4: Pydantic AI agent runtime ---
+# LLM-powered agent with tool calling, streaming, multi-provider support.
+# [openai,anthropic] extras pull in the provider SDKs.
+pydantic-ai[openai,anthropic]>=1.90,<2

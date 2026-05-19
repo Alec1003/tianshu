@@ -30,6 +30,14 @@ class Settings(BaseSettings):
     # First user auto-becomes superuser; useful in dev. Disable in shared envs.
     first_user_is_superuser: bool = Field(default=True)
 
+    # ── S4: Pydantic AI agent ─────────────────────────────────────────────────
+    # Format: "<provider>:<model-name>", e.g. "openai:gpt-4o" or
+    # "anthropic:claude-3-5-sonnet-20241022". Empty string disables the LLM
+    # agent and falls back to the built-in regex planner.
+    llm_model: str = Field(default="", description="Pydantic-AI model ID.")
+    llm_api_key: str = Field(default="", description="API key for the LLM provider.")
+    llm_base_url: str = Field(default="", description="Optional custom base URL (proxy / local LLM).")
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

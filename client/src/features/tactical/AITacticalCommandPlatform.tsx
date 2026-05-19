@@ -24,6 +24,7 @@ import {
 import { Button } from "@/components/ui/button";
 import Game from "@/game/Game";
 import Scenario from "@/game/Scenario";
+import { getRuntimeScenario } from "@/api/ai";
 import { SetScenarioTimeContext } from "@/gui/contextProviders/contexts/ScenarioTimeContext";
 import CesiumScenarioMap from "@/gui/map/CesiumScenarioMap";
 import type { CesiumPlacement } from "@/gui/map/CesiumToolbar";
@@ -431,6 +432,39 @@ export default function AITacticalCommandPlatform({
       game.scenarioPaused = true;
     };
   }, [game, refreshSnapshot]);
+
+  // 轮询后端 runtime，仿真暂停时每 3s 同步一次 MCP 变更到客户端。
+  // 用上次拉取到的单位总数作为变化信号，避免无变化时重复加载场景。
+  const runtimeUnitCountRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (snapshot.runState !== "idle") return;
+
+    const sync = async () => {
+      try {
+        const data = await getRuntimeScenario();
+        const cs = (data as Record<string, unknown>)?.currentScenario as
+          | Record<string, unknown>
+          | undefined;
+        if (!cs) return;
+        const count = (
+          ["aircraft", "ships", "facilities", "airbases", "weapons"] as const
+        ).reduce(
+          (s, k) => s + (Array.isArray(cs[k]) ? (cs[k] as unknown[]).length : 0),
+          0
+        );
+        if (runtimeUnitCountRef.current !== count) {
+          runtimeUnitCountRef.current = count;
+          loadScenarioFromObject(data);
+        }
+      } catch {
+        // best-effort，网络错误不影响前端正常运行
+      }
+    };
+
+    void sync();
+    const id = setInterval(sync, 3000);
+    return () => clearInterval(id);
+  }, [snapshot.runState, loadScenarioFromObject]);
 
   // 监听 outcome：每次新一局结束自动弹 AAR；用户关闭后不会重复弹。
   // 用 endedAt+reason+winnerSideId 拼成签名，确保 reset 后能再次触发。

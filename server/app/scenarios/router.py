@@ -10,9 +10,11 @@ Permission model (v1, single-user-owned):
 
 from __future__ import annotations
 
+import asyncio
+import json
 from typing import Sequence
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -207,3 +209,32 @@ async def create_aar_record(
     await session.commit()
     await session.refresh(rec)
     return rec
+
+
+# ---------- runtime activation ----------
+@router.post("/{scenario_id}/activate")
+async def activate_scenario(
+    scenario_id: str,
+    request: Request,
+    user: User = Depends(current_active_user),
+    session: AsyncSession = Depends(get_async_session),
+) -> dict:
+    """Load a DB scenario into the shared in-memory runtime.
+
+    Called by the frontend when the user enters /play/:scenarioId so that
+    MCP tools and /api/ai/command operate on the correct scenario.
+    The operation is best-effort from the frontend's perspective: the
+    browser-side game is already loaded from the DB payload; this call only
+    keeps the server-side runtime in sync.
+    """
+    sc = await session.get(Scenario, scenario_id)
+    if sc is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="not found")
+    if not sc.is_template and sc.owner_id != str(user.id):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="forbidden")
+
+    bridge = request.app.state.bridge
+    scenario_json = json.dumps(sc.data, ensure_ascii=False)
+    await asyncio.to_thread(bridge.runtime.load_scenario_from_json, scenario_json)
+
+    return {"ok": True, "scenario_id": sc.id, "scenario_name": sc.name}

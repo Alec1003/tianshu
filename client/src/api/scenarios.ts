@@ -52,6 +52,13 @@ export async function listAarRecords(scenarioId: string): Promise<AarRecord[]> {
   );
 }
 
+export async function activateScenario(id: string): Promise<void> {
+  await apiCall<unknown>(
+    `/api/scenarios/${encodeURIComponent(id)}/activate`,
+    { method: "POST" }
+  );
+}
+
 export async function createAarRecord(
   scenarioId: string,
   payload: AarRecordCreatePayload

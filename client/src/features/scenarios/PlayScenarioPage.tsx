@@ -23,6 +23,7 @@ import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 
 import { ApiError } from "@/api/client";
 import {
+  activateScenario,
   createAarRecord,
   createScenario,
   getScenario,
@@ -59,6 +60,13 @@ export default function PlayScenarioPage() {
       try {
         const sc = await getScenario(scenarioId);
         if (!cancelled) setScenario(sc);
+
+        // 把 DB 想定同步进后端 runtime，让 MCP 工具和 /api/ai/command
+        // 操作的是当前打开的项目，而不是默认的 SCS 场景。best-effort。
+        activateScenario(scenarioId).catch((err) => {
+          console.warn("[AICC] activateScenario failed (non-blocking)", err);
+        });
+
         // 项目状态自然演进：草稿 -> 推演中，一旦用户打开推演页。
         // 仅限本人项目且状态为 draft 时升级；模板不在这里改。
         if (

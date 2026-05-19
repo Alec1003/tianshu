@@ -1,7 +1,7 @@
 fastapi==0.115.12
 uvicorn==0.31.1
-pydantic==2.11.7
-pydantic-settings==2.6.0
+pydantic>=2.12,<3
+pydantic-settings>=2.6.0,<3
 gymnasium==0.29.1
 
 # --- S1+S2: auth + scenario persistence ---
@@ -16,9 +16,9 @@ aiosqlite==0.20.0
 # --- S3 (Sprint 1 / P0): MCP server ---
 # mcp 是官方 Model Context Protocol Python SDK，含 FastMCP 高层 API + stdio/HTTP
 # transport。锁 >=1.20,<2 保留兼容窗口；当前 PyPI 实际版本约 1.27。
-mcp>=1.20,<2
+mcp>=1.25,<2
 
 # --- S4: Pydantic AI agent runtime ---
-# LLM-powered agent with tool calling, streaming, multi-provider support.
+# Use pydantic-ai-slim (not the meta-package) to avoid pulling in all extras.
 # [openai,anthropic] extras pull in the provider SDKs.
-pydantic-ai[openai,anthropic]>=1.90,<2
+pydantic-ai-slim[openai,anthropic]>=1.90,<2

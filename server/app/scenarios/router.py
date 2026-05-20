@@ -234,7 +234,15 @@ async def activate_scenario(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="forbidden")
 
     bridge = request.app.state.bridge
+
+    # If the runtime already has this scenario loaded (same inner currentScenario.id),
+    # skip the reload so MCP-deployed units and other in-memory changes are preserved.
+    inner_id = (sc.data or {}).get("currentScenario", {}).get("id", "")
+    runtime_id = str(getattr(bridge.runtime.game.current_scenario, "id", ""))
+    if inner_id and inner_id == runtime_id:
+        return {"ok": True, "scenario_id": sc.id, "scenario_name": sc.name, "loaded": False}
+
     scenario_json = json.dumps(sc.data, ensure_ascii=False)
     await asyncio.to_thread(bridge.runtime.load_scenario_from_json, scenario_json)
 
-    return {"ok": True, "scenario_id": sc.id, "scenario_name": sc.name}
+    return {"ok": True, "scenario_id": sc.id, "scenario_name": sc.name, "loaded": True}

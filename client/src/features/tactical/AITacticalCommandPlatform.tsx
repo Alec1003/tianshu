@@ -20,6 +20,7 @@ import {
   Save,
   Settings,
   Shield,
+  Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Game from "@/game/Game";
@@ -34,6 +35,7 @@ import defaultScenarioJson from "@/scenarios/default_scenario.json";
 import { isScenarioObjectVisible } from "@/game/scenarioVisibility";
 import { cn } from "@/lib/utils";
 import { randomUUID } from "@/utils/generateUUID";
+import AISidebar, { type AISidebarTab } from "./AISidebar";
 import SimulationInspectorPanel from "./SimulationInspectorPanel";
 import SimulationSidebar, {
   type SimulationPanelId,
@@ -197,6 +199,10 @@ export default function AITacticalCommandPlatform({
   const [missionEditorMissionId, setMissionEditorMissionId] = useState<
     string | null
   >(null);
+  // AI 侧栏：默认 collapsed；sidebar 顶部 Sparkles 动作与底部 Settings
+  // 动作分别打开 chat / settings tab。
+  const [aiSidebarOpen, setAiSidebarOpen] = useState(false);
+  const [aiSidebarTab, setAiSidebarTab] = useState<AISidebarTab>("chat");
   const [showRoutes, setShowRoutes] = useState(false);
   const [showRanges, setShowRanges] = useState(false);
   const [placement, setPlacement] = useState<CesiumPlacement | null>(null);
@@ -214,12 +220,18 @@ export default function AITacticalCommandPlatform({
   const [snapshot, setSnapshot] = useState<SimulationSnapshot>(() =>
     buildSimulationSnapshot(game, "idle")
   );
+  // 把 scenario.id 镜像到 React state，AISidebar 用它做 chat 历史的
+  // localStorage 命名空间，切换 scenario 自动切换会话。
+  const [scenarioId, setScenarioId] = useState<string>(
+    () => game.currentScenario.id
+  );
 
   const refreshSnapshot = useCallback(
     (runState: SimulationRunState = runStateRef.current) => {
       runStateRef.current = runState;
       setScenarioTime(game.currentScenario.currentTime);
       setSnapshot(buildSimulationSnapshot(game, runState));
+      setScenarioId(game.currentScenario.id);
     },
     [game, setScenarioTime]
   );
@@ -584,7 +596,23 @@ export default function AITacticalCommandPlatform({
     commandSidebarWidth !== null
       ? `${commandSidebarWidth}px`
       : "clamp(18rem, 24vw, 26rem)";
-  const rightSidebarTrack = "clamp(18rem, 24vw, 26rem)";
+  // 仿真态势面板从地图右侧搬到地图下方后，右栏槽位留给 AI Sidebar；
+  // AI Sidebar 展开时加一列，收起时不占列宽。
+  const aiSidebarTrack = "clamp(20rem, 26vw, 28rem)";
+
+  // AI command 返回的 scenario 应用回 game；复用现有的 loadScenario
+  // 路径，后紧接一次 refreshSnapshot 让 UI 拿到最新单位 / 设施 / 任务。
+  const handleApplyAiScenario = useCallback(
+    (data: Record<string, unknown>) => {
+      try {
+        game.loadScenario(JSON.stringify(data));
+        refreshSnapshot();
+      } catch (err) {
+        console.error("[AICC] AI scenario apply failed", err);
+      }
+    },
+    [game, refreshSnapshot]
+  );
 
   // 当前 game JSON 快照，供保存/另存为按钮提取。
   // game.exportCurrentScenario() 返回字符串，这里再 parse 成 object 与后端契约对齐。
@@ -625,9 +653,14 @@ export default function AITacticalCommandPlatform({
     <div
       className="dark h-screen overflow-hidden bg-tactical-bg text-tactical-text lg:grid"
       style={{
-        gridTemplateColumns: sidebarCollapsed
-          ? `64px minmax(0,1fr) ${rightSidebarTrack}`
-          : `64px ${sidebarTrack} minmax(0,1fr) ${rightSidebarTrack}`,
+        gridTemplateColumns: (() => {
+          const railCol = `64px`;
+          const leftCol = sidebarCollapsed ? null : sidebarTrack;
+          const rightCol = aiSidebarOpen ? aiSidebarTrack : null;
+          return [railCol, leftCol, `minmax(0,1fr)`, rightCol]
+            .filter(Boolean)
+            .join(" ");
+        })(),
       }}
     >
       {showRouterChrome && scenarioMeta && (
@@ -731,6 +764,34 @@ export default function AITacticalCommandPlatform({
 
         <div className="flex flex-col items-center gap-3">
           <Button
+            aria-label={
+              aiSidebarOpen && aiSidebarTab === "chat"
+                ? "关闭 AI 侧栏"
+                : "打开 AI 侧栏"
+            }
+            className={cn(
+              "size-10",
+              aiSidebarOpen && aiSidebarTab === "chat"
+                ? "text-cyan-100 shadow-hud-cyan"
+                : "text-slate-400"
+            )}
+            onClick={() => {
+              if (aiSidebarOpen && aiSidebarTab === "chat") {
+                setAiSidebarOpen(false);
+              } else {
+                setAiSidebarOpen(true);
+                setAiSidebarTab("chat");
+              }
+            }}
+            size="icon"
+            title="AI 助手"
+            variant={
+              aiSidebarOpen && aiSidebarTab === "chat" ? "tactical" : "ghost"
+            }
+          >
+            <Sparkles className="size-4" />
+          </Button>
+          <Button
             aria-label={sidebarCollapsed ? "展开左侧栏" : "收起左侧栏"}
             className="size-10"
             onClick={() => setSidebarCollapsed((value) => !value)}
@@ -744,10 +805,28 @@ export default function AITacticalCommandPlatform({
             )}
           </Button>
           <Button
-            aria-label="系统设置"
-            className="size-10"
+            aria-label="AI / 系统设置"
+            className={cn(
+              "size-10",
+              aiSidebarOpen && aiSidebarTab === "settings"
+                ? "text-cyan-100 shadow-hud-cyan"
+                : "text-slate-400"
+            )}
+            onClick={() => {
+              if (aiSidebarOpen && aiSidebarTab === "settings") {
+                setAiSidebarOpen(false);
+              } else {
+                setAiSidebarOpen(true);
+                setAiSidebarTab("settings");
+              }
+            }}
             size="icon"
-            variant="ghost"
+            title="AI / 系统设置"
+            variant={
+              aiSidebarOpen && aiSidebarTab === "settings"
+                ? "tactical"
+                : "ghost"
+            }
           >
             <Settings className="size-4" />
           </Button>
@@ -799,7 +878,7 @@ export default function AITacticalCommandPlatform({
         </div>
       )}
 
-      <main className="relative min-h-0 overflow-hidden bg-[#050914]">
+      <main className="relative flex min-h-0 min-w-0 flex-col overflow-hidden bg-[#050914]">
         <div className="relative z-20 flex items-center justify-between border-b border-cyan-300/10 bg-[#030912]/92 px-4 py-3 backdrop-blur-xl lg:hidden">
           <div className="flex items-center gap-3">
             <div className="grid size-10 place-items-center rounded-xl border border-cyan-300/18 bg-cyan-300/8 text-cyan-100">
@@ -815,54 +894,75 @@ export default function AITacticalCommandPlatform({
           </Button>
         </div>
 
-        <CesiumScenarioMap
-          embedded
-          game={game}
-          missionCreatorOpen={missionCreatorOpen}
-          missionEditorMissionId={missionEditorMissionId}
-          mobileView={false}
-          placement={placement}
-          onMissionCreatorOpenChange={setMissionCreatorOpen}
-          onMissionEditorMissionIdChange={setMissionEditorMissionId}
-          onPlacementChange={setPlacement}
-          onScenarioMutation={refreshSnapshot}
-          showToolbar={false}
-          showRanges={showRanges}
-          showRoutes={showRoutes}
-        />
+        {/*
+          地图区域：占据 main 列剩余高度。Cesium 在 embedded 模式下用
+          position:absolute 填满父容器，所以这里必须 relative + 显式高度。
+        */}
+        <div className="relative min-h-0 flex-1">
+          <CesiumScenarioMap
+            embedded
+            game={game}
+            missionCreatorOpen={missionCreatorOpen}
+            missionEditorMissionId={missionEditorMissionId}
+            mobileView={false}
+            placement={placement}
+            onMissionCreatorOpenChange={setMissionCreatorOpen}
+            onMissionEditorMissionIdChange={setMissionEditorMissionId}
+            onPlacementChange={setPlacement}
+            onScenarioMutation={refreshSnapshot}
+            showToolbar={false}
+            showRanges={showRanges}
+            showRoutes={showRoutes}
+          />
 
-        <div className="pointer-events-none absolute left-4 top-4 z-10 hidden max-w-xl rounded-2xl border border-cyan-300/12 bg-[#030912]/72 px-4 py-3 shadow-[0_18px_70px_rgba(0,0,0,0.42)] backdrop-blur-xl lg:block">
-          <div className="flex items-center gap-3">
-            <span
-              className={cn(
-                "size-2.5 rounded-full",
-                snapshot.runState === "running"
-                  ? "animate-tactical-pulse bg-emerald-300"
-                  : snapshot.runState === "paused"
-                    ? "bg-amber-300"
-                    : "bg-cyan-300"
-              )}
-            />
-            <div>
-              <div className="text-sm font-semibold text-slate-100">
-                {snapshot.scenarioName}
-              </div>
-              <div className="mt-0.5 flex flex-wrap items-center gap-2 text-[11px] text-slate-400">
-                <span>原生 AICC Game Engine</span>
-                <span className="text-cyan-300/60">/</span>
-                <span>{snapshot.timeCompression}x 倍率</span>
-                <span className="text-cyan-300/60">/</span>
-                <span>{snapshot.aircraft + snapshot.ships} 个机动单位</span>
+          <div className="pointer-events-none absolute left-4 top-4 z-10 hidden max-w-xl rounded-2xl border border-cyan-300/12 bg-[#030912]/72 px-4 py-3 shadow-[0_18px_70px_rgba(0,0,0,0.42)] backdrop-blur-xl lg:block">
+            <div className="flex items-center gap-3">
+              <span
+                className={cn(
+                  "size-2.5 rounded-full",
+                  snapshot.runState === "running"
+                    ? "animate-tactical-pulse bg-emerald-300"
+                    : snapshot.runState === "paused"
+                      ? "bg-amber-300"
+                      : "bg-cyan-300"
+                )}
+              />
+              <div>
+                <div className="text-sm font-semibold text-slate-100">
+                  {snapshot.scenarioName}
+                </div>
+                <div className="mt-0.5 flex flex-wrap items-center gap-2 text-[11px] text-slate-400">
+                  <span>原生 AICC Game Engine</span>
+                  <span className="text-cyan-300/60">/</span>
+                  <span>{snapshot.timeCompression}x 倍率</span>
+                  <span className="text-cyan-300/60">/</span>
+                  <span>{snapshot.aircraft + snapshot.ships} 个机动单位</span>
+                </div>
               </div>
             </div>
           </div>
+
+          <div className="pointer-events-none absolute inset-0 z-[1] tactical-grid opacity-45" />
+          <div className="pointer-events-none absolute inset-x-0 top-0 z-[2] h-28 bg-gradient-to-b from-[#050914] via-[#050914]/55 to-transparent" />
         </div>
 
-        <div className="pointer-events-none absolute inset-0 z-[1] tactical-grid opacity-45" />
-        <div className="pointer-events-none absolute inset-x-0 top-0 z-[2] h-28 bg-gradient-to-b from-[#050914] via-[#050914]/55 to-transparent" />
+        {/*
+          仿真态势面板：固定在地图下方。原本作为 grid 第 4 列出现在右侧，
+          现搬到地图列底部，4 个核心卡片在 lg+ 横向 4 列铺开，腾出右侧
+          槽位给后续 AI 工具栏。
+        */}
+        <SimulationInspectorPanel game={game} snapshot={snapshot} />
       </main>
 
-      <SimulationInspectorPanel game={game} snapshot={snapshot} />
+      <AISidebar
+        activeTab={aiSidebarTab}
+        onApplyScenario={handleApplyAiScenario}
+        onOpenChange={setAiSidebarOpen}
+        onResumePlay={playSimulation}
+        onTabChange={setAiSidebarTab}
+        open={aiSidebarOpen}
+        scenarioId={scenarioId}
+      />
 
       <AARDialog
         elapsedLabel={formatElapsedHMS(snapshot.elapsedSeconds)}

@@ -19,6 +19,7 @@ import {
   Color,
   Entity,
   Ion,
+  MapMode2D,
   SceneMode,
   Math as CesiumMath,
   PolylineDashMaterialProperty,
@@ -418,6 +419,7 @@ export default function CesiumScenarioMap({
       // Start in flat 2D mode by default so legacy users don't see a globe
       // until they explicitly toggle 3D from the floating top toolbar.
       sceneMode: SceneMode.SCENE2D,
+      mapMode2D: MapMode2D.ROTATE,
       navigationHelpButton: false,
       fullscreenButton: false,
       selectionIndicator: false,

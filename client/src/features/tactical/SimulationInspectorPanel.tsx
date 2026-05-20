@@ -161,12 +161,12 @@ export default function SimulationInspectorPanel({
 
   return (
     <motion.aside
-      animate={{ opacity: 1, x: 0 }}
-      className="hidden min-h-0 border-l border-cyan-300/10 bg-[#050b13]/90 p-3 backdrop-blur-2xl lg:flex lg:flex-col"
-      initial={{ opacity: 0, x: 18 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="hidden shrink-0 border-t border-cyan-300/10 bg-[#050b13]/90 p-3 backdrop-blur-2xl lg:flex lg:h-[300px] lg:flex-col"
+      initial={{ opacity: 0, y: 18 }}
       transition={{ duration: 0.35, ease: "easeOut" }}
     >
-      <div className="mb-3 px-1">
+      <div className="mb-2 px-1">
         <div className="flex items-center justify-between">
           <div>
             <div className="text-xs uppercase tracking-[0.32em] text-cyan-300/70">
@@ -182,8 +182,8 @@ export default function SimulationInspectorPanel({
         </div>
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pr-1">
-        <Card className="border-cyan-300/12 bg-[#07111d]/82">
+      <div className="grid min-h-0 flex-1 grid-cols-1 items-start gap-3 overflow-y-auto pr-1 lg:auto-rows-min lg:grid-cols-2 xl:grid-cols-4 xl:overflow-x-auto xl:overflow-y-hidden">
+        <Card className="border-cyan-300/12 bg-[#07111d]/82 xl:flex xl:max-h-full xl:flex-col xl:overflow-hidden">
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2">
               <Activity className="size-4 text-emerald-300" />
@@ -240,14 +240,14 @@ export default function SimulationInspectorPanel({
           </CardContent>
         </Card>
 
-        <Card className="border-cyan-300/12 bg-[#07111d]/82">
+        <Card className="border-cyan-300/12 bg-[#07111d]/82 xl:flex xl:max-h-full xl:flex-col xl:overflow-hidden">
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2">
               <ShieldAlert className="size-4 text-cyan-200" />
               阵营态势
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-2">
+          <CardContent className="space-y-2 xl:flex-1 xl:overflow-y-auto">
             {sideSummaries.map((side) => (
               <div
                 className="rounded-xl border border-cyan-300/10 bg-slate-950/35 p-3"
@@ -296,14 +296,14 @@ export default function SimulationInspectorPanel({
           </CardContent>
         </Card>
 
-        <Card className="border-cyan-300/12 bg-[#07111d]/82">
+        <Card className="border-cyan-300/12 bg-[#07111d]/82 xl:flex xl:max-h-full xl:flex-col xl:overflow-hidden">
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2">
               <ClipboardList className="size-4 text-emerald-300" />
               任务队列
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-2">
+          <CardContent className="space-y-2 xl:flex-1 xl:overflow-y-auto">
             {activeMissions.length > 0 ? (
               activeMissions.map((mission) => (
                 <div
@@ -329,15 +329,15 @@ export default function SimulationInspectorPanel({
           </CardContent>
         </Card>
 
-        <Card className="border-cyan-300/12 bg-[#07111d]/82">
+        <Card className="border-cyan-300/12 bg-[#07111d]/82 xl:flex xl:max-h-full xl:flex-col xl:overflow-hidden">
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2">
               <Terminal className="size-4 text-cyan-200" />
               仿真日志
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="min-h-36 rounded-xl border border-cyan-300/10 bg-[#020711] p-3 font-mono text-[11px] leading-relaxed text-slate-400">
+          <CardContent className="xl:flex-1 xl:overflow-hidden">
+            <div className="min-h-36 rounded-xl border border-cyan-300/10 bg-[#020711] p-3 font-mono text-[11px] leading-relaxed text-slate-400 xl:h-full xl:min-h-0 xl:overflow-y-auto">
               {recentLogs.length > 0 ? (
                 recentLogs.map((log) => (
                   <div className="mb-2 last:mb-0" key={log.id}>
@@ -361,11 +361,6 @@ export default function SimulationInspectorPanel({
           </CardContent>
         </Card>
 
-        <Card className="mt-auto border-cyan-300/10 bg-white/[0.03]">
-          <CardContent className="p-4 text-xs leading-relaxed text-slate-400">
-            当前右侧面板只显示 AICC 仿真态势、阵营态势、任务队列和事件日志。
-          </CardContent>
-        </Card>
       </div>
     </motion.aside>
   );

@@ -56,12 +56,34 @@ def _exec(deps: AgentDeps, skill: str, params: dict[str, Any]) -> dict[str, Any]
         raise
 
 
+# Default base URLs for OpenAI-compatible providers. Front-end can still
+# override via the `baseUrl` field; this just spares the user typing the
+# obvious endpoint when they pick a known provider.
+_OPENAI_COMPAT_DEFAULT_BASE_URL: dict[str, str] = {
+    "deepseek": "https://api.deepseek.com/v1",
+    "qwen": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+    "ollama": "http://localhost:11434/v1",
+    # google supports an OpenAI-compatible endpoint:
+    # https://generativelanguage.googleapis.com/v1beta/openai/
+    "google": "https://generativelanguage.googleapis.com/v1beta/openai",
+}
+
+
 def resolve_model(model_id: str, api_key: str, base_url: str) -> Any:
     """Resolve a model_id string to a pydantic-ai model object.
 
     model_id format: "<provider>:<name>", e.g. "openai:gpt-4o" or
     "anthropic:claude-3-5-sonnet-20241022". If api_key / base_url are empty,
     pydantic-ai falls back to its own env-var lookup (OPENAI_API_KEY, etc.).
+
+    Supported providers:
+      - ``openai``:    native OpenAI SDK + optional base_url override.
+      - ``anthropic``: native Anthropic SDK.
+      - ``deepseek`` / ``qwen`` / ``ollama`` / ``google`` / ``custom``:
+        treated as OpenAI-compatible; uses OpenAIModel + OpenAIProvider with
+        an override base_url. Each known alias has a sensible default
+        endpoint (see ``_OPENAI_COMPAT_DEFAULT_BASE_URL``); ``custom``
+        requires an explicit base_url.
     """
     if not model_id:
         return None
@@ -86,6 +108,17 @@ def resolve_model(model_id: str, api_key: str, base_url: str) -> Any:
             name or "claude-3-5-sonnet-20241022",
             provider=AnthropicProvider(**kwargs),
         )
+
+    if provider in _OPENAI_COMPAT_DEFAULT_BASE_URL or provider == "custom":
+        effective_base = base_url or _OPENAI_COMPAT_DEFAULT_BASE_URL.get(provider, "")
+        if not effective_base:
+            # ``custom`` without an explicit base_url is unusable — bail out so
+            # the bridge can fall back to the global agent / regex planner.
+            return model_id
+        kwargs = {"base_url": effective_base}
+        if api_key:
+            kwargs["api_key"] = api_key
+        return OpenAIModel(name or "gpt-4o-mini", provider=OpenAIProvider(**kwargs))
 
     # Unknown provider prefix — pass string through and let pydantic-ai handle it.
     return model_id

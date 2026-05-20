@@ -22,6 +22,7 @@
     "test:utils": "npm run test src/utils/"
   },
   "dependencies": {
+    "@ai-sdk/react": "^2.0.192",
     "@auth0/auth0-react": "^2.3.0",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.0",
@@ -29,6 +30,7 @@
     "@mui/material": "^7.0.0",
     "@mui/system": "^7.0.0",
     "@radix-ui/react-slot": "^1.2.4",
+    "ai": "^5.0.190",
     "cesium": "^1.135.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

@@ -254,6 +254,73 @@ E4. 测试
             api/ai.py POST /chat）
 2026-05-20  作战胜负规则收敛：移除 ANNIHILATION，新规则 KEY_UNIT_DESTROYED →
             TIMEOUT，11/11 单测绿
+2026-05-20  后端 model override：前端 model 配置真生效
+            动机：上一切片 sidebar settings 里编辑 provider/baseUrl/apiKey
+                  /model 只本地保存与连接测试用，chat 仍走 env 配置 agent。
+                  现在让 /api/ai/command 在 context.model 完整时按需构造
+                  per-request agent。
+            改动：
+              - server/app/ai/pydantic_agent.py：resolve_model 扩展支持
+                deepseek / qwen / ollama / google / custom（OpenAI-compatible
+                + 默认 base_url 表）；custom 无 base_url 时 graceful fallback
+              - server/app/ai/bridge.py：新增 _resolve_agent_for_request
+                三级优先：context.model（完整 model+apiKey）→ env 全局 agent
+                → None；build 异常吞掉日志兜底；process_command_async
+                委托给它
+            测试：server/tests/test_bridge_model_override.py 10 case，
+                  覆盖 per-request 构造、apiKey/model 缺失 fallback、context
+                  全空、build 异常 fallback、whitespace trim、env+override
+                  全空 None、resolve_model 扩展 provider/custom 边界。
+                  19 passed (含 doctrine 9 + override 10)。
+            端到端：docker rebuild server；POST /api/ai/command
+                  - 无 context.model：regex 兜底 status=ok
+                  - context.model invalid-key：per-request 构造 OpenAIModel
+                    真调 OpenAI API → 401 invalid_api_key 回传到 execution.error。
+
+2026-05-20  AI Sidebar P0 切片落地（B1+B2 子集）
+            新增 client/src/features/tactical/AISidebar.tsx：
+              - 右侧抽屉式 sidebar，默认 collapsed；rail 上的 Sparkles
+                按钮打开 chat tab，左下角 Settings 按钮打开 settings tab
+              - chat：第一版用 POST /api/ai/command（同步），future
+                切片再切到 useChat({ api: '/api/ai/chat' }) 流式
+              - settings：三段
+                  · Model：provider/baseUrl/apiKey/model + 连接测试
+                    (POST /api/ai/model/check)
+                  · MCP Servers：增删改 + enable toggle + 项目内置 MCP 开关
+                  · Skills：后端 /api/ai/skills 只读列表 + 用户自定义增删
+              - 持久化：localStorage 沿用 panopticon.ai.* 老 keys
+              - 主题：cyan/slate tactical + shadcn Card/Button +
+                tailwind，无新依赖
+            AITacticalCommandPlatform.tsx：
+              - grid 4 列动态：rail / 可选左栏 / map / 可选 AI 栏
+              - onApplyScenario 路径接 game.loadScenario + refreshSnapshot
+            注意：当前 chat 仍走后端 env 配置的 agent，前端 model 编辑
+                  只本地保存 + 连接测试，后端 model override 留作后续切片。
+            验证：tsc -b 全过；docker compose build/up client 成功；
+                  GET /api/ai/skills 拿到 20 个技能；POST /api/ai/model/check
+                  对 invalid key 正确返回 auth fail。
+
+2026-05-20  流式 Chat 切片（Streaming Chat P0）
+            前端：
+              - AISidebar.tsx 切到 @ai-sdk/react useChat + ai v5
+                DefaultChatTransport，接 POST /api/ai/chat（SSE）
+              - ModelConfig 通过 X-AICC-Model-* header 动态下发后端
+                (provider / model / apiKey / baseUrl)，per-request 生效
+              - 消息渲染 UIMessage.parts：text 增量 + reasoning 折叠 +
+                tool-invocation 卡片（toolName/state/input/output/error）
+              - 流结束后自动 GET /api/ai/runtime/scenario 刷新地图
+              - localStorage 迁移到 messagesV2（UIMessage 格式）
+              - ChatPanel 加停止按钮（Square icon + stop()）
+              - 状态栏 busy/error 双态显示
+            后端：
+              - /api/ai/chat 路由读 X-AICC-Model-* header → resolve_model
+                → VercelAIAdapter.dispatch_request(model=...) 生效
+              - resolve_model 扩展：deepseek/qwen/ollama/google/custom
+            设置面板：amber 警告替换为 emerald 提示"header 实时生效"。
+            验证：tsc -b 0 error；docker build client 成功；
+                  GET / 200；GET /api/ai/skills 200；
+                  POST /api/ai/chat 503（无 key 时正确拒绝）。
+
 2026-05-20  修复"红蓝方不自主交战"关键 bug
             根因：server PanopticonRuntime._normalize_scenario_payload 在
             scenario 缺 doctrine 字段时回填空 `{}`，前端 Scenario 构造的

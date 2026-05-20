@@ -82,14 +82,60 @@ class PanopticonOpenClawBridge:
         """Synchronous path — regex planner only (no LLM)."""
         return self.agent.process_command(command=command, context=context)
 
+    def _resolve_agent_for_request(self, context: dict[str, Any] | None):
+        """Pick the pydantic-ai agent to use for a single request.
+
+        Priority:
+          1. ``context["model"]`` – user-supplied model config from the AI
+             sidebar. When ``provider`` + ``model`` + ``apiKey`` are all
+             present we build a one-off agent so the user's editor truly
+             takes effect.
+          2. ``self.pydantic_agent`` – the env-var–configured global agent
+             from ``from_env``.
+          3. ``None`` – caller falls back to the regex planner.
+
+        Errors during per-request build are swallowed and logged; we then
+        fall back to the global agent rather than failing the user's
+        command outright.
+        """
+        ctx = context or {}
+        model_cfg = ctx.get("model") if isinstance(ctx, dict) else None
+        if isinstance(model_cfg, dict):
+            provider = str(model_cfg.get("provider") or "").strip()
+            model_name = str(model_cfg.get("model") or "").strip()
+            api_key = str(model_cfg.get("apiKey") or "").strip()
+            base_url = str(model_cfg.get("baseUrl") or "").strip()
+            if provider and model_name and api_key:
+                model_id = f"{provider}:{model_name}"
+                try:
+                    from app.ai.pydantic_agent import build_agent  # noqa: PLC0415
+
+                    return build_agent(
+                        model_id=model_id,
+                        api_key=api_key,
+                        base_url=base_url,
+                    )
+                except Exception as exc:  # pragma: no cover - depends on SDK
+                    logger.warning(
+                        "per-request pydantic-ai agent build failed (%s): %s",
+                        model_id,
+                        exc,
+                    )
+        return self.pydantic_agent
+
     async def process_command_async(
         self, command: str, context: dict[str, Any] | None = None
     ) -> AgentExecutionSummary:
-        """Async path — uses pydantic-ai agent when configured, regex planner otherwise."""
-        if self.pydantic_agent is not None:
+        """Async path — uses pydantic-ai agent when configured, regex planner otherwise.
+
+        ``context["model"]`` (when supplied) overrides the global env-var
+        agent for this single request — see ``_resolve_agent_for_request``.
+        """
+        agent = self._resolve_agent_for_request(context)
+        if agent is not None:
             from app.ai.pydantic_agent import run_agent  # noqa: PLC0415
 
-            return await run_agent(self.pydantic_agent, command, self.skill_registry)
+            return await run_agent(agent, command, self.skill_registry)
         return self.agent.process_command(command=command, context=context)
 
     def exported_scenario(self) -> dict[str, Any]:

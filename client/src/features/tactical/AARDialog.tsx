@@ -25,7 +25,6 @@ function normalizeSideName(name: string) {
 const reasonLabel: Record<GameOutcomeReason, string> = {
   "": "推演进行中",
   KEY_UNIT_DESTROYED: "关键单位被毁",
-  ANNIHILATION: "全歼对手",
   TIMEOUT: "推演时长耗尽",
 };
 
@@ -33,8 +32,6 @@ const reasonHint: Record<GameOutcomeReason, string> = {
   "": "",
   KEY_UNIT_DESTROYED:
     "关键目标（isObjective）已被击毁，由攻击方直接判胜，额外加 200 分。",
-  ANNIHILATION:
-    "对方所有作战单位（飞机 + 舰船 + 防空设施 + 机场）已全部覆灭。",
   TIMEOUT: "推演到达预设时长，按总分裁定胜方；分数相等时取首个登记方。",
 };
 

@@ -1,21 +1,19 @@
 from __future__ import annotations
 
+import logging
 import os
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from app.ai.agent import PanopticonCommanderAgent
 from app.ai.mcp_client import MCPClientSkeleton, MCPServerConfig
 from app.ai.models import AgentExecutionSummary
 from app.ai.openclaw_sdk_adapter import OpenClawSDKAdapter
+from app.ai.pydantic_agent import AgentDeps, build_agent
 from app.ai.skill_registry import PanopticonSkillRegistry
 from app.panopticon.runtime import ROOT_DIR, PanopticonRuntime
 
-if TYPE_CHECKING:
-    from pydantic_ai import Agent
-
-    from app.ai.pydantic_agent import AgentDeps
-
+logger = logging.getLogger(__name__)
 
 DEFAULT_SCENARIO_PATH = ROOT_DIR / "client" / "src" / "scenarios" / "SCS.json"
 
@@ -44,15 +42,14 @@ class PanopticonOpenClawBridge:
         # ── S4: Pydantic AI agent ─────────────────────────────────────────────
         # Built only when a model is configured; otherwise None and the regex
         # planner in self.agent is used as the fallback.
-        self.pydantic_agent: Agent[AgentDeps, str] | None = None
+        self.pydantic_agent = None
         if llm_model:
-            from app.ai.pydantic_agent import build_agent  # noqa: PLC0415
-
             self.pydantic_agent = build_agent(
                 model_id=llm_model,
                 api_key=llm_api_key,
                 base_url=llm_base_url,
             )
+            logger.info("pydantic-ai agent built: model=%s", llm_model)
 
     @classmethod
     def from_env(cls) -> "PanopticonOpenClawBridge":
@@ -69,10 +66,6 @@ class PanopticonOpenClawBridge:
         )
 
     def _register_default_mcp_skeleton(self) -> None:
-        # ------------------------------- MCP extension -------------------------------
-        # Keep only connection skeleton here. Add concrete external MCP servers
-        # (e.g., solver service) when available.
-        # ---------------------------------------------------------------------------
         self.mcp_client.register_server(
             MCPServerConfig(
                 name="solver-reserved",

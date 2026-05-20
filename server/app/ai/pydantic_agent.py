@@ -15,6 +15,8 @@ from typing import Any
 from pydantic_ai import Agent, RunContext
 from pydantic_ai.models.anthropic import AnthropicModel
 from pydantic_ai.models.openai import OpenAIModel
+from pydantic_ai.providers.anthropic import AnthropicProvider
+from pydantic_ai.providers.openai import OpenAIProvider
 
 from app.ai.models import AgentExecutionSummary, SkillExecutionResult
 from app.ai.skill_registry import PanopticonSkillRegistry
@@ -67,26 +69,23 @@ def resolve_model(model_id: str, api_key: str, base_url: str) -> Any:
     provider, _, name = model_id.partition(":")
 
     if provider == "openai":
-        if api_key or base_url:
-            from openai import AsyncOpenAI  # noqa: PLC0415
-
-            kwargs: dict[str, Any] = {}
-            if api_key:
-                kwargs["api_key"] = api_key
-            if base_url:
-                kwargs["base_url"] = base_url
-            return OpenAIModel(name or "gpt-4o", openai_client=AsyncOpenAI(**kwargs))
-        return OpenAIModel(name or "gpt-4o")
+        kwargs: dict[str, Any] = {}
+        if api_key:
+            kwargs["api_key"] = api_key
+        if base_url:
+            kwargs["base_url"] = base_url
+        return OpenAIModel(name or "gpt-4o", provider=OpenAIProvider(**kwargs))
 
     if provider == "anthropic":
+        kwargs = {}
         if api_key:
-            from anthropic import AsyncAnthropic  # noqa: PLC0415
-
-            return AnthropicModel(
-                name or "claude-3-5-sonnet-20241022",
-                anthropic_client=AsyncAnthropic(api_key=api_key),
-            )
-        return AnthropicModel(name or "claude-3-5-sonnet-20241022")
+            kwargs["api_key"] = api_key
+        if base_url:
+            kwargs["base_url"] = base_url
+        return AnthropicModel(
+            name or "claude-3-5-sonnet-20241022",
+            provider=AnthropicProvider(**kwargs),
+        )
 
     # Unknown provider prefix — pass string through and let pydantic-ai handle it.
     return model_id
@@ -98,7 +97,7 @@ def build_agent(model_id: str, api_key: str = "", base_url: str = "") -> Agent[A
     agent: Agent[AgentDeps, str] = Agent(
         model=model,
         deps_type=AgentDeps,
-        result_type=str,
+        output_type=str,
         system_prompt=SYSTEM_PROMPT,
     )
 

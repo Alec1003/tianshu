@@ -895,7 +895,6 @@ function ScenarioActionButton({
 const OUTCOME_REASON_LABEL: Record<GameOutcome["reason"], string> = {
   "": "推演进行中",
   KEY_UNIT_DESTROYED: "关键单位被毁",
-  ANNIHILATION: "全歼对手",
   TIMEOUT: "时长耗尽",
 };
 

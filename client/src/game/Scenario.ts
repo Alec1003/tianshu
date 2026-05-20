@@ -85,7 +85,20 @@ export default class Scenario {
     this.referencePoints = parameters.referencePoints ?? [];
     this.missions = parameters.missions ?? [];
     this.relationships = parameters.relationships ?? new Relationships({});
-    this.doctrine = parameters.doctrine ?? this.getDefaultDoctrine();
+    // 防御性兜底：servers / 历史快照可能把 doctrine 序列化成 {} 或缺失某些
+    // sideId 的条目。这里若任意一方没条令就用默认（全开交战类）补齐，避免
+    // checkSideDoctrine 直接返回 false 导致红蓝静止不交战。
+    const incoming = parameters.doctrine;
+    if (!incoming || Object.keys(incoming).length === 0) {
+      this.doctrine = this.getDefaultDoctrine();
+    } else {
+      this.doctrine = incoming;
+      this.sides.forEach((side) => {
+        if (!this.doctrine[side.id]) {
+          this.doctrine[side.id] = this.getDefaultSideDoctrine();
+        }
+      });
+    }
   }
 
   getDefaultDoctrine(): Doctrine {

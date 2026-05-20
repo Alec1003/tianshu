@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+import json
+import logging
+
 from fastapi import APIRouter, Request
+from fastapi.responses import StreamingResponse
 
 from app.ai.model_checker import check_model_connectivity
 from app.ai.models import (
@@ -10,6 +14,7 @@ from app.ai.models import (
     ModelCheckResponse,
 )
 
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/ai", tags=["ai"])
 
@@ -62,3 +67,37 @@ def list_skills(request: Request) -> dict:
 @router.post("/model/check", response_model=ModelCheckResponse)
 def check_model(payload: ModelCheckRequest) -> ModelCheckResponse:
     return check_model_connectivity(payload)
+
+
+# ─── S4: Streaming Chat (Pydantic AI) ─────────────────────────────────────────
+
+
+@router.post("/chat")
+async def chat(request: Request) -> StreamingResponse:
+    """Streaming chat endpoint powered by pydantic-ai.
+
+    Accepts Vercel AI SDK compatible request body (messages array).
+    Returns SSE stream of text deltas that any AI-SDK–compatible frontend
+    (useChat from @ai-sdk/react) can consume out of the box.
+
+    Falls back to a non-streaming JSON error if no LLM agent is configured.
+    """
+    from pydantic_ai.ui.vercel_ai import VercelAIAdapter  # noqa: PLC0415
+
+    from app.ai.pydantic_agent import AgentDeps  # noqa: PLC0415
+
+    bridge = request.app.state.bridge
+
+    if bridge.pydantic_agent is None:
+        return StreamingResponse(
+            iter([json.dumps({"error": "No LLM configured. Set AICC_LLM_MODEL + AICC_LLM_API_KEY."})]),
+            status_code=503,
+            media_type="application/json",
+        )
+
+    deps = AgentDeps(registry=bridge.skill_registry)
+    return await VercelAIAdapter.dispatch_request(
+        request,
+        agent=bridge.pydantic_agent,
+        deps=deps,
+    )

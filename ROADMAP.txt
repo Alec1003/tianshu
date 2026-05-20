@@ -1,0 +1,272 @@
+================================================================================
+AICC 后续开发路线图（ROADMAP）
+================================================================================
+基线时间：2026-05-20
+作者：Cascade（与用户结对）
+状态：本文件为"待办池"，每完成一项请勾掉并在文末追加完成日期
+
+================================================================================
+0. 当前位置（基线快照）
+================================================================================
+
+已完成（截至本基线）：
+  [x] MCP Server（stdio + Streamable HTTP，21 个工具）
+  [x] Pydantic AI Agent runtime 骨架
+      - server/app/ai/pydantic_agent.py：AgentDeps + SYSTEM_PROMPT + 全部
+        工具绑定 + run_agent 封装
+      - 适配 pydantic-ai 1.98 API：OpenAIProvider / AnthropicProvider
+      - Agent(..., output_type=str, deps_type=AgentDeps)
+  [x] Bridge LLM 接入
+      - server/app/ai/bridge.py：__init__ 接受 llm_model/llm_api_key/
+        llm_base_url；from_env 读 AICC_ 前缀
+      - process_command_async 优先走 pydantic agent，未配置时回退 regex
+  [x] API 端点
+      - POST /api/ai/command 改 async，兼容现有 schema
+      - POST /api/ai/chat：VercelAIAdapter SSE 流，未配置 LLM 返 503
+  [x] 作战胜负规则收敛（用户拍板）
+      - 移除 ANNIHILATION 作为胜利条件
+      - 新规则：KEY_UNIT_DESTROYED（唯一决胜）→ TIMEOUT（按总分裁定）
+      - 触及文件：Game.ts / SimulationSidebar.tsx / AARDialog.tsx /
+        VictoryConditions.spec.ts
+      - 测试：VictoryConditions.spec.ts 11/11 绿
+      - tsc -b --noEmit 全通过
+
+未关闭风险（声明）：
+  - /api/ai/chat 端到端 SSE 仅 import 期验证，未跑真 LLM
+  - vitest 全量套件有 34 个失败但全部在 src/utils/test/utils.spec.js
+    （时区/颜色/路由数学），与本次改动无关，预存遗留
+
+
+================================================================================
+1. P0-A 当前切片收口（建议 0.5d 内闭环）
+================================================================================
+
+A1. /api/ai/chat smoke 脚本
+    [ ] 创建 server/_pai_chat_smoke.py
+        - 设 AICC_LLM_MODEL + AICC_LLM_API_KEY 后调 POST /api/ai/chat
+        - 收 SSE 流并断言至少一个 tool_call delta 落入 runtime
+        - 调 /api/ai/runtime/scenario 复核单位是否真的部署/移动
+    [ ] 提供 2 个 provider 路径：openai:gpt-4o-mini + anthropic:haiku
+    [ ] 无真 key 时降级用 pydantic_ai.models.test.TestModel 做离线断言
+    验收：脚本 0 退出码即视为通过
+
+A2. README/CLAUDE.md S4 小节
+    [ ] env 变量表
+        AICC_LLM_MODEL（示例：openai:gpt-4o / anthropic:claude-3-5-sonnet）
+        AICC_LLM_API_KEY
+        AICC_LLM_BASE_URL（可选）
+    [ ] /api/ai/chat 请求/响应示例（curl + SSE 输出片段）
+    [ ] /api/ai/command vs /api/ai/chat 取舍说明
+    [ ] 前端 Vercel AI SDK useChat 接入片段
+
+A3. aud 收口
+    [ ] 对本切片 9 个改动文件走一次 audit
+        清单：
+          server/app/ai/pydantic_agent.py
+          server/app/ai/bridge.py
+          server/app/ai/__init__.py
+          server/app/api/ai.py
+          server/app/config.py
+          server/app/main.py（若有改）
+          server/requirements.txt
+          client/src/game/Game.ts
+          client/src/game/test/VictoryConditions.spec.ts
+          client/src/features/tactical/SimulationSidebar.tsx
+          client/src/features/tactical/AARDialog.tsx
+
+
+================================================================================
+2. P0-B AI Sidebar 前端骨架（2-3d，最高价值切片）
+================================================================================
+风格参考：Palantir AIP / Cursor 右侧 chat panel
+
+B1. 布局与状态
+    [ ] 在主 layout 加右侧 collapsible sidebar（默认 collapsed）
+    [ ] zustand 或 context store：
+        - chatOpen / activeTab (chat|rules|skills)
+        - mode (advisor|takeover) —— 参谋模式 / 接管模式
+        - messages（来自 useChat）
+        - pendingActions（待用户确认的写操作）
+
+B2. Chat 面板
+    [ ] 接 Vercel AI SDK：useChat({ api: '/api/ai/chat' })
+    [ ] 流式渲染 markdown + 自定义 ToolInvocation 渲染器
+        - UnitDeployed → 绿色卡片 + 单位 ID + 跳转到地图
+        - UnitMoved / SimStepped → 浅色 timeline
+        - 错误 → 红色 toast
+    [ ] tool_call 完成后自动调 /api/ai/runtime/scenario →
+        game.loadScenario(JSON.stringify(...)) 刷新地图
+
+B3. 参谋模式 vs 接管模式
+    [ ] 模式切换开关（顶部 segmented control）
+    [ ] 参谋模式：写操作（deploy/move/delete/trigger）→ pending → confirm/reject
+        - 服务端要求：bridge 增加 dry_run 标志或 server-side approval queue
+        - 第一版可前端拦截：tool_call 来时不立即应用，等用户点确认才调用
+          /api/ai/runtime/apply
+    [ ] 接管模式：tool_call 直接落地
+    [ ] 写操作显式权限提示
+
+B4. 单元测试
+    [ ] AISidebar 渲染 + 模式切换 + pending 队列 happy path（vitest + RTL）
+
+
+================================================================================
+3. P0-C Rules（用户级 + 想定级两层）（1-2d）
+================================================================================
+
+C1. 数据模型
+    [ ] DB 表 rules
+        id / user_id / scenario_id?（NULL=用户全局规则）
+        name / content / enabled / priority / created_at / updated_at
+    [ ] Alembic migration
+
+C2. 注入路径
+    [ ] 软约束 → Agent.system_prompt 动态拼接
+        - 在 build_agent 时若有 active rules，concatenate 到 SYSTEM_PROMPT
+        - 或用 pydantic-ai 的 dynamic instructions
+    [ ] 硬约束 → 在 skill_registry.execute 处加 RuleEnforcer 钩子
+        - 例："不许部署 RED 单位"在 deploy 工具入口拦截
+
+C3. API
+    [ ] CRUD：POST/GET/PUT/DELETE /api/ai/rules
+    [ ] GET /api/ai/rules/active?scenario_id=... 返回合并后的有效规则集
+
+C4. Sidebar Rules 面板
+    [ ] 列表 / 编辑器（monaco 或简版 textarea）/ 启用开关
+    [ ] 与 chat 联动：违反硬约束时 chat 红色提示
+
+C5. 测试
+    [ ] 规则注入 + 硬约束拦截 单测
+
+
+================================================================================
+4. P0-D Skills 加载（YAML frontmatter + markdown）（1-2d）
+================================================================================
+风格参考：Anthropic Skills
+
+D1. Skill 文件规范
+    [ ] server/skills/*.md 目录约定
+    [ ] frontmatter 字段：name / description / triggers（glob 或关键词）
+    [ ] body：行动手册 markdown
+
+D2. 加载器
+    [ ] server/app/ai/skill_loader.py
+        - 解析 frontmatter（python-frontmatter）
+        - 命中触发器时把 body 注入 system_prompt 或作为 hint message
+    [ ] 与现有 skill_registry（21 个 runtime 工具）解耦：
+        - YAML skill = 高层套路（"先侦察后打击"）
+        - runtime skill = 底层动作（deploy_unit / move_unit）
+
+D3. API
+    [ ] GET /api/ai/skills/yaml 列出可用套路
+    [ ] POST /api/ai/skills/yaml 上传用户自定义套路（保存到 user skills 目录）
+
+D4. Sidebar Skills 面板
+    [ ] 列出已加载套路，可点击查看 markdown
+    [ ] 上传用户套路
+
+D5. 预设套路（最少 3 个）
+    [ ] yaml_skills/recon_then_strike.md
+    [ ] yaml_skills/cap_defensive.md
+    [ ] yaml_skills/strike_high_value_target.md
+
+
+================================================================================
+5. P0-E AI 接管单边 / 对抗 benchmark（2-3d，平台卖点）
+================================================================================
+
+E1. 推演 loop
+    [ ] server/app/ai/dual_agent_runner.py
+        - 每个 step：blue_agent.run() → 应用 → red_agent.run() → 应用 →
+          game.step() → 检查胜负
+        - 共享同一个 MCP server（同一个 PanopticonRuntime 实例）
+    [ ] CLI：python -m app.ai.dual_agent --scenario default.json --max-steps 500
+
+E2. 评估指标
+    [ ] outcomes 表：
+        episode_id / scenario / winner / steps / blue_units_lost / red_units_lost /
+        blue_decision_ms_avg / red_decision_ms_avg
+    [ ] CSV 导出脚本
+
+E3. UI 触发入口
+    [ ] Sidebar 增加 "AI vs AI 对战" 按钮
+    [ ] 实时显示双方决策日志（双 chat 流）
+
+E4. 测试
+    [ ] 用 TestModel 跑 10 episode smoke，断言 outcomes 表有数据
+
+
+================================================================================
+6. P1 后续优化（非阻塞，按需做）
+================================================================================
+
+[ ] /api/ai/chat 加 JWT 鉴权（对齐 fastapi-users）
+[ ] 工具调用参数 RBAC（在 skill_registry.execute 处挂钩）
+[ ] 修预存测试遗留（utils.spec.js 时区/颜色/路由）
+[ ] 多方场景的 Relationships 真正用上（同盟/中立判定）
+[ ] 同 tick 多个 isObjective 死亡时的胜负仲裁
+[ ] TIMEOUT 平分时的"平局"出口（目前取 sides[0]）
+[ ] 性能：MCP 工具调用并发 + 长 scenario 序列化优化
+
+
+================================================================================
+7. 风险与验证清单
+================================================================================
+
+7.1 真 LLM 验证（A1 完成后做一次即可）
+    - openai:gpt-4o-mini + 真 API key → /api/ai/chat 流式正常
+    - anthropic:claude-3-5-haiku + 真 API key → 同上
+    - tool_call 在两个 provider 下都能正确执行并影响 runtime
+
+7.2 前端兼容性
+    - Vercel AI SDK 版本与 pydantic-ai VercelAIAdapter 协议版本对齐
+    - 若 SDK 升到 v5 协议，pydantic-ai 1.98 默认是 v4，需要在 adapter
+      构造时显式指定 protocol_version
+
+7.3 数据安全
+    - rules / yaml skills 上传需要 user_id 隔离
+    - LLM API key 严禁落库，永远从 env 读
+
+7.4 回归
+    - 每个切片合并前跑 client vitest（聚焦 game/* 测试，忽略 utils.spec.js
+      预存失败）
+    - 每个切片合并前跑 server pytest（如有）+ ruff/mypy
+    - 触发 aud 技能审计
+
+
+================================================================================
+8. 决策点（等用户拍板再开工）
+================================================================================
+
+[ ] 切片顺序：A → B → C → D → E（默认）  还是  A → B → E → C → D（先做对战
+    benchmark 拉出平台卖点，再补 rules/skills）？
+[ ] Rules / Skills 是否共用一个面板（折叠在 Sidebar 内）还是独立 tab？
+[ ] AI vs AI 对战是否需要"录像回放"（用 PlaybackRecorder 已有的能力）？
+[ ] LLM cost 控制：是否要在 server 端记录每次调用的 input/output token，
+    按 user_id 做配额？
+
+
+================================================================================
+9. 完成日志（每完成一项追加到这里）
+================================================================================
+
+2026-05-20  Pydantic AI Agent runtime 骨架完成（pydantic_agent.py + bridge.py +
+            api/ai.py POST /chat）
+2026-05-20  作战胜负规则收敛：移除 ANNIHILATION，新规则 KEY_UNIT_DESTROYED →
+            TIMEOUT，11/11 单测绿
+2026-05-20  修复"红蓝方不自主交战"关键 bug
+            根因：server PanopticonRuntime._normalize_scenario_payload 在
+            scenario 缺 doctrine 字段时回填空 `{}`，前端 Scenario 构造的
+            `?? getDefaultDoctrine()` 不触发（`{}` truthy），导致
+            checkSideDoctrine 全 false，所有自主交战函数静默 noop。
+            修复：
+              - server/app/panopticon/_doctrine.py（新）：抽出
+                _DEFAULT_SIDE_DOCTRINE + normalize_scenario_payload
+              - server/app/panopticon/runtime.py：委托给新模块
+              - client/src/game/Scenario.ts：构造函数对空 doctrine 或缺
+                sideId 条目走默认条令兜底
+            回归测试：
+              - server/tests/test_doctrine_normalize.py 9/9 绿
+              - client/src/game/test/ScenarioDoctrineFallback.spec.ts 3/3 绿
+              - VictoryConditions.spec.ts 11/11 仍绿
+              - tsc -b --noEmit 全通过

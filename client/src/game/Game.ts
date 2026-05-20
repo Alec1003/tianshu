@@ -41,15 +41,11 @@ import { DoctrineType, SideDoctrine } from "@/game/Doctrine";
 const MAX_HISTORY_SIZE = 20;
 
 // 胜负判定原因：
-// - KEY_UNIT_DESTROYED：某关键单位（isObjective=true）被击毁，对方立即胜。
-// - ANNIHILATION：某一方所有可作战单位（aircraft/ship/facility/airbase）归零。
-// - TIMEOUT：达到 scenario.duration 上限，按总分裁定。
+// - KEY_UNIT_DESTROYED：某关键单位（isObjective=true）被击毁，对方立即胜（唯一“决胜”条件）。
+// - TIMEOUT：达到 scenario.duration 上限 → 按总分裁定胜方。
 // 空字符串表示尚未结束（gameOutcome.ended=false）。
-export type GameOutcomeReason =
-  | ""
-  | "KEY_UNIT_DESTROYED"
-  | "ANNIHILATION"
-  | "TIMEOUT";
+// 备注：一方作战单位归零本身不再触发胜负，推演继续直到关键单位被毁或超时。
+export type GameOutcomeReason = "" | "KEY_UNIT_DESTROYED" | "TIMEOUT";
 
 export interface GameOutcome {
   ended: boolean;
@@ -2243,9 +2239,9 @@ export default class Game {
 
   // 胜负判定：每个 step 末尾调用。优先级（高 → 低）：
   //   1. 已结束 → 直接返回
-  //   2. KEY_UNIT_DESTROYED：消费 scenario.lastObjectiveDestroyed
-  //   3. ANNIHILATION：某方作战单位（aircraft+ship+facility+airbase）全毁
-  //   4. TIMEOUT：达到 scenario.duration → 取总分最高方
+  //   2. KEY_UNIT_DESTROYED：消费 scenario.lastObjectiveDestroyed → 攻方胜
+  //   3. TIMEOUT：达到 scenario.duration → 取总分最高方
+  // 注：一方作战单位全毁本身不再结束推演（不是胜利条件），继续等关键单位或超时。
   checkGameEnded(): boolean {
     if (this.gameOutcome.ended) return true;
 
@@ -2261,35 +2257,8 @@ export default class Game {
       return true;
     }
 
-    // ANNIHILATION（至少 2 方场景）
-    const sides = this.currentScenario.sides;
-    if (sides.length >= 2) {
-      const aliveSideIds = new Set<string>();
-      this.currentScenario.aircraft.forEach((u) => aliveSideIds.add(u.sideId));
-      this.currentScenario.ships.forEach((u) => aliveSideIds.add(u.sideId));
-      this.currentScenario.facilities.forEach((u) =>
-        aliveSideIds.add(u.sideId)
-      );
-      this.currentScenario.airbases.forEach((u) =>
-        aliveSideIds.add(u.sideId)
-      );
-      const eliminated = sides.filter((s) => !aliveSideIds.has(s.id));
-      const survivors = sides.filter((s) => aliveSideIds.has(s.id));
-      if (eliminated.length > 0 && survivors.length > 0) {
-        const winner = survivors.reduce((a, b) =>
-          (a.totalScore ?? 0) >= (b.totalScore ?? 0) ? a : b
-        );
-        this.gameOutcome = {
-          ended: true,
-          winnerSideId: winner.id,
-          reason: "ANNIHILATION",
-          endedAt: this.currentScenario.currentTime,
-        };
-        return true;
-      }
-    }
-
     // TIMEOUT
+    const sides = this.currentScenario.sides;
     const elapsed =
       this.currentScenario.currentTime - this.currentScenario.startTime;
     if (

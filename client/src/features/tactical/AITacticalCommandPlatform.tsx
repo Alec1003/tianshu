@@ -433,11 +433,11 @@ export default function AITacticalCommandPlatform({
     };
   }, [game, refreshSnapshot]);
 
-  // 轮询后端 runtime，仿真暂停时每 3s 同步一次 MCP 变更到客户端。
+  // 轮询后端 runtime，仿真未在运行时每 3s 同步一次 MCP 变更到客户端。
   // 用上次拉取到的单位总数作为变化信号，避免无变化时重复加载场景。
   const runtimeUnitCountRef = useRef<number | null>(null);
   useEffect(() => {
-    if (snapshot.runState !== "idle") return;
+    if (snapshot.runState === "running") return;
 
     const sync = async () => {
       try {

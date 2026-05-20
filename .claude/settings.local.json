@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(& \"C:\\\\Users\\\\11631\\\\Desktop\\\\AICC-master\\\\.python312\\\\python.exe\" -c 'import sys; sys.path.insert\\(0, r\"C:\\\\Users\\\\11631\\\\Desktop\\\\AICC-master\\\\server\"\\); import app.mcp.__main__ as m; m.main\\(\\)')",
+      "PowerShell(& \"C:\\\\Users\\\\11631\\\\Desktop\\\\AICC-master\\\\.python312\\\\python.exe\" -c \"import sys; sys.path.insert\\(0, r'C:\\\\Users\\\\11631\\\\Desktop\\\\AICC-master\\\\server'\\); import app.mcp.__main__ as m; m.main\\(\\)\")",
+      "PowerShell(& \"C:\\\\Users\\\\11631\\\\Desktop\\\\AICC-master\\\\.python312\\\\python.exe\" -c \"import sys;sys.path.insert\\(0,r'C:\\\\Users\\\\11631\\\\Desktop\\\\AICC-master\\\\server'\\);import app.mcp.__main__ as m;print\\('MCP_IMPORT_OK'\\)\")",
+      "mcp__aicc__runtime_deploy_ship"
+    ]
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "aicc"
+  ]
+}

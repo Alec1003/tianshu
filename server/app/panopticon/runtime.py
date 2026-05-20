@@ -23,6 +23,12 @@ from blade.units.Facility import Facility  # type: ignore  # noqa: E402
 from blade.units.ReferencePoint import ReferencePoint  # type: ignore  # noqa: E402
 from blade.units.Ship import Ship  # type: ignore  # noqa: E402
 
+from app.panopticon._doctrine import (  # noqa: E402
+    _DEFAULT_SIDE_DOCTRINE,
+    default_doctrine_for_sides as _default_doctrine_for_sides,
+    normalize_scenario_payload as _normalize_scenario_payload_impl,
+)
+
 
 class PanopticonRuntime:
     """Low-intrusion runtime wrapper around Panopticon native simulation engine."""
@@ -64,20 +70,12 @@ class PanopticonRuntime:
 
     @staticmethod
     def _normalize_scenario_payload(scenario_json: str) -> str:
-        """Backfill fields required by gym/blade loader for legacy scenarios."""
-        try:
-            payload = json.loads(scenario_json)
-        except json.JSONDecodeError:
-            return scenario_json
+        """委托给 ``app.panopticon._doctrine.normalize_scenario_payload``。
 
-        if not isinstance(payload, dict):
-            return scenario_json
-
-        current = payload.get("currentScenario")
-        if isinstance(current, dict) and "doctrine" not in current:
-            current["doctrine"] = {}
-
-        return json.dumps(payload)
+        逻辑见该模块文档；保留这个 staticmethod 是因为现有调用方都通过
+        ``PanopticonRuntime._normalize_scenario_payload`` 访问。
+        """
+        return _normalize_scenario_payload_impl(scenario_json)
 
     def _resolve_side_id(self, side_ref: str | None) -> str:
         if side_ref:

@@ -1,0 +1,17 @@
+{
+  "mcpServers": {
+    "aicc": {
+      "command": "C:\\Users\\11631\\Desktop\\AICC-master\\.python312\\python.exe",
+      "args": [
+        "-c",
+        "import sys;sys.path.insert(0,r'C:\\Users\\11631\\Desktop\\AICC-master\\server');import app.mcp.__main__ as m;m.main()"
+      ],
+      "cwd": "C:\\Users\\11631\\Desktop\\AICC-master\\server",
+      "env": {
+        "AICC_MCP_USER_ID": "c3f63422-8e08-43d3-85d8-95f28aeca3ef",
+        "AICC_DATABASE_URL": "sqlite+aiosqlite:///./data/aicc.db",
+        "AICC_JWT_SECRET": "aicc-dev-secret-change-me-in-production"
+      }
+    }
+  }
+}

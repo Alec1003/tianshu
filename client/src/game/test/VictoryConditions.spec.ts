@@ -166,30 +166,13 @@ describe("Game.checkGameEnded", () => {
     expect(game.gameOutcome.winnerSideId).toBe(blue.id);
   });
 
-  test("ANNIHILATION: side with zero combat units loses", () => {
-    const { blue, red, scenario, game } = makeTwoSideScenario();
-    // 只剩蓝方
+  test("side with zero combat units does NOT end the game (waits for KEY_UNIT or TIMEOUT)", () => {
+    const { blue, red: _red, scenario, game } = makeTwoSideScenario();
+    // 只剩蓝方有单位，红方全灭——但新规则下全灭不再是胜利条件
     scenario.aircraft.push(makeAircraft({ id: "a1", sideId: blue.id }));
-    // 红方无单位
-
-    expect(game.checkGameEnded()).toBe(true);
-    expect(game.gameOutcome.reason).toBe("ANNIHILATION");
-    expect(game.gameOutcome.winnerSideId).toBe(blue.id);
-  });
-
-  test("ANNIHILATION not triggered when scenario has only one side", () => {
-    const onlyBlue = new Side({ id: "blue-1", name: "BLUE", color: "blue" });
-    const scenario = new Scenario({
-      id: "sc-1",
-      name: "Single-side",
-      startTime: 0,
-      currentTime: 0,
-      duration: 14400,
-      sides: [onlyBlue],
-    });
-    const game = new Game(scenario);
 
     expect(game.checkGameEnded()).toBe(false);
+    expect(game.gameOutcome.ended).toBe(false);
   });
 
   test("TIMEOUT: at duration limit, highest-score side wins", () => {
@@ -209,23 +192,39 @@ describe("Game.checkGameEnded", () => {
     expect(game.gameOutcome.winnerSideId).toBe(blue.id);
   });
 
-  test("priority: KEY_UNIT_DESTROYED beats ANNIHILATION when both conditions match", () => {
-    const { blue, red, scenario, game } = makeTwoSideScenario();
-    // 红方只有一个关键单位
+  test("priority: KEY_UNIT_DESTROYED beats TIMEOUT when both conditions match", () => {
+    const { blue, red, scenario, game } = makeTwoSideScenario({ duration: 60 });
+    scenario.aircraft.push(makeAircraft({ id: "a1", sideId: blue.id }));
     const vip = makeAircraft({
       id: "vip-red",
       sideId: red.id,
       isObjective: true,
     });
-    scenario.aircraft.push(makeAircraft({ id: "a1", sideId: blue.id }));
     scenario.aircraft.push(vip);
+    // 击毁关键单位同时推到超时点
     onUnitDestroyed(scenario, blue.id, vip);
-    // 同时把红方 vip 也物理移除，触发 ANNIHILATION 条件
-    scenario.aircraft = scenario.aircraft.filter((u) => u.id !== "vip-red");
+    scenario.currentTime = scenario.startTime + 60;
+    // TIMEOUT 下红方总分更高，以验证 KEY_UNIT_DESTROYED 优先于 TIMEOUT 的打分裁定
+    blue.totalScore = 0;
+    red.totalScore = 9999;
 
     expect(game.checkGameEnded()).toBe(true);
-    // KEY_UNIT_DESTROYED 优先
     expect(game.gameOutcome.reason).toBe("KEY_UNIT_DESTROYED");
+    // 胜方 = 击毁关键单位的攻方（蓝方），而不是 TIMEOUT 按分裁定的红方
+    expect(game.gameOutcome.winnerSideId).toBe(blue.id);
+  });
+
+  test("TIMEOUT decides winner by score when no KEY_UNIT_DESTROYED occurred", () => {
+    const { blue, red, scenario, game } = makeTwoSideScenario({ duration: 60 });
+    scenario.aircraft.push(makeAircraft({ id: "a1", sideId: blue.id }));
+    // 红方全灭，关键单位未被击毁。超时后按总分裁定。
+    blue.totalScore = 100;
+    red.totalScore = 50;
+    scenario.currentTime = scenario.startTime + 60;
+
+    expect(game.checkGameEnded()).toBe(true);
+    expect(game.gameOutcome.reason).toBe("TIMEOUT");
+    expect(game.gameOutcome.winnerSideId).toBe(blue.id);
   });
 });
 

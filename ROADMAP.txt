@@ -337,3 +337,17 @@ E4. 测试
               - client/src/game/test/ScenarioDoctrineFallback.spec.ts 3/3 绿
               - VictoryConditions.spec.ts 11/11 仍绿
               - tsc -b --noEmit 全通过
+
+2026-05-20  修复清除航线后新航线串入旧末端点
+            根因：Game.commitRoute 将 route 直接赋值为 desiredRoute，同一数组
+            引用可能被后续绘制/提交链路复用。
+            修复：
+              - client/src/game/Game.ts：提交航线时复制航点数组，切断
+                route 与 desiredRoute 引用。
+              - client/src/game/test/Game.spec.ts：覆盖 aircraft/ship 提交后
+                再追加 desiredRoute 不污染已提交 route。
+            验证：
+              - npm run test -- src/game/test/Game.spec.ts 2/2 绿
+              - npx tsc -b --noEmit 全通过
+              - docker compose build client 成功
+              - docker compose up -d client 成功

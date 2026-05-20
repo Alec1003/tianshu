@@ -989,14 +989,20 @@ export default class Game {
     const aircraft = this.currentScenario.getAircraft(unitId);
     if (aircraft) {
       this.recordHistory();
-      aircraft.route = aircraft.desiredRoute;
+      aircraft.route = aircraft.desiredRoute.map(([latitude, longitude]) => [
+        latitude,
+        longitude,
+      ]);
       aircraft.desiredRoute = [];
       return aircraft;
     }
     const ship = this.currentScenario.getShip(unitId);
     if (ship) {
       this.recordHistory();
-      ship.route = ship.desiredRoute;
+      ship.route = ship.desiredRoute.map(([latitude, longitude]) => [
+        latitude,
+        longitude,
+      ]);
       ship.desiredRoute = [];
       return ship;
     }

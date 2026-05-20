@@ -1,8 +1,10 @@
 import {
+  CallbackProperty,
   Cartesian2,
   Cartesian3,
   Color,
   ColorMaterialProperty,
+  ConstantProperty,
   Entity,
   HorizontalOrigin,
   LabelStyle,
@@ -133,6 +135,20 @@ const WEAPON_PREFIX = "weapon:";
 
 const SELECTED_SCALE = 1.4;
 const DEFAULT_SCALE = 1;
+
+// 关键单位（``isObjective: true``）图标在地图上做 alpha 脉动闪烁。
+// 周期 ~1.2s，alpha 在 0.3 ~ 1.0 之间余弦平滑过渡；非关键单位直接用
+// ``NORMAL_BILLBOARD_COLOR``（不染色，Color.WHITE 在 Cesium 里等价于
+// 不做颜色乘算）。CallbackProperty 在每帧渲染时被 Cesium 重新调用 →
+// 不依赖外部 timer，render loop 跑就闪。
+const BLINK_PERIOD_MS = 1200;
+const OBJECTIVE_BLINK_COLOR = new CallbackProperty((_time, result) => {
+  const phase = (Date.now() % BLINK_PERIOD_MS) / BLINK_PERIOD_MS;
+  const wave = 0.5 - 0.5 * Math.cos(phase * Math.PI * 2);
+  const alpha = 0.3 + 0.7 * wave;
+  return Color.WHITE.withAlpha(alpha, result);
+}, false);
+const NORMAL_BILLBOARD_COLOR = new ConstantProperty(Color.WHITE);
 
 export class CesiumScenarioEntities {
   private readonly viewer: Viewer;
@@ -274,6 +290,13 @@ export class CesiumScenarioEntities {
       const labelColor = Color.fromCssColorString(unit.sideColor);
       const scale =
         this.selectedId === unit.id ? SELECTED_SCALE : DEFAULT_SCALE;
+      // 仅 Aircraft / Ship / Facility / Airbase 有 ``isObjective`` 字段；
+      // ReferencePoint 没有此概念，转成布尔后落到 false 即不闪。
+      const isObjective =
+        (unit as { isObjective?: boolean }).isObjective === true;
+      const billboardColor = isObjective
+        ? OBJECTIVE_BLINK_COLOR
+        : NORMAL_BILLBOARD_COLOR;
 
       const existing = this.entities.get(unit.id);
       if (existing) {
@@ -284,6 +307,10 @@ export class CesiumScenarioEntities {
           (existing.billboard.image as unknown) = iconUrl;
           (existing.billboard.rotation as unknown) = rotation;
           (existing.billboard.scale as unknown) = scale;
+          // billboard.color 用 CallbackProperty / ConstantProperty 直接赋值。
+          // 同一关键单位只赋同一个 OBJECTIVE_BLINK_COLOR 实例（==）；切换
+          // objective 状态时显式覆盖，触发 Cesium 重绑定。
+          (existing.billboard.color as unknown) = billboardColor;
         }
         if (existing.label) {
           (existing.label.text as unknown) = localizeUnitName(unit.name);
@@ -297,6 +324,7 @@ export class CesiumScenarioEntities {
             image: iconUrl,
             rotation,
             scale,
+            color: billboardColor,
             verticalOrigin: VerticalOrigin.CENTER,
             horizontalOrigin: HorizontalOrigin.CENTER,
           },

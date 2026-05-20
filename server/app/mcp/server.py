@@ -185,6 +185,9 @@ mcp = FastMCP(
     # set the inner path to ``/`` so the final URL stays ``/api/mcp``
     # (default would have produced ``/api/mcp/mcp``).
     streamable_http_path="/",
+    # Stateless mode: no server-side session tracking. Each request is handled
+    # independently, so server restarts never invalidate client connections.
+    stateless_http=True,
 )
 
 

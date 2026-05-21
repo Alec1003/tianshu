@@ -42,8 +42,8 @@ describe("Scenario", () => {
       sideBlue,
       sideRed,
     ] = getTestUnits();
-    expect(testScenario.getSide("BLUE")).toBe(sideBlue);
-    expect(testScenario.getSide("RED")).toBe(sideRed);
+    expect(testScenario.getSide("1")).toBe(sideBlue);
+    expect(testScenario.getSide("2")).toBe(sideRed);
   });
 
   test("getSide returns undefined if the side is not found", () => {
@@ -97,18 +97,18 @@ describe("Scenario", () => {
     const newAircraftName = "F-22";
     const newAircraftClassname = "Stealth Fighter";
     const newAircraftSpeed = 600;
-    const newAircraftWeaponQuantity = 60;
     const newAircraftCurrentFuel = 1000;
     const newAircraftFuelRate = 5;
+    const newAircraftRange = 600;
     const [testScenario] = getTestUnits();
     testScenario.updateAircraft(
       "5",
       newAircraftName,
       newAircraftClassname,
       newAircraftSpeed,
-      newAircraftWeaponQuantity,
       newAircraftCurrentFuel,
-      newAircraftFuelRate
+      newAircraftFuelRate,
+      newAircraftRange
     );
     const updatedAircraft = testScenario.getAircraft("5");
     expect(updatedAircraft.name).toBe(newAircraftName);
@@ -116,9 +116,7 @@ describe("Scenario", () => {
     expect(updatedAircraft.speed).toBe(newAircraftSpeed);
     expect(updatedAircraft.currentFuel).toBe(newAircraftCurrentFuel);
     expect(updatedAircraft.fuelRate).toBe(newAircraftFuelRate);
-    expect(updatedAircraft.weapons[0].currentQuantity).toBe(
-      newAircraftWeaponQuantity
-    );
+    expect(updatedAircraft.range).toBe(newAircraftRange);
   });
 
   test("can update a ship", () => {
@@ -126,7 +124,6 @@ describe("Scenario", () => {
     const newShipClassname = "USS Enterprise";
     const newShipSpeed = 200;
     const newShipCurrentFuel = 200;
-    const newShipWeaponQuantity = 50;
     const newShipRange = 600;
     const [testScenario] = getTestUnits();
     testScenario.updateShip(
@@ -135,7 +132,6 @@ describe("Scenario", () => {
       newShipClassname,
       newShipSpeed,
       newShipCurrentFuel,
-      newShipWeaponQuantity,
       newShipRange
     );
     const updatedShip = testScenario.getShip("6");
@@ -143,7 +139,6 @@ describe("Scenario", () => {
     expect(updatedShip.className).toBe(newShipClassname);
     expect(updatedShip.speed).toBe(newShipSpeed);
     expect(updatedShip.currentFuel).toBe(newShipCurrentFuel);
-    expect(updatedShip.weapons[0].currentQuantity).toBe(newShipWeaponQuantity);
     expect(updatedShip.range).toBe(newShipRange);
   });
 
@@ -151,22 +146,17 @@ describe("Scenario", () => {
     const newFacilityName = "Patriot";
     const newFacilityClassname = "Patriot";
     const newFacilityRange = 300;
-    const newFacilityWeaponQuantity = 40;
     const [testScenario] = getTestUnits();
     testScenario.updateFacility(
       "7",
       newFacilityName,
       newFacilityClassname,
-      newFacilityRange,
-      newFacilityWeaponQuantity
+      newFacilityRange
     );
     const updatedFacility = testScenario.getFacility("7");
     expect(updatedFacility.name).toBe(newFacilityName);
     expect(updatedFacility.className).toBe(newFacilityClassname);
     expect(updatedFacility.range).toBe(newFacilityRange);
-    expect(updatedFacility.weapons[0].currentQuantity).toBe(
-      newFacilityWeaponQuantity
-    );
   });
 
   test("can update airbase", () => {

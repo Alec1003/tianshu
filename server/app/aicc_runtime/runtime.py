@@ -23,15 +23,15 @@ from blade.units.Facility import Facility  # type: ignore  # noqa: E402
 from blade.units.ReferencePoint import ReferencePoint  # type: ignore  # noqa: E402
 from blade.units.Ship import Ship  # type: ignore  # noqa: E402
 
-from app.panopticon._doctrine import (  # noqa: E402
+from app.aicc_runtime._doctrine import (  # noqa: E402
     _DEFAULT_SIDE_DOCTRINE,
     default_doctrine_for_sides as _default_doctrine_for_sides,
     normalize_scenario_payload as _normalize_scenario_payload_impl,
 )
 
 
-class PanopticonRuntime:
-    """Low-intrusion runtime wrapper around Panopticon native simulation engine."""
+class AICCRuntime:
+    """Low-intrusion runtime wrapper around AICC native simulation engine."""
 
     def __init__(self, scenario_path: Path) -> None:
         self._lock = RLock()
@@ -70,10 +70,10 @@ class PanopticonRuntime:
 
     @staticmethod
     def _normalize_scenario_payload(scenario_json: str) -> str:
-        """委托给 ``app.panopticon._doctrine.normalize_scenario_payload``。
+        """委托给 ``app.aicc_runtime._doctrine.normalize_scenario_payload``。
 
         逻辑见该模块文档；保留这个 staticmethod 是因为现有调用方都通过
-        ``PanopticonRuntime._normalize_scenario_payload`` 访问。
+        ``AICCRuntime._normalize_scenario_payload`` 访问。
         """
         return _normalize_scenario_payload_impl(scenario_json)
 

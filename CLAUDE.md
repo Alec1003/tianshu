@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project overview
 
-AICC is a tactical scenario / wargame platform: a React + Cesium frontend on port 3000 talks to a FastAPI backend on port 8000 that wraps a Python `gym/blade` simulation engine. Natural-language commands flow through an OpenClaw-style "Panopticon" bridge into a skill registry that mutates the live scenario. The same backend also exposes an MCP server (stdio + Streamable HTTP at `/api/mcp/`) so external LLMs (Claude Desktop, Cursor) drive the *same* runtime instance the browser is rendering.
+AICC is a tactical scenario / wargame platform: a React + Cesium frontend on port 3000 talks to a FastAPI backend on port 8000 that wraps a Python `gym/blade` simulation engine. Natural-language commands flow through an OpenClaw-style "AICC" bridge into a skill registry that mutates the live scenario. The same backend also exposes an MCP server (stdio + Streamable HTTP at `/api/mcp/`) so external LLMs (Claude Desktop, Cursor) drive the *same* runtime instance the browser is rendering.
 
 ## Common commands
 
@@ -30,11 +30,11 @@ The Python interpreter lives at `.python312\python.exe` in the repo root — `st
 
 ### Backend (`server/app/`)
 
-- `main.py` builds the FastAPI app. The `lifespan` is load-bearing: it (1) creates DB + seeds system templates, (2) constructs `PanopticonOpenClawBridge` which owns the singleton `PanopticonRuntime`, (3) calls `set_shared_runtime(bridge.runtime)` *before* opening the MCP session manager, then (4) wraps `yield` inside `async with mcp.session_manager.run()`. The MCP HTTP transport is mounted at `/api/mcp` behind `BearerAuthASGI`.
-- `ai/bridge.py` — `PanopticonOpenClawBridge` is the composition root: runtime + skill registry + agent + MCP client skeleton + SDK adapter. `from_env()` is the only constructor callers use.
-- `ai/agent.py` — `PanopticonCommanderAgent` parses natural-language commands (regex-driven; see `UUID_RE`, `NUMBER_RE`, etc.) and dispatches to skills. Hooks `_plan_with_sdk()` for future OpenClaw SDK integration.
+- `main.py` builds the FastAPI app. The `lifespan` is load-bearing: it (1) creates DB + seeds system templates, (2) constructs `AICCOpenClawBridge` which owns the singleton `AICCRuntime`, (3) calls `set_shared_runtime(bridge.runtime)` *before* opening the MCP session manager, then (4) wraps `yield` inside `async with mcp.session_manager.run()`. The MCP HTTP transport is mounted at `/api/mcp` behind `BearerAuthASGI`.
+- `ai/bridge.py` — `AICCOpenClawBridge` is the composition root: runtime + skill registry + agent + MCP client skeleton + SDK adapter. `from_env()` is the only constructor callers use.
+- `ai/agent.py` — `AICCCommanderAgent` parses natural-language commands (regex-driven; see `UUID_RE`, `NUMBER_RE`, etc.) and dispatches to skills. Hooks `_plan_with_sdk()` for future OpenClaw SDK integration.
 - `ai/skill_registry.py` — Concrete skill implementations bound to the runtime.
-- `panopticon/runtime.py` — `PanopticonRuntime` wraps `gym/blade`'s `Game`/`Scenario`. It mutates `sys.path` at import time to put `<repo>/gym` on the path, then imports `blade.*` modules. Holds an `RLock` and a script-step cursor for staged playback. `ROOT_DIR` is `repo` root computed via `parents[3]`.
+- `aicc/runtime.py` — `AICCRuntime` wraps `gym/blade`'s `Game`/`Scenario`. It mutates `sys.path` at import time to put `<repo>/gym` on the path, then imports `blade.*` modules. Holds an `RLock` and a script-step cursor for staged playback. `ROOT_DIR` is `repo` root computed via `parents[3]`.
 - `api/ai.py` — three endpoints:
   - `POST /api/ai/command` — main NL command surface; returns execution summary + freshly exported scenario JSON.
   - `GET /api/ai/runtime/scenario` — read-only snapshot of the live runtime (the front-end polls this to see MCP-side mutations).
@@ -44,12 +44,12 @@ The Python interpreter lives at `.python312\python.exe` in the repo root — `st
 - `mcp/` — FastMCP server. `server.py` registers all tools (27 tools + 2 resources + 1 template). Two transports:
   - **stdio**: `python -m app.mcp`. Auth via `AICC_MCP_TOKEN` (JWT) or `AICC_MCP_USER_ID` (dev shortcut).
   - **Streamable HTTP**: mounted at `/api/mcp/` with per-request `Authorization: Bearer <jwt>`. `AICC_MCP_HTTP_DEV_USER_ID` skips auth for local dev (warns in logs).
-  - Tools split into two groups: **DB scenarios** (12 tools — static persistence on the `Scenario` table) and **runtime** (15 tools — live in-memory `PanopticonRuntime`). The two groups do **not** auto-sync; use `runtime_load_scenario_from_db` and `runtime_save_to_db` to bridge.
+  - Tools split into two groups: **DB scenarios** (12 tools — static persistence on the `Scenario` table) and **runtime** (15 tools — live in-memory `AICCRuntime`). The two groups do **not** auto-sync; use `runtime_load_scenario_from_db` and `runtime_save_to_db` to bridge.
 - `db/session.py` — async SQLAlchemy session. SQLite at `./data/aicc.db` by default; docker-compose mounts a volume so data survives rebuilds.
 
 ### Shared-runtime invariant
 
-The MCP server and `/api/ai/command` operate on the **same** `PanopticonRuntime` instance (`app.state.bridge.runtime`). External LLM mutations through MCP are immediately visible at `GET /api/ai/runtime/scenario`. The browser, however, has its own client-side `Game` (`client/src/game/Game.ts`) and does **not** auto-poll — frontend must explicitly call the snapshot endpoint and `game.loadScenario(json)` to pick up MCP-side changes.
+The MCP server and `/api/ai/command` operate on the **same** `AICCRuntime` instance (`app.state.bridge.runtime`). External LLM mutations through MCP are immediately visible at `GET /api/ai/runtime/scenario`. The browser, however, has its own client-side `Game` (`client/src/game/Game.ts`) and does **not** auto-poll — frontend must explicitly call the snapshot endpoint and `game.loadScenario(json)` to pick up MCP-side changes.
 
 ### Simulation engine — two copies
 

@@ -143,7 +143,7 @@ class AarRecordOut(BaseModel):
     created_at: datetime
 
 
-# ---------- Runtime (PanopticonRuntime) ----------------------------------
+# ---------- Runtime (AICCRuntime) ----------------------------------
 
 
 class RuntimeSideStat(BaseModel):
@@ -156,7 +156,7 @@ class RuntimeSideStat(BaseModel):
 class RuntimeStatus(BaseModel):
     """正在跑的内存活想定的态势快照。
 
-    注意：这是 ``PanopticonRuntime.game.current_scenario`` 的实时状态，
+    注意：这是 ``AICCRuntime.game.current_scenario`` 的实时状态，
     与 ``Scenario.data``（DB 静态快照）不同源；二者通过 ``runtime_load_*`` /
     ``runtime_save_to_db`` 桥接，不会自动同步。
     """

@@ -12,8 +12,8 @@
  *   MCP Servers（增删改 + enable toggle）/ Skills（后端已注册 + 用户
  *   自定义）三段。
  * - 持久化：modelConfig / mcpServers / customSkills / projectMcpEnabled
- *   沿用 panopticon.ai.* 老 keys；chat 消息由于类型从
- *   ChatMessage 迁移到 UIMessage，另存为 panopticon.ai.messages.v2。
+ *   使用 aicc.ai.* keys；chat 消息由于类型从
+ *   ChatMessage 迁移到 UIMessage，另存为 aicc.ai.messages.v2。
  * - 主题：cyan/slate tactical，复用 shadcn Card/Button，TailwindCSS。
  *
  * Props 由 AITacticalCommandPlatform 控制：open / activeTab /
@@ -64,6 +64,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
 export type AISidebarTab = "chat" | "settings";
+type AIChatMode = "ask" | "command";
 
 interface MCPServerConfig {
   id: string;
@@ -107,6 +108,18 @@ interface ModelCheckResponse {
   error?: string | null;
 }
 
+interface ToolRunSnapshot {
+  toolName: string;
+  state: string;
+}
+
+interface ChatRunSummary {
+  label: string;
+  detail: string;
+  tone: "idle" | "running" | "done" | "error";
+  tools: ToolRunSnapshot[];
+}
+
 interface AISidebarProps {
   open: boolean;
   activeTab: AISidebarTab;
@@ -130,15 +143,11 @@ interface AISidebarProps {
 }
 
 const STORAGE_KEY = {
-  // v2: messages now follow ai-sdk v5 UIMessage shape (parts[] with text +
-  // tool-invocation chunks). v1 (`panopticon.ai.messages`) was a flat
-  // {role,text,state,detail} list; left untouched to avoid clobbering, but
-  // never read.
-  messagesV2: "panopticon.ai.messages.v2",
-  mcpServers: "panopticon.ai.mcpServers",
-  customSkills: "panopticon.ai.customSkills",
-  model: "panopticon.ai.model",
-  projectMcpEnabled: "panopticon.ai.projectMcpEnabled",
+  messagesV2: "aicc.ai.messages.v2",
+  mcpServers: "aicc.ai.mcpServers",
+  customSkills: "aicc.ai.customSkills",
+  model: "aicc.ai.model",
+  projectMcpEnabled: "aicc.ai.projectMcpEnabled",
 } as const;
 
 const DEFAULT_MODEL: ModelConfig = {
@@ -160,11 +169,7 @@ const MODEL_PROVIDER_OPTIONS = [
 
 const MODEL_PRESETS: Record<string, string[]> = {
   openai: ["gpt-5", "gpt-5-mini", "gpt-4.1", "gpt-4o", "gpt-4o-mini"],
-  anthropic: [
-    "claude-3-7-sonnet",
-    "claude-3-5-sonnet",
-    "claude-3-5-haiku",
-  ],
+  anthropic: ["claude-3-7-sonnet", "claude-3-5-sonnet", "claude-3-5-haiku"],
   google: ["gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.0-flash"],
   deepseek: ["deepseek-chat", "deepseek-reasoner"],
   qwen: ["qwen-max", "qwen-plus", "qwen-turbo"],
@@ -174,11 +179,12 @@ const MODEL_PRESETS: Record<string, string[]> = {
 
 const DEFAULT_MCP_SERVERS: MCPServerConfig[] = [
   {
-    id: typeof crypto !== "undefined" && "randomUUID" in crypto
-      ? crypto.randomUUID()
-      : `mcp-${Date.now()}`,
-    name: "Panopticon MCP",
-    endpoint: "stdio://local-panopticon-mcp",
+    id:
+      typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : `mcp-${Date.now()}`,
+    name: "AICC MCP",
+    endpoint: "stdio://local-aicc-mcp",
     transport: "stdio",
     enabled: true,
   },
@@ -238,6 +244,104 @@ function messagesKeyFor(scenarioId: string | undefined): string {
   return `${STORAGE_KEY.messagesV2}:${scenarioId || "__none__"}`;
 }
 
+function getToolRunSnapshot(part: unknown): ToolRunSnapshot {
+  const p = part as {
+    type?: string;
+    toolName?: string;
+    state?: string;
+  };
+  const toolName = p.toolName
+    ? p.toolName
+    : typeof p.type === "string" && p.type.startsWith("tool-")
+      ? p.type.slice("tool-".length)
+      : "tool";
+  return {
+    toolName,
+    state: p.state ?? "unknown",
+  };
+}
+
+function formatChatError(error: Error): string {
+  const message = error.message || "Unknown chat error";
+  if (
+    message.includes("503") ||
+    message.toLowerCase().includes("service unavailable") ||
+    message.includes("No LLM configured")
+  ) {
+    return "No LLM is configured. Fill API Key in Settings > 模型配置, or set AICC_LLM_MODEL and AICC_LLM_API_KEY in the server environment.";
+  }
+  return message;
+}
+
+function summarizeChatRun(
+  messages: UIMessage[],
+  busy: boolean,
+  hasError: boolean
+): ChatRunSummary {
+  if (hasError) {
+    return {
+      label: "Run failed",
+      detail: "Check the latest assistant response or model settings",
+      tone: "error",
+      tools: [],
+    };
+  }
+
+  const lastAssistant = [...messages]
+    .reverse()
+    .find((message) => message.role === "assistant");
+  const tools =
+    lastAssistant?.parts
+      .filter((part) => isToolOrDynamicToolUIPart(part))
+      .map(getToolRunSnapshot) ?? [];
+  const completed = tools.filter(
+    (tool) => tool.state === "output-available"
+  ).length;
+  const failed = tools.some((tool) => tool.state === "output-error");
+  const runningTool = tools.find(
+    (tool) => tool.state !== "output-available" && tool.state !== "output-error"
+  );
+
+  if (busy && tools.length > 0) {
+    return {
+      label: "Running tools",
+      detail: `${completed}/${tools.length} tasks done${
+        runningTool ? ` · ${runningTool.toolName}` : ""
+      }`,
+      tone: "running",
+      tools,
+    };
+  }
+
+  if (busy) {
+    return {
+      label: "Thinking",
+      detail: "Waiting for assistant response",
+      tone: "running",
+      tools,
+    };
+  }
+
+  if (tools.length > 0) {
+    return {
+      label: failed ? "Tasks finished with errors" : "Tasks complete",
+      detail: `${completed}/${tools.length} tasks done`,
+      tone: failed ? "error" : "done",
+      tools,
+    };
+  }
+
+  return {
+    label: messages.length > 0 ? "Ready for follow-up" : "No active run",
+    detail:
+      messages.length > 0
+        ? "Ask another question or issue a command"
+        : "Start by asking about the current scenario",
+    tone: "idle",
+    tools,
+  };
+}
+
 export default function AISidebar({
   open,
   activeTab,
@@ -279,6 +383,7 @@ export default function AISidebar({
 
   // —— 聊天 / 流式状态 ——
   const [commandInput, setCommandInput] = useState("");
+  const [chatMode, setChatMode] = useState<AIChatMode>("command");
   const chatLogRef = useRef<HTMLDivElement | null>(null);
 
   // headers 函数需要读最新 modelConfig，但 transport 有状态不能重建；
@@ -287,6 +392,10 @@ export default function AISidebar({
   useEffect(() => {
     modelConfigRef.current = modelConfig;
   }, [modelConfig]);
+  const chatModeRef = useRef<AIChatMode>(chatMode);
+  useEffect(() => {
+    chatModeRef.current = chatMode;
+  }, [chatMode]);
 
   const transport = useMemo(
     () =>
@@ -299,6 +408,7 @@ export default function AISidebar({
           if (m.model) h["X-AICC-Model-Name"] = m.model;
           if (m.apiKey) h["X-AICC-Model-Api-Key"] = m.apiKey;
           if (m.baseUrl) h["X-AICC-Model-Base-Url"] = m.baseUrl;
+          h["X-AICC-Chat-Mode"] = chatModeRef.current;
           return h;
         },
       }),
@@ -315,9 +425,13 @@ export default function AISidebar({
   } = useChat({ transport });
 
   const busy = status === "submitted" || status === "streaming";
+  const chatRunSummary = useMemo(
+    () => summarizeChatRun(messages, busy, Boolean(chatError)),
+    [messages, busy, chatError]
+  );
 
   // ─── 按 scenario 隔离 chat 历史 ─────────────────────────────────────────
-  // 设计：localStorage key = `panopticon.ai.messages.v2:<scenarioId>`。
+  // 设计：localStorage key = `aicc.ai.messages.v2:<scenarioId>`。
   // 首次挂载：直接读当前 scenario 的历史 → setMessages。
   // 之后切换 scenario（id 变化）时：
   //   1) 把当前 messages 落盘到 *旧* scenario 的 key（保留它的会话）
@@ -329,10 +443,7 @@ export default function AISidebar({
   useEffect(() => {
     if (!initializedRef.current) {
       initializedRef.current = true;
-      const initial = safeLoad<UIMessage[]>(
-        messagesKeyFor(scenarioId),
-        []
-      );
+      const initial = safeLoad<UIMessage[]>(messagesKeyFor(scenarioId), []);
       if (initial.length) setMessages(initial);
       prevScenarioIdRef.current = scenarioId;
       return;
@@ -379,6 +490,7 @@ export default function AISidebar({
     if (!wasBusyRef.current) return;
     wasBusyRef.current = false;
     if (status !== "ready") return;
+    if (chatMode === "ask") return;
     // 找最近一条 assistant 消息，扫它的 tool 调用决定推演意图。
     // ai-sdk v5 的 tool part 有两种形态：
     //   - 静态工具：``{ type: 'tool-<name>', ... }``（pydantic-ai @agent.tool 走这条）
@@ -431,7 +543,7 @@ export default function AISidebar({
         }
       }
     })();
-  }, [busy, status, messages, onApplyScenario, onResumePlay]);
+  }, [busy, status, chatMode, messages, onApplyScenario, onResumePlay]);
 
   // —— 设置表单局部状态 ——
   const [newServerName, setNewServerName] = useState("");
@@ -516,9 +628,13 @@ export default function AISidebar({
       const trimmed = text.trim();
       if (!trimmed || busy) return;
       onTabChange("chat");
-      sendMessage({ text: trimmed });
+      const messageText =
+        chatMode === "ask"
+          ? `Ask mode: answer, analyze, or plan only. Do not execute scenario-changing tools.\n\n${trimmed}`
+          : trimmed;
+      sendMessage({ text: messageText });
     },
-    [busy, onTabChange, sendMessage]
+    [busy, chatMode, onTabChange, sendMessage]
   );
 
   const onSubmitChat = (event: FormEvent<HTMLFormElement>): void => {
@@ -612,24 +728,24 @@ export default function AISidebar({
     <aside
       className={cn(
         "relative hidden h-full min-h-0 min-w-0 flex-col border-l",
-        "border-cyan-300/10 bg-[#050b13]/92 backdrop-blur-2xl lg:flex"
+        "border-slate-700/50 bg-[#0a0f18]/95 backdrop-blur-2xl lg:flex"
       )}
     >
       {/* 顶部：标题 + tabs + 关闭 */}
-      <header className="flex items-center justify-between gap-2 border-b border-cyan-300/10 px-3 py-2.5">
+      <header className="flex items-center justify-between gap-2 border-b border-slate-700/50 px-3 py-2.5">
         <div className="flex items-center gap-2">
-          <div className="grid size-7 place-items-center rounded-lg border border-cyan-300/22 bg-cyan-300/10 text-cyan-100">
+          <div className="grid size-7 place-items-center rounded-lg border border-slate-700/50 bg-slate-800/50 text-slate-300">
             <Sparkles className="size-3.5" />
           </div>
           <div>
-            <div className="text-[10px] uppercase tracking-[0.32em] text-cyan-300/65">
+            <div className="text-[10px] uppercase tracking-[0.32em] text-slate-500">
               AI Copilot
             </div>
             <div className="flex items-center gap-1.5 text-sm font-semibold text-slate-100 leading-tight">
               AICC 助手
               {scenarioId && (
                 <span
-                  className="rounded bg-cyan-300/8 px-1.5 py-0.5 font-mono text-[9px] font-normal tracking-wider text-cyan-300/70"
+                  className="rounded bg-slate-800/50 px-1.5 py-0.5 font-mono text-[9px] font-normal tracking-wider text-slate-400"
                   title={`会话已绑定到 scenario ${scenarioId}`}
                 >
                   #{scenarioId.slice(0, 6)}
@@ -650,7 +766,7 @@ export default function AISidebar({
         </Button>
       </header>
 
-      <div className="flex items-center gap-1 border-b border-cyan-300/10 px-3 py-1.5">
+      <div className="flex items-center gap-1 border-b border-slate-700/50 px-3 py-1.5">
         <TabButton
           active={activeTab === "chat"}
           icon={<MessageSquare className="size-3.5" />}
@@ -666,14 +782,14 @@ export default function AISidebar({
         <div className="ml-auto text-[11px] text-slate-500">
           {busy ? (
             <span className="inline-flex items-center gap-1">
-              <Loader2 className="size-3 animate-spin" /> 推理中
+              <Loader2 className="size-3 animate-spin" /> Thinking
             </span>
           ) : chatError ? (
             <span className="inline-flex items-center gap-1 text-red-300">
-              <AlertTriangle className="size-3" /> 错误
+              <AlertTriangle className="size-3" /> Error
             </span>
           ) : (
-            <span>就绪</span>
+            <span>Ready</span>
           )}
         </div>
       </div>
@@ -683,8 +799,12 @@ export default function AISidebar({
         {activeTab === "chat" ? (
           <ChatPanel
             chatLogRef={chatLogRef}
+            chatError={chatError}
+            chatRunSummary={chatRunSummary}
+            chatMode={chatMode}
             commandInput={commandInput}
             messages={messages}
+            onChatModeChange={setChatMode}
             onCommandInputChange={setCommandInput}
             onQuickCommand={sendChat}
             onSubmit={onSubmitChat}
@@ -763,8 +883,8 @@ function TabButton({ active, icon, label, onClick }: TabButtonProps) {
       className={cn(
         "inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs transition-colors",
         active
-          ? "bg-cyan-300/12 text-cyan-100"
-          : "text-slate-400 hover:bg-white/5 hover:text-slate-200"
+          ? "bg-slate-700/50 text-slate-100"
+          : "text-slate-400 hover:bg-slate-800/30 hover:text-slate-200"
       )}
       onClick={onClick}
       type="button"
@@ -802,7 +922,7 @@ const SELECT_CLASS =
   "h-8 w-full rounded-md border border-cyan-300/12 bg-slate-950/40 px-2 text-xs text-slate-100 focus:border-cyan-300/40 focus:outline-none focus:ring-1 focus:ring-cyan-300/30";
 
 const TEXTAREA_CLASS =
-  "min-h-[64px] w-full resize-none rounded-md border border-cyan-300/12 bg-slate-950/40 p-2 text-xs text-slate-100 placeholder:text-slate-600 focus:border-cyan-300/40 focus:outline-none focus:ring-1 focus:ring-cyan-300/30";
+  "min-h-[64px] w-full resize-none rounded-lg border border-slate-700/50 bg-slate-900/50 p-2 text-xs text-slate-100 placeholder:text-slate-600 focus:border-slate-600/50 focus:outline-none focus:ring-1 focus:ring-slate-600/30";
 
 // ────────────────────────────────────────────────────────────────────────────
 // Chat Panel
@@ -811,9 +931,13 @@ const TEXTAREA_CLASS =
 interface ChatPanelProps {
   messages: UIMessage[];
   chatLogRef: React.MutableRefObject<HTMLDivElement | null>;
+  chatError?: Error;
+  chatRunSummary: ChatRunSummary;
+  chatMode: AIChatMode;
   commandInput: string;
   busy: boolean;
   stop: () => void;
+  onChatModeChange: (mode: AIChatMode) => void;
   onCommandInputChange: (next: string) => void;
   onQuickCommand: (cmd: string) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
@@ -822,44 +946,72 @@ interface ChatPanelProps {
 function ChatPanel({
   messages,
   chatLogRef,
+  chatError,
+  chatRunSummary,
+  chatMode,
   commandInput,
   busy,
   stop,
+  onChatModeChange,
   onCommandInputChange,
   onQuickCommand,
   onSubmit,
 }: ChatPanelProps) {
+  const chatErrorMessage = chatError ? formatChatError(chatError) : "";
+
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div
         ref={chatLogRef}
-        className="flex-1 space-y-2 overflow-y-auto px-3 py-3"
+        className="flex-1 space-y-1 overflow-y-auto px-3 py-3"
       >
+        <RunStatusCard summary={chatRunSummary} />
+        {chatErrorMessage && (
+          <div className="mb-3 rounded-lg border border-red-300/25 bg-red-300/[0.05] px-2.5 py-2 text-[11px] text-red-100">
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="mt-0.5 size-3" />
+              <div>
+                <div className="font-medium">AI chat unavailable</div>
+                <div className="mt-0.5 text-[10px] opacity-80">
+                  {chatErrorMessage}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
         {messages.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-xs text-slate-500">
-            <Sparkles className="size-5 text-cyan-300/60" />
-            <div>用自然语言操作仿真</div>
+            <Sparkles className="size-5 text-slate-600" />
+            <div className="text-slate-400">
+              Ask anything about this scenario
+            </div>
             <div className="text-[11px] text-slate-600">
               示例：开始推演、部署单位、查看战况……
             </div>
           </div>
         ) : (
-          messages.map((m) => <MessageBubble key={m.id} message={m} />)
+          messages.map((m) => <MessageBlock key={m.id} message={m} />)
         )}
       </div>
 
-      <div className="border-t border-cyan-300/10 px-3 py-2">
-        <div className="mb-2 flex flex-wrap gap-1.5">
-          {QUICK_COMMANDS.map((cmd) => (
-            <button
-              className="rounded-full border border-cyan-300/12 bg-white/[0.03] px-2.5 py-1 text-[11px] text-slate-300 transition-colors hover:border-cyan-300/30 hover:bg-cyan-300/8 hover:text-cyan-100"
-              key={cmd}
-              onClick={() => onQuickCommand(cmd)}
-              type="button"
-            >
-              {cmd}
-            </button>
-          ))}
+      <div className="border-t border-slate-700/50 px-3 py-2">
+        <ModeSwitcher
+          disabled={busy}
+          mode={chatMode}
+          onModeChange={onChatModeChange}
+        />
+        <div className="mb-2 flex flex-wrap gap-1">
+          {chatMode === "command" &&
+            QUICK_COMMANDS.map((cmd) => (
+              <button
+                className="rounded-md border border-slate-700/50 bg-slate-800/50 px-2 py-0.5 text-[10px] text-slate-400 transition-colors hover:border-slate-600/50 hover:bg-slate-700/50 hover:text-slate-200"
+                key={cmd}
+                onClick={() => onQuickCommand(cmd)}
+                type="button"
+              >
+                {cmd}
+              </button>
+            ))}
         </div>
         <form className="flex flex-col gap-2" onSubmit={onSubmit}>
           <textarea
@@ -871,34 +1023,42 @@ function ChatPanel({
                 event.currentTarget.form?.requestSubmit();
               }
             }}
-            placeholder="输入指令，Enter 发送，Shift+Enter 换行"
+            placeholder={
+              chatMode === "ask"
+                ? "Ask about this scenario without changing it..."
+                : "Command this scenario..."
+            }
             value={commandInput}
-            rows={3}
+            rows={2}
           />
-          <div className="flex items-center justify-between text-[11px] text-slate-500">
+          <div className="flex items-center justify-between text-[10px] text-slate-500">
             <span>
-              {busy ? "AI 推理中…" : "Enter 发送"}
+              {busy
+                ? "Thinking…"
+                : chatMode === "ask"
+                  ? "Ask mode: answer-only guidance"
+                  : "Command mode: scenario changes allowed"}
             </span>
             {busy ? (
               <Button
-                className="h-7 gap-1.5 px-3"
+                className="h-6 gap-1 px-2 text-[10px]"
                 onClick={() => stop()}
                 size="sm"
                 type="button"
                 variant="danger"
               >
-                <Square className="size-3" />
-                停止
+                <Square className="size-2.5" />
+                Stop
               </Button>
             ) : (
               <Button
-                className="h-7 gap-1.5 px-3"
+                className="h-6 gap-1 px-2 text-[10px]"
                 disabled={!commandInput.trim()}
                 size="sm"
                 type="submit"
               >
-                <Send className="size-3.5" />
-                发送
+                <Send className="size-3" />
+                Send
               </Button>
             )}
           </div>
@@ -908,26 +1068,135 @@ function ChatPanel({
   );
 }
 
-function MessageBubble({ message }: { message: UIMessage }) {
+function ModeSwitcher({
+  disabled,
+  mode,
+  onModeChange,
+}: {
+  disabled: boolean;
+  mode: AIChatMode;
+  onModeChange: (mode: AIChatMode) => void;
+}) {
+  const modes: Array<{ label: string; value: AIChatMode }> = [
+    { label: "Ask", value: "ask" },
+    { label: "Command", value: "command" },
+  ];
+
+  return (
+    <div className="mb-2 flex items-center justify-between gap-2 text-[10px] text-slate-500">
+      <div className="inline-flex rounded-md border border-slate-700/50 bg-slate-900/50 p-0.5">
+        {modes.map((item) => (
+          <button
+            className={cn(
+              "rounded px-2 py-0.5 transition-colors",
+              mode === item.value
+                ? "bg-slate-700/70 text-slate-100"
+                : "text-slate-500 hover:text-slate-300",
+              disabled && "cursor-not-allowed opacity-50"
+            )}
+            disabled={disabled}
+            key={item.value}
+            onClick={() => onModeChange(item.value)}
+            type="button"
+          >
+            {item.label}
+          </button>
+        ))}
+      </div>
+      <span className="truncate">
+        {mode === "ask" ? "Explain and plan" : "Tools can change scenario"}
+      </span>
+    </div>
+  );
+}
+
+function RunStatusCard({ summary }: { summary: ChatRunSummary }) {
+  const icon =
+    summary.tone === "running" ? (
+      <Loader2 className="mt-0.5 size-3 animate-spin" />
+    ) : summary.tone === "done" ? (
+      <CheckCircle2 className="mt-0.5 size-3" />
+    ) : summary.tone === "error" ? (
+      <AlertTriangle className="mt-0.5 size-3" />
+    ) : (
+      <Sparkles className="mt-0.5 size-3" />
+    );
+
+  return (
+    <div
+      className={cn(
+        "mb-3 rounded-lg border px-2.5 py-2 text-[11px]",
+        summary.tone === "running" &&
+          "border-blue-300/20 bg-blue-300/[0.04] text-blue-100",
+        summary.tone === "done" &&
+          "border-emerald-300/20 bg-emerald-300/[0.04] text-emerald-100",
+        summary.tone === "error" &&
+          "border-red-300/25 bg-red-300/[0.05] text-red-100",
+        summary.tone === "idle" &&
+          "border-slate-700/50 bg-slate-900/40 text-slate-300"
+      )}
+    >
+      <div className="flex items-start gap-2">
+        {icon}
+        <div className="min-w-0 flex-1">
+          <div className="font-medium">{summary.label}</div>
+          <div className="mt-0.5 truncate text-[10px] opacity-70">
+            {summary.detail}
+          </div>
+        </div>
+      </div>
+      {summary.tools.length > 0 && (
+        <details className="mt-2">
+          <summary className="cursor-pointer text-[10px] opacity-70">
+            {summary.tools.length} tool call
+            {summary.tools.length > 1 ? "s" : ""}
+          </summary>
+          <div className="mt-1 space-y-1">
+            {summary.tools.map((tool, idx) => (
+              <div
+                className="flex items-center justify-between gap-2 rounded bg-black/20 px-2 py-1 font-mono text-[10px] text-slate-300"
+                key={`${tool.toolName}-${idx}`}
+              >
+                <span className="truncate">{tool.toolName}</span>
+                <span className="shrink-0 uppercase text-slate-500">
+                  {tool.state}
+                </span>
+              </div>
+            ))}
+          </div>
+        </details>
+      )}
+    </div>
+  );
+}
+
+function MessageBlock({ message }: { message: UIMessage }) {
   const isUser = message.role === "user";
   const text = previewText(message);
   const hasContent = text || message.parts.length > 0;
 
   return (
-    <div className={cn("flex", isUser ? "justify-end" : "justify-start")}>
+    <div
+      className={cn(
+        "flex flex-col gap-1",
+        isUser ? "items-end" : "items-start"
+      )}
+    >
+      <div
+        className={cn("text-[10px] text-slate-500", isUser ? "pr-1" : "pl-1")}
+      >
+        {isUser ? "你" : "助手"}
+      </div>
       <div
         className={cn(
-          "max-w-[88%] rounded-xl border px-3 py-2 text-xs shadow-sm",
+          "max-w-[92%] rounded-lg px-3 py-2 text-xs",
           isUser
-            ? "border-cyan-300/22 bg-cyan-300/8 text-cyan-50"
-            : "border-cyan-300/10 bg-[#07111d]/85 text-slate-100"
+            ? "bg-slate-800/80 text-slate-100"
+            : "bg-transparent text-slate-100"
         )}
       >
-        <div className="mb-1 text-[10px] uppercase tracking-[0.16em] text-slate-500">
-          {isUser ? "你" : "助手"}
-        </div>
         {!hasContent && !isUser && (
-          <span className="inline-flex items-center gap-1 text-slate-400">
+          <span className="inline-flex items-center gap-1 text-slate-500">
             <Loader2 className="size-3 animate-spin" /> 思考中…
           </span>
         )}
@@ -943,12 +1212,12 @@ function MessageBubble({ message }: { message: UIMessage }) {
             return (
               <details
                 key={idx}
-                className="mt-1 rounded-md border border-cyan-300/10 bg-black/20 px-2 py-1"
+                className="mt-2 rounded-md border border-slate-700/50 bg-slate-900/50 px-2 py-1"
               >
-                <summary className="cursor-pointer text-[10px] text-cyan-300/60">
+                <summary className="cursor-pointer text-[10px] text-slate-400">
                   推理过程
                 </summary>
-                <div className="mt-1 whitespace-pre-wrap text-[11px] text-slate-400">
+                <div className="mt-1 whitespace-pre-wrap text-[11px] text-slate-500">
                   {part.text}
                 </div>
               </details>
@@ -971,37 +1240,37 @@ function MessageBubble({ message }: { message: UIMessage }) {
                 ? p.type.slice("tool-".length)
                 : "tool";
             return (
-              <div
+              <details
                 key={idx}
-                className="mt-1.5 rounded-md border border-cyan-300/12 bg-slate-950/40 p-2"
+                className="mt-2 rounded-md border border-slate-700/50 bg-slate-900/50 p-2"
               >
-                <div className="flex items-center gap-1.5 text-[10px] font-medium text-cyan-200">
+                <summary className="cursor-pointer flex items-center gap-1.5 text-[10px] font-medium text-slate-300">
                   <Wrench className="size-3" />
                   {toolName}
-                  <span className="ml-auto rounded bg-cyan-300/10 px-1.5 py-0.5 text-[9px] uppercase text-cyan-300/70">
+                  <span className="rounded bg-slate-700/50 px-1.5 py-0.5 text-[9px] uppercase text-slate-400">
                     {p.state}
                   </span>
-                </div>
+                </summary>
                 {p.input != null && (
-                  <pre className="mt-1 max-h-24 overflow-auto rounded bg-black/30 p-1.5 font-mono text-[10px] text-slate-300">
+                  <pre className="mt-2 max-h-24 overflow-auto rounded bg-black/30 p-1.5 font-mono text-[10px] text-slate-300">
                     {typeof p.input === "string"
                       ? p.input
                       : JSON.stringify(p.input, null, 2)}
                   </pre>
                 )}
                 {p.state === "output-available" && p.output != null && (
-                  <pre className="mt-1 max-h-24 overflow-auto rounded bg-black/30 p-1.5 font-mono text-[10px] text-emerald-200/80">
+                  <pre className="mt-2 max-h-24 overflow-auto rounded bg-black/30 p-1.5 font-mono text-[10px] text-emerald-300/80">
                     {typeof p.output === "string"
                       ? p.output
                       : JSON.stringify(p.output, null, 2)}
                   </pre>
                 )}
                 {p.state === "output-error" && p.errorText && (
-                  <div className="mt-1 text-[10px] text-red-300">
+                  <div className="mt-2 text-[10px] text-red-300">
                     {p.errorText}
                   </div>
                 )}
-              </div>
+              </details>
             );
           }
           return null;
@@ -1203,7 +1472,8 @@ function ModelSection({
             {modelCheckResult.sample_models &&
               modelCheckResult.sample_models.length > 0 && (
                 <div className="mt-0.5 text-[10px] opacity-80">
-                  sample: {modelCheckResult.sample_models.slice(0, 5).join(", ")}
+                  sample:{" "}
+                  {modelCheckResult.sample_models.slice(0, 5).join(", ")}
                 </div>
               )}
             {modelCheckResult.error && (
@@ -1389,8 +1659,7 @@ function SkillsSection({
               className="bg-cyan-300/10 text-[10px] text-cyan-100"
               variant="muted"
             >
-              后端 {registeredSkills.length} · 自定义{" "}
-              {activeCustomSkillsCount}
+              后端 {registeredSkills.length} · 自定义 {activeCustomSkillsCount}
             </Badge>
             <Button
               aria-label="刷新后端技能列表"

@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Any, Callable
 
 from app.ai.models import SkillDefinition
-from app.panopticon.runtime import PanopticonRuntime
+from app.aicc_runtime.runtime import AICCRuntime
 
 
 SkillFunc = Callable[..., dict[str, Any]]
@@ -25,10 +25,10 @@ class RegisteredSkill:
         )
 
 
-class PanopticonSkillRegistry:
-    """Skill registry for mapping OpenClaw-style tool calls to native Panopticon control APIs."""
+class AICCSkillRegistry:
+    """Skill registry for mapping OpenClaw-style tool calls to native AICC control APIs."""
 
-    def __init__(self, runtime: PanopticonRuntime) -> None:
+    def __init__(self, runtime: AICCRuntime) -> None:
         self.runtime = runtime
         self._skills: dict[str, RegisteredSkill] = {}
         self._register_all()

@@ -12,6 +12,9 @@ services:
       # SQLite file lives in the named volume mounted below so user data
       # survives `docker compose down` and image rebuilds.
       AICC_DATABASE_URL: "sqlite+aiosqlite:////app/server/data/aicc.db"
+      AICC_LLM_MODEL: "${AICC_LLM_MODEL:-}"
+      AICC_LLM_API_KEY: "${AICC_LLM_API_KEY:-}"
+      AICC_LLM_BASE_URL: "${AICC_LLM_BASE_URL:-}"
     volumes:
       - aicc_server_data:/app/server/data
     restart: unless-stopped

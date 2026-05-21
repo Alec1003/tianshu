@@ -1,4 +1,4 @@
-"""Pydantic AI agent runtime for Panopticon tactical skill execution.
+"""Pydantic AI agent runtime for AICC tactical skill execution.
 
 Each registered skill becomes a typed pydantic-ai tool so the LLM receives
 proper JSON-schema descriptions and can call them with validated arguments.
@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Literal
 
 from pydantic_ai import Agent, RunContext
 from pydantic_ai.models.anthropic import AnthropicModel
@@ -19,11 +19,11 @@ from pydantic_ai.providers.anthropic import AnthropicProvider
 from pydantic_ai.providers.openai import OpenAIProvider
 
 from app.ai.models import AgentExecutionSummary, SkillExecutionResult
-from app.ai.skill_registry import PanopticonSkillRegistry
+from app.ai.skill_registry import AICCSkillRegistry
 
 
 SYSTEM_PROMPT = """
-You are the Panopticon Commander Agent — an AI operator for a tactical simulation platform.
+You are the AICC Commander Agent — an AI operator for a tactical simulation platform.
 Your job: parse natural-language tactical commands and execute them via the available tools.
 
 Rules:
@@ -37,12 +37,24 @@ Rules:
 
 @dataclass
 class AgentDeps:
-    registry: PanopticonSkillRegistry
+    registry: AICCSkillRegistry
+    chat_mode: Literal["ask", "command"] = "command"
     call_log: list[SkillExecutionResult] = field(default_factory=list)
 
 
 def _exec(deps: AgentDeps, skill: str, params: dict[str, Any]) -> dict[str, Any]:
     """Execute a skill, log the result, and re-raise on error so pydantic-ai sees it."""
+    if deps.chat_mode == "ask":
+        error = "Tool execution is disabled in Ask mode."
+        deps.call_log.append(
+            SkillExecutionResult(
+                skill=skill,
+                status="error",
+                parameters=params,
+                error=error,
+            )
+        )
+        raise PermissionError(error)
     try:
         result = deps.registry.execute(skill, params)
         deps.call_log.append(
@@ -124,8 +136,13 @@ def resolve_model(model_id: str, api_key: str, base_url: str) -> Any:
     return model_id
 
 
-def build_agent(model_id: str, api_key: str = "", base_url: str = "") -> Agent[AgentDeps, str]:
-    """Build a pydantic-ai Agent with all Panopticon skills registered as tools."""
+def build_agent(
+    model_id: str,
+    api_key: str = "",
+    base_url: str = "",
+    enable_tools: bool = True,
+) -> Agent[AgentDeps, str]:
+    """Build a pydantic-ai Agent with all AICC skills registered as tools."""
     model = resolve_model(model_id, api_key, base_url)
     agent: Agent[AgentDeps, str] = Agent(
         model=model,
@@ -133,6 +150,8 @@ def build_agent(model_id: str, api_key: str = "", base_url: str = "") -> Agent[A
         output_type=str,
         system_prompt=SYSTEM_PROMPT,
     )
+    if not enable_tools:
+        return agent
 
     # ── Simulation lifecycle ──────────────────────────────────────────────────
 
@@ -326,7 +345,7 @@ def build_agent(model_id: str, api_key: str = "", base_url: str = "") -> Agent[A
 async def run_agent(
     agent: Agent[AgentDeps, str],
     command: str,
-    registry: PanopticonSkillRegistry,
+    registry: AICCSkillRegistry,
 ) -> AgentExecutionSummary:
     """Run the pydantic-ai agent and wrap the result in AgentExecutionSummary."""
     deps = AgentDeps(registry=registry)

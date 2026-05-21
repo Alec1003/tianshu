@@ -46,7 +46,7 @@ def runtime_scenario(request: Request) -> dict:
 
     This is the **read-only** counterpart to the MCP ``runtime_*`` tools:
     the front-end (or any HTTP client) can poll this endpoint to grab the
-    latest snapshot of the shared ``PanopticonRuntime`` that MCP / AI
+    latest snapshot of the shared ``AICCRuntime`` that MCP / AI
     commands are mutating. The returned shape is identical to the
     ``scenario`` field in ``POST /api/ai/command`` responses, so
     ``game.loadScenario(JSON.stringify(response))`` works on the client.
@@ -90,6 +90,11 @@ def _read_model_override_from_headers(
     )
 
 
+def _read_chat_mode_from_headers(request: Request) -> str:
+    mode = (request.headers.get("x-aicc-chat-mode") or "command").strip().lower()
+    return "ask" if mode == "ask" else "command"
+
+
 @router.post("/chat")
 async def chat(request: Request) -> StreamingResponse:
     """Streaming chat endpoint powered by pydantic-ai.
@@ -112,6 +117,7 @@ async def chat(request: Request) -> StreamingResponse:
     from app.ai.pydantic_agent import AgentDeps, build_agent  # noqa: PLC0415
 
     bridge = request.app.state.bridge
+    chat_mode = _read_chat_mode_from_headers(request)
 
     # Per-request model override via headers (set by AI sidebar useChat).
     provider, model_name, api_key, base_url = _read_model_override_from_headers(request)
@@ -130,6 +136,7 @@ async def chat(request: Request) -> StreamingResponse:
                 model_id=model_id,
                 api_key=api_key,
                 base_url=base_url,
+                enable_tools=chat_mode == "command",
             )
             logger.info("chat: per-request agent built (model=%s)", model_id)
         except Exception as exc:  # pragma: no cover - depends on SDK install
@@ -137,7 +144,12 @@ async def chat(request: Request) -> StreamingResponse:
                 "chat: per-request agent build failed (%s): %s", model_id, exc
             )
 
-    agent = per_request_agent or bridge.pydantic_agent
+    fallback_agent = (
+        bridge.pydantic_agent
+        if chat_mode == "command"
+        else getattr(bridge, "pydantic_ask_agent", None)
+    )
+    agent = per_request_agent or fallback_agent
     if agent is None:
         return StreamingResponse(
             iter(
@@ -157,7 +169,7 @@ async def chat(request: Request) -> StreamingResponse:
             media_type="application/json",
         )
 
-    deps = AgentDeps(registry=bridge.skill_registry)
+    deps = AgentDeps(registry=bridge.skill_registry, chat_mode=chat_mode)
     return await VercelAIAdapter.dispatch_request(
         request,
         agent=agent,

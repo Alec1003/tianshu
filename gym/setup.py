@@ -11,7 +11,7 @@ setup(
     author_email="mhua2@jh.edu",
     license="Apache 2.0 License",
     keywords="Warfare Simulation AI Reinforcement Learning",
-    url="https://github.com/orgulous/panopticon",
+    url="https://github.com/orgulous/aicc",
     packages=[
         "blade",
         "blade.db",

@@ -1,4 +1,4 @@
-"""Regression：``PanopticonOpenClawBridge._resolve_agent_for_request``。
+"""Regression：``AICCOpenClawBridge._resolve_agent_for_request``。
 
 行为契约：
   1. ``context["model"]`` 包含 provider + model + apiKey 时，调用
@@ -8,7 +8,7 @@
   3. ``build_agent`` 抛异常时，吞掉错误日志，返回
      ``self.pydantic_agent`` 兜底，绝不让用户请求整个失败。
 
-不实例化真实 ``PanopticonOpenClawBridge``（避免拉 blade/gymnasium）；用
+不实例化真实 ``AICCOpenClawBridge``（避免拉 blade/gymnasium）；用
 ``types.SimpleNamespace`` 模拟出 ``pydantic_agent`` 属性，把
 ``_resolve_agent_for_request`` 当作 unbound 方法直接调用。
 """
@@ -22,7 +22,7 @@ import pytest
 
 from app.ai import bridge as bridge_mod
 from app.ai import pydantic_agent as pa_mod
-from app.ai.bridge import PanopticonOpenClawBridge
+from app.ai.bridge import AICCOpenClawBridge
 
 
 SENTINEL_ENV_AGENT = object()
@@ -35,7 +35,7 @@ def _fake_self(env_agent: Any) -> SimpleNamespace:
 
 
 def _resolve(self_like: SimpleNamespace, context: dict[str, Any] | None) -> Any:
-    return PanopticonOpenClawBridge._resolve_agent_for_request(self_like, context)
+    return AICCOpenClawBridge._resolve_agent_for_request(self_like, context)
 
 
 @pytest.fixture(autouse=True)

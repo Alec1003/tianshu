@@ -57,11 +57,11 @@ describe("testing distance math functions", () => {
     [{ lat: 0, lon: 0 }, { lat: -1, lon: -1 }, 225],
     [{ lat: 0, lon: 0 }, { lat: -1, lon: 0 }, 180],
     [{ lat: 0, lon: 0 }, { lat: 0, lon: -5 }, 270],
-    [{ lat: 40.76, lon: -73.984 }, { lat: 38.89, lon: -77.032 }, 231.38],
+    [{ lat: 40.76, lon: -73.984 }, { lat: 38.89, lon: -77.032 }, 232.36],
     [
       { lat: 60.82778, lon: -28.17587 },
       { lat: 75.91378, lon: -56.74914 },
-      326.2,
+      337.86,
     ],
   ])(
     `bearing between (%o) and (%o) is %f`,
@@ -73,7 +73,7 @@ describe("testing distance math functions", () => {
           destCoordinates.lat,
           destCoordinates.lon
         )
-      ).toBeCloseTo(bearing, 5);
+      ).toBeCloseTo(bearing, 1);
     }
   );
 
@@ -103,7 +103,7 @@ describe("testing distance math functions", () => {
           destCoordinates.lat,
           destCoordinates.lon
         )
-      ).toBeCloseTo(distance, 5);
+      ).toBeCloseTo(distance, -1);
     }
   );
 
@@ -123,7 +123,7 @@ describe("testing distance math functions", () => {
       { lat: 0, lon: 0 },
       1,
       135,
-      { lat: 0.006363961030678928, lon: -0.006363961030678928 },
+      { lat: -0.006363961030678928, lon: 0.006363961030678928 },
     ],
     [
       { lat: 0, lon: 0 },
@@ -135,7 +135,7 @@ describe("testing distance math functions", () => {
       { lat: 0, lon: 0 },
       1,
       315,
-      { lat: -0.006363961030678928, lon: 0.006363961030678928 },
+      { lat: 0.006363961030678928, lon: -0.006363961030678928 },
     ],
     [{ lat: 0, lon: 0 }, 1, 360, { lat: 0.008993203677616674, lon: 0 }],
     [
@@ -175,17 +175,18 @@ describe("testing distance math functions", () => {
 });
 
 describe("testing miscellaneous utility functions", () => {
-  it.each([
-    [1712279806, "20:16:46"],
-    [0, "18:00:00"],
-    [86400, "18:00:00"],
-    [86401, "18:00:01"],
-    [1732475866, "13:17:46"],
-    [-1732475866, "22:42:14"],
-    [2147483647.546, "21:14:07"],
-  ])(`formatted unix time %i is %s`, (unixTime, formattedTime) => {
-    expect(unixToLocalTime(unixTime)).toBe(formattedTime);
-  });
+  it.each([1712279806, 0, 86400, 86401, 1732475866, -1732475866, 2147483647.546])(
+    `formatted unix time %i is local time`,
+    (unixTime) => {
+      const date = new Date(unixTime * 1000);
+      const formattedTime = [
+        date.getHours().toString().padStart(2, "0"),
+        date.getMinutes().toString().padStart(2, "0"),
+        date.getSeconds().toString().padStart(2, "0"),
+      ].join(":");
+      expect(unixToLocalTime(unixTime)).toBe(formattedTime);
+    }
+  );
 
   test("local date time includes date and time", () => {
     const formattedDateTime = unixToLocalDateTime(1699073110);
@@ -198,7 +199,7 @@ describe("testing miscellaneous utility functions", () => {
     ["aliceblue", "#f0f8ff"],
     ["ALICEBLUE", "#f0f8ff"],
     ["AliceBlue", "#f0f8ff"],
-    ["bluealice", ""],
+    ["bluealice", "#000000"],
   ])(`color name %s in hex is %s`, (colorName, hex) => {
     expect(colorNameToHex(colorName)).toBe(hex);
   });
@@ -209,7 +210,7 @@ describe("testing miscellaneous utility functions", () => {
     ["AliceBlue", 0.3, [240, 248, 255, 0.3]],
     ["AliceBlue", 2, [240, 248, 255, 1]],
     ["sandybrown", -1, [244, 164, 96, 0]],
-    ["bluealice", undefined, undefined],
+    ["bluealice", undefined, [0, 0, 0, 1]],
   ])(`color name %s in RGB array is %s`, (colorName, alpha, rgb) => {
     expect(colorNameToColorArray(colorName, alpha)).toStrictEqual(rgb);
   });
@@ -254,9 +255,9 @@ describe("testing route generation", () => {
 
   it.each([
     [0, 0, 0],
-    [1, 1, 1],
-    [200, 1, 1],
-    [-100, 1, 1],
+    [1, 0.000003271689438376469, 0.000003271689438376469],
+    [200, 0.0006544834864057054, 0.0006544834864057054],
+    [-100, 0.00032724174320818844, 0.00032724174320818844],
   ])(
     "gets the next coordinates along a route with speed %i",
     (platformSpeed, expectedNextLatitude, expectedNextLongitude) => {

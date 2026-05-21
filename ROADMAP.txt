@@ -179,7 +179,7 @@ E1. 推演 loop
     [ ] server/app/ai/dual_agent_runner.py
         - 每个 step：blue_agent.run() → 应用 → red_agent.run() → 应用 →
           game.step() → 检查胜负
-        - 共享同一个 MCP server（同一个 PanopticonRuntime 实例）
+        - 共享同一个 MCP server（同一个 AICCRuntime 实例）
     [ ] CLI：python -m app.ai.dual_agent --scenario default.json --max-steps 500
 
 E2. 评估指标
@@ -288,7 +288,7 @@ E4. 测试
                     (POST /api/ai/model/check)
                   · MCP Servers：增删改 + enable toggle + 项目内置 MCP 开关
                   · Skills：后端 /api/ai/skills 只读列表 + 用户自定义增删
-              - 持久化：localStorage 沿用 panopticon.ai.* 老 keys
+              - 持久化：localStorage 沿用 aicc.ai.* 老 keys
               - 主题：cyan/slate tactical + shadcn Card/Button +
                 tailwind，无新依赖
             AITacticalCommandPlatform.tsx：
@@ -322,14 +322,14 @@ E4. 测试
                   POST /api/ai/chat 503（无 key 时正确拒绝）。
 
 2026-05-20  修复"红蓝方不自主交战"关键 bug
-            根因：server PanopticonRuntime._normalize_scenario_payload 在
+            根因：server AICCRuntime._normalize_scenario_payload 在
             scenario 缺 doctrine 字段时回填空 `{}`，前端 Scenario 构造的
             `?? getDefaultDoctrine()` 不触发（`{}` truthy），导致
             checkSideDoctrine 全 false，所有自主交战函数静默 noop。
             修复：
-              - server/app/panopticon/_doctrine.py（新）：抽出
+              - server/app/aicc_runtime/_doctrine.py（新）：抽出
                 _DEFAULT_SIDE_DOCTRINE + normalize_scenario_payload
-              - server/app/panopticon/runtime.py：委托给新模块
+              - server/app/aicc_runtime/runtime.py：委托给新模块
               - client/src/game/Scenario.ts：构造函数对空 doctrine 或缺
                 sideId 条目走默认条令兜底
             回归测试：
@@ -351,3 +351,16 @@ E4. 测试
               - npx tsc -b --noEmit 全通过
               - docker compose build client 成功
               - docker compose up -d client 成功
+
+2026-05-21  修复前端全量测试门禁
+            根因：utils/Scenario/App 旧测试断言与当前实现不一致，且
+            App.spec.tsx 为空测试套件。
+            修复：
+              - client/src/utils/test/utils.spec.js：修正地理计算精度、
+                本地时间、未知颜色兜底和 getNextCoordinates 期望。
+              - client/src/game/test/Scenario.spec.js：按当前 API 签名修正
+                side 查询和 update* 断言。
+              - client/src/test/App.spec.tsx：补最小有效测试，避免空套件。
+            验证：
+              - npm test：15 files / 167 tests 全绿
+              - npx tsc -b --noEmit 全通过

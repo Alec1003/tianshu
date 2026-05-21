@@ -29,7 +29,7 @@ void i18n
     detection: {
       order: ["querystring", "localStorage", "navigator"],
       lookupQuerystring: "lng",
-      lookupLocalStorage: "panopticon.lng",
+      lookupLocalStorage: "aicc.lng",
       caches: ["localStorage"],
     },
     returnNull: false,

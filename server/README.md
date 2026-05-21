@@ -1,20 +1,20 @@
-# Panopticon OpenClaw Embedded Backend
+# AICC Embedded Backend
 
 ## Design Summary
 - Single FastAPI process.
 - No extra OpenClaw gateway process and no extra OpenClaw-only port.
-- Panopticon native simulation functions are wrapped as Skills and called in-process.
+- AICC native simulation functions are wrapped as Skills and called in-process.
 - MCP support is scaffold-only (connection/invocation framework, no business implementation).
 
 ## Directory
 - `app/main.py`: FastAPI app entry.
 - `app/api/ai.py`: `/api/ai/command` API.
-- `app/ai/agent.py`: Panopticon Commander agent (NL parsing + skill dispatch).
+- `app/ai/agent.py`: AICC Commander agent (NL parsing + skill dispatch).
 - `app/ai/openclaw_sdk_adapter.py`: Embedded OpenClaw SDK adapter seam (in-process).
 - `app/ai/skill_registry.py`: Skill definitions and registration.
 - `app/ai/mcp_client.py`: MCP client skeleton (extension area).
 - `app/ai/bridge.py`: Unified OpenClaw bridge module.
-- `app/panopticon/runtime.py`: Native engine runtime adapter (calls `gym/blade` in-process).
+- `app/aicc_runtime/runtime.py`: Native engine runtime adapter (calls `gym/blade` in-process).
 
 ## Install
 ```bash
@@ -88,7 +88,7 @@ Protocol](https://modelcontextprotocol.io) 暴露给任意 MCP 客户端
 
 > **两组不同源，不会自动同步**：
 > - DB 组读写 ``Scenario`` 表（静态快照）
-> - Runtime 组读写进程内 ``PanopticonRuntime``（内存活想定）
+> - Runtime 组读写进程内 ``AICCRuntime``（内存活想定）
 > - 要把 DB 中的一个想定接管进推演，调 ``runtime_load_scenario_from_db``。
 > - 要把当前推演中的活想定持久化，调 ``runtime_save_to_db``。
 
@@ -202,7 +202,7 @@ MCP 现在 **同时** 支持两种传输：
 HTTP 模式核心特性：
 
 - **共享 runtime**：MCP tool 与 `/api/ai/command` 操作 **同一个**
-  `PanopticonRuntime` 实例（`app.state.bridge.runtime`）。AI 通过 MCP
+  `AICCRuntime` 实例（`app.state.bridge.runtime`）。AI 通过 MCP
   部署 / step → 后端 runtime 立即更新。
   > **注意**：前端浏览器有自己的 client-side `Game`（`client/src/game/Game.ts`），
   > 地图从 `game.currentScenario` 渲染，**不会自动轮询后端**。要让前端看到
@@ -255,7 +255,7 @@ cd server
   严格走线程池（避免阻塞 event loop）
 
 端到端验证已覆盖：
-- **stdio lifespan 烟雾**：PanopticonRuntime 加载 SCS 想定（3 sides / 14
+- **stdio lifespan 烟雾**：AICCRuntime 加载 SCS 想定（3 sides / 14
   aircraft / 5 airbases），`runtime_step` 推进仿真时间。
 - **HTTP 8 步烟雾**：①无 token 401 ②假 token 401 ③注册+登录拿 JWT
   ④ JSON-RPC initialize ⑤ tools/list=29 ⑥ runtime_status ⑦

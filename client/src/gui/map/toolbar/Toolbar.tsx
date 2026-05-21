@@ -25,7 +25,7 @@ import { styled } from "@mui/material/styles";
 import Game from "@/game/Game";
 import { AircraftDb, FacilityDb, ShipDb } from "@/game/db/UnitDb";
 import { APP_DRAWER_WIDTH } from "@/utils/constants";
-import PanopticonLogoSvg from "@/gui/assets/svg/panopticon.svg?react";
+import AICCLogoSvg from "@/gui/assets/svg/aicc.svg?react";
 import ToolbarCollapsible from "@/gui/map/toolbar/ToolbarCollapsible";
 import CurrentActionContextDisplay from "@/gui/map/toolbar/CurrentActionContextDisplay";
 import MenuIcon from "@mui/icons-material/Menu";
@@ -504,7 +504,7 @@ export default function Toolbar(props: Readonly<ToolBarProps>) {
       const [localDateString, time] = getLocalDateTime().split("T");
       const timestamp = `${localDateString.replace(/-/g, "_")}_T${time}`;
       const currentScenarioName = !scenarioName
-        ? "panopticon_scenario"
+        ? "aicc_scenario"
         : scenarioName.trim().replace(/\s+/g, "_").toLowerCase();
       const exportName = currentScenarioName + "_" + timestamp;
       const dataStr =
@@ -867,7 +867,7 @@ export default function Toolbar(props: Readonly<ToolBarProps>) {
   }
 
   const ScenarioDb = [
-    { name: "default_scenario", displayName: "Panopticon Demo" },
+    { name: "default_scenario", displayName: "AICC Demo" },
     { name: "SCS", displayName: "South China Sea Strike" },
     { name: "_upload", displayName: "Upload..." },
   ];
@@ -1564,7 +1564,7 @@ export default function Toolbar(props: Readonly<ToolBarProps>) {
           )}
           <Stack direction={"row"} sx={{ alignItems: "center" }}>
             <IconButton
-              href="https://panopticon-ai.com/"
+              href="/"
               target="_blank"
               disableRipple
               sx={{
@@ -1577,13 +1577,13 @@ export default function Toolbar(props: Readonly<ToolBarProps>) {
                 height: 47,
               }}
             >
-              <PanopticonLogoSvg />
+              <AICCLogoSvg />
             </IconButton>
             <Typography
               variant="h6"
               noWrap
               component="a"
-              href="https://panopticon-ai.com/"
+              href="/"
               target="_blank"
               sx={{
                 mr: 2,
@@ -1954,7 +1954,7 @@ export default function Toolbar(props: Readonly<ToolBarProps>) {
             </Typography>
             <Typography variant="body2">•</Typography>
             <IconButton
-              href="https://github.com/Panopticon-AI-team/panopticon"
+              href="https://github.com/Alec1003/AICC"
               target="_blank"
               color="inherit"
               aria-label={t("toolbar.drawer.github")}

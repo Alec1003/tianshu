@@ -61,7 +61,7 @@ from app.mcp.utils import (
     iter_units,
     unit_brief,
 )
-from app.panopticon.runtime import PanopticonRuntime
+from app.aicc_runtime.runtime import AICCRuntime
 from app.scenarios import service as scenario_service
 from app.scenarios.errors import ScenarioServiceError
 from app.scenarios.models import Scenario
@@ -75,7 +75,7 @@ logger = logging.getLogger(__name__)
 
 # ----- Cross-mode injection points ------------------------------------------
 # Two MCP transports share one tool surface:
-#   - stdio  : user resolved once from ENV at lifespan; new PanopticonRuntime
+#   - stdio  : user resolved once from ENV at lifespan; new AICCRuntime
 #              created per process (single-user scope).
 #   - http   : runtime is **shared** with the FastAPI process
 #              (``app.state.bridge.runtime`` from ``ai/bridge.py``); user is
@@ -87,14 +87,14 @@ logger = logging.getLogger(__name__)
 # the lifespan or the tool registry.
 # ---------------------------------------------------------------------------
 
-_shared_runtime: PanopticonRuntime | None = None
+_shared_runtime: AICCRuntime | None = None
 _request_user_var: contextvars.ContextVar[User | None] = contextvars.ContextVar(
     "_aicc_mcp_request_user", default=None
 )
 
 
-def set_shared_runtime(runtime: PanopticonRuntime | None) -> None:
-    """Bind a long-lived ``PanopticonRuntime`` for HTTP transport.
+def set_shared_runtime(runtime: AICCRuntime | None) -> None:
+    """Bind a long-lived ``AICCRuntime`` for HTTP transport.
 
     Must be called **before** ``mcp_lifespan`` enters (i.e. before the FastAPI
     lifespan hands control to ``session_manager.run()``); after that the
@@ -104,7 +104,7 @@ def set_shared_runtime(runtime: PanopticonRuntime | None) -> None:
     _shared_runtime = runtime
 
 
-def get_shared_runtime() -> PanopticonRuntime | None:
+def get_shared_runtime() -> AICCRuntime | None:
     return _shared_runtime
 
 
@@ -135,7 +135,7 @@ class McpAppContext:
     """
 
     user: User | None
-    runtime: PanopticonRuntime
+    runtime: AICCRuntime
 
 
 @asynccontextmanager
@@ -171,7 +171,7 @@ async def mcp_lifespan(server: FastMCP) -> AsyncIterator[McpAppContext]:  # noqa
     try:
         yield McpAppContext(user=user, runtime=runtime)
     finally:
-        # No explicit shutdown hook on PanopticonRuntime; in stdio mode GC
+        # No explicit shutdown hook on AICCRuntime; in stdio mode GC
         # reclaims it when the process exits, in HTTP mode the FastAPI host
         # owns its lifecycle.
         pass
@@ -223,7 +223,7 @@ def _get_user(ctx: Context) -> User:
     )
 
 
-def _get_runtime(ctx: Context) -> PanopticonRuntime:
+def _get_runtime(ctx: Context) -> AICCRuntime:
     app_ctx: McpAppContext = ctx.request_context.lifespan_context
     return app_ctx.runtime
 
@@ -706,10 +706,10 @@ def _nearest_distance_km(
 
 
 # ===========================================================================
-# Runtime tools: in-memory live scenario driven by PanopticonRuntime.
+# Runtime tools: in-memory live scenario driven by AICCRuntime.
 #
 # 边界（重要，给 LLM 看也给运维看）：
-# - "Runtime" 是 stdio 进程内一个 PanopticonRuntime 实例，跑的是活想定；
+# - "Runtime" 是 stdio 进程内一个 AICCRuntime 实例，跑的是活想定；
 #   这一组工具改变的状态**不会自动写回 DB**。
 # - "DB scenarios" 是 ``Scenario`` 表，是用户保存的静态快照。
 #   要把当前 runtime 状态持久化，必须显式调用 ``runtime_save_to_db``。
@@ -728,7 +728,7 @@ _RUNTIME_UNIT_FIELDS: tuple[tuple[str, str], ...] = (
 )
 
 
-def _runtime_unit_counts(runtime: PanopticonRuntime) -> dict[str, int]:
+def _runtime_unit_counts(runtime: AICCRuntime) -> dict[str, int]:
     scenario = runtime.game.current_scenario
     counts: dict[str, int] = {}
     for attr, key in _RUNTIME_UNIT_FIELDS:
@@ -737,7 +737,7 @@ def _runtime_unit_counts(runtime: PanopticonRuntime) -> dict[str, int]:
     return counts
 
 
-def _runtime_side_stats(runtime: PanopticonRuntime) -> list[RuntimeSideStat]:
+def _runtime_side_stats(runtime: AICCRuntime) -> list[RuntimeSideStat]:
     out: list[RuntimeSideStat] = []
     for s in runtime.game.current_scenario.sides:
         color = getattr(s.color, "value", s.color)
@@ -752,7 +752,7 @@ def _runtime_side_stats(runtime: PanopticonRuntime) -> list[RuntimeSideStat]:
     return out
 
 
-def _runtime_status_payload(runtime: PanopticonRuntime) -> dict[str, Any]:
+def _runtime_status_payload(runtime: AICCRuntime) -> dict[str, Any]:
     scenario = runtime.game.current_scenario
     start = int(scenario.start_time or 0)
     duration = int(scenario.duration or 0)
@@ -1212,7 +1212,7 @@ async def runtime_set_current_side(ctx: Context, side: str) -> dict[str, Any]:
 # ---------- runtime: outcome ------------------------------------------------
 
 
-def _runtime_outcome_payload(runtime: PanopticonRuntime) -> dict[str, Any]:
+def _runtime_outcome_payload(runtime: AICCRuntime) -> dict[str, Any]:
     """计算"P0 可靠"的两个胜负信号：time_up + annihilation。"""
     scenario = runtime.game.current_scenario
     start = int(scenario.start_time or 0)

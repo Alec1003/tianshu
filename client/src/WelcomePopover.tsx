@@ -112,7 +112,7 @@ const WelcomePopover: React.FC<WelcomePopoverProps> = ({ open, onClose }) => {
             <Typography variant="body2">
               {t("welcome.privacyAgreement")}{" "}
               <Link
-                href="http://panopticon-ai.com/privacy"
+                href="/privacy"
                 target="_blank"
                 rel="noopener"
                 underline="hover"

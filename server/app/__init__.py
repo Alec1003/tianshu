@@ -1,2 +1,2 @@
-"""Panopticon AI backend package."""
+"""AICC AI backend package."""
 

@@ -2,7 +2,7 @@
 
 Client/gui for BLADE Gymnasium environment.
 
-> Please review the [client project structure](https://github.com/Panopticon-AI-team/panopticon/blob/main/CONTRIBUTING.md#client) to get familiar with the folder and file organization and their intended context.
+> Please review the AICC client project structure to get familiar with the folder and file organization and their intended context.
 
 ---
 
@@ -19,11 +19,11 @@ Client/gui for BLADE Gymnasium environment.
 ### [Clone Repository](#clone-repository)
 
 ```bash
-git clone git@github.com:Panopticon-AI-team/panopticon.git
+git clone git@github.com:Alec1003/AICC.git
 ```
 
 ```bash
-cd panopticon/client
+cd AICC/client
 ```
 
 ```bash

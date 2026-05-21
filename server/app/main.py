@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.ai.bridge import PanopticonOpenClawBridge
+from app.ai.bridge import AICCOpenClawBridge
 from app.api.ai import router as ai_router
 from app.auth.router import router as auth_router
 from app.db.session import create_db_and_tables
@@ -24,7 +24,7 @@ async def lifespan(app: FastAPI):
 
     The MCP runtime intentionally piggy-backs on the FastAPI bridge:
     ``set_shared_runtime`` makes ``app.mcp.server.mcp_lifespan`` skip its
-    own ``PanopticonRuntime`` boot and reuse the one driving
+    own ``AICCRuntime`` boot and reuse the one driving
     ``/api/ai/command``. That single shared instance is the whole reason
     HTTP-mounted MCP can let an external LLM see / mutate the same live
     scenario the browser front-end is looking at.
@@ -45,7 +45,7 @@ async def lifespan(app: FastAPI):
         # down. We log so dev can spot the problem.
         logger.exception("seed_system_templates failed; continuing without templates")
 
-    app.state.bridge = PanopticonOpenClawBridge.from_env()
+    app.state.bridge = AICCOpenClawBridge.from_env()
     set_shared_runtime(app.state.bridge.runtime)
 
     # First call lazily creates ``mcp._session_manager``; we must trigger it

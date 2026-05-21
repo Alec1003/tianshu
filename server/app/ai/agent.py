@@ -8,7 +8,7 @@ from typing import Any
 from app.ai.mcp_client import MCPClientSkeleton
 from app.ai.models import AgentExecutionSummary, SkillExecutionResult
 from app.ai.openclaw_sdk_adapter import OpenClawSDKAdapter
-from app.ai.skill_registry import PanopticonSkillRegistry
+from app.ai.skill_registry import AICCSkillRegistry
 
 
 UUID_RE = re.compile(
@@ -29,11 +29,11 @@ class PlannedSkillCall:
     source_text: str
 
 
-class PanopticonCommanderAgent:
-    """Panopticon 指挥智能体（OpenClaw 嵌入式适配层）。"""
+class AICCCommanderAgent:
+    """AICC 指挥智能体（OpenClaw 嵌入式适配层）。"""
 
     SYSTEM_PROMPT = """
-你是 Panopticon 指挥智能体。你的任务：
+你是 AICC 指挥智能体。你的任务：
 1) 解析自然语言作战控制指令
 2) 识别意图并提取参数
 3) 映射到已注册 Skill
@@ -48,7 +48,7 @@ class PanopticonCommanderAgent:
 
     def __init__(
         self,
-        skill_registry: PanopticonSkillRegistry,
+        skill_registry: AICCSkillRegistry,
         mcp_client: MCPClientSkeleton,
         sdk_adapter: OpenClawSDKAdapter | None = None,
     ) -> None:
@@ -473,7 +473,7 @@ class PanopticonCommanderAgent:
     def _build_no_skill_message(self, command: str) -> str:
         if NON_ACTION_CHAT_RE.match(command.strip()):
             return (
-                "I can execute Panopticon control skills. Try one of these commands:\n"
+                "I can execute AICC control skills. Try one of these commands:\n"
                 "1) start simulation\n"
                 "2) step simulation 3 steps\n"
                 "3) deploy BLUE aircraft F-16 at 22.1 121.5\n"

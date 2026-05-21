@@ -5,21 +5,21 @@ import os
 from pathlib import Path
 from typing import Any
 
-from app.ai.agent import PanopticonCommanderAgent
+from app.ai.agent import AICCCommanderAgent
 from app.ai.mcp_client import MCPClientSkeleton, MCPServerConfig
 from app.ai.models import AgentExecutionSummary
 from app.ai.openclaw_sdk_adapter import OpenClawSDKAdapter
 from app.ai.pydantic_agent import AgentDeps, build_agent
-from app.ai.skill_registry import PanopticonSkillRegistry
-from app.panopticon.runtime import ROOT_DIR, PanopticonRuntime
+from app.ai.skill_registry import AICCSkillRegistry
+from app.aicc_runtime.runtime import ROOT_DIR, AICCRuntime
 
 logger = logging.getLogger(__name__)
 
 DEFAULT_SCENARIO_PATH = ROOT_DIR / "client" / "src" / "scenarios" / "SCS.json"
 
 
-class PanopticonOpenClawBridge:
-    """Unified bridge for OpenClaw agent, skill registry, and MCP skeleton."""
+class AICCOpenClawBridge:
+    """Unified bridge for AICC agent, skill registry, and MCP skeleton."""
 
     def __init__(
         self,
@@ -28,11 +28,11 @@ class PanopticonOpenClawBridge:
         llm_api_key: str = "",
         llm_base_url: str = "",
     ) -> None:
-        self.runtime = PanopticonRuntime(scenario_path=scenario_path)
-        self.skill_registry = PanopticonSkillRegistry(runtime=self.runtime)
+        self.runtime = AICCRuntime(scenario_path=scenario_path)
+        self.skill_registry = AICCSkillRegistry(runtime=self.runtime)
         self.mcp_client = MCPClientSkeleton()
         self.sdk_adapter = OpenClawSDKAdapter()
-        self.agent = PanopticonCommanderAgent(
+        self.agent = AICCCommanderAgent(
             skill_registry=self.skill_registry,
             mcp_client=self.mcp_client,
             sdk_adapter=self.sdk_adapter,
@@ -43,16 +43,23 @@ class PanopticonOpenClawBridge:
         # Built only when a model is configured; otherwise None and the regex
         # planner in self.agent is used as the fallback.
         self.pydantic_agent = None
+        self.pydantic_ask_agent = None
         if llm_model:
             self.pydantic_agent = build_agent(
                 model_id=llm_model,
                 api_key=llm_api_key,
                 base_url=llm_base_url,
             )
+            self.pydantic_ask_agent = build_agent(
+                model_id=llm_model,
+                api_key=llm_api_key,
+                base_url=llm_base_url,
+                enable_tools=False,
+            )
             logger.info("pydantic-ai agent built: model=%s", llm_model)
 
     @classmethod
-    def from_env(cls) -> "PanopticonOpenClawBridge":
+    def from_env(cls) -> "AICCOpenClawBridge":
         from app.config import get_settings  # noqa: PLC0415
 
         settings = get_settings()

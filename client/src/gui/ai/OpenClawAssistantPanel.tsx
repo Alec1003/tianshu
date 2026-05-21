@@ -78,11 +78,11 @@ interface OpenClawAssistantPanelProps {
 }
 
 const STORAGE_KEY = {
-  messages: "panopticon.ai.messages",
-  mcpServers: "panopticon.ai.mcpServers",
-  customSkills: "panopticon.ai.customSkills",
-  model: "panopticon.ai.model",
-  projectMcpEnabled: "panopticon.ai.projectMcpEnabled",
+  messages: "aicc.ai.messages",
+  mcpServers: "aicc.ai.mcpServers",
+  customSkills: "aicc.ai.customSkills",
+  model: "aicc.ai.model",
+  projectMcpEnabled: "aicc.ai.projectMcpEnabled",
 };
 
 const DEFAULT_MODEL: ModelConfig = {
@@ -119,8 +119,8 @@ const MODEL_PRESETS: Record<string, string[]> = {
 const DEFAULT_MCP_SERVERS: MCPServerConfig[] = [
   {
     id: crypto.randomUUID(),
-    name: "Panopticon MCP Skeleton",
-    endpoint: "stdio://local-panopticon-mcp",
+    name: "AICC MCP Skeleton",
+    endpoint: "stdio://local-aicc-mcp",
     transport: "stdio",
     enabled: true,
   },
@@ -467,7 +467,7 @@ export default function OpenClawAssistantPanel({
     return (
       <div className="openclaw-panel-body">
         <section className="openclaw-hero">
-          <h4>Panopticon Command Assistant</h4>
+          <h4>AICC Command Assistant</h4>
           <p>
             Use natural language to invoke OpenClaw skills for simulation,
             unit, script and situation control.
@@ -846,7 +846,7 @@ export default function OpenClawAssistantPanel({
           <header className="openclaw-panel-header">
             <div className="openclaw-panel-title">
               <h3>OpenClaw</h3>
-              <span>Panopticon Command UI</span>
+              <span>AICC Command UI</span>
             </div>
             <div className="openclaw-panel-actions">
               <button type="button" onClick={() => setActiveTab("chat")}>

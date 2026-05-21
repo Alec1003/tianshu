@@ -1,7 +1,7 @@
-"""MCP runtime provider: 单进程单 PanopticonRuntime + async 适配层。
+"""MCP runtime provider: 单进程单 AICCRuntime + async 适配层。
 
 为什么单独成文件：
-- ``PanopticonRuntime`` 内部用 ``threading.RLock`` 做粒度锁，是同步阻塞。
+- ``AICCRuntime`` 内部用 ``threading.RLock`` 做粒度锁，是同步阻塞。
   FastMCP 的 tool 是 async；直接调 sync 会卡住 event loop（pyd 反例 1）。
   这里集中提供 ``run_in_runtime(fn, ...)`` 用 ``asyncio.to_thread`` 把所有
   调用扔进线程池，保证 event loop 不阻塞。
@@ -22,7 +22,7 @@ import os
 from pathlib import Path
 from typing import Any, Awaitable, Callable, TypeVar
 
-from app.panopticon.runtime import ROOT_DIR, PanopticonRuntime
+from app.aicc_runtime.runtime import ROOT_DIR, AICCRuntime
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +38,7 @@ T = TypeVar("T")
 def resolve_default_scenario_path() -> Path:
     """允许用 ``AICC_MCP_RUNTIME_SCENARIO`` 切换 runtime 启动想定。
 
-    传相对路径时基准是项目根，不是 cwd（与 PanopticonRuntime 内部一致）。
+    传相对路径时基准是项目根，不是 cwd（与 AICCRuntime 内部一致）。
     """
     override = os.environ.get(ENV_RUNTIME_SCENARIO, "").strip()
     if override:
@@ -47,11 +47,11 @@ def resolve_default_scenario_path() -> Path:
     return DEFAULT_SCENARIO_PATH
 
 
-async def create_runtime_async() -> PanopticonRuntime:
+async def create_runtime_async() -> AICCRuntime:
     """lifespan 启动期调用：把同步构造扔线程池避免阻塞 event loop。"""
     path = resolve_default_scenario_path()
     logger.info("mcp.runtime: bootstrapping with scenario %s", path)
-    return await asyncio.to_thread(PanopticonRuntime, path)
+    return await asyncio.to_thread(AICCRuntime, path)
 
 
 async def run_in_runtime(

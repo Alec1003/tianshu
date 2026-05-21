@@ -28,25 +28,15 @@ import {
   useState,
 } from "react";
 import {
-  Activity,
   AlertTriangle,
   CheckCircle2,
-  ChevronRight,
-  Cpu,
-  KeyRound,
   Loader2,
   MessageSquare,
-  Plug,
-  Plus,
-  RefreshCw,
   Send,
-  Settings as SettingsIcon,
   Sparkles,
   Square,
-  Trash2,
   Wrench,
   X,
-  XCircle,
 } from "lucide-react";
 import { useChat } from "@ai-sdk/react";
 import {
@@ -58,10 +48,9 @@ import {
 } from "ai";
 
 import { getRuntimeScenario } from "@/api/ai";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import TacticalSettingsModal from "./TacticalSettingsModal";
 
 export type AISidebarTab = "chat" | "settings";
 type AIChatMode = "ask" | "command";
@@ -88,13 +77,13 @@ interface ModelConfig {
   model: string;
 }
 
-interface RegisteredSkill {
+export interface RegisteredSkill {
   name: string;
   description: string;
   parameters?: Record<string, unknown>;
 }
 
-interface ModelCheckResponse {
+export interface ModelCheckResponse {
   status: "ok" | "partial" | "error";
   message: string;
   provider: string;
@@ -125,6 +114,8 @@ interface AISidebarProps {
   activeTab: AISidebarTab;
   onOpenChange: (open: boolean) => void;
   onTabChange: (tab: AISidebarTab) => void;
+  settingsOpen?: boolean;
+  onSettingsOpenChange?: (open: boolean) => void;
   /** AI command 返回的 scenario JSON 应用回 game。 */
   onApplyScenario?: (scenario: Record<string, unknown>) => void;
   /**
@@ -156,16 +147,6 @@ const DEFAULT_MODEL: ModelConfig = {
   apiKey: "",
   model: "gpt-4o-mini",
 };
-
-const MODEL_PROVIDER_OPTIONS = [
-  "openai",
-  "anthropic",
-  "google",
-  "deepseek",
-  "qwen",
-  "ollama",
-  "custom",
-] as const;
 
 const MODEL_PRESETS: Record<string, string[]> = {
   openai: ["gpt-5", "gpt-5-mini", "gpt-4.1", "gpt-4o", "gpt-4o-mini"],
@@ -347,6 +328,8 @@ export default function AISidebar({
   activeTab,
   onOpenChange,
   onTabChange,
+  settingsOpen = false,
+  onSettingsOpenChange,
   onApplyScenario,
   onResumePlay,
   scenarioId,
@@ -615,10 +598,10 @@ export default function AISidebar({
     void refreshRegisteredSkills();
   }, [refreshRegisteredSkills]);
   useEffect(() => {
-    if (open && activeTab === "settings") {
+    if (settingsOpen) {
       void refreshRegisteredSkills();
     }
-  }, [open, activeTab, refreshRegisteredSkills]);
+  }, [settingsOpen, refreshRegisteredSkills]);
 
   // ─── 聊天提交 ──────────────────────────────────────────────────────────────
   // sendMessage / status / stop / setMessages 都由 useChat 提供，
@@ -722,147 +705,144 @@ export default function AISidebar({
     }
   }, [modelConfig]);
 
-  if (!open) return null;
-
   return (
-    <aside
-      className={cn(
-        "relative hidden h-full min-h-0 min-w-0 flex-col border-l",
-        "border-slate-700/50 bg-[#0a0f18]/95 backdrop-blur-2xl lg:flex"
-      )}
-    >
-      {/* 顶部：标题 + tabs + 关闭 */}
-      <header className="flex items-center justify-between gap-2 border-b border-slate-700/50 px-3 py-2.5">
-        <div className="flex items-center gap-2">
-          <div className="grid size-7 place-items-center rounded-lg border border-slate-700/50 bg-slate-800/50 text-slate-300">
-            <Sparkles className="size-3.5" />
-          </div>
-          <div>
-            <div className="text-[10px] uppercase tracking-[0.32em] text-slate-500">
-              AI Copilot
+    <>
+      <TacticalSettingsModal
+        activeCustomSkillsCount={activeCustomSkills.length}
+        activeMcpServersCount={activeMcpServers.length}
+        checkingModel={checkingModel}
+        customSkills={customSkills}
+        mcpServers={mcpServers}
+        modelCheckResult={modelCheckResult}
+        modelConfig={modelConfig}
+        modelPresetOptions={modelPresetOptions}
+        newServerEndpoint={newServerEndpoint}
+        newServerName={newServerName}
+        newServerTransport={newServerTransport}
+        newSkillDescription={newSkillDescription}
+        newSkillName={newSkillName}
+        onAddServer={handleAddServer}
+        onAddSkill={handleAddSkill}
+        onCheckModel={() => void checkModelConnection()}
+        onClearMessages={() => setMessages([])}
+        onModelConfigChange={setModelConfig}
+        onNewServerEndpointChange={setNewServerEndpoint}
+        onNewServerNameChange={setNewServerName}
+        onNewServerTransportChange={setNewServerTransport}
+        onNewSkillDescriptionChange={setNewSkillDescription}
+        onNewSkillNameChange={setNewSkillName}
+        onOpenChange={onSettingsOpenChange ?? (() => undefined)}
+        onProjectMcpEnabledChange={setProjectMcpEnabled}
+        onRefreshSkills={() => void refreshRegisteredSkills()}
+        onRemoveCustomSkill={(id) =>
+          setCustomSkills((prev) => prev.filter((s) => s.id !== id))
+        }
+        onRemoveServer={(id) =>
+          setMcpServers((prev) => prev.filter((s) => s.id !== id))
+        }
+        onToggleCustomSkill={(id, enabled) =>
+          setCustomSkills((prev) =>
+            prev.map((s) => (s.id === id ? { ...s, enabled } : s))
+          )
+        }
+        onToggleServer={(id, enabled) =>
+          setMcpServers((prev) =>
+            prev.map((s) => (s.id === id ? { ...s, enabled } : s))
+          )
+        }
+        open={settingsOpen}
+        projectMcpEnabled={projectMcpEnabled}
+        registeredSkills={registeredSkills}
+        selectedPreset={selectedPreset}
+        skillsError={skillsError}
+        skillsLoading={skillsLoading}
+      />
+      {open && (
+        <aside
+          className={cn(
+            "relative hidden h-full min-h-0 min-w-0 flex-col border-l",
+            "border-slate-700/50 bg-[#0a0f18]/95 backdrop-blur-2xl lg:flex"
+          )}
+        >
+          {/* 顶部：标题 + tabs + 关闭 */}
+          <header className="flex items-center justify-between gap-2 border-b border-slate-700/50 px-3 py-2.5">
+            <div className="flex items-center gap-2">
+              <div className="grid size-7 place-items-center rounded-lg border border-slate-700/50 bg-slate-800/50 text-slate-300">
+                <Sparkles className="size-3.5" />
+              </div>
+              <div>
+                <div className="text-[10px] uppercase tracking-[0.32em] text-slate-500">
+                  AI Copilot
+                </div>
+                <div className="flex items-center gap-1.5 text-sm font-semibold text-slate-100 leading-tight">
+                  AICC 助手
+                  {scenarioId && (
+                    <span
+                      className="rounded bg-slate-800/50 px-1.5 py-0.5 font-mono text-[9px] font-normal tracking-wider text-slate-400"
+                      title={`会话已绑定到 scenario ${scenarioId}`}
+                    >
+                      #{scenarioId.slice(0, 6)}
+                    </span>
+                  )}
+                </div>
+              </div>
             </div>
-            <div className="flex items-center gap-1.5 text-sm font-semibold text-slate-100 leading-tight">
-              AICC 助手
-              {scenarioId && (
-                <span
-                  className="rounded bg-slate-800/50 px-1.5 py-0.5 font-mono text-[9px] font-normal tracking-wider text-slate-400"
-                  title={`会话已绑定到 scenario ${scenarioId}`}
-                >
-                  #{scenarioId.slice(0, 6)}
+            <Button
+              aria-label="关闭 AI 侧栏"
+              className="size-8 text-slate-400 hover:text-slate-100"
+              onClick={() => onOpenChange(false)}
+              size="icon"
+              variant="ghost"
+              title="收起 AI 侧栏"
+            >
+              <X className="size-4" />
+            </Button>
+          </header>
+
+          <div className="flex items-center gap-1 border-b border-slate-700/50 px-3 py-1.5">
+            <TabButton
+              active={activeTab === "chat"}
+              icon={<MessageSquare className="size-3.5" />}
+              label="聊天"
+              onClick={() => onTabChange("chat")}
+            />
+            <div className="ml-auto text-[11px] text-slate-500">
+              {busy ? (
+                <span className="inline-flex items-center gap-1">
+                  <Loader2 className="size-3 animate-spin" /> Thinking
                 </span>
+              ) : chatError ? (
+                <span className="inline-flex items-center gap-1 text-red-300">
+                  <AlertTriangle className="size-3" /> Error
+                </span>
+              ) : (
+                <span>Ready</span>
               )}
             </div>
           </div>
-        </div>
-        <Button
-          aria-label="关闭 AI 侧栏"
-          className="size-8 text-slate-400 hover:text-slate-100"
-          onClick={() => onOpenChange(false)}
-          size="icon"
-          variant="ghost"
-          title="收起 AI 侧栏"
-        >
-          <X className="size-4" />
-        </Button>
-      </header>
 
-      <div className="flex items-center gap-1 border-b border-slate-700/50 px-3 py-1.5">
-        <TabButton
-          active={activeTab === "chat"}
-          icon={<MessageSquare className="size-3.5" />}
-          label="聊天"
-          onClick={() => onTabChange("chat")}
-        />
-        <TabButton
-          active={activeTab === "settings"}
-          icon={<SettingsIcon className="size-3.5" />}
-          label="设置"
-          onClick={() => onTabChange("settings")}
-        />
-        <div className="ml-auto text-[11px] text-slate-500">
-          {busy ? (
-            <span className="inline-flex items-center gap-1">
-              <Loader2 className="size-3 animate-spin" /> Thinking
-            </span>
-          ) : chatError ? (
-            <span className="inline-flex items-center gap-1 text-red-300">
-              <AlertTriangle className="size-3" /> Error
-            </span>
-          ) : (
-            <span>Ready</span>
-          )}
-        </div>
-      </div>
-
-      {/* Tab 内容 */}
-      <div className="flex min-h-0 flex-1 flex-col">
-        {activeTab === "chat" ? (
-          <ChatPanel
-            chatLogRef={chatLogRef}
-            chatError={chatError}
-            chatRunSummary={chatRunSummary}
-            chatMode={chatMode}
-            commandInput={commandInput}
-            messages={messages}
-            onChatModeChange={setChatMode}
-            onCommandInputChange={setCommandInput}
-            onQuickCommand={sendChat}
-            onSubmit={onSubmitChat}
-            busy={busy}
-            stop={stop}
-          />
-        ) : (
-          <SettingsPanel
-            activeCustomSkillsCount={activeCustomSkills.length}
-            activeMcpServersCount={activeMcpServers.length}
-            checkingModel={checkingModel}
-            customSkills={customSkills}
-            mcpServers={mcpServers}
-            modelCheckResult={modelCheckResult}
-            modelConfig={modelConfig}
-            modelPresetOptions={modelPresetOptions}
-            newServerEndpoint={newServerEndpoint}
-            newServerName={newServerName}
-            newServerTransport={newServerTransport}
-            newSkillDescription={newSkillDescription}
-            newSkillName={newSkillName}
-            onAddServer={handleAddServer}
-            onAddSkill={handleAddSkill}
-            onCheckModel={() => void checkModelConnection()}
-            onClearMessages={() => setMessages([])}
-            onModelConfigChange={setModelConfig}
-            onNewServerEndpointChange={setNewServerEndpoint}
-            onNewServerNameChange={setNewServerName}
-            onNewServerTransportChange={setNewServerTransport}
-            onNewSkillDescriptionChange={setNewSkillDescription}
-            onNewSkillNameChange={setNewSkillName}
-            onProjectMcpEnabledChange={setProjectMcpEnabled}
-            onRefreshSkills={() => void refreshRegisteredSkills()}
-            onRemoveCustomSkill={(id) =>
-              setCustomSkills((prev) => prev.filter((s) => s.id !== id))
-            }
-            onRemoveServer={(id) =>
-              setMcpServers((prev) => prev.filter((s) => s.id !== id))
-            }
-            onToggleCustomSkill={(id, enabled) =>
-              setCustomSkills((prev) =>
-                prev.map((s) => (s.id === id ? { ...s, enabled } : s))
-              )
-            }
-            onToggleServer={(id, enabled) =>
-              setMcpServers((prev) =>
-                prev.map((s) => (s.id === id ? { ...s, enabled } : s))
-              )
-            }
-            projectMcpEnabled={projectMcpEnabled}
-            registeredSkills={registeredSkills}
-            selectedPreset={selectedPreset}
-            skillsError={skillsError}
-            skillsLoading={skillsLoading}
-          />
-        )}
-      </div>
-    </aside>
+          {/* Tab 内容 */}
+          <div className="flex min-h-0 flex-1 flex-col">
+            {activeTab === "chat" && (
+              <ChatPanel
+                chatLogRef={chatLogRef}
+                chatError={chatError}
+                chatRunSummary={chatRunSummary}
+                chatMode={chatMode}
+                commandInput={commandInput}
+                messages={messages}
+                onChatModeChange={setChatMode}
+                onCommandInputChange={setCommandInput}
+                onQuickCommand={sendChat}
+                onSubmit={onSubmitChat}
+                busy={busy}
+                stop={stop}
+              />
+            )}
+          </div>
+        </aside>
+      )}
+    </>
   );
 }
 
@@ -894,32 +874,6 @@ function TabButton({ active, icon, label, onClick }: TabButtonProps) {
     </button>
   );
 }
-
-interface InputRowProps {
-  label?: string;
-  hint?: string;
-  children: React.ReactNode;
-}
-
-function InputRow({ label, hint, children }: InputRowProps) {
-  return (
-    <label className="flex flex-col gap-1.5">
-      {label && (
-        <span className="text-[11px] uppercase tracking-[0.18em] text-slate-500">
-          {label}
-        </span>
-      )}
-      {children}
-      {hint && <span className="text-[10px] text-slate-600">{hint}</span>}
-    </label>
-  );
-}
-
-const INPUT_CLASS =
-  "h-8 w-full rounded-md border border-cyan-300/12 bg-slate-950/40 px-2 text-xs text-slate-100 placeholder:text-slate-600 focus:border-cyan-300/40 focus:outline-none focus:ring-1 focus:ring-cyan-300/30";
-
-const SELECT_CLASS =
-  "h-8 w-full rounded-md border border-cyan-300/12 bg-slate-950/40 px-2 text-xs text-slate-100 focus:border-cyan-300/40 focus:outline-none focus:ring-1 focus:ring-cyan-300/30";
 
 const TEXTAREA_CLASS =
   "min-h-[64px] w-full resize-none rounded-lg border border-slate-700/50 bg-slate-900/50 p-2 text-xs text-slate-100 placeholder:text-slate-600 focus:border-slate-600/50 focus:outline-none focus:ring-1 focus:ring-slate-600/30";
@@ -1282,11 +1236,11 @@ function MessageBlock({ message }: { message: UIMessage }) {
 
 export type { MCPServerConfig, CustomSkillConfig, ModelConfig };
 
-// ────────────────────────────────────────────────────────────────────────────
-// Settings Panel
-// ────────────────────────────────────────────────────────────────────────────
+// ──────────────────────────────────────────────────────────────────────────────
+// Settings Panel Props
+// ──────────────────────────────────────────────────────────────────────────────
 
-interface SettingsPanelProps {
+export interface TacticalSettingsProps {
   modelConfig: ModelConfig;
   modelPresetOptions: string[];
   selectedPreset: string;
@@ -1321,491 +1275,4 @@ interface SettingsPanelProps {
   onNewSkillDescriptionChange: (v: string) => void;
   onRefreshSkills: () => void;
   onClearMessages: () => void;
-}
-
-function SettingsPanel(props: SettingsPanelProps) {
-  return (
-    <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-3 py-3">
-      <ModelSection {...props} />
-      <McpSection {...props} />
-      <SkillsSection {...props} />
-      <DangerZone onClearMessages={props.onClearMessages} />
-    </div>
-  );
-}
-
-function ModelSection({
-  modelConfig,
-  modelPresetOptions,
-  selectedPreset,
-  modelCheckResult,
-  checkingModel,
-  onModelConfigChange,
-  onCheckModel,
-}: SettingsPanelProps) {
-  const update = (patch: Partial<ModelConfig>) =>
-    onModelConfigChange({ ...modelConfig, ...patch });
-
-  return (
-    <Card className="border-cyan-300/12 bg-[#07111d]/82">
-      <CardHeader className="pb-2">
-        <CardTitle className="flex items-center justify-between gap-2 text-sm">
-          <span className="inline-flex items-center gap-2 text-slate-100">
-            <Cpu className="size-4 text-cyan-200" />
-            模型配置
-          </span>
-          <Button
-            className="h-7 gap-1.5 px-2.5 text-[11px]"
-            disabled={checkingModel}
-            onClick={onCheckModel}
-            size="sm"
-            variant="tactical"
-          >
-            {checkingModel ? (
-              <Loader2 className="size-3 animate-spin" />
-            ) : (
-              <Plug className="size-3" />
-            )}
-            连接测试
-          </Button>
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-2.5">
-        <div className="grid grid-cols-2 gap-2">
-          <InputRow label="Provider">
-            <select
-              className={SELECT_CLASS}
-              onChange={(e) => update({ provider: e.target.value })}
-              value={modelConfig.provider}
-            >
-              {MODEL_PROVIDER_OPTIONS.map((p) => (
-                <option key={p} value={p}>
-                  {p}
-                </option>
-              ))}
-            </select>
-          </InputRow>
-          <InputRow label="预设模型">
-            <select
-              className={SELECT_CLASS}
-              onChange={(e) => {
-                if (e.target.value !== "__custom__") {
-                  update({ model: e.target.value });
-                }
-              }}
-              value={selectedPreset}
-            >
-              <option value="__custom__">自定义</option>
-              {modelPresetOptions.map((m) => (
-                <option key={m} value={m}>
-                  {m}
-                </option>
-              ))}
-            </select>
-          </InputRow>
-        </div>
-
-        <InputRow label="模型名" hint="自定义模型可以直接输入名称">
-          <input
-            className={INPUT_CLASS}
-            onChange={(e) => update({ model: e.target.value })}
-            placeholder="例如 gpt-4o-mini"
-            value={modelConfig.model}
-          />
-        </InputRow>
-
-        <InputRow
-          label="Base URL"
-          hint="留空则使用 provider 默认；自建/反代必填"
-        >
-          <input
-            className={INPUT_CLASS}
-            onChange={(e) => update({ baseUrl: e.target.value })}
-            placeholder="https://api.openai.com/v1"
-            value={modelConfig.baseUrl}
-          />
-        </InputRow>
-
-        <InputRow label="API Key">
-          <div className="relative">
-            <KeyRound className="absolute left-2 top-1/2 size-3 -translate-y-1/2 text-slate-500" />
-            <input
-              className={cn(INPUT_CLASS, "pl-7")}
-              onChange={(e) => update({ apiKey: e.target.value })}
-              placeholder="sk-..."
-              type="password"
-              value={modelConfig.apiKey}
-            />
-          </div>
-        </InputRow>
-
-        {modelCheckResult && (
-          <div
-            className={cn(
-              "rounded-md border px-2.5 py-2 text-[11px]",
-              modelCheckResult.status === "ok"
-                ? "border-emerald-300/30 bg-emerald-300/8 text-emerald-100"
-                : modelCheckResult.status === "partial"
-                  ? "border-amber-300/30 bg-amber-300/8 text-amber-100"
-                  : "border-red-300/30 bg-red-300/8 text-red-100"
-            )}
-          >
-            <div className="flex items-center gap-1.5 font-medium">
-              {modelCheckResult.status === "ok" ? (
-                <CheckCircle2 className="size-3.5" />
-              ) : (
-                <XCircle className="size-3.5" />
-              )}
-              {modelCheckResult.message}
-            </div>
-            <div className="mt-1 text-[10px] opacity-80">
-              endpoint: {modelCheckResult.endpoint || "N/A"} · auth:{" "}
-              {modelCheckResult.auth_ok ? "ok" : "fail"} · models:{" "}
-              {modelCheckResult.models_listed ? "ok" : "fail"}
-            </div>
-            {modelCheckResult.checked_model && (
-              <div className="mt-0.5 text-[10px] opacity-80">
-                model: {modelCheckResult.checked_model} ·{" "}
-                {modelCheckResult.checked_model_exists ? "exists" : "missing"}
-              </div>
-            )}
-            {modelCheckResult.sample_models &&
-              modelCheckResult.sample_models.length > 0 && (
-                <div className="mt-0.5 text-[10px] opacity-80">
-                  sample:{" "}
-                  {modelCheckResult.sample_models.slice(0, 5).join(", ")}
-                </div>
-              )}
-            {modelCheckResult.error && (
-              <div className="mt-0.5 text-[10px] opacity-80">
-                err: {modelCheckResult.error}
-              </div>
-            )}
-          </div>
-        )}
-
-        <div className="rounded-md border border-emerald-300/15 bg-emerald-300/[0.04] px-2.5 py-1.5 text-[10px] text-emerald-200/80">
-          模型配置通过 X-AICC-Model-* header 在每次请求时下发后端，实时生效。
-          若留空则使用后端环境变量默认配置。
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function McpSection({
-  mcpServers,
-  activeMcpServersCount,
-  projectMcpEnabled,
-  newServerName,
-  newServerEndpoint,
-  newServerTransport,
-  onProjectMcpEnabledChange,
-  onAddServer,
-  onRemoveServer,
-  onToggleServer,
-  onNewServerNameChange,
-  onNewServerEndpointChange,
-  onNewServerTransportChange,
-}: SettingsPanelProps) {
-  return (
-    <Card className="border-cyan-300/12 bg-[#07111d]/82">
-      <CardHeader className="pb-2">
-        <CardTitle className="flex items-center justify-between gap-2 text-sm">
-          <span className="inline-flex items-center gap-2 text-slate-100">
-            <Plug className="size-4 text-cyan-200" />
-            MCP Servers
-          </span>
-          <Badge
-            className="bg-cyan-300/10 text-[10px] text-cyan-100"
-            variant="muted"
-          >
-            {activeMcpServersCount} 启用
-          </Badge>
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-2.5">
-        <label className="flex items-center justify-between rounded-md border border-cyan-300/10 bg-slate-950/35 px-2.5 py-1.5 text-[11px] text-slate-200">
-          <span>项目内置 MCP</span>
-          <input
-            checked={projectMcpEnabled}
-            className="size-3.5 accent-cyan-400"
-            onChange={(e) => onProjectMcpEnabledChange(e.target.checked)}
-            type="checkbox"
-          />
-        </label>
-
-        <div className="space-y-2">
-          {mcpServers.length === 0 ? (
-            <div className="rounded-md border border-dashed border-cyan-300/12 px-2.5 py-2 text-center text-[11px] text-slate-500">
-              暂无 MCP server
-            </div>
-          ) : (
-            mcpServers.map((server) => (
-              <div
-                className="rounded-md border border-cyan-300/10 bg-slate-950/30 p-2 text-xs"
-                key={server.id}
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5">
-                      <span className="truncate font-medium text-slate-100">
-                        {server.name}
-                      </span>
-                      <span className="rounded bg-cyan-300/10 px-1.5 py-0.5 text-[9px] uppercase text-cyan-200">
-                        {server.transport}
-                      </span>
-                    </div>
-                    <div className="mt-0.5 truncate text-[10px] text-slate-500">
-                      {server.endpoint}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <input
-                      checked={server.enabled}
-                      className="size-3.5 accent-cyan-400"
-                      onChange={(e) =>
-                        onToggleServer(server.id, e.target.checked)
-                      }
-                      type="checkbox"
-                    />
-                    <Button
-                      aria-label="移除该 MCP server"
-                      className="size-6 text-slate-500 hover:text-red-300"
-                      onClick={() => onRemoveServer(server.id)}
-                      size="icon"
-                      variant="ghost"
-                    >
-                      <Trash2 className="size-3" />
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-
-        <div className="space-y-2 rounded-md border border-cyan-300/10 bg-slate-950/20 p-2.5">
-          <div className="text-[10px] uppercase tracking-[0.18em] text-slate-500">
-            添加新 MCP server
-          </div>
-          <div className="grid grid-cols-3 gap-1.5">
-            <input
-              className={cn(INPUT_CLASS, "col-span-2")}
-              onChange={(e) => onNewServerNameChange(e.target.value)}
-              placeholder="名称"
-              value={newServerName}
-            />
-            <select
-              className={SELECT_CLASS}
-              onChange={(e) =>
-                onNewServerTransportChange(
-                  e.target.value as "stdio" | "sse" | "http"
-                )
-              }
-              value={newServerTransport}
-            >
-              <option value="stdio">stdio</option>
-              <option value="sse">sse</option>
-              <option value="http">http</option>
-            </select>
-          </div>
-          <input
-            className={INPUT_CLASS}
-            onChange={(e) => onNewServerEndpointChange(e.target.value)}
-            placeholder="endpoint（如 stdio://... 或 https://...）"
-            value={newServerEndpoint}
-          />
-          <Button
-            className="w-full gap-1.5"
-            disabled={!newServerName.trim() || !newServerEndpoint.trim()}
-            onClick={onAddServer}
-            size="sm"
-            variant="tactical"
-          >
-            <Plus className="size-3.5" /> 添加 MCP server
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function SkillsSection({
-  registeredSkills,
-  skillsLoading,
-  skillsError,
-  customSkills,
-  activeCustomSkillsCount,
-  newSkillName,
-  newSkillDescription,
-  onRefreshSkills,
-  onAddSkill,
-  onRemoveCustomSkill,
-  onToggleCustomSkill,
-  onNewSkillNameChange,
-  onNewSkillDescriptionChange,
-}: SettingsPanelProps) {
-  return (
-    <Card className="border-cyan-300/12 bg-[#07111d]/82">
-      <CardHeader className="pb-2">
-        <CardTitle className="flex items-center justify-between gap-2 text-sm">
-          <span className="inline-flex items-center gap-2 text-slate-100">
-            <Wrench className="size-4 text-cyan-200" />
-            技能
-          </span>
-          <div className="flex items-center gap-1.5">
-            <Badge
-              className="bg-cyan-300/10 text-[10px] text-cyan-100"
-              variant="muted"
-            >
-              后端 {registeredSkills.length} · 自定义 {activeCustomSkillsCount}
-            </Badge>
-            <Button
-              aria-label="刷新后端技能列表"
-              className="size-6 text-slate-400 hover:text-cyan-100"
-              disabled={skillsLoading}
-              onClick={onRefreshSkills}
-              size="icon"
-              variant="ghost"
-            >
-              <RefreshCw
-                className={cn("size-3", skillsLoading && "animate-spin")}
-              />
-            </Button>
-          </div>
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-2.5">
-        {skillsError && (
-          <div className="rounded-md border border-red-300/30 bg-red-300/8 px-2.5 py-1.5 text-[11px] text-red-100">
-            刷新失败：{skillsError}
-          </div>
-        )}
-
-        <div className="space-y-1">
-          <div className="text-[10px] uppercase tracking-[0.18em] text-slate-500">
-            后端已注册（只读）
-          </div>
-          {registeredSkills.length === 0 ? (
-            <div className="rounded-md border border-dashed border-cyan-300/12 px-2.5 py-2 text-center text-[11px] text-slate-500">
-              {skillsLoading ? "加载中…" : "暂无"}
-            </div>
-          ) : (
-            registeredSkills.map((skill) => (
-              <div
-                className="rounded-md border border-cyan-300/10 bg-slate-950/30 px-2 py-1.5 text-xs"
-                key={skill.name}
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <span className="truncate font-medium text-slate-100">
-                    {skill.name}
-                  </span>
-                  <ChevronRight className="size-3 text-slate-600" />
-                </div>
-                <div className="mt-0.5 truncate text-[10px] text-slate-500">
-                  {skill.description}
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-
-        <div className="space-y-1">
-          <div className="text-[10px] uppercase tracking-[0.18em] text-slate-500">
-            自定义技能
-          </div>
-          {customSkills.length === 0 ? (
-            <div className="rounded-md border border-dashed border-cyan-300/12 px-2.5 py-2 text-center text-[11px] text-slate-500">
-              暂无自定义
-            </div>
-          ) : (
-            customSkills.map((skill) => (
-              <div
-                className="rounded-md border border-cyan-300/10 bg-slate-950/30 px-2 py-1.5 text-xs"
-                key={skill.id}
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <span className="truncate font-medium text-slate-100">
-                    {skill.name}
-                  </span>
-                  <div className="flex items-center gap-1.5">
-                    <input
-                      checked={skill.enabled}
-                      className="size-3.5 accent-cyan-400"
-                      onChange={(e) =>
-                        onToggleCustomSkill(skill.id, e.target.checked)
-                      }
-                      type="checkbox"
-                    />
-                    <Button
-                      aria-label="删除自定义技能"
-                      className="size-6 text-slate-500 hover:text-red-300"
-                      onClick={() => onRemoveCustomSkill(skill.id)}
-                      size="icon"
-                      variant="ghost"
-                    >
-                      <Trash2 className="size-3" />
-                    </Button>
-                  </div>
-                </div>
-                <div className="mt-0.5 truncate text-[10px] text-slate-500">
-                  {skill.description}
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-
-        <div className="space-y-2 rounded-md border border-cyan-300/10 bg-slate-950/20 p-2.5">
-          <div className="text-[10px] uppercase tracking-[0.18em] text-slate-500">
-            添加自定义技能
-          </div>
-          <input
-            className={INPUT_CLASS}
-            onChange={(e) => onNewSkillNameChange(e.target.value)}
-            placeholder="技能名"
-            value={newSkillName}
-          />
-          <input
-            className={INPUT_CLASS}
-            onChange={(e) => onNewSkillDescriptionChange(e.target.value)}
-            placeholder="描述（给 AI 看的提示）"
-            value={newSkillDescription}
-          />
-          <Button
-            className="w-full gap-1.5"
-            disabled={!newSkillName.trim() || !newSkillDescription.trim()}
-            onClick={onAddSkill}
-            size="sm"
-            variant="tactical"
-          >
-            <Plus className="size-3.5" /> 添加技能
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function DangerZone({ onClearMessages }: { onClearMessages: () => void }) {
-  return (
-    <Card className="border-red-400/15 bg-red-500/[0.03]">
-      <CardHeader className="pb-2">
-        <CardTitle className="flex items-center gap-2 text-sm text-red-100">
-          <Activity className="size-4" /> 数据
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-2">
-        <Button
-          className="w-full gap-1.5"
-          onClick={onClearMessages}
-          size="sm"
-          variant="danger"
-        >
-          <Trash2 className="size-3.5" /> 清空聊天记录
-        </Button>
-      </CardContent>
-    </Card>
-  );
 }

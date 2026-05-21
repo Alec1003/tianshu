@@ -35,8 +35,9 @@ import defaultScenarioJson from "@/scenarios/default_scenario.json";
 import { isScenarioObjectVisible } from "@/game/scenarioVisibility";
 import { cn } from "@/lib/utils";
 import { randomUUID } from "@/utils/generateUUID";
-import AISidebar, { type AISidebarTab } from "./AISidebar";
+import AISidebar from "./AISidebar";
 import SimulationInspectorPanel from "./SimulationInspectorPanel";
+import TopTacticalBar from "./TopTacticalBar";
 import SimulationSidebar, {
   type SimulationPanelId,
   type SimulationRunState,
@@ -59,9 +60,7 @@ const railItems: Array<{
 
 // 从任意 scenario JSON 创建一个全新的 Game 实例。传 null/undefined 则走默认 SCS。
 // 独立出来是为了让 PlayScenarioPage 能传入远端拉取的 JSON。
-function createAiccGameFromJson(
-  scenarioJson: object | null | undefined
-): Game {
+function createAiccGameFromJson(scenarioJson: object | null | undefined): Game {
   const currentScenario = new Scenario({
     id: randomUUID(),
     name: "AICC Tactical Simulation",
@@ -73,11 +72,16 @@ function createAiccGameFromJson(
   try {
     game.loadScenario(JSON.stringify(source));
   } catch (err) {
-    console.error("[AICC] createAiccGameFromJson: loadScenario failed, falling back to SCS", err);
+    console.error(
+      "[AICC] createAiccGameFromJson: loadScenario failed, falling back to SCS",
+      err
+    );
     game.loadScenario(JSON.stringify(SCSScenarioJson));
     // Defer the alert so it doesn't block the synchronous useState initializer.
     window.setTimeout(() => {
-      window.alert("场景数据格式无效，已加载默认 SCS 场景。请重新保存或联系管理员。");
+      window.alert(
+        "场景数据格式无效，已加载默认 SCS 场景。请重新保存或联系管理员。"
+      );
     }, 0);
   }
   game.scenarioPaused = true;
@@ -202,7 +206,7 @@ export default function AITacticalCommandPlatform({
   // AI 侧栏：默认 collapsed；sidebar 顶部 Sparkles 动作与底部 Settings
   // 动作分别打开 chat / settings tab。
   const [aiSidebarOpen, setAiSidebarOpen] = useState(false);
-  const [aiSidebarTab, setAiSidebarTab] = useState<AISidebarTab>("chat");
+  const [settingsModalOpen, setSettingsModalOpen] = useState(false);
   const [showRoutes, setShowRoutes] = useState(false);
   const [showRanges, setShowRanges] = useState(false);
   const [placement, setPlacement] = useState<CesiumPlacement | null>(null);
@@ -326,9 +330,7 @@ export default function AITacticalCommandPlatform({
 
   const handleNewScenario = useCallback(() => {
     if (
-      !window.confirm(
-        "创建新场景将清空当前所有阵营、单位和任务，是否继续？"
-      )
+      !window.confirm("创建新场景将清空当前所有阵营、单位和任务，是否继续？")
     ) {
       return;
     }
@@ -385,10 +387,11 @@ export default function AITacticalCommandPlatform({
       });
       const url = URL.createObjectURL(blob);
       const ts = new Date().toISOString().replace(/[:.]/g, "_");
-      const safeName = (game.currentScenario.name || "aicc_scenario")
-        .trim()
-        .replace(/[^A-Za-z0-9_\-]+/g, "_")
-        .slice(0, 60) || "aicc_scenario";
+      const safeName =
+        (game.currentScenario.name || "aicc_scenario")
+          .trim()
+          .replace(/[^A-Za-z0-9_-]+/g, "_")
+          .slice(0, 60) || "aicc_scenario";
       const a = document.createElement("a");
       a.href = url;
       a.download = `${safeName}_${ts}.json`;
@@ -461,7 +464,8 @@ export default function AITacticalCommandPlatform({
         const count = (
           ["aircraft", "ships", "facilities", "airbases", "weapons"] as const
         ).reduce(
-          (s, k) => s + (Array.isArray(cs[k]) ? (cs[k] as unknown[]).length : 0),
+          (s, k) =>
+            s + (Array.isArray(cs[k]) ? (cs[k] as unknown[]).length : 0),
           0
         );
         if (runtimeUnitCountRef.current !== count) {
@@ -556,17 +560,11 @@ export default function AITacticalCommandPlatform({
 
   const sidebarRef = useRef<HTMLDivElement | null>(null);
 
-  const handleSidebarResizeStart = (
-    event: MouseEvent<HTMLDivElement>
-  ) => {
+  const handleSidebarResizeStart = (event: MouseEvent<HTMLDivElement>) => {
     event.preventDefault();
     const startX = event.clientX;
-    const startWidth =
-      sidebarRef.current?.getBoundingClientRect().width ?? 320;
-    const sidebarMax = Math.max(
-      360,
-      Math.min(window.innerWidth - 360, 720)
-    );
+    const startWidth = sidebarRef.current?.getBoundingClientRect().width ?? 320;
+    const sidebarMax = Math.max(360, Math.min(window.innerWidth - 360, 720));
 
     const onMove = (moveEvent: globalThis.MouseEvent) => {
       const delta = moveEvent.clientX - startX;
@@ -616,7 +614,10 @@ export default function AITacticalCommandPlatform({
 
   // 当前 game JSON 快照，供保存/另存为按钮提取。
   // game.exportCurrentScenario() 返回字符串，这里再 parse 成 object 与后端契约对齐。
-  const captureCurrentScenarioData = useCallback((): Record<string, unknown> => {
+  const captureCurrentScenarioData = useCallback((): Record<
+    string,
+    unknown
+  > => {
     const raw = game.exportCurrentScenario();
     try {
       return JSON.parse(raw) as Record<string, unknown>;
@@ -663,74 +664,6 @@ export default function AITacticalCommandPlatform({
         })(),
       }}
     >
-      {showRouterChrome && scenarioMeta && (
-        <div
-          className="pointer-events-none fixed inset-x-0 top-0 z-[10000] flex justify-center px-2 py-2"
-          style={{ paddingLeft: 72 /* leave room for the rail */ }}
-        >
-          <div className="pointer-events-auto flex items-center gap-2 rounded-full border border-cyan-300/20 bg-[#050914]/85 px-3 py-1.5 text-xs text-slate-200 shadow-hud-cyan backdrop-blur">
-            {onExit && (
-              <button
-                type="button"
-                onClick={onExit}
-                className="flex items-center gap-1 rounded-full px-2 py-0.5 text-slate-300 hover:bg-white/10 hover:text-slate-100"
-                title="返回想定列表"
-              >
-                <ArrowLeft className="size-3.5" /> 返回
-              </button>
-            )}
-            <span className="mx-1 h-3 w-px bg-cyan-300/20" />
-            <span className="font-medium text-slate-100">
-              {scenarioMeta.name}
-            </span>
-            {scenarioMeta.isTemplate && (
-              <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-medium text-amber-200">
-                模板·只读
-              </span>
-            )}
-            <span className="ml-1 text-[10px] text-slate-500">
-              v{scenarioMeta.version}
-            </span>
-            <span className="mx-1 h-3 w-px bg-cyan-300/20" />
-            {onSave && !scenarioMeta.isTemplate && (
-              <button
-                type="button"
-                onClick={handleSaveClick}
-                disabled={savingState === "saving"}
-                className={cn(
-                  "flex items-center gap-1 rounded-full px-2.5 py-0.5 font-medium transition-colors",
-                  savingState === "saved"
-                    ? "bg-emerald-500/25 text-emerald-200"
-                    : savingState === "error"
-                      ? "bg-red-500/25 text-red-200"
-                      : "bg-cyan-400/20 text-cyan-100 hover:bg-cyan-400/30"
-                )}
-                title="保存到当前想定"
-              >
-                <Save className="size-3.5" />
-                {savingState === "saving"
-                  ? "保存中…"
-                  : savingState === "saved"
-                    ? "已保存"
-                    : savingState === "error"
-                      ? "保存失败"
-                      : "保存"}
-              </button>
-            )}
-            {onRequestSaveAs && (
-              <button
-                type="button"
-                onClick={handleSaveAsClick}
-                className="flex items-center gap-1 rounded-full px-2.5 py-0.5 text-slate-200 hover:bg-white/10"
-                title="另存为新想定"
-              >
-                <Copy className="size-3.5" /> 另存为
-              </button>
-            )}
-          </div>
-        </div>
-      )}
-
       <motion.nav
         animate={{ opacity: 1 }}
         className="hidden border-r border-cyan-300/10 bg-[#030912]/95 px-2 py-5 backdrop-blur-2xl lg:flex lg:flex-col"
@@ -764,30 +697,15 @@ export default function AITacticalCommandPlatform({
 
         <div className="flex flex-col items-center gap-3">
           <Button
-            aria-label={
-              aiSidebarOpen && aiSidebarTab === "chat"
-                ? "关闭 AI 侧栏"
-                : "打开 AI 侧栏"
-            }
+            aria-label={aiSidebarOpen ? "关闭 AI 侧栏" : "打开 AI 侧栏"}
             className={cn(
               "size-10",
-              aiSidebarOpen && aiSidebarTab === "chat"
-                ? "text-cyan-100 shadow-hud-cyan"
-                : "text-slate-400"
+              aiSidebarOpen ? "text-cyan-100 shadow-hud-cyan" : "text-slate-400"
             )}
-            onClick={() => {
-              if (aiSidebarOpen && aiSidebarTab === "chat") {
-                setAiSidebarOpen(false);
-              } else {
-                setAiSidebarOpen(true);
-                setAiSidebarTab("chat");
-              }
-            }}
+            onClick={() => setAiSidebarOpen((value) => !value)}
             size="icon"
             title="AI 助手"
-            variant={
-              aiSidebarOpen && aiSidebarTab === "chat" ? "tactical" : "ghost"
-            }
+            variant={aiSidebarOpen ? "tactical" : "ghost"}
           >
             <Sparkles className="size-4" />
           </Button>
@@ -808,25 +726,14 @@ export default function AITacticalCommandPlatform({
             aria-label="AI / 系统设置"
             className={cn(
               "size-10",
-              aiSidebarOpen && aiSidebarTab === "settings"
+              settingsModalOpen
                 ? "text-cyan-100 shadow-hud-cyan"
                 : "text-slate-400"
             )}
-            onClick={() => {
-              if (aiSidebarOpen && aiSidebarTab === "settings") {
-                setAiSidebarOpen(false);
-              } else {
-                setAiSidebarOpen(true);
-                setAiSidebarTab("settings");
-              }
-            }}
+            onClick={() => setSettingsModalOpen((value) => !value)}
             size="icon"
             title="AI / 系统设置"
-            variant={
-              aiSidebarOpen && aiSidebarTab === "settings"
-                ? "tactical"
-                : "ghost"
-            }
+            variant={settingsModalOpen ? "tactical" : "ghost"}
           >
             <Settings className="size-4" />
           </Button>
@@ -879,20 +786,14 @@ export default function AITacticalCommandPlatform({
       )}
 
       <main className="relative flex min-h-0 min-w-0 flex-col overflow-hidden bg-[#050914]">
-        <div className="relative z-20 flex items-center justify-between border-b border-cyan-300/10 bg-[#030912]/92 px-4 py-3 backdrop-blur-xl lg:hidden">
-          <div className="flex items-center gap-3">
-            <div className="grid size-10 place-items-center rounded-xl border border-cyan-300/18 bg-cyan-300/8 text-cyan-100">
-              <Map className="size-5" />
-            </div>
-            <div>
-              <div className="text-base font-semibold text-slate-100">AICC</div>
-              <div className="text-xs text-slate-500">仿真指挥平台</div>
-            </div>
-          </div>
-          <Button size="icon" variant="ghost">
-            <Settings className="size-4" />
-          </Button>
-        </div>
+        <TopTacticalBar
+          snapshot={snapshot}
+          aiSidebarOpen={aiSidebarOpen}
+          onToggleAiSidebar={() => setAiSidebarOpen((value) => !value)}
+          settingsOpen={settingsModalOpen}
+          onToggleSettings={() => setSettingsModalOpen((value) => !value)}
+          scenarioMeta={scenarioMeta}
+        />
 
         {/*
           地图区域：占据 main 列剩余高度。Cesium 在 embedded 模式下用
@@ -915,33 +816,6 @@ export default function AITacticalCommandPlatform({
             showRoutes={showRoutes}
           />
 
-          <div className="pointer-events-none absolute left-4 top-4 z-10 hidden max-w-xl rounded-2xl border border-cyan-300/12 bg-[#030912]/72 px-4 py-3 shadow-[0_18px_70px_rgba(0,0,0,0.42)] backdrop-blur-xl lg:block">
-            <div className="flex items-center gap-3">
-              <span
-                className={cn(
-                  "size-2.5 rounded-full",
-                  snapshot.runState === "running"
-                    ? "animate-tactical-pulse bg-emerald-300"
-                    : snapshot.runState === "paused"
-                      ? "bg-amber-300"
-                      : "bg-cyan-300"
-                )}
-              />
-              <div>
-                <div className="text-sm font-semibold text-slate-100">
-                  {snapshot.scenarioName}
-                </div>
-                <div className="mt-0.5 flex flex-wrap items-center gap-2 text-[11px] text-slate-400">
-                  <span>原生 AICC Game Engine</span>
-                  <span className="text-cyan-300/60">/</span>
-                  <span>{snapshot.timeCompression}x 倍率</span>
-                  <span className="text-cyan-300/60">/</span>
-                  <span>{snapshot.aircraft + snapshot.ships} 个机动单位</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
           <div className="pointer-events-none absolute inset-0 z-[1] tactical-grid opacity-45" />
           <div className="pointer-events-none absolute inset-x-0 top-0 z-[2] h-28 bg-gradient-to-b from-[#050914] via-[#050914]/55 to-transparent" />
         </div>
@@ -955,13 +829,15 @@ export default function AITacticalCommandPlatform({
       </main>
 
       <AISidebar
-        activeTab={aiSidebarTab}
+        activeTab="chat"
         onApplyScenario={handleApplyAiScenario}
         onOpenChange={setAiSidebarOpen}
         onResumePlay={playSimulation}
-        onTabChange={setAiSidebarTab}
+        onSettingsOpenChange={setSettingsModalOpen}
+        onTabChange={() => setAiSidebarOpen(true)}
         open={aiSidebarOpen}
         scenarioId={scenarioId}
+        settingsOpen={settingsModalOpen}
       />
 
       <AARDialog

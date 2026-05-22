@@ -17,7 +17,6 @@
     "preview": "vite preview",
     "test": "vitest --run",
     "test:watch": "vitest --watch",
-    "test:game": "npm run test src/game/test/",
     "test:units": "npm run test src/game/units/",
     "test:utils": "npm run test src/utils/"
   },

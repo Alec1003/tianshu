@@ -2,7 +2,6 @@ import {
   useCallback,
   useContext,
   useMemo,
-  useRef,
   useState,
 } from "react";
 import { useTranslation } from "react-i18next";
@@ -88,6 +87,10 @@ interface CesiumToolbarProps {
   onToggleGodMode: () => void;
   onOpenMissionCreator: () => void;
   onScenarioTimeChange: (time: number) => void;
+  onPlay?: () => void | Promise<void>;
+  onPause?: () => void | Promise<void>;
+  onStep?: () => void | Promise<void>;
+  onReset?: () => void | Promise<void>;
 }
 
 type ScenarioPreset = {
@@ -172,12 +175,15 @@ export default function CesiumToolbar({
   onToggleEraser,
   onToggleGodMode,
   onOpenMissionCreator,
-  onScenarioTimeChange,
   onLoadScenarioJson,
   onBeginPlace,
   placement,
   onCancelPlace,
   scenarioTick,
+  onPlay,
+  onPause,
+  onStep,
+  onReset,
 }: Readonly<CesiumToolbarProps>) {
   const { t } = useTranslation();
   const theme = useTheme();
@@ -188,52 +194,28 @@ export default function CesiumToolbar({
   void scenarioTick;
 
   // ---------------------- TIME CONTROL ---------------------------------------
-  // Drive the play loop here so the toolbar is self-contained. Cesium sync
-  // (200ms) reflects updates without explicit redraws.
-  const [paused, setPaused] = useState<boolean>(game.scenarioPaused);
-  const playLoopRunning = useRef(false);
+  const [timeControlBusy, setTimeControlBusy] = useState(false);
+  const paused = game.scenarioPaused;
+  const runTimeControl = useCallback(
+    (action: (() => void | Promise<void>) | undefined) => {
+      if (!action || timeControlBusy) return;
+      setTimeControlBusy(true);
+      void Promise.resolve(action()).finally(() => setTimeControlBusy(false));
+    },
+    [timeControlBusy]
+  );
 
-  const togglePlay = useCallback(async () => {
-    if (!game.scenarioPaused) {
-      game.scenarioPaused = true;
-      setPaused(true);
-      return;
-    }
-    if (playLoopRunning.current) return;
-    playLoopRunning.current = true;
-    game.scenarioPaused = false;
-    setPaused(false);
-    try {
-      while (!game.scenarioPaused && !game.checkGameEnded()) {
-        const compression = game.currentScenario.timeCompression || 1;
-        for (let i = 0; i < compression; i++) game.step();
-        onScenarioTimeChange(game.currentScenario.currentTime);
-        // Yield to the event loop so Cesium / React stay responsive.
-        await new Promise((r) => setTimeout(r, 0));
-      }
-    } finally {
-      playLoopRunning.current = false;
-      game.scenarioPaused = true;
-      setPaused(true);
-    }
-  }, [game, onScenarioTimeChange]);
+  const togglePlay = useCallback(() => {
+    runTimeControl(paused ? onPlay : onPause);
+  }, [onPause, onPlay, paused, runTimeControl]);
 
   const stepOnce = useCallback(() => {
-    game.scenarioPaused = true;
-    setPaused(true);
-    game.step();
-    onScenarioTimeChange(game.currentScenario.currentTime);
-  }, [game, onScenarioTimeChange]);
+    runTimeControl(onStep);
+  }, [onStep, runTimeControl]);
 
   const restart = useCallback(() => {
-    game.scenarioPaused = true;
-    setPaused(true);
-    // Re-load whatever the current scenario JSON would be by re-importing the
-    // SCS preset. This mirrors OL's "restart" semantic for the demo flow.
-    onLoadScenarioJson(
-      JSON.stringify(clonePresetScenarioWithNow(SCSScenarioJson))
-    );
-  }, [game, onLoadScenarioJson]);
+    runTimeControl(onReset);
+  }, [onReset, runTimeControl]);
 
   const [speedTick, setSpeedTick] = useState(0);
   const [speedPulse, setSpeedPulse] = useState(false);
@@ -804,16 +786,19 @@ export default function CesiumToolbar({
             )
           }
           active={!paused}
+          disabled={timeControlBusy || (paused ? !onPlay : !onPause)}
           onClick={togglePlay}
         />
         <ToolButton
           title={t("toolbar.time.step")}
           icon={<SkipNextIcon fontSize="small" />}
+          disabled={timeControlBusy || !onStep}
           onClick={stepOnce}
         />
         <ToolButton
           title={t("toolbar.time.restart")}
           icon={<RestartAltIcon fontSize="small" />}
+          disabled={timeControlBusy || !onReset}
           onClick={restart}
         />
         <Tooltip title={t("toolbar.time.speed")} placement="right" arrow>

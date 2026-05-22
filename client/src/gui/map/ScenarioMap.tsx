@@ -79,6 +79,10 @@ interface ScenarioMapProps {
   game: Game;
   projection?: Projection;
   mobileView: boolean;
+  onPlay?: () => void | Promise<void>;
+  onPause?: () => void | Promise<void>;
+  onStep?: () => void | Promise<void>;
+  onReset?: () => void | Promise<void>;
 }
 
 interface IOpenMultipleFeatureSelector {
@@ -117,6 +121,10 @@ export default function ScenarioMap({
   game,
   projection,
   mobileView,
+  onPlay,
+  onPause,
+  onStep,
+  onReset,
 }: Readonly<ScenarioMapProps>) {
   const mapRef = useRef<HTMLDivElement | null>(null);
   const defaultProjection = getProjection(DEFAULT_OL_PROJECTION_CODE);
@@ -1012,14 +1020,55 @@ export default function ScenarioMap({
   }
 
   function handleStepGameClick() {
-    game.recordStep(true);
     setGamePaused();
-    stepGameAndDrawFrame();
+    if (!onStep) {
+      toastContext?.addToast(
+        "Backend runtime controls are not available in this map.",
+        "warning"
+      );
+      return;
+    }
+    void Promise.resolve(onStep())
+      .then(() => {
+        setCurrentScenarioTimeToContext(game.currentScenario.currentTime);
+        refreshAllLayers();
+        loadFeatureEntitiesState();
+        updateCurrentSimulationLogsToContext();
+      })
+      .catch(() => {
+        toastContext?.addToast("Failed to step backend runtime.", "error");
+      });
   }
 
   function handlePauseGameClick() {
     setGamePaused();
     setCurrentScenarioTimeToContext(game.currentScenario.currentTime);
+    if (onPause) {
+      void Promise.resolve(onPause()).catch(() => {
+        toastContext?.addToast("Failed to pause backend runtime.", "error");
+      });
+    }
+  }
+
+  function handleResetGameClick() {
+    setGamePaused();
+    if (!onReset) {
+      toastContext?.addToast(
+        "Backend runtime controls are not available in this map.",
+        "warning"
+      );
+      return;
+    }
+    void Promise.resolve(onReset())
+      .then(() => {
+        setCurrentScenarioTimeToContext(game.currentScenario.currentTime);
+        refreshAllLayers();
+        loadFeatureEntitiesState();
+        updateCurrentSimulationLogsToContext();
+      })
+      .catch(() => {
+        toastContext?.addToast("Failed to reset backend runtime.", "error");
+      });
   }
 
   function loadAndDisplayCurrentRecordedFrame(refreshAll = false) {
@@ -1071,49 +1120,25 @@ export default function ScenarioMap({
   }
 
   async function handlePlayGameClick() {
-    game.recordStep(true);
+    if (!onPlay) {
+      setGamePaused();
+      toastContext?.addToast(
+        "Backend runtime controls are not available in this map.",
+        "warning"
+      );
+      return;
+    }
     setCurrentGameStatusToContext("Scenario playing");
-    game.scenarioPaused = false;
-    let gameEnded = game.checkGameEnded();
-    while (!game.scenarioPaused && !gameEnded) {
-      const [_observation, _reward, terminated, truncated, _info] =
-        stepGameAndDrawFrame();
-
-      const status = terminated || truncated;
-      gameEnded = status as boolean;
-
-      await delay(0);
+    try {
+      await Promise.resolve(onPlay());
+      setCurrentScenarioTimeToContext(game.currentScenario.currentTime);
+      refreshAllLayers();
+      loadFeatureEntitiesState();
+      updateCurrentSimulationLogsToContext();
+    } catch {
+      setGamePaused();
+      toastContext?.addToast("Failed to start backend runtime.", "error");
     }
-  }
-
-  function stepGameForStepSize(
-    stepSize: number
-  ): [Scenario, number, boolean, boolean, null] {
-    let steps = 1;
-    let [observation, reward, terminated, truncated, info] = game.step();
-    while (steps < stepSize) {
-      [observation, reward, terminated, truncated, info] = game.step();
-      steps++;
-    }
-    return [observation, reward, terminated, truncated, info];
-  }
-
-  function stepGameAndDrawFrame() {
-    // const gameStepStartTime = new Date().getTime();
-    const [observation, reward, terminated, truncated, info] =
-      stepGameForStepSize(game.currentScenario.timeCompression);
-    // const gameStepElapsed = new Date().getTime() - gameStepStartTime;
-
-    setCurrentScenarioTimeToContext(observation.currentTime);
-    updateCurrentSimulationLogsToContext();
-
-    // const guiDrawStartTime = new Date().getTime();
-    drawNextFrame(observation);
-    game.recordStep();
-    // const guiDrawElapsed = new Date().getTime() - guiDrawStartTime;
-    // console.log('gameStepElapsed:', gameStepElapsed, 'guiDrawElapsed:', guiDrawElapsed)
-
-    return [observation, reward, terminated, truncated, info];
   }
 
   function drawNextFrame(observation: Scenario) {
@@ -2297,6 +2322,7 @@ export default function ScenarioMap({
         playOnClick={handlePlayGameClick}
         stepOnClick={handleStepGameClick}
         pauseOnClick={handlePauseGameClick}
+        resetOnClick={handleResetGameClick}
         toggleScenarioTimeCompressionOnClick={toggleScenarioTimeCompression}
         toggleRecordEverySeconds={toggleRecordEverySeconds}
         recordScenarioOnClick={handleRecordScenarioClick}

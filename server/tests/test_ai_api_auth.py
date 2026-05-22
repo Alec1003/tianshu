@@ -20,8 +20,54 @@ class _FakeSkillRegistry:
         ]
 
 
+class _FakeRuntime:
+    def __init__(self, scenario_id: str = "demo") -> None:
+        self.loaded_payload: str | None = None
+        self.game = SimpleNamespace(
+            scenario_paused=True,
+            game_outcome={
+                "ended": False,
+                "winner_side_id": "",
+                "reason": "",
+                "ended_at": 0,
+            },
+            current_scenario=SimpleNamespace(
+                id=scenario_id,
+                start_time=100,
+                current_time=100,
+                duration=600,
+                last_objective_destroyed=None,
+            ),
+        )
+
+    def start_simulation(self) -> dict:
+        self.game.scenario_paused = False
+        return {"running": True}
+
+    def pause_simulation(self) -> dict:
+        self.game.scenario_paused = True
+        return {"running": False}
+
+    def reset_simulation(self) -> dict:
+        self.game.scenario_paused = True
+        self.game.current_scenario.current_time = self.game.current_scenario.start_time
+        return {"reset": True}
+
+    def step_simulation(self, steps: int = 1) -> dict:
+        self.game.current_scenario.current_time += steps
+        return {"steps": steps, "currentTime": self.game.current_scenario.current_time}
+
+    def load_scenario_from_json(self, scenario_json: str) -> dict:
+        self.loaded_payload = scenario_json
+        self.game.current_scenario.id = "loaded"
+        return {"loaded": True}
+
+
 class _FakeBridge:
     skill_registry = _FakeSkillRegistry()
+
+    def __init__(self, scenario_id: str = "demo") -> None:
+        self.runtime = _FakeRuntime(scenario_id)
 
     async def process_command_async(
         self,
@@ -31,15 +77,16 @@ class _FakeBridge:
         return AgentExecutionSummary(command=command, decomposition=[command])
 
     def exported_scenario(self) -> dict:
-        return {"currentScenario": {"id": "demo"}}
+        return {"currentScenario": {"id": self.runtime.game.current_scenario.id}}
 
 
 class _UserScopedFakeBridge(_FakeBridge):
     def __init__(self, user_id: str) -> None:
+        super().__init__(f"demo:{user_id}")
         self.user_id = user_id
 
     def exported_scenario(self) -> dict:
-        return {"currentScenario": {"id": f"demo:{self.user_id}"}}
+        return {"currentScenario": {"id": self.runtime.game.current_scenario.id}}
 
 
 class _FakeBridgeRegistry:
@@ -92,7 +139,13 @@ def test_ai_routes_reject_unauthenticated_requests() -> None:
     client = _build_client()
 
     cases = [
+        ("get", "/api/ai/runtime", None),
         ("get", "/api/ai/runtime/scenario", None),
+        ("put", "/api/ai/runtime/scenario", {"scenario": {"currentScenario": {"id": "x"}}}),
+        ("post", "/api/ai/runtime/start", None),
+        ("post", "/api/ai/runtime/pause", None),
+        ("post", "/api/ai/runtime/reset", None),
+        ("post", "/api/ai/runtime/step", {"steps": 1}),
         ("get", "/api/ai/skills", None),
         ("post", "/api/ai/command", {"command": "pause"}),
         (
@@ -121,6 +174,53 @@ def test_ai_command_and_runtime_work_for_authenticated_user() -> None:
     runtime_response = client.get("/api/ai/runtime/scenario")
     assert runtime_response.status_code == 200
     assert runtime_response.json() == {"currentScenario": {"id": "demo"}}
+
+
+def test_ai_runtime_control_endpoints_return_authoritative_snapshot() -> None:
+    client = _build_client(authenticated=True)
+
+    start_response = client.post("/api/ai/runtime/start")
+    assert start_response.status_code == 200
+    start_payload = start_response.json()
+    assert start_payload["action"] == "start"
+    assert start_payload["running"] is True
+    assert start_payload["paused"] is False
+    assert start_payload["scenario"] == {"currentScenario": {"id": "demo"}}
+
+    step_response = client.post("/api/ai/runtime/step", json={"steps": 3})
+    assert step_response.status_code == 200
+    step_payload = step_response.json()
+    assert step_payload["action"] == "step"
+    assert step_payload["current_time"] == 103
+    assert step_payload["elapsed"] == 3
+    assert step_payload["duration_left"] == 597
+    assert step_payload["state"] == {"steps": 3, "currentTime": 103}
+
+    pause_response = client.post("/api/ai/runtime/pause")
+    assert pause_response.status_code == 200
+    assert pause_response.json()["paused"] is True
+
+    reset_response = client.post("/api/ai/runtime/reset")
+    assert reset_response.status_code == 200
+    reset_payload = reset_response.json()
+    assert reset_payload["action"] == "reset"
+    assert reset_payload["current_time"] == 100
+
+    load_response = client.put(
+        "/api/ai/runtime/scenario",
+        json={"scenario": {"currentScenario": {"id": "loaded"}}},
+    )
+    assert load_response.status_code == 200
+    load_payload = load_response.json()
+    assert load_payload["action"] == "load_scenario"
+    assert load_payload["scenario"] == {"currentScenario": {"id": "loaded"}}
+
+
+def test_ai_runtime_step_rejects_invalid_step_count() -> None:
+    client = _build_client(authenticated=True)
+
+    too_large = client.post("/api/ai/runtime/step", json={"steps": 7201})
+    assert too_large.status_code == 422
 
 
 def test_ai_runtime_uses_user_scoped_bridge_registry() -> None:

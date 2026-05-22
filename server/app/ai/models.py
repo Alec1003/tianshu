@@ -50,6 +50,34 @@ class AICommandResponse(BaseModel):
     scenario: dict[str, Any] | None = None
 
 
+class RuntimeStepRequest(BaseModel):
+    steps: int = Field(
+        default=1,
+        ge=1,
+        le=7200,
+        description="Number of authoritative backend simulation seconds to advance.",
+    )
+
+
+class RuntimeLoadScenarioRequest(BaseModel):
+    scenario: dict[str, Any] = Field(
+        description="Frontend-shaped scenario JSON to load into the backend runtime.",
+    )
+
+
+class RuntimeSnapshotResponse(BaseModel):
+    ok: Literal[True] = True
+    action: str = ""
+    state: dict[str, Any] = Field(default_factory=dict)
+    running: bool
+    paused: bool
+    current_time: int
+    elapsed: int
+    duration_left: int
+    outcome: dict[str, Any]
+    scenario: dict[str, Any]
+
+
 class ModelCheckRequest(BaseModel):
     provider: str = "openai"
     baseUrl: str = Field(min_length=1)

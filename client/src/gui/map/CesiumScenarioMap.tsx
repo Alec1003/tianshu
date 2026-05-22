@@ -64,6 +64,10 @@ interface CesiumScenarioMapProps {
   onMissionEditorMissionIdChange?: (missionId: string | null) => void;
   onPlacementChange?: (placement: CesiumPlacement | null) => void;
   onScenarioMutation?: () => void;
+  onPlay?: () => void | Promise<void>;
+  onPause?: () => void | Promise<void>;
+  onStep?: () => void | Promise<void>;
+  onReset?: () => void | Promise<void>;
 }
 
 // CesiumToolbar rail width. Keep in sync with CesiumToolbar.tsx Paper width.
@@ -137,6 +141,10 @@ export default function CesiumScenarioMap({
   onMissionEditorMissionIdChange,
   onPlacementChange,
   onScenarioMutation,
+  onPlay,
+  onPause,
+  onStep,
+  onReset,
 }: Readonly<CesiumScenarioMapProps>) {
   const { t } = useTranslation();
   // Localized className -> label dictionaries for the right-click add-unit
@@ -563,8 +571,8 @@ export default function CesiumScenarioMap({
     });
 
     // Render units (aircraft / ship / facility / airbase / referencePoint) as
-    // Cesium entities. We poll-diff on a 200ms interval so game.step() updates
-    // (positions, additions, removals) propagate without instrumenting game core.
+    // Cesium entities. We poll-diff so backend snapshots and local edit
+    // mutations propagate without instrumenting the map renderer.
     const scenarioEntities = new CesiumScenarioEntities(viewer);
     entitiesRef.current = scenarioEntities;
     let syncInFlight = false;
@@ -980,6 +988,10 @@ export default function CesiumScenarioMap({
             onToggleGodMode={toggleGodMode}
             onOpenMissionCreator={() => setMissionCreatorVisible(true)}
             onScenarioTimeChange={setCurrentScenarioTimeToContext}
+            onPlay={onPlay}
+            onPause={onPause}
+            onStep={onStep}
+            onReset={onReset}
           />
         )}
         <div style={{ pointerEvents: "auto" }}>

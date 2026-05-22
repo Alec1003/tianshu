@@ -13,6 +13,9 @@ from app.ai.models import (
     AICommandResponse,
     ModelCheckRequest,
     ModelCheckResponse,
+    RuntimeLoadScenarioRequest,
+    RuntimeSnapshotResponse,
+    RuntimeStepRequest,
 )
 from app.auth.models import User
 from app.auth.users import current_active_user
@@ -31,6 +34,63 @@ def _bridge_for_user(request: Request, user: User) -> Any:
     if registry is not None:
         return registry.get_bridge_for_user(user)
     return request.app.state.bridge
+
+
+def _runtime_for_user(request: Request, user: User) -> Any:
+    bridge = _bridge_for_user(request, user)
+    runtime = getattr(bridge, "runtime", None)
+    if runtime is None:
+        raise RuntimeError("AI bridge does not expose a runtime")
+    return runtime
+
+
+def _runtime_outcome_payload(runtime: Any) -> dict[str, Any]:
+    scenario = runtime.game.current_scenario
+    start = int(getattr(scenario, "start_time", 0) or 0)
+    duration = int(getattr(scenario, "duration", 0) or 0)
+    current = int(getattr(scenario, "current_time", start) or start)
+    raw_outcome = getattr(runtime.game, "game_outcome", {}) or {}
+    ended = bool(raw_outcome.get("ended", False))
+    winner_side_id = (
+        raw_outcome.get("winner_side_id") or raw_outcome.get("winnerSideId") or None
+    )
+    return {
+        "ended": ended,
+        "winner_side_id": winner_side_id if ended else None,
+        "reason": raw_outcome.get("reason", "") or "",
+        "ended_at": int(raw_outcome.get("ended_at") or raw_outcome.get("endedAt") or 0),
+        "objective_destroyed": getattr(scenario, "last_objective_destroyed", None),
+        "time_up": duration > 0 and current >= start + duration,
+    }
+
+
+def _runtime_snapshot(
+    request: Request,
+    user: User,
+    *,
+    action: str = "",
+    state: dict[str, Any] | None = None,
+) -> RuntimeSnapshotResponse:
+    bridge = _bridge_for_user(request, user)
+    runtime = getattr(bridge, "runtime", None)
+    if runtime is None:
+        raise RuntimeError("AI bridge does not expose a runtime")
+    scenario = runtime.game.current_scenario
+    start = int(getattr(scenario, "start_time", 0) or 0)
+    duration = int(getattr(scenario, "duration", 0) or 0)
+    current = int(getattr(scenario, "current_time", start) or start)
+    paused = bool(getattr(runtime.game, "scenario_paused", True))
+    return RuntimeSnapshotResponse(
+        action=action,
+        state=state or {},
+        running=not paused,
+        paused=paused,
+        current_time=current,
+        elapsed=max(0, current - start),
+        duration_left=max(0, start + duration - current),
+        outcome=_runtime_outcome_payload(runtime),
+        scenario=bridge.exported_scenario(),
+    )
 
 
 @router.post("/command", response_model=AICommandResponse)
@@ -77,6 +137,68 @@ def runtime_scenario(
     """
     bridge = _bridge_for_user(request, user)
     return bridge.exported_scenario()
+
+
+@router.get("/runtime", response_model=RuntimeSnapshotResponse)
+def runtime_snapshot(
+    request: Request,
+    user: User = Depends(current_active_user),
+) -> RuntimeSnapshotResponse:
+    """Return the authoritative backend runtime snapshot."""
+    return _runtime_snapshot(request, user, action="snapshot")
+
+
+@router.put("/runtime/scenario", response_model=RuntimeSnapshotResponse)
+def runtime_load_scenario(
+    request: Request,
+    payload: RuntimeLoadScenarioRequest,
+    user: User = Depends(current_active_user),
+) -> RuntimeSnapshotResponse:
+    """Load a frontend-shaped scenario JSON into the user's backend runtime."""
+    runtime = _runtime_for_user(request, user)
+    state = runtime.load_scenario_from_json(json.dumps(payload.scenario))
+    return _runtime_snapshot(request, user, action="load_scenario", state=state)
+
+
+@router.post("/runtime/start", response_model=RuntimeSnapshotResponse)
+def runtime_start(
+    request: Request,
+    user: User = Depends(current_active_user),
+) -> RuntimeSnapshotResponse:
+    runtime = _runtime_for_user(request, user)
+    state = runtime.start_simulation()
+    return _runtime_snapshot(request, user, action="start", state=state)
+
+
+@router.post("/runtime/pause", response_model=RuntimeSnapshotResponse)
+def runtime_pause(
+    request: Request,
+    user: User = Depends(current_active_user),
+) -> RuntimeSnapshotResponse:
+    runtime = _runtime_for_user(request, user)
+    state = runtime.pause_simulation()
+    return _runtime_snapshot(request, user, action="pause", state=state)
+
+
+@router.post("/runtime/reset", response_model=RuntimeSnapshotResponse)
+def runtime_reset(
+    request: Request,
+    user: User = Depends(current_active_user),
+) -> RuntimeSnapshotResponse:
+    runtime = _runtime_for_user(request, user)
+    state = runtime.reset_simulation()
+    return _runtime_snapshot(request, user, action="reset", state=state)
+
+
+@router.post("/runtime/step", response_model=RuntimeSnapshotResponse)
+def runtime_step(
+    request: Request,
+    payload: RuntimeStepRequest,
+    user: User = Depends(current_active_user),
+) -> RuntimeSnapshotResponse:
+    runtime = _runtime_for_user(request, user)
+    state = runtime.step_simulation(payload.steps)
+    return _runtime_snapshot(request, user, action="step", state=state)
 
 
 @router.get("/skills")

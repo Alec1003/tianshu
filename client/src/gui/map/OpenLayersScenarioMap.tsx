@@ -6,11 +6,19 @@ import ScenarioMap from "@/gui/map/ScenarioMap";
 interface OpenLayersScenarioMapProps {
   game: Game;
   mobileView: boolean;
+  onPlay?: () => void | Promise<void>;
+  onPause?: () => void | Promise<void>;
+  onStep?: () => void | Promise<void>;
+  onReset?: () => void | Promise<void>;
 }
 
 export default function OpenLayersScenarioMap({
   game,
   mobileView,
+  onPlay,
+  onPause,
+  onStep,
+  onReset,
 }: Readonly<OpenLayersScenarioMapProps>) {
   const projection = getProjection(DEFAULT_OL_PROJECTION_CODE) ?? undefined;
 
@@ -25,6 +33,10 @@ export default function OpenLayersScenarioMap({
       game={game}
       projection={projection}
       mobileView={mobileView}
+      onPlay={onPlay}
+      onPause={onPause}
+      onStep={onStep}
+      onReset={onReset}
     />
   );
 }

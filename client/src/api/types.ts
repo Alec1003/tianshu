@@ -35,6 +35,28 @@ export interface ScenarioDetail extends ScenarioListItem {
   data: Record<string, unknown>;
 }
 
+export interface RuntimeOutcome {
+  ended: boolean;
+  winner_side_id: string | null;
+  reason: string;
+  ended_at: number;
+  objective_destroyed: Record<string, unknown> | null;
+  time_up: boolean;
+}
+
+export interface RuntimeSnapshot {
+  ok: true;
+  action: string;
+  state: Record<string, unknown>;
+  running: boolean;
+  paused: boolean;
+  current_time: number;
+  elapsed: number;
+  duration_left: number;
+  outcome: RuntimeOutcome;
+  scenario: Record<string, unknown>;
+}
+
 export interface ScenarioCreatePayload {
   name: string;
   description?: string;

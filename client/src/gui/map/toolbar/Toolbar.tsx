@@ -96,9 +96,10 @@ interface ToolBarProps {
   ) => void;
   addShipOnClick: (unitClassName: string) => void;
   addReferencePointOnClick: () => void;
-  playOnClick: () => void;
-  stepOnClick: () => void;
-  pauseOnClick: () => void;
+  playOnClick: () => void | Promise<void>;
+  stepOnClick: () => void | Promise<void>;
+  pauseOnClick: () => void | Promise<void>;
+  resetOnClick: () => void | Promise<void>;
   toggleScenarioTimeCompressionOnClick: () => void;
   toggleRecordEverySeconds: () => void;
   recordScenarioOnClick: () => void;
@@ -220,12 +221,6 @@ export default function Toolbar(props: Readonly<ToolBarProps>) {
         : [props.scenarioCurrentSideId]
     );
   }, [props.scenarioCurrentSideId]);
-  const [initialScenarioString, setInitialScenarioString] = useState<string>(
-    props.game.exportCurrentScenario()
-  );
-  const [currentScenarioString, setCurrentScenarioString] = useState<
-    string | null
-  >(null);
   const [scenarioName, setScenarioName] = useState<string>(
     props.game.currentScenario.name ?? "New Scenario"
   );
@@ -530,7 +525,6 @@ export default function Toolbar(props: Readonly<ToolBarProps>) {
       props.pauseOnClick();
       setScenarioPaused(true);
       loadScenario(scenario.scenarioString);
-      setCurrentScenarioString(scenario.scenarioString);
       toastContext?.addToast("Scenario loaded successfully!", "success");
     } else {
       toastContext?.addToast(
@@ -583,7 +577,6 @@ export default function Toolbar(props: Readonly<ToolBarProps>) {
         }
         const scenarioString = JSON.stringify(scenarioJsonWithNewId);
         loadScenario(scenarioString);
-        setCurrentScenarioString(scenarioString);
         toastContext?.addToast("Scenario loaded successfully!", "success");
       } catch (error) {
         toastContext?.addToast(
@@ -636,7 +629,6 @@ export default function Toolbar(props: Readonly<ToolBarProps>) {
         reader.onload = (readerEvent) => {
           const scenarioString = readerEvent.target?.result as string;
           loadScenario(scenarioString);
-          setCurrentScenarioString(scenarioString);
           toastContext?.addToast(
             "Scenario file uploaded successfully!",
             "success"
@@ -657,22 +649,12 @@ export default function Toolbar(props: Readonly<ToolBarProps>) {
   const reloadScenario = () => {
     props.pauseOnClick();
     setScenarioPaused(true);
-    if (currentScenarioString) {
-      try {
-        loadScenario(currentScenarioString, false);
-        props.game.currentScenario.updateScenarioName(scenarioName);
-        setScenarioName(props.game.currentScenario.name);
-      } catch {
-        toastContext?.addToast(
-          "Failed to restart scenario. Please refresh page or try again later.",
-          "error"
-        );
-      }
-    } else {
-      loadScenario(initialScenarioString, false);
-      props.game.currentScenario.updateScenarioName(scenarioName);
-      setScenarioName(props.game.currentScenario.name);
-    }
+    void Promise.resolve(props.resetOnClick()).catch(() => {
+      toastContext?.addToast(
+        "Failed to restart scenario. Please refresh page or try again later.",
+        "error"
+      );
+    });
   };
 
   const handlePlayClick = () => {

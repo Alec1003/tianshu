@@ -1,9 +1,8 @@
-import { useContext } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Chip } from "@mui/material";
 import { unixToLocalDateTime } from "@/utils/dateTimeFunctions";
 import { colorPalette } from "@/utils/constants";
-import { ScenarioTimeContext } from "@/gui/contextProviders/contexts/ScenarioTimeContext";
 
 const scenarioTimeDisplayStyle = {
   backgroundColor: colorPalette.lightGray,
@@ -14,13 +13,22 @@ const scenarioTimeDisplayStyle = {
 };
 
 export default function ScenarioTimeDisplay() {
-  const currentScenarioTime = useContext(ScenarioTimeContext);
+  const [currentTime, setCurrentTime] = useState(() =>
+    Math.floor(Date.now() / 1000)
+  );
   const { t } = useTranslation();
+
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      setCurrentTime(Math.floor(Date.now() / 1000));
+    }, 1000);
+    return () => window.clearInterval(id);
+  }, []);
 
   return (
     <Chip
       label={t("map.currentTime", {
-        time: unixToLocalDateTime(currentScenarioTime),
+        time: unixToLocalDateTime(currentTime),
       })}
       style={scenarioTimeDisplayStyle}
     />

@@ -56,6 +56,16 @@ import blankScenarioJson from "@/scenarios/blank_scenario.json";
 // caused an immediate crash when opening a newly-created blank project.
 const EMPTY_SCENARIO_DATA = blankScenarioJson as Record<string, unknown>;
 
+function setScenarioClockToNow(data: Record<string, unknown>) {
+  const currentScenario = data.currentScenario as
+    | Record<string, unknown>
+    | undefined;
+  if (!currentScenario) return;
+  const now = Math.floor(Date.now() / 1000);
+  currentScenario.startTime = now;
+  currentScenario.currentTime = now;
+}
+
 const STATUS_META: Record<
   ScenarioStatus,
   { label: string; tone: string; dot: string }
@@ -808,6 +818,7 @@ function CreateScenarioDialog({
       const cs = (data as { currentScenario?: Record<string, unknown> })
         .currentScenario;
       if (cs) cs.name = name.trim();
+      setScenarioClockToNow(data);
       const created = await createScenario({
         name: name.trim(),
         description: description.trim(),

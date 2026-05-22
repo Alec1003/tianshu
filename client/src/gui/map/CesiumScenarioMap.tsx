@@ -44,6 +44,8 @@ import CesiumToolbar, {
 } from "@/gui/map/CesiumToolbar";
 import { localizeAirbaseName } from "@/i18n/entityNames";
 
+export type CesiumSceneModeKey = "2d" | "3d";
+
 interface CesiumScenarioMapProps {
   game: Game;
   mobileView: boolean;
@@ -51,6 +53,10 @@ interface CesiumScenarioMapProps {
   showToolbar?: boolean;
   showRoutes?: boolean;
   showRanges?: boolean;
+  baseLayer?: CesiumBaseLayerKey;
+  onBaseLayerChange?: (key: CesiumBaseLayerKey) => void;
+  sceneMode?: CesiumSceneModeKey;
+  onSceneModeChange?: (mode: CesiumSceneModeKey) => void;
   placement?: CesiumPlacement | null;
   missionCreatorOpen?: boolean;
   missionEditorMissionId?: string | null;
@@ -120,6 +126,10 @@ export default function CesiumScenarioMap({
   showToolbar = true,
   showRoutes = true,
   showRanges = true,
+  baseLayer: controlledBaseLayer,
+  onBaseLayerChange,
+  sceneMode: controlledSceneMode,
+  onSceneModeChange,
   placement: controlledPlacement,
   missionCreatorOpen,
   missionEditorMissionId,
@@ -163,11 +173,25 @@ export default function CesiumScenarioMap({
   selectedUnitRef.current = selectedUnit;
   // Toolbar-driven state. baseLayer + placement live in React so re-renders
   // update the toolbar UI; refs mirror them for the long-lived Cesium effect.
-  const [baseLayer, setBaseLayer] = useState<CesiumBaseLayerKey>("darkMatter");
+  const [internalBaseLayer, setInternalBaseLayer] =
+    useState<CesiumBaseLayerKey>("darkMatter");
+  const baseLayer = controlledBaseLayer ?? internalBaseLayer;
+  const setBaseLayer = useCallback(
+    (nextBaseLayer: CesiumBaseLayerKey) => {
+      if (onBaseLayerChange) {
+        onBaseLayerChange(nextBaseLayer);
+        return;
+      }
+      setInternalBaseLayer(nextBaseLayer);
+    },
+    [onBaseLayerChange]
+  );
   // 2D / 3D scene morph state. Cesium uses SceneMode.SCENE2D / SCENE3D; we
   // mirror to React state so the floating top toolbar can highlight the
   // active button without subscribing to scene events.
-  const [is3D, setIs3D] = useState(false);
+  const [is3D, setIs3D] = useState(controlledSceneMode === "3d");
+  const activeSceneMode: CesiumSceneModeKey =
+    controlledSceneMode ?? (is3D ? "3d" : "2d");
   const [internalPlacement, setInternalPlacement] =
     useState<CesiumPlacement | null>(null);
   const placementIsControlled = controlledPlacement !== undefined;
@@ -418,7 +442,8 @@ export default function CesiumScenarioMap({
       sceneModePicker: false,
       // Start in flat 2D mode by default so legacy users don't see a globe
       // until they explicitly toggle 3D from the floating top toolbar.
-      sceneMode: SceneMode.SCENE2D,
+      sceneMode:
+        activeSceneMode === "3d" ? SceneMode.SCENE3D : SceneMode.SCENE2D,
       mapMode2D: MapMode2D.ROTATE,
       navigationHelpButton: false,
       fullscreenButton: false,
@@ -786,6 +811,20 @@ export default function CesiumScenarioMap({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    const viewer = viewerRef.current;
+    const nextIs3D = activeSceneMode === "3d";
+    setIs3D(nextIs3D);
+    onSceneModeChange?.(activeSceneMode);
+    if (!viewer) return;
+    if (nextIs3D && viewer.scene.mode !== SceneMode.SCENE3D) {
+      viewer.scene.morphTo3D(0.6);
+    }
+    if (!nextIs3D && viewer.scene.mode !== SceneMode.SCENE2D) {
+      viewer.scene.morphTo2D(0.6);
+    }
+  }, [activeSceneMode, onSceneModeChange]);
+
   // Replace the imagery layer whenever the user picks a new base map.
   // We add the new layer first, fade alpha 0 -> 1 over ~300ms, then drop the
   // older layers. This avoids a sub-second white flash from removeAll().
@@ -945,68 +984,6 @@ export default function CesiumScenarioMap({
         )}
         <div style={{ pointerEvents: "auto" }}>
           <BottomInfoDisplay mobileView={mobileView} />
-        </div>
-        {/* Floating top toolbar: 2D / 3D scene toggle. Anchored top-right
-            so it never overlaps the unit popup on the left. */}
-        <div
-          style={{
-            pointerEvents: "auto",
-            position: embedded ? "absolute" : "fixed",
-            top: 12,
-            right: 12,
-            zIndex: 20000,
-            display: "flex",
-            gap: 4,
-            background: "rgba(13, 17, 23, 0.85)",
-            border: "1px solid rgba(255,255,255,0.12)",
-            borderRadius: 6,
-            padding: 4,
-          }}
-        >
-          <button
-            type="button"
-            onClick={() => {
-              const v = viewerRef.current;
-              if (!v) return;
-              v.scene.morphTo2D(0.6);
-              setIs3D(false);
-            }}
-            style={{
-              padding: "4px 10px",
-              fontSize: 12,
-              fontWeight: 600,
-              cursor: "pointer",
-              border: "1px solid",
-              borderColor: !is3D ? "#4ec07a" : "rgba(255,255,255,0.2)",
-              background: !is3D ? "rgba(78,192,122,0.18)" : "transparent",
-              color: !is3D ? "#4ec07a" : "rgba(255,255,255,0.85)",
-              borderRadius: 4,
-            }}
-          >
-            {t("map.baseLayer.sceneMode.2D")}
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              const v = viewerRef.current;
-              if (!v) return;
-              v.scene.morphTo3D(0.6);
-              setIs3D(true);
-            }}
-            style={{
-              padding: "4px 10px",
-              fontSize: 12,
-              fontWeight: 600,
-              cursor: "pointer",
-              border: "1px solid",
-              borderColor: is3D ? "#4ec07a" : "rgba(255,255,255,0.2)",
-              background: is3D ? "rgba(78,192,122,0.18)" : "transparent",
-              color: is3D ? "#4ec07a" : "rgba(255,255,255,0.85)",
-              borderRadius: 4,
-            }}
-          >
-            {t("map.baseLayer.sceneMode.3D")}
-          </button>
         </div>
         {selectedUnit && (
           <div
@@ -1275,9 +1252,7 @@ export default function CesiumScenarioMap({
                       : contextMenu.unit.type === "facility"
                         ? s.getFacility(contextMenu.unit.unit.id)
                         : s.getAirbase(contextMenu.unit.unit.id);
-                return u?.isObjective
-                  ? "☆ 取消关键单位"
-                  : "★ 设为关键单位";
+                return u?.isObjective ? "☆ 取消关键单位" : "★ 设为关键单位";
               })()}
             </MenuItem>
           )}

@@ -48,9 +48,10 @@ export default function PlayScenarioPage() {
   const [saveAsBusy, setSaveAsBusy] = useState(false);
   // The tactical platform calls onRequestSaveAs with the latest JSON. We hold
   // it in state so the dialog can submit it once the user confirms a name.
-  const [pendingData, setPendingData] = useState<Record<string, unknown> | null>(
-    null
-  );
+  const [pendingData, setPendingData] = useState<Record<
+    string,
+    unknown
+  > | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -59,22 +60,18 @@ export default function PlayScenarioPage() {
     (async () => {
       try {
         const sc = await getScenario(scenarioId);
-        if (!cancelled) setScenario(sc);
+        if (cancelled) return;
 
         // 把 DB 想定同步进后端 runtime，让 MCP 工具和 /api/ai/command
         // 操作的是当前打开的项目，而不是默认的 SCS 场景。best-effort。
-        activateScenario(scenarioId).catch((err) => {
+        await activateScenario(scenarioId).catch((err) => {
           console.warn("[AICC] activateScenario failed (non-blocking)", err);
         });
+        if (!cancelled) setScenario(sc);
 
         // 项目状态自然演进：草稿 -> 推演中，一旦用户打开推演页。
         // 仅限本人项目且状态为 draft 时升级；模板不在这里改。
-        if (
-          !cancelled &&
-          sc &&
-          !sc.is_template &&
-          sc.status === "draft"
-        ) {
+        if (!cancelled && sc && !sc.is_template && sc.status === "draft") {
           try {
             const promoted = await updateScenario(sc.id, { status: "running" });
             if (!cancelled) setScenario(promoted);
@@ -217,6 +214,7 @@ export default function PlayScenarioPage() {
   return (
     <>
       <AITacticalCommandPlatform
+        key={meta.id}
         scenarioMeta={meta}
         initialScenarioData={scenario.data}
         onSave={handleSave}

@@ -541,7 +541,7 @@ export default function Toolbar(props: Readonly<ToolBarProps>) {
   };
 
   const loadPresetScenario = (presetScenarioName: string) => {
-    let scenarioJson: Object | null = null;
+    let scenarioJson: object | null = null;
     switch (presetScenarioName) {
       case "blank_scenario":
         scenarioJson = blankScenarioJson;
@@ -566,7 +566,8 @@ export default function Toolbar(props: Readonly<ToolBarProps>) {
       try {
         props.pauseOnClick();
         setScenarioPaused(true);
-        let scenarioJsonWithNewId = JSON.parse(JSON.stringify(scenarioJson));
+        const scenarioJsonWithNewId = JSON.parse(JSON.stringify(scenarioJson));
+        const now = Math.floor(Date.now() / 1000);
         if (
           presetScenarioName === "blank_scenario" ||
           presetScenarioName === "SCS" ||
@@ -574,6 +575,10 @@ export default function Toolbar(props: Readonly<ToolBarProps>) {
         ) {
           if (scenarioJsonWithNewId.currentScenario?.id) {
             scenarioJsonWithNewId.currentScenario.id = randomUUID();
+          }
+          if (scenarioJsonWithNewId.currentScenario) {
+            scenarioJsonWithNewId.currentScenario.startTime = now;
+            scenarioJsonWithNewId.currentScenario.currentTime = now;
           }
         }
         const scenarioString = JSON.stringify(scenarioJsonWithNewId);

@@ -90,6 +90,25 @@ interface CesiumToolbarProps {
   onScenarioTimeChange: (time: number) => void;
 }
 
+type ScenarioPreset = {
+  currentScenario?: {
+    id?: string;
+    startTime?: number;
+    currentTime?: number;
+  };
+};
+
+function clonePresetScenarioWithNow(raw: object): ScenarioPreset {
+  const cloned = JSON.parse(JSON.stringify(raw)) as ScenarioPreset;
+  if (cloned.currentScenario?.id) cloned.currentScenario.id = randomUUID();
+  if (cloned.currentScenario) {
+    const now = Math.floor(Date.now() / 1000);
+    cloned.currentScenario.startTime = now;
+    cloned.currentScenario.currentTime = now;
+  }
+  return cloned;
+}
+
 // Section header used between groups. Tight, uppercased, military-style.
 function SectionLabel({ title }: { title: string }) {
   return (
@@ -211,7 +230,9 @@ export default function CesiumToolbar({
     setPaused(true);
     // Re-load whatever the current scenario JSON would be by re-importing the
     // SCS preset. This mirrors OL's "restart" semantic for the demo flow.
-    onLoadScenarioJson(JSON.stringify(SCSScenarioJson));
+    onLoadScenarioJson(
+      JSON.stringify(clonePresetScenarioWithNow(SCSScenarioJson))
+    );
   }, [game, onLoadScenarioJson]);
 
   const [speedTick, setSpeedTick] = useState(0);
@@ -237,8 +258,7 @@ export default function CesiumToolbar({
   const loadPreset = useCallback(
     (raw: object) => {
       // Bump scenario id so React-keyed code (if any) re-mounts cleanly.
-      const cloned = JSON.parse(JSON.stringify(raw));
-      if (cloned?.currentScenario?.id) cloned.currentScenario.id = randomUUID();
+      const cloned = clonePresetScenarioWithNow(raw);
       onLoadScenarioJson(JSON.stringify(cloned));
       closeScenarioMenu();
     },

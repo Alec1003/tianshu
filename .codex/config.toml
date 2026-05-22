@@ -1,0 +1,5 @@
+[mcp_servers.aicc]
+url = "http://127.0.0.1:8000/api/mcp/"
+
+[mcp_servers.aicc.http_headers]
+Authorization = "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxYmI3NDA3My1mNmY5LTQ0ZWQtOWVmMS04NWViOTQ3YWNkODkiLCJhdWQiOlsiZmFzdGFwaS11c2VyczphdXRoIl0sImV4cCI6MTc3OTc3OTY4OX0.08ZVEySEs9gke-rvDx7MTcDwlBaB8FXFkqYPXFNE05w"

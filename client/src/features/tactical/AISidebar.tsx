@@ -49,6 +49,7 @@ import {
 
 import { getRuntimeScenario } from "@/api/ai";
 import { Button } from "@/components/ui/button";
+import type { CesiumBaseLayerKey } from "@/gui/map/CesiumToolbar";
 import { cn } from "@/lib/utils";
 import TacticalSettingsModal from "./TacticalSettingsModal";
 
@@ -125,6 +126,8 @@ interface AISidebarProps {
    * 此回调（视为单次推演 N 步即停）。
    */
   onResumePlay?: () => void | Promise<void>;
+  mapBaseLayer: CesiumBaseLayerKey;
+  onMapBaseLayerChange: (key: CesiumBaseLayerKey) => void;
   /**
    * 当前 scenario id，用作 chat 历史的 localStorage 命名空间。
    * 切换/重置/导入新 scenario 时变化，自动切换该 scenario 的会话。
@@ -332,6 +335,8 @@ export default function AISidebar({
   onSettingsOpenChange,
   onApplyScenario,
   onResumePlay,
+  mapBaseLayer,
+  onMapBaseLayerChange,
   scenarioId,
 }: AISidebarProps) {
   // —— 持久化状态 ——
@@ -716,6 +721,7 @@ export default function AISidebar({
         modelCheckResult={modelCheckResult}
         modelConfig={modelConfig}
         modelPresetOptions={modelPresetOptions}
+        mapBaseLayer={mapBaseLayer}
         newServerEndpoint={newServerEndpoint}
         newServerName={newServerName}
         newServerTransport={newServerTransport}
@@ -725,6 +731,7 @@ export default function AISidebar({
         onAddSkill={handleAddSkill}
         onCheckModel={() => void checkModelConnection()}
         onClearMessages={() => setMessages([])}
+        onMapBaseLayerChange={onMapBaseLayerChange}
         onModelConfigChange={setModelConfig}
         onNewServerEndpointChange={setNewServerEndpoint}
         onNewServerNameChange={setNewServerName}
@@ -1261,6 +1268,8 @@ export interface TacticalSettingsProps {
   newSkillDescription: string;
   onModelConfigChange: (next: ModelConfig) => void;
   onCheckModel: () => void;
+  mapBaseLayer: CesiumBaseLayerKey;
+  onMapBaseLayerChange: (key: CesiumBaseLayerKey) => void;
   onProjectMcpEnabledChange: (enabled: boolean) => void;
   onAddServer: () => void;
   onRemoveServer: (id: string) => void;

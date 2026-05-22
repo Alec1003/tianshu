@@ -27,8 +27,13 @@ import Game from "@/game/Game";
 import Scenario from "@/game/Scenario";
 import { getRuntimeScenario } from "@/api/ai";
 import { SetScenarioTimeContext } from "@/gui/contextProviders/contexts/ScenarioTimeContext";
-import CesiumScenarioMap from "@/gui/map/CesiumScenarioMap";
-import type { CesiumPlacement } from "@/gui/map/CesiumToolbar";
+import CesiumScenarioMap, {
+  type CesiumSceneModeKey,
+} from "@/gui/map/CesiumScenarioMap";
+import type {
+  CesiumBaseLayerKey,
+  CesiumPlacement,
+} from "@/gui/map/CesiumToolbar";
 import SCSScenarioJson from "@/scenarios/SCS.json";
 import blankScenarioJson from "@/scenarios/blank_scenario.json";
 import defaultScenarioJson from "@/scenarios/default_scenario.json";
@@ -58,17 +63,34 @@ const railItems: Array<{
   { id: "assets", label: "单位", icon: Boxes },
 ];
 
+function cloneDefaultScenarioWithNow(scenarioJson: object): object {
+  const cloned = JSON.parse(JSON.stringify(scenarioJson)) as {
+    currentScenario?: {
+      startTime?: number;
+      currentTime?: number;
+    };
+  };
+  const now = Math.floor(Date.now() / 1000);
+  if (cloned.currentScenario) {
+    cloned.currentScenario.startTime = now;
+    cloned.currentScenario.currentTime = now;
+  }
+  return cloned;
+}
+
 // 从任意 scenario JSON 创建一个全新的 Game 实例。传 null/undefined 则走默认 SCS。
 // 独立出来是为了让 PlayScenarioPage 能传入远端拉取的 JSON。
 function createAiccGameFromJson(scenarioJson: object | null | undefined): Game {
+  const now = Math.floor(Date.now() / 1000);
   const currentScenario = new Scenario({
     id: randomUUID(),
     name: "AICC Tactical Simulation",
-    startTime: 1699073110,
+    startTime: now,
+    currentTime: now,
     duration: 14400,
   });
   const game = new Game(currentScenario);
-  const source = scenarioJson ?? SCSScenarioJson;
+  const source = scenarioJson ?? cloneDefaultScenarioWithNow(SCSScenarioJson);
   try {
     game.loadScenario(JSON.stringify(source));
   } catch (err) {
@@ -76,7 +98,9 @@ function createAiccGameFromJson(scenarioJson: object | null | undefined): Game {
       "[AICC] createAiccGameFromJson: loadScenario failed, falling back to SCS",
       err
     );
-    game.loadScenario(JSON.stringify(SCSScenarioJson));
+    game.loadScenario(
+      JSON.stringify(cloneDefaultScenarioWithNow(SCSScenarioJson))
+    );
     // Defer the alert so it doesn't block the synchronous useState initializer.
     window.setTimeout(() => {
       window.alert(
@@ -209,6 +233,9 @@ export default function AITacticalCommandPlatform({
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
   const [showRoutes, setShowRoutes] = useState(false);
   const [showRanges, setShowRanges] = useState(false);
+  const [mapSceneMode, setMapSceneMode] = useState<CesiumSceneModeKey>("2d");
+  const [mapBaseLayer, setMapBaseLayer] =
+    useState<CesiumBaseLayerKey>("darkMatter");
   const [placement, setPlacement] = useState<CesiumPlacement | null>(null);
   const runStateRef = useRef<SimulationRunState>("idle");
   const playLoopRunning = useRef(false);
@@ -229,6 +256,7 @@ export default function AITacticalCommandPlatform({
   const [scenarioId, setScenarioId] = useState<string>(
     () => game.currentScenario.id
   );
+  const chatScenarioId = scenarioMeta?.id ?? scenarioId;
 
   const refreshSnapshot = useCallback(
     (runState: SimulationRunState = runStateRef.current) => {
@@ -452,6 +480,7 @@ export default function AITacticalCommandPlatform({
   // 用上次拉取到的单位总数作为变化信号，避免无变化时重复加载场景。
   const runtimeUnitCountRef = useRef<number | null>(null);
   useEffect(() => {
+    if (scenarioMeta) return;
     if (snapshot.runState === "running") return;
 
     const sync = async () => {
@@ -480,7 +509,7 @@ export default function AITacticalCommandPlatform({
     void sync();
     const id = setInterval(sync, 3000);
     return () => clearInterval(id);
-  }, [snapshot.runState, loadScenarioFromObject]);
+  }, [scenarioMeta, snapshot.runState, loadScenarioFromObject]);
 
   // 监听 outcome：每次新一局结束自动弹 AAR；用户关闭后不会重复弹。
   // 用 endedAt+reason+winnerSideId 拼成签名，确保 reset 后能再次触发。
@@ -793,6 +822,16 @@ export default function AITacticalCommandPlatform({
           settingsOpen={settingsModalOpen}
           onToggleSettings={() => setSettingsModalOpen((value) => !value)}
           scenarioMeta={scenarioMeta}
+          onExit={onExit}
+          onSave={onSave ? () => void handleSaveClick() : undefined}
+          onRequestSaveAs={
+            onRequestSaveAs ? () => handleSaveAsClick() : undefined
+          }
+          savingState={savingState}
+          mapSceneMode={mapSceneMode}
+          onToggleMapSceneMode={() =>
+            setMapSceneMode((value) => (value === "3d" ? "2d" : "3d"))
+          }
         />
 
         {/*
@@ -801,6 +840,7 @@ export default function AITacticalCommandPlatform({
         */}
         <div className="relative min-h-0 flex-1">
           <CesiumScenarioMap
+            baseLayer={mapBaseLayer}
             embedded
             game={game}
             missionCreatorOpen={missionCreatorOpen}
@@ -809,8 +849,11 @@ export default function AITacticalCommandPlatform({
             placement={placement}
             onMissionCreatorOpenChange={setMissionCreatorOpen}
             onMissionEditorMissionIdChange={setMissionEditorMissionId}
+            onBaseLayerChange={setMapBaseLayer}
             onPlacementChange={setPlacement}
             onScenarioMutation={refreshSnapshot}
+            onSceneModeChange={setMapSceneMode}
+            sceneMode={mapSceneMode}
             showToolbar={false}
             showRanges={showRanges}
             showRoutes={showRoutes}
@@ -835,8 +878,10 @@ export default function AITacticalCommandPlatform({
         onResumePlay={playSimulation}
         onSettingsOpenChange={setSettingsModalOpen}
         onTabChange={() => setAiSidebarOpen(true)}
+        mapBaseLayer={mapBaseLayer}
         open={aiSidebarOpen}
-        scenarioId={scenarioId}
+        onMapBaseLayerChange={setMapBaseLayer}
+        scenarioId={chatScenarioId}
         settingsOpen={settingsModalOpen}
       />
 

@@ -1,21 +1,18 @@
 import { motion } from "framer-motion";
 import {
   Activity,
-  AlertTriangle,
   ArrowLeft,
   Bell,
   BrainCircuit,
   Copy,
   Cpu,
   Layers3,
-  Map,
   Save,
   Search,
   Settings,
   Shield,
   Signal,
   UserCircle,
-  Wifi,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { SimulationSnapshot } from "./SimulationSidebar";
@@ -36,6 +33,8 @@ interface TopTacticalBarProps {
   onSave?: () => void;
   onRequestSaveAs?: () => void;
   savingState?: "idle" | "saving" | "saved" | "error";
+  mapSceneMode?: "2d" | "3d";
+  onToggleMapSceneMode?: () => void;
 }
 
 export default function TopTacticalBar({
@@ -49,6 +48,8 @@ export default function TopTacticalBar({
   onSave,
   onRequestSaveAs,
   savingState,
+  mapSceneMode = "2d",
+  onToggleMapSceneMode,
 }: TopTacticalBarProps) {
   const isRunning = snapshot.runState === "running";
 
@@ -84,9 +85,11 @@ export default function TopTacticalBar({
       <div className="flex items-center gap-4">
         {onExit && (
           <button
+            aria-label="返回想定列表"
             onClick={onExit}
             className="group flex size-8 items-center justify-center rounded-lg border border-cyan-400/20 bg-cyan-950/20 text-cyan-500/70 transition-all hover:border-cyan-400/50 hover:bg-cyan-400/10 hover:text-cyan-300 hover:shadow-[0_0_12px_rgba(34,211,238,0.15)]"
             title="返回想定列表"
+            type="button"
           >
             <ArrowLeft className="size-4 transition-transform group-hover:-translate-x-0.5" />
           </button>
@@ -103,11 +106,11 @@ export default function TopTacticalBar({
                 AICC
               </span>
               <span className="rounded border border-cyan-400/20 bg-cyan-400/10 px-1 py-px font-mono text-[9px] uppercase text-cyan-300">
-                COMMAND
+                指挥
               </span>
             </div>
             <div className="text-[10px] uppercase tracking-widest text-cyan-500/70">
-              Tactical Network
+              AI 战术指挥网络
             </div>
           </div>
         </div>
@@ -117,13 +120,11 @@ export default function TopTacticalBar({
         <div className="hidden lg:block">
           <div className="flex items-center gap-2">
             <span className="font-mono text-xs font-semibold text-slate-200">
-              {scenarioMeta?.name ||
-                snapshot.scenarioName ||
-                "UNKNOWN SCENARIO"}
+              {scenarioMeta?.name || snapshot.scenarioName || "未命名想定"}
             </span>
             {scenarioMeta?.isTemplate && (
               <span className="rounded border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-amber-400">
-                TEMPLATE
+                模板
               </span>
             )}
             {scenarioMeta?.version !== undefined && (
@@ -134,12 +135,12 @@ export default function TopTacticalBar({
             {isRunning && (
               <span className="ml-1 flex items-center gap-1.5 rounded-full border border-emerald-400/30 bg-emerald-400/10 px-2 py-0.5 text-[9px] uppercase tracking-widest text-emerald-400">
                 <span className="size-1.5 animate-pulse rounded-full bg-emerald-400" />
-                Live Sim
+                推演中
               </span>
             )}
             <span className="ml-1 flex items-center gap-1.5 rounded-full border border-cyan-400/30 bg-cyan-400/10 px-2 py-0.5 text-[9px] uppercase tracking-widest text-cyan-300">
               <BrainCircuit className="size-3" />
-              AI CONTROL ACTIVE
+              AI 驱动中
             </span>
           </div>
         </div>
@@ -150,9 +151,9 @@ export default function TopTacticalBar({
         <div className="flex items-center gap-6 rounded-full border border-white/5 bg-white/[0.02] px-6 py-1.5 shadow-inner">
           <div className="flex items-center gap-2">
             <Activity className="size-3 text-cyan-500" />
-            <span className="font-mono text-[10px] text-slate-400">DEFCON</span>
+            <span className="font-mono text-[10px] text-slate-400">态势</span>
             <span className="font-mono text-xs font-bold text-amber-400">
-              3
+              三级
             </span>
           </div>
 
@@ -162,7 +163,7 @@ export default function TopTacticalBar({
             <Cpu className="size-3 text-cyan-500" />
             <span className="font-mono text-[10px] text-slate-400">AI</span>
             <span className="font-mono text-xs font-bold text-cyan-400 shadow-cyan-400 drop-shadow-md">
-              ONLINE
+              在线
             </span>
           </div>
 
@@ -175,21 +176,21 @@ export default function TopTacticalBar({
                 isRunning ? "text-emerald-400 animate-pulse" : "text-slate-500"
               )}
             />
-            <span className="font-mono text-[10px] text-slate-400">STATE</span>
+            <span className="font-mono text-[10px] text-slate-400">状态</span>
             <span
               className={cn(
                 "font-mono text-xs font-bold",
                 isRunning ? "text-emerald-400" : "text-amber-400"
               )}
             >
-              {isRunning ? "RUNNING" : "STANDBY"}
+              {isRunning ? "运行" : "待命"}
             </span>
           </div>
 
           <div className="h-3 w-px bg-white/10" />
 
           <div className="flex items-center gap-2">
-            <span className="font-mono text-[10px] text-slate-400">SPEED</span>
+            <span className="font-mono text-[10px] text-slate-400">倍速</span>
             <span className="font-mono text-xs font-bold text-slate-200">
               {snapshot.timeCompression}x
             </span>
@@ -199,14 +200,14 @@ export default function TopTacticalBar({
             <>
               <div className="h-3 w-px bg-white/10" />
               <div className="flex w-24 items-center gap-2">
-                <span className="font-mono text-[9px] text-blue-400">BLU</span>
+                <span className="font-mono text-[9px] text-blue-400">蓝方</span>
                 <div className="relative h-1.5 flex-1 overflow-hidden rounded-full bg-red-900/50">
                   <div
                     className="absolute inset-y-0 left-0 bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)]"
                     style={{ width: `${blueRatio}%` }}
                   />
                 </div>
-                <span className="font-mono text-[9px] text-red-400">RED</span>
+                <span className="font-mono text-[9px] text-red-400">红方</span>
               </div>
             </>
           )}
@@ -214,7 +215,7 @@ export default function TopTacticalBar({
           <div className="h-3 w-px bg-white/10" />
 
           <div className="flex items-center gap-2">
-            <span className="font-mono text-[10px] text-slate-400">ACTV</span>
+            <span className="font-mono text-[10px] text-slate-400">单位</span>
             <span className="font-mono text-xs font-bold text-slate-200">
               {totalUnits}
             </span>
@@ -245,12 +246,12 @@ export default function TopTacticalBar({
                 <Save className="size-3.5" />
                 <span className="hidden sm:inline">
                   {savingState === "saving"
-                    ? "SAVING..."
+                    ? "保存中"
                     : savingState === "saved"
-                      ? "SAVED"
+                      ? "已保存"
                       : savingState === "error"
-                        ? "ERROR"
-                        : "SAVE"}
+                        ? "失败"
+                        : "保存"}
                 </span>
               </button>
             )}
@@ -262,23 +263,47 @@ export default function TopTacticalBar({
                 title="另存为新想定"
               >
                 <Copy className="size-3.5" />
-                <span className="hidden sm:inline">SAVE AS</span>
+                <span className="hidden sm:inline">另存</span>
               </button>
             )}
           </div>
         )}
 
         <div className="hidden items-center gap-1 md:flex">
-          <button className="grid size-8 place-items-center rounded bg-transparent text-slate-400 transition-colors hover:bg-white/5 hover:text-cyan-300">
-            <span className="font-mono text-[10px] font-bold">3D</span>
+          <button
+            aria-label={mapSceneMode === "3d" ? "切换二维地图" : "切换三维地图"}
+            className="grid size-8 place-items-center rounded bg-transparent text-slate-400 transition-colors hover:bg-white/5 hover:text-cyan-300 disabled:cursor-not-allowed disabled:opacity-40"
+            disabled={!onToggleMapSceneMode}
+            onClick={onToggleMapSceneMode}
+            title={mapSceneMode === "3d" ? "切换为二维地图" : "切换为三维地图"}
+            type="button"
+          >
+            <span className="font-mono text-[10px] font-bold">
+              {mapSceneMode === "3d" ? "2D" : "3D"}
+            </span>
           </button>
-          <button className="grid size-8 place-items-center rounded bg-transparent text-slate-400 transition-colors hover:bg-white/5 hover:text-cyan-300">
+          <button
+            aria-label="图层控制"
+            className="grid size-8 place-items-center rounded bg-transparent text-slate-400 transition-colors hover:bg-white/5 hover:text-cyan-300"
+            title="图层控制"
+            type="button"
+          >
             <Layers3 className="size-4" />
           </button>
-          <button className="grid size-8 place-items-center rounded bg-transparent text-slate-400 transition-colors hover:bg-white/5 hover:text-cyan-300">
+          <button
+            aria-label="战术搜索"
+            className="grid size-8 place-items-center rounded bg-transparent text-slate-400 transition-colors hover:bg-white/5 hover:text-cyan-300"
+            title="战术搜索"
+            type="button"
+          >
             <Search className="size-4" />
           </button>
-          <button className="relative grid size-8 place-items-center rounded bg-transparent text-slate-400 transition-colors hover:bg-white/5 hover:text-cyan-300">
+          <button
+            aria-label="告警中心"
+            className="relative grid size-8 place-items-center rounded bg-transparent text-slate-400 transition-colors hover:bg-white/5 hover:text-cyan-300"
+            title="告警中心"
+            type="button"
+          >
             <Bell className="size-4" />
             <span className="absolute right-2 top-2 size-1.5 rounded-full bg-amber-400" />
           </button>
@@ -287,6 +312,7 @@ export default function TopTacticalBar({
         <div className="hidden h-6 w-px bg-cyan-400/20 md:block" />
 
         <button
+          aria-label={aiSidebarOpen ? "关闭 AI 助手" : "打开 AI 助手"}
           onClick={() => onToggleAiSidebar()}
           className={cn(
             "flex h-8 items-center gap-2 rounded border px-3 transition-all",
@@ -294,14 +320,18 @@ export default function TopTacticalBar({
               ? "border-cyan-400/50 bg-cyan-400/10 text-cyan-300 shadow-[0_0_12px_rgba(34,211,238,0.2)]"
               : "border-white/5 bg-white/5 text-slate-300 hover:border-cyan-400/30 hover:bg-cyan-400/5 hover:text-cyan-300"
           )}
+          title={aiSidebarOpen ? "关闭 AI 助手" : "打开 AI 助手"}
+          type="button"
         >
           <BrainCircuit className="size-4" />
           <span className="font-mono text-[10px] font-bold uppercase tracking-wider">
-            Copilot
+            AI 助手
           </span>
         </button>
 
         <button
+          aria-label={settingsOpen ? "关闭战术配置中心" : "打开战术配置中心"}
+          disabled={!onToggleSettings}
           onClick={() => onToggleSettings && onToggleSettings()}
           className={cn(
             "grid size-8 place-items-center rounded border transition-all",
@@ -309,11 +339,18 @@ export default function TopTacticalBar({
               ? "border-cyan-400/50 bg-cyan-400/10 text-cyan-300"
               : "border-transparent bg-transparent text-slate-400 hover:bg-white/5 hover:text-cyan-300"
           )}
+          title={settingsOpen ? "关闭战术配置中心" : "打开战术配置中心"}
+          type="button"
         >
           <Settings className="size-4" />
         </button>
 
-        <button className="ml-1 grid size-8 place-items-center rounded-full border border-cyan-400/20 bg-[#01040a]">
+        <button
+          aria-label="当前操作员"
+          className="ml-1 grid size-8 place-items-center rounded-full border border-cyan-400/20 bg-[#01040a]"
+          title="当前操作员"
+          type="button"
+        >
           <UserCircle className="size-6 text-slate-400" />
         </button>
       </div>

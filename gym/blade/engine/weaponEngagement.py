@@ -19,6 +19,15 @@ from blade.utils.utils import (
 
 Target = Aircraft | Facility | Weapon | Airbase | Ship
 
+UNIT_SCORE_TABLE = {
+    "aircraft": 10,
+    "weapon": 1,
+    "facility": 30,
+    "ship": 50,
+    "airbase": 100,
+}
+OBJECTIVE_BONUS_SCORE = 200
+
 
 def is_threat_detected(
     threat: Aircraft | Weapon, detector: Facility | Ship | Aircraft
@@ -40,7 +49,7 @@ def weapon_can_engage_target(target: Target, weapon: Weapon) -> bool:
 
     distance_to_target_nm = (distance_to_target_km * 1000) / NAUTICAL_MILES_TO_METERS
 
-    return distance_to_target_nm < weapon_engagement_range_nm
+    return distance_to_target_nm <= weapon_engagement_range_nm
 
 
 def check_target_tracked_by_count(current_scenario: Scenario, target: Target) -> int:
@@ -49,6 +58,44 @@ def check_target_tracked_by_count(current_scenario: Scenario, target: Target) ->
         if weapon.target_id == target.id:
             count += 1
     return count
+
+
+def on_unit_destroyed(
+    current_scenario: Scenario, attacker_side_id: str, target: Target
+) -> None:
+    attacker_side = current_scenario.get_side(attacker_side_id)
+    if attacker_side is None:
+        return
+
+    base_score = UNIT_SCORE_TABLE["weapon"]
+    unit_type = "weapon"
+    if isinstance(target, Aircraft):
+        base_score = UNIT_SCORE_TABLE["aircraft"]
+        unit_type = "aircraft"
+    elif isinstance(target, Facility):
+        base_score = UNIT_SCORE_TABLE["facility"]
+        unit_type = "facility"
+    elif isinstance(target, Ship):
+        base_score = UNIT_SCORE_TABLE["ship"]
+        unit_type = "ship"
+    elif isinstance(target, Airbase):
+        base_score = UNIT_SCORE_TABLE["airbase"]
+        unit_type = "airbase"
+
+    is_objective = not isinstance(target, Weapon) and getattr(
+        target, "is_objective", False
+    )
+    attacker_side.total_score = getattr(attacker_side, "total_score", 0) + base_score
+    if is_objective:
+        attacker_side.total_score += OBJECTIVE_BONUS_SCORE
+        current_scenario.last_objective_destroyed = {
+            "attacker_side_id": attacker_side_id,
+            "victim_side_id": getattr(target, "side_id", ""),
+            "unit_id": target.id,
+            "unit_name": target.name,
+            "unit_type": unit_type,
+            "destroyed_at": current_scenario.current_time,
+        }
 
 
 def weapon_endgame(current_scenario: Scenario, weapon: Weapon, target: Target) -> bool:
@@ -64,6 +111,7 @@ def weapon_endgame(current_scenario: Scenario, weapon: Weapon, target: Target) -
             current_scenario.airbases.remove(target)
         elif isinstance(target, Weapon):
             current_scenario.weapons.remove(target)
+        on_unit_destroyed(current_scenario, weapon.side_id, target)
         return True
     return False
 

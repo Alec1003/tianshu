@@ -17,10 +17,14 @@ from types import SimpleNamespace
 import pytest
 
 from app.mcp.server import (
+    _get_runtime,
     _runtime_outcome_payload,
     _runtime_side_stats,
     _runtime_status_payload,
     _runtime_unit_counts,
+    reset_request_user,
+    set_request_user,
+    set_shared_runtime_provider,
 )
 from app.mcp.schemas import RuntimeOutcome, RuntimeStatus
 
@@ -46,6 +50,7 @@ def _make_runtime(
     duration: int = 600,
     current_time: int | None = None,
     paused: bool = True,
+    game_outcome: dict | None = None,
 ) -> SimpleNamespace:
     """Build the minimum object graph that ``_runtime_*`` helpers walk."""
     scenario = SimpleNamespace(
@@ -62,7 +67,12 @@ def _make_runtime(
         weapons=weapons or [],
         reference_points=reference_points or [],
     )
-    game = SimpleNamespace(current_scenario=scenario, scenario_paused=paused)
+    game = SimpleNamespace(
+        current_scenario=scenario,
+        scenario_paused=paused,
+        game_outcome=game_outcome
+        or {"ended": False, "winner_side_id": "", "reason": "", "ended_at": 0},
+    )
     return SimpleNamespace(game=game)
 
 
@@ -153,7 +163,7 @@ def test_outcome_detects_time_up():
     assert sorted(parsed.surviving_side_ids) == ["blue", "red"]
 
 
-def test_outcome_detects_annihilation_and_infers_winner():
+def test_outcome_reports_annihilation_without_declaring_winner():
     runtime = _make_runtime(
         sides=[_make_side("blue", "BLUE"), _make_side("red", "RED")],
         aircraft=[_make_unit("blue")],  # RED has no combat units left
@@ -167,7 +177,31 @@ def test_outcome_detects_annihilation_and_infers_winner():
     assert parsed.time_up is False
     assert parsed.annihilated_side_ids == ["red"]
     assert parsed.surviving_side_ids == ["blue"]
+    assert parsed.ended is False
+    assert parsed.inferred_winner_side_id is None
+
+
+def test_outcome_uses_runtime_game_outcome_for_winner():
+    runtime = _make_runtime(
+        sides=[_make_side("blue", "BLUE"), _make_side("red", "RED")],
+        aircraft=[_make_unit("blue"), _make_unit("red")],
+        start_time=0,
+        duration=600,
+        current_time=42,
+        game_outcome={
+            "ended": True,
+            "winner_side_id": "blue",
+            "reason": "KEY_UNIT_DESTROYED",
+            "ended_at": 42,
+        },
+    )
+    payload = _runtime_outcome_payload(runtime)
+    parsed = RuntimeOutcome.model_validate(payload)
+    assert parsed.ended is True
+    assert parsed.winner_side_id == "blue"
     assert parsed.inferred_winner_side_id == "blue"
+    assert parsed.reason == "KEY_UNIT_DESTROYED"
+    assert parsed.ended_at == 42
 
 
 def test_outcome_no_winner_when_all_annihilated():
@@ -222,3 +256,21 @@ async def test_run_in_runtime_delegates_to_thread():
     result_value, worker_thread = await run_in_runtime(_identity, 42)
     assert result_value == 42
     assert worker_thread != main_loop_thread
+
+
+def test_get_runtime_uses_per_request_user_provider():
+    user = SimpleNamespace(id="user-a")
+    runtime = _make_runtime(sides=[_make_side("blue", "BLUE")])
+    ctx = SimpleNamespace(
+        request_context=SimpleNamespace(
+            lifespan_context=SimpleNamespace(user=None, runtime=None)
+        )
+    )
+
+    token = set_request_user(user)
+    set_shared_runtime_provider(lambda current_user: runtime if current_user.id == user.id else None)
+    try:
+        assert _get_runtime(ctx) is runtime
+    finally:
+        reset_request_user(token)
+        set_shared_runtime_provider(None)

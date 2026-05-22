@@ -51,12 +51,25 @@ class Game:
         self.recorder = PlaybackRecorder(record_every_seconds, recording_export_path)
         self.scenario_paused = True
         self.current_attacker_id = ""
+        self.game_outcome = self._create_initial_game_outcome()
         self.map_view = {
             "defaultCenter": [0, 0],
             "currentCameraCenter": [0, 0],
             "defaultZoom": 0,
             "currentCameraZoom": 0,
         }
+
+    def _create_initial_game_outcome(self) -> dict:
+        return {
+            "ended": False,
+            "winner_side_id": "",
+            "reason": "",
+            "ended_at": 0,
+        }
+
+    def _reset_game_outcome(self) -> None:
+        self.game_outcome = self._create_initial_game_outcome()
+        self.current_scenario.last_objective_destroyed = None
 
     def remove_aircraft(self, aircraft_id: str) -> None:
         self.current_scenario.aircraft.remove(
@@ -87,6 +100,7 @@ class Game:
                     home_base_id=aircraft.home_base_id,
                     rtb=False,
                     target_id=aircraft.target_id,
+                    is_objective=getattr(aircraft, "is_objective", False),
                 )
                 homebase.aircraft.append(new_aircraft)
                 self.remove_aircraft(aircraft.id)
@@ -354,6 +368,21 @@ class Game:
 
         return 0
 
+    def can_launch_at(
+        self,
+        origin: Aircraft | Ship,
+        target: Aircraft | Facility | Weapon | Airbase | Ship,
+        weapon: Weapon,
+        weapon_quantity: int,
+    ) -> bool:
+        return (
+            weapon_quantity > 0
+            and weapon.current_quantity >= weapon_quantity
+            and target.id != origin.id
+            and self.current_scenario.is_hostile(origin.side_id, target.side_id)
+            and weapon_can_engage_target(target, weapon)
+        )
+
     def facility_auto_defense(self) -> None:
         for facility in self.current_scenario.facilities:
             if self.current_scenario.check_side_doctrine(
@@ -510,6 +539,60 @@ class Game:
                 aircraft.side_id, DoctrineType.AIRCRAFT_CHASE_HOSTILE
             ) and aircraft.target_id and aircraft.target_id != "":
                 aircraft_pursuit(self.current_scenario, aircraft)
+
+    def aircraft_surface_engagement(self) -> None:
+        self.update_onboard_weapon_positions()
+        for aircraft in self.current_scenario.aircraft:
+            if len(aircraft.weapons) == 0:
+                continue
+            if not self.current_scenario.check_side_doctrine(
+                aircraft.side_id, DoctrineType.AIRCRAFT_ATTACK_HOSTILE
+            ):
+                continue
+
+            aircraft_weapon_with_max_range = (
+                aircraft.get_weapon_with_highest_engagement_range()
+            )
+            if aircraft_weapon_with_max_range is None:
+                continue
+
+            candidates: list[tuple[int, float, Facility | Ship | Airbase]] = []
+            for candidate in (
+                self.current_scenario.facilities
+                + self.current_scenario.ships
+                + self.current_scenario.airbases
+            ):
+                distance_nm = (
+                    get_distance_between_two_points(
+                        aircraft.latitude,
+                        aircraft.longitude,
+                        candidate.latitude,
+                        candidate.longitude,
+                    )
+                    * 1000
+                ) / NAUTICAL_MILES_TO_METERS
+                if distance_nm > aircraft.get_detection_range() * 1.1:
+                    continue
+                if not self.can_launch_at(
+                    aircraft, candidate, aircraft_weapon_with_max_range, 1
+                ):
+                    continue
+                priority = 0 if isinstance(candidate, Facility) else 1
+                candidates.append((priority, distance_nm, candidate))
+
+            if len(candidates) == 0:
+                continue
+
+            target = sorted(candidates, key=lambda item: (item[0], item[1]))[0][2]
+            if check_target_tracked_by_count(self.current_scenario, target) > 0:
+                continue
+            launch_weapon(
+                self.current_scenario,
+                aircraft,
+                target,
+                aircraft_weapon_with_max_range,
+                1,
+            )
 
     def update_units_on_patrol_mission(self):
         active_patrol_missions = list(
@@ -816,6 +899,7 @@ class Game:
         self.facility_auto_defense()
         self.ship_auto_defense()
         self.aircraft_air_to_air_engagement()
+        self.aircraft_surface_engagement()
 
         self.update_units_on_patrol_mission()
         self.clear_completed_strike_missions()
@@ -862,8 +946,42 @@ class Game:
         self.current_side_id = self.current_scenario.sides[0].id
         self.scenario_paused = True
         self.current_attacker_id = ""
+        self._reset_game_outcome()
+        for side in self.current_scenario.sides:
+            side.total_score = 0
 
     def check_game_ended(self) -> bool:
+        if self.game_outcome["ended"]:
+            return True
+
+        objective_event = self.current_scenario.last_objective_destroyed
+        if objective_event:
+            self.game_outcome = {
+                "ended": True,
+                "winner_side_id": objective_event["attacker_side_id"],
+                "reason": "KEY_UNIT_DESTROYED",
+                "ended_at": self.current_scenario.current_time,
+            }
+            return True
+
+        elapsed = self.current_scenario.current_time - self.current_scenario.start_time
+        if self.current_scenario.duration > 0 and elapsed >= self.current_scenario.duration:
+            winner = (
+                max(
+                    self.current_scenario.sides,
+                    key=lambda side: getattr(side, "total_score", 0),
+                )
+                if self.current_scenario.sides
+                else None
+            )
+            self.game_outcome = {
+                "ended": True,
+                "winner_side_id": winner.id if winner is not None else "",
+                "reason": "TIMEOUT",
+                "ended_at": self.current_scenario.current_time,
+            }
+            return True
+
         return False
 
     def export_scenario(self) -> dict:
@@ -970,6 +1088,7 @@ class Game:
                     target_id=(
                         aircraft["targetId"] if "targetId" in aircraft.keys() else ""
                     ),
+                    is_objective=aircraft.get("isObjective", False),
                 )
             )
         for airbase in saved_scenario["airbases"]:
@@ -1024,6 +1143,7 @@ class Game:
                     target_id=(
                         aircraft["targetId"] if "targetId" in aircraft.keys() else ""
                     ),
+                    is_objective=aircraft.get("isObjective", False),
                 )
                 airbase_aircraft.append(new_aircraft)
             loaded_scenario.airbases.append(
@@ -1037,6 +1157,7 @@ class Game:
                     altitude=airbase["altitude"],
                     side_color=airbase["sideColor"],
                     aircraft=airbase_aircraft,
+                    is_objective=airbase.get("isObjective", False),
                 )
             )
         for facility in saved_scenario["facilities"]:
@@ -1078,6 +1199,7 @@ class Game:
                     range=facility["range"],
                     side_color=facility["sideColor"],
                     weapons=facility_weapons,
+                    is_objective=facility.get("isObjective", False),
                 )
             )
         for weapon in saved_scenario["weapons"]:
@@ -1154,6 +1276,7 @@ class Game:
                     home_base_id=aircraft["homeBaseId"],
                     rtb=aircraft["rtb"],
                     target_id=aircraft["targetId"] if aircraft["targetId"] else "",
+                    is_objective=aircraft.get("isObjective", False),
                 )
                 ship_aircraft.append(new_aircraft)
             ship_weapons = []
@@ -1201,6 +1324,7 @@ class Game:
                     side_color=ship["sideColor"],
                     weapons=ship_weapons,
                     aircraft=ship_aircraft,
+                    is_objective=ship.get("isObjective", False),
                 )
             )
         if "referencePoints" in saved_scenario.keys():
@@ -1256,6 +1380,7 @@ class Game:
 
         self.initial_scenario = copy.deepcopy(loaded_scenario)
         self.current_scenario = loaded_scenario
+        self._reset_game_outcome()
 
     def start_recording(self):
         self.recorder.start_recording(self.current_scenario)

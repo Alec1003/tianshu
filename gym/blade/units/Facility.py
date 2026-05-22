@@ -17,6 +17,7 @@ class Facility:
         range: float = 250.0,
         side_color: str | SIDE_COLOR | None = None,
         weapons: Optional[List[Weapon]] = None,
+        is_objective: bool = False,
     ):
         self.id = id
         self.name = name
@@ -28,6 +29,7 @@ class Facility:
         self.range = range
         self.side_color = convert_color_name_to_side_color(side_color)
         self.weapons = weapons if weapons is not None else []
+        self.is_objective = is_objective
 
     def get_total_weapon_quantity(self) -> int:
         return sum([weapon.current_quantity for weapon in self.weapons])
@@ -56,4 +58,5 @@ class Facility:
                 else self.side_color
             ),
             "weapons": [weapon.to_dict() for weapon in self.weapons],
+            "is_objective": self.is_objective,
         }

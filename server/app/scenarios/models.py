@@ -19,11 +19,12 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Integer,
+    JSON,
     String,
     Text,
     func,
 )
-from sqlalchemy.dialects.sqlite import JSON as SQLITE_JSON
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -37,6 +38,9 @@ def _uuid_pk():
         primary_key=True,
         default=lambda: str(uuid.uuid4()),
     )
+
+
+SCENARIO_JSON = JSON().with_variant(JSONB, "postgresql")
 
 
 class Scenario(Base):
@@ -57,9 +61,9 @@ class Scenario(Base):
     name: Mapped[str] = mapped_column(String(120), nullable=False)
     description: Mapped[str] = mapped_column(Text, default="", nullable=False)
 
-    # Whole scenario JSON (sides, units, missions, ...). SQLite JSON type maps
-    # to TEXT under the hood; PostgreSQL will use JSONB once we migrate.
-    data: Mapped[dict] = mapped_column(SQLITE_JSON, nullable=False)
+    # Whole scenario JSON (sides, units, missions, ...). SQLite maps this to a
+    # JSON-text affinity, while PostgreSQL stores it as JSONB.
+    data: Mapped[dict] = mapped_column(SCENARIO_JSON, nullable=False)
 
     is_template: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
@@ -124,7 +128,7 @@ class AarRecord(Base):
     winner_side_id: Mapped[str] = mapped_column(String(80), default="", nullable=False)
 
     # JSON: { scenarioName, endedAt, elapsedSeconds, sides:[{id,name,score,...}] }
-    summary: Mapped[dict] = mapped_column(SQLITE_JSON, nullable=False)
+    summary: Mapped[dict] = mapped_column(SCENARIO_JSON, nullable=False)
 
     ended_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False

@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import json
-from typing import Sequence
+from typing import Any, Sequence
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy import select
@@ -33,6 +33,13 @@ from app.scenarios.schemas import (
 )
 
 router = APIRouter(prefix="/api/scenarios", tags=["scenarios"])
+
+
+def _bridge_for_user(request: Request, user: User) -> Any:
+    registry = getattr(request.app.state, "bridge_registry", None)
+    if registry is not None:
+        return registry.get_bridge_for_user(user)
+    return request.app.state.bridge
 
 
 # ---------- list / detail ----------
@@ -219,7 +226,7 @@ async def activate_scenario(
     user: User = Depends(current_active_user),
     session: AsyncSession = Depends(get_async_session),
 ) -> dict:
-    """Load a DB scenario into the shared in-memory runtime.
+    """Load a DB scenario into this user's in-memory runtime.
 
     Called by the frontend when the user enters /play/:scenarioId so that
     MCP tools and /api/ai/command operate on the correct scenario.
@@ -233,7 +240,7 @@ async def activate_scenario(
     if not sc.is_template and sc.owner_id != str(user.id):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="forbidden")
 
-    bridge = request.app.state.bridge
+    bridge = _bridge_for_user(request, user)
 
     # If the runtime already has this scenario loaded (same inner currentScenario.id),
     # skip the reload so MCP-deployed units and other in-memory changes are preserved.

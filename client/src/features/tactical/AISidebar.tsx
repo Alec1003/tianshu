@@ -51,6 +51,7 @@ import { getRuntimeScenario } from "@/api/ai";
 import { Button } from "@/components/ui/button";
 import type { CesiumBaseLayerKey } from "@/gui/map/CesiumToolbar";
 import { cn } from "@/lib/utils";
+import { apiCall, getStoredToken } from "@/api/client";
 import TacticalSettingsModal from "./TacticalSettingsModal";
 
 export type AISidebarTab = "chat" | "settings";
@@ -392,6 +393,8 @@ export default function AISidebar({
         headers: () => {
           const m = modelConfigRef.current;
           const h: Record<string, string> = {};
+          const token = getStoredToken();
+          if (token) h.Authorization = `Bearer ${token}`;
           if (m.provider) h["X-AICC-Model-Provider"] = m.provider;
           if (m.model) h["X-AICC-Model-Name"] = m.model;
           if (m.apiKey) h["X-AICC-Model-Api-Key"] = m.apiKey;
@@ -585,11 +588,9 @@ export default function AISidebar({
     setSkillsLoading(true);
     setSkillsError(null);
     try {
-      const response = await fetch(`/api/ai/skills`);
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const payload = (await response.json()) as {
-        skills?: RegisteredSkill[];
-      };
+      const payload = await apiCall<{ skills?: RegisteredSkill[] }>(
+        "/api/ai/skills"
+      );
       setRegisteredSkills(payload.skills ?? []);
     } catch (error) {
       setSkillsError(error instanceof Error ? error.message : "Unknown error");
@@ -687,13 +688,10 @@ export default function AISidebar({
     setCheckingModel(true);
     setModelCheckResult(null);
     try {
-      const response = await fetch(`/api/ai/model/check`, {
+      const payload = await apiCall<ModelCheckResponse>("/api/ai/model/check", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(modelConfig),
+        json: modelConfig,
       });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const payload = (await response.json()) as ModelCheckResponse;
       setModelCheckResult(payload);
     } catch (error) {
       setModelCheckResult({

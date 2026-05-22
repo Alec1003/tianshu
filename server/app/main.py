@@ -6,12 +6,13 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.ai.bridge import AICCOpenClawBridge
+from app.ai.bridge_registry import AICCBridgeRegistry
 from app.api.ai import router as ai_router
 from app.auth.router import router as auth_router
+from app.config import get_settings, validate_production_settings
 from app.db.session import create_db_and_tables
 from app.mcp.http_auth import BearerAuthASGI
-from app.mcp.server import mcp, set_shared_runtime
+from app.mcp.server import mcp, set_shared_runtime, set_shared_runtime_provider
 from app.scenarios.router import router as scenarios_router
 from app.scenarios.seed import seed_system_templates
 
@@ -31,9 +32,10 @@ async def lifespan(app: FastAPI):
 
     Order matters:
         1. DB / templates (cheap, idempotent).
-        2. Bridge construction -> owns the runtime.
-        3. ``set_shared_runtime`` BEFORE we open ``mcp.session_manager.run()``
-           (mcp_lifespan reads the slot during enter).
+        2. Bridge registry construction -> owns per-user runtime sessions.
+        3. ``set_shared_runtime_provider`` BEFORE opening
+           ``mcp.session_manager.run()`` (mcp_lifespan reads the slot during
+           enter).
         4. ``async with session_manager.run()`` starts MCP's task group;
            must wrap ``yield`` so it stays alive for the whole app lifetime.
     """
@@ -45,22 +47,25 @@ async def lifespan(app: FastAPI):
         # down. We log so dev can spot the problem.
         logger.exception("seed_system_templates failed; continuing without templates")
 
-    app.state.bridge = AICCOpenClawBridge.from_env()
-    set_shared_runtime(app.state.bridge.runtime)
+    app.state.bridge_registry = AICCBridgeRegistry.from_env()
+    set_shared_runtime_provider(app.state.bridge_registry.get_runtime_for_user)
 
     # First call lazily creates ``mcp._session_manager``; we must trigger it
     # before entering the run() context below.
     mcp.streamable_http_app()
     async with mcp.session_manager.run():
         logger.info(
-            "mcp.http: mounted at /api/mcp (shared runtime; scenario=%s)",
-            app.state.bridge.runtime.game.current_scenario.name,
+            "mcp.http: mounted at /api/mcp (per-user runtime registry)",
         )
         yield
+    set_shared_runtime_provider(None)
     set_shared_runtime(None)
+    app.state.bridge_registry.clear()
 
 
 def create_app() -> FastAPI:
+    settings = get_settings()
+    validate_production_settings(settings)
     app = FastAPI(
         title="AICC Tactical Backend",
         version="0.2.0",
@@ -73,7 +78,7 @@ def create_app() -> FastAPI:
 
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origins=settings.cors_origin_list,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],

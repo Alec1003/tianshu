@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import json
 import logging
+from typing import Any
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import StreamingResponse
 
 from app.ai.model_checker import check_model_connectivity
@@ -13,15 +14,32 @@ from app.ai.models import (
     ModelCheckRequest,
     ModelCheckResponse,
 )
+from app.auth.models import User
+from app.auth.users import current_active_user
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/ai", tags=["ai"])
+router = APIRouter(
+    prefix="/api/ai",
+    tags=["ai"],
+    dependencies=[Depends(current_active_user)],
+)
+
+
+def _bridge_for_user(request: Request, user: User) -> Any:
+    registry = getattr(request.app.state, "bridge_registry", None)
+    if registry is not None:
+        return registry.get_bridge_for_user(user)
+    return request.app.state.bridge
 
 
 @router.post("/command", response_model=AICommandResponse)
-async def command(request: Request, payload: AICommandRequest) -> AICommandResponse:
-    bridge = request.app.state.bridge
+async def command(
+    request: Request,
+    payload: AICommandRequest,
+    user: User = Depends(current_active_user),
+) -> AICommandResponse:
+    bridge = _bridge_for_user(request, user)
     execution = await bridge.process_command_async(payload.command, payload.context)
     scenario = bridge.exported_scenario()
 
@@ -41,7 +59,10 @@ async def command(request: Request, payload: AICommandRequest) -> AICommandRespo
 
 
 @router.get("/runtime/scenario")
-def runtime_scenario(request: Request) -> dict:
+def runtime_scenario(
+    request: Request,
+    user: User = Depends(current_active_user),
+) -> dict:
     """Export the current in-memory runtime scenario as JSON.
 
     This is the **read-only** counterpart to the MCP ``runtime_*`` tools:
@@ -51,16 +72,19 @@ def runtime_scenario(request: Request) -> dict:
     ``scenario`` field in ``POST /api/ai/command`` responses, so
     ``game.loadScenario(JSON.stringify(response))`` works on the client.
 
-    No auth required (aligns with ``/api/ai/command`` which is also open);
-    add ``Depends(current_active_user)`` when multi-tenant auth is wired.
+    Authentication is enforced at the router level because this shared
+    runtime can contain user-loaded scenario state and AI/MCP mutations.
     """
-    bridge = request.app.state.bridge
+    bridge = _bridge_for_user(request, user)
     return bridge.exported_scenario()
 
 
 @router.get("/skills")
-def list_skills(request: Request) -> dict:
-    bridge = request.app.state.bridge
+def list_skills(
+    request: Request,
+    user: User = Depends(current_active_user),
+) -> dict:
+    bridge = _bridge_for_user(request, user)
     return {"skills": [definition.model_dump() for definition in bridge.skill_registry.definitions()]}
 
 
@@ -96,7 +120,10 @@ def _read_chat_mode_from_headers(request: Request) -> str:
 
 
 @router.post("/chat")
-async def chat(request: Request) -> StreamingResponse:
+async def chat(
+    request: Request,
+    user: User = Depends(current_active_user),
+) -> StreamingResponse:
     """Streaming chat endpoint powered by pydantic-ai.
 
     Accepts Vercel AI SDK compatible request body (messages array).
@@ -116,7 +143,7 @@ async def chat(request: Request) -> StreamingResponse:
 
     from app.ai.pydantic_agent import AgentDeps, build_agent  # noqa: PLC0415
 
-    bridge = request.app.state.bridge
+    bridge = _bridge_for_user(request, user)
     chat_mode = _read_chat_mode_from_headers(request)
 
     # Per-request model override via headers (set by AI sidebar useChat).

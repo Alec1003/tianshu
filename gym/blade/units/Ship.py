@@ -30,6 +30,7 @@ class Ship:
         weapons: Optional[List[Weapon]] = None,
         aircraft: Optional[List[Aircraft]] = None,
         desired_route: Optional[List[List[float]]] = None,
+        is_objective: bool = False,
     ):
         self.id = id
         self.name = name
@@ -50,6 +51,7 @@ class Ship:
         self.weapons = weapons if weapons is not None else []
         self.aircraft = aircraft if aircraft is not None else []
         self.desired_route = desired_route if desired_route is not None else []
+        self.is_objective = is_objective
 
     def get_total_weapon_quantity(self) -> int:
         return sum([weapon.current_quantity for weapon in self.weapons])
@@ -92,4 +94,5 @@ class Ship:
             ),
             "weapons": [weapon.to_dict() for weapon in self.weapons],
             "aircraft": [ac.to_dict() for ac in self.aircraft],
+            "is_objective": self.is_objective,
         }

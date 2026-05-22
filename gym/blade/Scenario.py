@@ -38,6 +38,7 @@ class Scenario:
         missions: list[PatrolMission | StrikeMission] = None,
         relationships: Relationships = Relationships(),
         doctrine: Doctrine = None,
+        last_objective_destroyed: dict | None = None,
     ):
         self.id = id
         self.name = name
@@ -55,6 +56,7 @@ class Scenario:
         self.missions = missions if missions is not None else []
         self.relationships = relationships
         self.doctrine = doctrine if doctrine is not None else self.get_default_doctrine()
+        self.last_objective_destroyed = last_objective_destroyed
 
     def get_default_doctrine(self) -> Doctrine:
         default_doctrine: Doctrine = {}

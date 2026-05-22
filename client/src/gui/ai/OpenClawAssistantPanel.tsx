@@ -1,4 +1,12 @@
-import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import {
+  FormEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { getStoredToken } from "@/api/client";
 import "@/styles/AIAssistantPanel.css";
 
 type PanelTab = "chat" | "settings";
@@ -104,11 +112,7 @@ const MODEL_PROVIDER_OPTIONS = [
 
 const MODEL_PRESETS: Record<string, string[]> = {
   openai: ["gpt-5", "gpt-5-mini", "gpt-4.1", "gpt-4o", "gpt-4o-mini"],
-  anthropic: [
-    "claude-3-7-sonnet",
-    "claude-3-5-sonnet",
-    "claude-3-5-haiku",
-  ],
+  anthropic: ["claude-3-7-sonnet", "claude-3-5-sonnet", "claude-3-5-haiku"],
   google: ["gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.0-flash"],
   deepseek: ["deepseek-chat", "deepseek-reasoner"],
   qwen: ["qwen-max", "qwen-plus", "qwen-turbo"],
@@ -152,6 +156,13 @@ function safeSave<T>(key: string, value: T): void {
   }
 }
 
+function authHeaders(
+  extra: Record<string, string> = {}
+): Record<string, string> {
+  const token = getStoredToken();
+  return token ? { ...extra, Authorization: `Bearer ${token}` } : extra;
+}
+
 function formatTime(timestamp: number): string {
   return new Date(timestamp).toLocaleTimeString([], {
     hour: "2-digit",
@@ -185,7 +196,10 @@ export default function OpenClawAssistantPanel({
     safeLoad<CustomSkillConfig[]>(STORAGE_KEY.customSkills, [])
   );
   const [modelConfig, setModelConfig] = useState<ModelConfig>(() => {
-    const loaded = safeLoad<Partial<ModelConfig>>(STORAGE_KEY.model, DEFAULT_MODEL);
+    const loaded = safeLoad<Partial<ModelConfig>>(
+      STORAGE_KEY.model,
+      DEFAULT_MODEL
+    );
     return {
       provider: loaded.provider ?? DEFAULT_MODEL.provider,
       baseUrl: loaded.baseUrl ?? DEFAULT_MODEL.baseUrl,
@@ -226,6 +240,27 @@ export default function OpenClawAssistantPanel({
     ? modelConfig.model
     : "__custom__";
 
+  const refreshRegisteredSkills = useCallback(async (): Promise<void> => {
+    setSkillsLoading(true);
+    setSkillsError(null);
+    try {
+      const response = await fetch(`${aiBaseUrl}/api/ai/skills`, {
+        headers: authHeaders(),
+      });
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      const payload = (await response.json()) as {
+        skills?: OpenClawSkillDefinition[];
+      };
+      setRegisteredSkills(payload.skills ?? []);
+    } catch (error) {
+      setSkillsError(error instanceof Error ? error.message : "Unknown error");
+    } finally {
+      setSkillsLoading(false);
+    }
+  }, [aiBaseUrl]);
+
   useEffect(() => {
     setPanelOpen(!mobileView);
   }, [mobileView]);
@@ -259,26 +294,7 @@ export default function OpenClawAssistantPanel({
 
   useEffect(() => {
     void refreshRegisteredSkills();
-  }, []);
-
-  async function refreshRegisteredSkills(): Promise<void> {
-    setSkillsLoading(true);
-    setSkillsError(null);
-    try {
-      const response = await fetch(`${aiBaseUrl}/api/ai/skills`);
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-      const payload = (await response.json()) as {
-        skills?: OpenClawSkillDefinition[];
-      };
-      setRegisteredSkills(payload.skills ?? []);
-    } catch (error) {
-      setSkillsError(error instanceof Error ? error.message : "Unknown error");
-    } finally {
-      setSkillsLoading(false);
-    }
-  }
+  }, [refreshRegisteredSkills]);
 
   function appendMessage(role: MessageRole, text: string, state: MessageState) {
     const nextMessage: ChatMessage = {
@@ -314,14 +330,18 @@ export default function OpenClawAssistantPanel({
     setSending(true);
 
     appendMessage("user", trimmed, "ok");
-    const assistantMessageId = appendMessage("assistant", "Running...", "pending");
+    const assistantMessageId = appendMessage(
+      "assistant",
+      "Running...",
+      "pending"
+    );
 
     try {
       const response = await fetch(`${aiBaseUrl}/api/ai/command`, {
         method: "POST",
-        headers: {
+        headers: authHeaders({
           "Content-Type": "application/json",
-        },
+        }),
         body: JSON.stringify({
           command: trimmed,
           context: {
@@ -436,9 +456,9 @@ export default function OpenClawAssistantPanel({
     try {
       const response = await fetch(`${aiBaseUrl}/api/ai/model/check`, {
         method: "POST",
-        headers: {
+        headers: authHeaders({
           "Content-Type": "application/json",
-        },
+        }),
         body: JSON.stringify(modelConfig),
       });
 
@@ -469,8 +489,8 @@ export default function OpenClawAssistantPanel({
         <section className="openclaw-hero">
           <h4>AICC Command Assistant</h4>
           <p>
-            Use natural language to invoke OpenClaw skills for simulation,
-            unit, script and situation control.
+            Use natural language to invoke OpenClaw skills for simulation, unit,
+            script and situation control.
           </p>
         </section>
 

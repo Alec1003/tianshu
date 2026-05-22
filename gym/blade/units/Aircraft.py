@@ -100,6 +100,7 @@ class Aircraft:
         rtb: bool = False,
         target_id: Optional[str] = "",
         desired_route: Optional[List[List[float]]] = None,
+        is_objective: bool = False,
     ):
         self.id = id
         self.name = name
@@ -123,6 +124,7 @@ class Aircraft:
         self.target_id = target_id if target_id is not None else ""
         self.black_box = BlackBox()
         self.desired_route = desired_route if desired_route is not None else []
+        self.is_objective = is_objective
 
     def get_total_weapon_quantity(self) -> int:
         return sum([weapon.current_quantity for weapon in self.weapons])
@@ -167,4 +169,5 @@ class Aircraft:
             "home_base_id": str(self.home_base_id),
             "rtb": self.rtb,
             "target_id": str(self.target_id),
+            "is_objective": self.is_objective,
         }

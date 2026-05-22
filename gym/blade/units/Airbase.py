@@ -17,6 +17,7 @@ class Airbase:
         altitude: float,
         side_color: str | SIDE_COLOR | None = None,
         aircraft: Optional[List[Aircraft]] = None,
+        is_objective: bool = False,
     ):
         self.id = id
         self.name = name
@@ -27,6 +28,7 @@ class Airbase:
         self.altitude = altitude  # FT ASL -- currently default
         self.side_color = convert_color_name_to_side_color(side_color)
         self.aircraft = aircraft if aircraft is not None else []
+        self.is_objective = is_objective
 
     def to_dict(self):
         return {
@@ -43,4 +45,5 @@ class Airbase:
                 else self.side_color
             ),
             "aircraft": [ac.to_dict() for ac in self.aircraft],
+            "is_objective": self.is_objective,
         }

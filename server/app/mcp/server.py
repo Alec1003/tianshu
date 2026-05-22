@@ -23,7 +23,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any
+from typing import Any, Callable
 
 from mcp.server.fastmcp import Context, FastMCP
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -77,10 +77,9 @@ logger = logging.getLogger(__name__)
 # Two MCP transports share one tool surface:
 #   - stdio  : user resolved once from ENV at lifespan; new AICCRuntime
 #              created per process (single-user scope).
-#   - http   : runtime is **shared** with the FastAPI process
-#              (``app.state.bridge.runtime`` from ``ai/bridge.py``); user is
-#              resolved per-request from the Bearer token via
-#              ``app.mcp.http_auth.BearerAuthASGI``.
+#   - http   : runtime is resolved per request from FastAPI's per-user bridge
+#              registry; user is resolved per-request from the Bearer token
+#              via ``app.mcp.http_auth.BearerAuthASGI``.
 #
 # These module-level slots let the host (FastAPI app or stdio __main__) plug
 # in the right pieces before MCP starts handling traffic, without forking
@@ -88,6 +87,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 _shared_runtime: AICCRuntime | None = None
+_shared_runtime_provider: Callable[[User], AICCRuntime] | None = None
 _request_user_var: contextvars.ContextVar[User | None] = contextvars.ContextVar(
     "_aicc_mcp_request_user", default=None
 )
@@ -106,6 +106,18 @@ def set_shared_runtime(runtime: AICCRuntime | None) -> None:
 
 def get_shared_runtime() -> AICCRuntime | None:
     return _shared_runtime
+
+
+def set_shared_runtime_provider(
+    provider: Callable[[User], AICCRuntime] | None,
+) -> None:
+    """Bind a per-user runtime provider for HTTP transport."""
+    global _shared_runtime_provider
+    _shared_runtime_provider = provider
+
+
+def get_shared_runtime_provider() -> Callable[[User], AICCRuntime] | None:
+    return _shared_runtime_provider
 
 
 def set_request_user(user: User | None) -> contextvars.Token[User | None]:
@@ -135,7 +147,7 @@ class McpAppContext:
     """
 
     user: User | None
-    runtime: AICCRuntime
+    runtime: AICCRuntime | None
 
 
 @asynccontextmanager
@@ -144,8 +156,12 @@ async def mcp_lifespan(server: FastMCP) -> AsyncIterator[McpAppContext]:  # noqa
     # clone doesn't blow up with "no such table". Idempotent.
     await create_db_and_tables()
 
+    shared_provider = get_shared_runtime_provider()
     shared = get_shared_runtime()
-    if shared is not None:
+    if shared_provider is not None:
+        runtime = None
+        user = None
+    elif shared is not None:
         # HTTP mode: the FastAPI host already owns the runtime + auth flow.
         # We deliberately skip ENV-based user resolution here -- requests
         # carry their own Bearer token, and lifespan-scoped user would just
@@ -224,7 +240,14 @@ def _get_user(ctx: Context) -> User:
 
 
 def _get_runtime(ctx: Context) -> AICCRuntime:
+    provider = get_shared_runtime_provider()
+    if provider is not None:
+        return provider(_get_user(ctx))
     app_ctx: McpAppContext = ctx.request_context.lifespan_context
+    if app_ctx.runtime is None:
+        raise _UnauthenticatedError(
+            "no runtime bound; HTTP transport requires a valid Bearer token"
+        )
     return app_ctx.runtime
 
 
@@ -1213,13 +1236,21 @@ async def runtime_set_current_side(ctx: Context, side: str) -> dict[str, Any]:
 
 
 def _runtime_outcome_payload(runtime: AICCRuntime) -> dict[str, Any]:
-    """计算"P0 可靠"的两个胜负信号：time_up + annihilation。"""
+    """Return authoritative runtime outcome plus survival signals."""
     scenario = runtime.game.current_scenario
     start = int(scenario.start_time or 0)
     duration = int(scenario.duration or 0)
     current = int(scenario.current_time or start)
     duration_left = max(0, start + duration - current)
     time_up = duration > 0 and current >= start + duration
+    raw_outcome = getattr(runtime.game, "game_outcome", {}) or {}
+    ended = bool(raw_outcome.get("ended", False))
+    winner_side_id = (
+        raw_outcome.get("winner_side_id") or raw_outcome.get("winnerSideId") or None
+    )
+    reason = raw_outcome.get("reason", "") or ""
+    ended_at = int(raw_outcome.get("ended_at") or raw_outcome.get("endedAt") or 0)
+    objective_destroyed = getattr(scenario, "last_objective_destroyed", None)
 
     # Per-side surviving unit counts (exclude reference points: they're
     # navigational, not combat assets).
@@ -1235,15 +1266,16 @@ def _runtime_outcome_payload(runtime: AICCRuntime) -> dict[str, Any]:
             alive += sum(1 for u in bucket if getattr(u, "side_id", None) == side_id)
         (surviving if alive > 0 else annihilated).append(side_id)
 
-    inferred_winner: str | None = None
-    if len(surviving) == 1 and len(sides) > 1:
-        inferred_winner = surviving[0]
-
     return RuntimeOutcome(
+        ended=ended,
+        winner_side_id=winner_side_id if ended else None,
+        reason=reason,
+        ended_at=ended_at,
+        objective_destroyed=objective_destroyed,
         time_up=time_up,
         annihilated_side_ids=annihilated,
         surviving_side_ids=surviving,
-        inferred_winner_side_id=inferred_winner,
+        inferred_winner_side_id=winner_side_id if ended else None,
         current_time=current,
         duration_left=duration_left,
     ).model_dump(mode="json")
@@ -1253,9 +1285,8 @@ def _runtime_outcome_payload(runtime: AICCRuntime) -> dict[str, Any]:
 async def runtime_get_outcome(ctx: Context) -> dict[str, Any]:
     """读取当前推演的胜负信号。
 
-    返回 ``time_up``、各方存活情况和（可选的）推断赢家。LLM 应根据这些
-    字段+作战清单的胜负条件自行判断对局是否结束；不要假设 ``ended``
-    单字段（后端 blade.Game.check_game_ended 当前是占位）。
+    返回后端仿真引擎的权威 ``ended`` / ``winner_side_id`` / ``reason``，
+    同时保留 ``time_up``、各方存活和全灭状态作为辅助态势信号。
     """
     runtime = _get_runtime(ctx)
     return _runtime_outcome_payload(runtime)

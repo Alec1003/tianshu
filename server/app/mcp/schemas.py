@@ -202,19 +202,19 @@ class RuntimeSimpleResult(BaseModel):
 
 
 class RuntimeOutcome(BaseModel):
-    """胜负判定的最小可用版本。
+    """Authoritative runtime outcome plus supporting survival signals.
 
-    后端 blade.Game.check_game_ended 当前是占位（始终返回 False），所以这
-    层把 P0 能可靠判断的两个信号回吐：
-    - **time_up**：currentTime ≥ startTime + duration
-    - **annihilated_sides**：某一方所有单位都没了（含 weapon/airbase/...
-      非 referencePoint）
-
-    LLM 拿到这些字段后可以自行决定下一步策略，不强行返回单一 winner，避
-    免误导（api 反例 22：客户端不应解析 message 文案做分支）。
+    ``ended`` / ``winner_side_id`` / ``reason`` come from the Python simulation
+    engine. ``annihilated_side_ids`` and ``surviving_side_ids`` remain status
+    signals only; annihilation is not a victory condition.
     """
 
     ok: Literal[True] = True
+    ended: bool = False
+    winner_side_id: str | None = None
+    reason: str = ""
+    ended_at: int = 0
+    objective_destroyed: dict[str, Any] | None = None
     time_up: bool
     annihilated_side_ids: list[str]
     surviving_side_ids: list[str]

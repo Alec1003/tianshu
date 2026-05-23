@@ -101,6 +101,10 @@ class Aircraft:
         target_id: Optional[str] = "",
         desired_route: Optional[List[List[float]]] = None,
         is_objective: bool = False,
+        is_tanker: bool = False,
+        fuel_offload_capacity: float = 0.0,
+        fuel_transfer_rate: float = 0.0,
+        refuel_range: float = 0.0,
     ):
         self.id = id
         self.name = name
@@ -125,6 +129,28 @@ class Aircraft:
         self.black_box = BlackBox()
         self.desired_route = desired_route if desired_route is not None else []
         self.is_objective = is_objective
+        class_name_lower = class_name.lower()
+        class_name_upper = class_name.upper()
+        self.is_tanker = (
+            is_tanker
+            or "tanker" in class_name_lower
+            or class_name_upper.startswith("KC-")
+        )
+        self.fuel_offload_capacity = (
+            fuel_offload_capacity
+            if fuel_offload_capacity > 0
+            else (max_fuel * 0.75 if self.is_tanker else 0.0)
+        )
+        self.fuel_transfer_rate = (
+            fuel_transfer_rate
+            if fuel_transfer_rate > 0
+            else (100.0 if self.is_tanker else 0.0)
+        )
+        self.refuel_range = (
+            refuel_range
+            if refuel_range > 0
+            else (2.0 if self.is_tanker else 0.0)
+        )
 
     def get_total_weapon_quantity(self) -> int:
         return sum([weapon.current_quantity for weapon in self.weapons])
@@ -170,4 +196,8 @@ class Aircraft:
             "rtb": self.rtb,
             "target_id": str(self.target_id),
             "is_objective": self.is_objective,
+            "is_tanker": self.is_tanker,
+            "fuel_offload_capacity": self.fuel_offload_capacity,
+            "fuel_transfer_rate": self.fuel_transfer_rate,
+            "refuel_range": self.refuel_range,
         }

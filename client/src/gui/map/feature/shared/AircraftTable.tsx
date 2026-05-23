@@ -264,6 +264,12 @@ function AircraftTableToolbar(props: AircraftTableToolbarProps) {
                 <Typography variant="body2" sx={{ fontWeight: "bold" }}>
                   Detection Range: {aircraft.range.toFixed(0)} nm
                 </Typography>
+                {aircraft.isTanker && (
+                  <Typography variant="body2" sx={{ fontWeight: "bold" }}>
+                    Tanker: {aircraft.fuelOffloadCapacity?.toFixed(0) ?? 0} lbs
+                    offload, {aircraft.refuelRange?.toFixed(0) ?? 0} nm
+                  </Typography>
+                )}
               </Stack>
             }
           >

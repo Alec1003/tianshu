@@ -44,6 +44,11 @@ function makeApi(): RuntimeApiClient {
         state: { steps },
       })
     ),
+    attack: vi.fn(async (attack) =>
+      makeSnapshot("attack", {
+        state: { attacked: true, ...attack },
+      })
+    ),
   };
 }
 
@@ -76,5 +81,21 @@ describe("RuntimeController", () => {
     expect(api.loadScenario).toHaveBeenCalledWith({
       currentScenario: { id: "loaded" },
     });
+
+    await controller.attack({
+      attacker_type: "aircraft",
+      attacker_id: "aircraft-1",
+      target_id: "target-1",
+      weapon_id: "weapon-1",
+      weapon_quantity: 1,
+    });
+    expect(api.attack).toHaveBeenCalledWith({
+      attacker_type: "aircraft",
+      attacker_id: "aircraft-1",
+      target_id: "target-1",
+      weapon_id: "weapon-1",
+      weapon_quantity: 1,
+    });
+    expect(controller.snapshot?.action).toBe("attack");
   });
 });

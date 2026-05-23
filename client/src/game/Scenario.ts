@@ -7,7 +7,7 @@ import Ship from "@/game/units/Ship";
 import { getDistanceBetweenTwoPoints } from "@/utils/mapFunctions";
 import ReferencePoint from "@/game/units/ReferencePoint";
 import PatrolMission from "@/game/mission/PatrolMission";
-import { Target } from "@/game/engine/weaponEngagement";
+import type { Target } from "@/game/Target";
 import StrikeMission from "@/game/mission/StrikeMission";
 import { Mission } from "@/game/Game";
 import { SIDE_COLOR } from "@/utils/colors";

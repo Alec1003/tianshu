@@ -24,6 +24,10 @@ interface IAircraft {
   targetId?: string;
   desiredRoute?: number[][];
   isObjective?: boolean;
+  isTanker?: boolean;
+  fuelOffloadCapacity?: number;
+  fuelTransferRate?: number;
+  refuelRange?: number;
 }
 
 export default class Aircraft {
@@ -49,6 +53,10 @@ export default class Aircraft {
   targetId: string;
   desiredRoute: number[][] = [];
   isObjective: boolean;
+  isTanker: boolean;
+  fuelOffloadCapacity: number;
+  fuelTransferRate: number;
+  refuelRange: number;
 
   constructor(parameters: IAircraft) {
     this.id = parameters.id;
@@ -73,6 +81,29 @@ export default class Aircraft {
     this.targetId = parameters.targetId ?? "";
     this.desiredRoute = parameters.desiredRoute ?? [];
     this.isObjective = parameters.isObjective ?? false;
+    const classNameLower = this.className.toLowerCase();
+    this.isTanker =
+      parameters.isTanker ??
+      (classNameLower.includes("tanker") ||
+        this.className.toUpperCase().startsWith("KC-"));
+    this.fuelOffloadCapacity =
+      parameters.fuelOffloadCapacity && parameters.fuelOffloadCapacity > 0
+        ? parameters.fuelOffloadCapacity
+        : this.isTanker
+          ? this.maxFuel * 0.75
+          : 0;
+    this.fuelTransferRate =
+      parameters.fuelTransferRate && parameters.fuelTransferRate > 0
+        ? parameters.fuelTransferRate
+        : this.isTanker
+          ? 100
+          : 0;
+    this.refuelRange =
+      parameters.refuelRange && parameters.refuelRange > 0
+        ? parameters.refuelRange
+        : this.isTanker
+          ? 2
+          : 0;
   }
 
   getTotalWeaponQuantity(): number {

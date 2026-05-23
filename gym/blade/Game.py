@@ -101,6 +101,12 @@ class Game:
                     rtb=False,
                     target_id=aircraft.target_id,
                     is_objective=getattr(aircraft, "is_objective", False),
+                    is_tanker=getattr(aircraft, "is_tanker", False),
+                    fuel_offload_capacity=getattr(
+                        aircraft, "fuel_offload_capacity", 0.0
+                    ),
+                    fuel_transfer_rate=getattr(aircraft, "fuel_transfer_rate", 0.0),
+                    refuel_range=getattr(aircraft, "refuel_range", 0.0),
                 )
                 homebase.aircraft.append(new_aircraft)
                 self.remove_aircraft(aircraft.id)
@@ -367,6 +373,118 @@ class Game:
             return fuel_needed_to_return_to_base
 
         return 0
+
+    def _available_tanker_fuel(self, tanker: Aircraft) -> float:
+        reserve_fuel = max(0.0, tanker.max_fuel * 0.1)
+        return max(
+            0.0,
+            min(
+                getattr(tanker, "fuel_offload_capacity", 0.0),
+                tanker.current_fuel - reserve_fuel,
+            ),
+        )
+
+    def _find_refueling_tanker(self, receiver: Aircraft) -> Aircraft | None:
+        if receiver.current_fuel >= receiver.max_fuel:
+            return None
+
+        best_tanker: Aircraft | None = None
+        best_distance = float("inf")
+        for tanker in self.current_scenario.aircraft:
+            if tanker.id == receiver.id:
+                continue
+            if not getattr(tanker, "is_tanker", False):
+                continue
+            if tanker.side_id != receiver.side_id:
+                continue
+            if self._available_tanker_fuel(tanker) <= 0:
+                continue
+            refuel_range = max(0.0, getattr(tanker, "refuel_range", 0.0))
+            if refuel_range <= 0:
+                continue
+            distance_nm = (
+                get_distance_between_two_points(
+                    tanker.latitude,
+                    tanker.longitude,
+                    receiver.latitude,
+                    receiver.longitude,
+                )
+                * 1000
+            ) / NAUTICAL_MILES_TO_METERS
+            if distance_nm <= refuel_range and distance_nm < best_distance:
+                best_tanker = tanker
+                best_distance = distance_nm
+        return best_tanker
+
+    def refuel_aircraft(
+        self,
+        receiver_id: str,
+        tanker_id: str | None = None,
+        fuel_quantity: float | None = None,
+    ) -> dict:
+        receiver = self.current_scenario.get_aircraft(receiver_id)
+        if receiver is None:
+            raise ValueError("Receiver aircraft not found")
+
+        tanker = (
+            self.current_scenario.get_aircraft(tanker_id)
+            if tanker_id
+            else self._find_refueling_tanker(receiver)
+        )
+        if tanker is None:
+            return {"refueled": False, "reason": "no_tanker_available"}
+        if tanker.id == receiver.id:
+            return {"refueled": False, "reason": "receiver_is_tanker"}
+        if not getattr(tanker, "is_tanker", False):
+            return {"refueled": False, "reason": "not_a_tanker"}
+        if tanker.side_id != receiver.side_id:
+            return {"refueled": False, "reason": "different_side"}
+
+        distance_nm = (
+            get_distance_between_two_points(
+                tanker.latitude,
+                tanker.longitude,
+                receiver.latitude,
+                receiver.longitude,
+            )
+            * 1000
+        ) / NAUTICAL_MILES_TO_METERS
+        if distance_nm > max(0.0, getattr(tanker, "refuel_range", 0.0)):
+            return {"refueled": False, "reason": "out_of_range"}
+
+        available = self._available_tanker_fuel(tanker)
+        receiver_need = max(0.0, receiver.max_fuel - receiver.current_fuel)
+        requested = (
+            max(0.0, fuel_quantity)
+            if fuel_quantity is not None and fuel_quantity > 0
+            else max(0.0, getattr(tanker, "fuel_transfer_rate", 0.0))
+        )
+        transfer = min(available, receiver_need, requested)
+        if transfer <= 0:
+            return {"refueled": False, "reason": "no_transfer_capacity"}
+
+        receiver.current_fuel += transfer
+        tanker.current_fuel -= transfer
+        tanker.fuel_offload_capacity = max(0.0, tanker.fuel_offload_capacity - transfer)
+        return {
+            "refueled": True,
+            "receiverId": receiver.id,
+            "tankerId": tanker.id,
+            "fuelTransferred": transfer,
+            "receiverFuel": receiver.current_fuel,
+            "tankerFuel": tanker.current_fuel,
+            "tankerOffloadRemaining": tanker.fuel_offload_capacity,
+        }
+
+    def aerial_refueling(self) -> list[dict]:
+        events = []
+        for receiver in list(self.current_scenario.aircraft):
+            if getattr(receiver, "is_tanker", False):
+                continue
+            result = self.refuel_aircraft(receiver.id)
+            if result.get("refueled"):
+                events.append(result)
+        return events
 
     def can_launch_at(
         self,
@@ -823,6 +941,8 @@ class Game:
                         next_waypoint_longitude,
                     )
             aircraft.current_fuel -= aircraft.fuel_rate / 3600
+            if not getattr(aircraft, "is_tanker", False):
+                self.refuel_aircraft(aircraft.id)
             fuel_needed_to_return_to_base = self.get_fuel_needed_to_return_to_base(
                 aircraft
             )
@@ -1089,6 +1209,10 @@ class Game:
                         aircraft["targetId"] if "targetId" in aircraft.keys() else ""
                     ),
                     is_objective=aircraft.get("isObjective", False),
+                    is_tanker=aircraft.get("isTanker", False),
+                    fuel_offload_capacity=aircraft.get("fuelOffloadCapacity", 0.0),
+                    fuel_transfer_rate=aircraft.get("fuelTransferRate", 0.0),
+                    refuel_range=aircraft.get("refuelRange", 0.0),
                 )
             )
         for airbase in saved_scenario["airbases"]:
@@ -1144,6 +1268,10 @@ class Game:
                         aircraft["targetId"] if "targetId" in aircraft.keys() else ""
                     ),
                     is_objective=aircraft.get("isObjective", False),
+                    is_tanker=aircraft.get("isTanker", False),
+                    fuel_offload_capacity=aircraft.get("fuelOffloadCapacity", 0.0),
+                    fuel_transfer_rate=aircraft.get("fuelTransferRate", 0.0),
+                    refuel_range=aircraft.get("refuelRange", 0.0),
                 )
                 airbase_aircraft.append(new_aircraft)
             loaded_scenario.airbases.append(
@@ -1277,6 +1405,10 @@ class Game:
                     rtb=aircraft["rtb"],
                     target_id=aircraft["targetId"] if aircraft["targetId"] else "",
                     is_objective=aircraft.get("isObjective", False),
+                    is_tanker=aircraft.get("isTanker", False),
+                    fuel_offload_capacity=aircraft.get("fuelOffloadCapacity", 0.0),
+                    fuel_transfer_rate=aircraft.get("fuelTransferRate", 0.0),
+                    refuel_range=aircraft.get("refuelRange", 0.0),
                 )
                 ship_aircraft.append(new_aircraft)
             ship_weapons = []

@@ -15,7 +15,7 @@ import PatrolMission from "@/game/mission/PatrolMission";
 import Aircraft from "@/game/units/Aircraft";
 import ReferencePoint from "@/game/units/ReferencePoint";
 import StrikeMission from "@/game/mission/StrikeMission";
-import { Target } from "@/game/engine/weaponEngagement";
+import type { Target } from "@/game/Target";
 import SelectField from "@/gui/shared/ui/SelectField";
 import TextField from "@/gui/shared/ui/TextField";
 import type { Mission } from "@/game/Game";

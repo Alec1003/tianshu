@@ -226,6 +226,7 @@
       "weaponEngagementRange": "Weapon Range",
       "homeBase": "Home Base",
       "rtb": "RTB",
+      "tanker": "Tanker",
       "target": "Target"
     },
     "unit": {

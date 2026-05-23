@@ -44,6 +44,10 @@ describe("Aircraft", () => {
       sideColor: "blue",
       weapons: [testWeapon],
       homeBaseId: "homebase-1234",
+      isTanker: true,
+      fuelOffloadCapacity: 150000,
+      fuelTransferRate: 100,
+      refuelRange: 2,
     });
     expect(testAircraft.id).toBe("12345");
     expect(testAircraft.name).toBe("F-16");
@@ -67,6 +71,10 @@ describe("Aircraft", () => {
     expect(testAircraft.homeBaseId).toBe("homebase-1234");
     expect(testAircraft.selected).toBe(false);
     expect(testAircraft.rtb).toBe(false);
+    expect(testAircraft.isTanker).toBe(true);
+    expect(testAircraft.fuelOffloadCapacity).toBe(150000);
+    expect(testAircraft.fuelTransferRate).toBe(100);
+    expect(testAircraft.refuelRange).toBe(2);
   });
 
   test("getTotalWeaponQuantity returns the correct number of weapons on an Aircraft", () => {

@@ -10,7 +10,7 @@ import {
 } from "@/game/db/UnitDb";
 import MissionCreatorCard from "@/gui/map/mission/MissionCreatorCard";
 import MissionEditorCard from "@/gui/map/mission/MissionEditorCard";
-import type { Target } from "@/game/engine/weaponEngagement";
+import type { Target } from "@/game/Target";
 import {
   CallbackProperty,
   Cartesian2,

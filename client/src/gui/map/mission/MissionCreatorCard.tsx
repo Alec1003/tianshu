@@ -3,7 +3,7 @@ import Draggable from "react-draggable";
 import Card from "@mui/material/Card";
 import Aircraft from "@/game/units/Aircraft";
 import ReferencePoint from "@/game/units/ReferencePoint";
-import { Target } from "@/game/engine/weaponEngagement";
+import type { Target } from "@/game/Target";
 import {
   Button,
   CardContent,

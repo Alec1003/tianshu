@@ -72,6 +72,7 @@ import SimulationLogs from "@/gui/map/toolbar/SimulationLogs";
 import { SetScenarioSidesContext } from "@/gui/contextProviders/contexts/ScenarioSidesContext";
 import { SideDoctrine } from "@/game/Doctrine";
 import OpenClawAssistantPanel from "@/gui/ai/OpenClawAssistantPanel";
+import type { RuntimeAttackRequest } from "@/api/types";
 
 interface ScenarioMapProps {
   zoom: number;
@@ -83,6 +84,7 @@ interface ScenarioMapProps {
   onPause?: () => void | Promise<void>;
   onStep?: () => void | Promise<void>;
   onReset?: () => void | Promise<void>;
+  onAttack?: (attack: RuntimeAttackRequest) => void | Promise<void>;
 }
 
 interface IOpenMultipleFeatureSelector {
@@ -125,6 +127,7 @@ export default function ScenarioMap({
   onPause,
   onStep,
   onReset,
+  onAttack,
 }: Readonly<ScenarioMapProps>) {
   const mapRef = useRef<HTMLDivElement | null>(null);
   const defaultProjection = getProjection(DEFAULT_OL_PROJECTION_CODE);
@@ -249,9 +252,9 @@ export default function ScenarioMap({
   const routeMeasurementTooltipRef = useRef<Overlay | null>(null);
   const routeMeasurementListenerRef = useRef<EventsKey | undefined>(undefined);
   const teleportingUnitRef = useRef(false);
-  const handleMapClickRef = useRef<(event: MapBrowserEvent<MouseEvent>) => void>(
-    () => {}
-  );
+  const handleMapClickRef = useRef<
+    (event: MapBrowserEvent<MouseEvent>) => void | Promise<void>
+  >(() => {});
 
   const DrawerHeader = styled("div")(({ theme }) => ({
     display: "flex",
@@ -374,7 +377,7 @@ export default function ScenarioMap({
       if (game.selectingTarget) {
         event.stopPropagation();
       }
-      handleMapClickRef.current(event);
+      void handleMapClickRef.current(event);
     });
     const contextMenuHandler = function (event: MouseEvent) {
       event.preventDefault();
@@ -481,7 +484,7 @@ export default function ScenarioMap({
     return context;
   }
 
-  function handleMapClick(event: MapBrowserEvent<MouseEvent>) {
+  async function handleMapClick(event: MapBrowserEvent<MouseEvent>) {
     const mapClickContext = getMapClickContext(event);
     const featuresAtPixel = getFeaturesAtPixel(
       theMap.getEventPixel(event.originalEvent)
@@ -506,30 +509,14 @@ export default function ScenarioMap({
       }
       case "aircraftSelectedAttackTarget": {
         const targetFeature = featuresAtPixel[0];
-        const targetId = targetFeature.getProperties()?.id;
-        game.handleAircraftAttack(
-          game.currentAttackParams.currentAttackerId,
-          targetId,
-          game.currentAttackParams.currentWeaponId,
-          game.currentAttackParams.currentWeaponQuantity,
-          game.currentAttackParams.autoAttack
-        );
-        resetAttack();
-        setCurrentGameStatusToContext("Target acquired");
+        const targetId = targetFeature?.getProperties()?.id;
+        await executeRuntimeAttack("aircraft", targetId);
         break;
       }
       case "shipSelectedAttackTarget": {
         const targetFeature = featuresAtPixel[0];
-        const targetId = targetFeature.getProperties()?.id;
-        game.handleShipAttack(
-          game.currentAttackParams.currentAttackerId,
-          targetId,
-          game.currentAttackParams.currentWeaponId,
-          game.currentAttackParams.currentWeaponQuantity,
-          game.currentAttackParams.autoAttack
-        );
-        resetAttack();
-        setCurrentGameStatusToContext("Target acquired");
+        const targetId = targetFeature?.getProperties()?.id;
+        await executeRuntimeAttack("ship", targetId);
         break;
       }
       case "aircraftCancelledAttack": {
@@ -551,6 +538,50 @@ export default function ScenarioMap({
         break;
       case "default":
         break;
+    }
+  }
+
+  async function executeRuntimeAttack(
+    attackerType: RuntimeAttackRequest["attacker_type"],
+    targetId: string | undefined
+  ) {
+    if (!targetId) {
+      resetAttack();
+      setCurrentGameStatusToContext("No target selected");
+      return;
+    }
+
+    if (!onAttack) {
+      resetAttack();
+      setCurrentGameStatusToContext("Backend runtime attack unavailable");
+      toastContext?.addToast("Backend runtime attack unavailable", "error");
+      return;
+    }
+
+    const params = game.currentAttackParams;
+    const attack: RuntimeAttackRequest = {
+      attacker_type: attackerType,
+      attacker_id: params.currentAttackerId,
+      target_id: targetId,
+      weapon_quantity: params.autoAttack ? 1 : params.currentWeaponQuantity,
+      auto: params.autoAttack,
+    };
+    if (params.currentWeaponId) {
+      attack.weapon_id = params.currentWeaponId;
+    }
+
+    try {
+      await onAttack(attack);
+      resetAttack();
+      refreshAllLayers();
+      setCurrentGameStatusToContext("Target acquired");
+    } catch (err) {
+      resetAttack();
+      setCurrentGameStatusToContext("Attack rejected by backend runtime");
+      toastContext?.addToast(
+        err instanceof Error ? err.message : "Attack rejected by backend runtime",
+        "error"
+      );
     }
   }
 
@@ -726,7 +757,11 @@ export default function ScenarioMap({
         aircraftTemplate?.speed,
         aircraftTemplate?.maxFuel,
         aircraftTemplate?.fuelRate,
-        aircraftTemplate?.range
+        aircraftTemplate?.range,
+        aircraftTemplate?.isTanker,
+        aircraftTemplate?.fuelOffloadCapacity,
+        aircraftTemplate?.fuelTransferRate,
+        aircraftTemplate?.refuelRange
       );
       game.addingAircraft = false;
     } else if (game.addingFacility) {
@@ -1215,7 +1250,11 @@ export default function ScenarioMap({
     speed?: number,
     maxFuel?: number,
     fuelRate?: number,
-    range?: number
+    range?: number,
+    isTanker?: boolean,
+    fuelOffloadCapacity?: number,
+    fuelTransferRate?: number,
+    refuelRange?: number
   ) {
     coordinates = toLonLat(coordinates, theMap.getView().getProjection());
     className = className ?? "F-22Z";
@@ -1230,7 +1269,11 @@ export default function ScenarioMap({
       speed,
       maxFuel,
       fuelRate,
-      range
+      range,
+      isTanker,
+      fuelOffloadCapacity,
+      fuelTransferRate,
+      refuelRange
     );
     if (newAircraft) {
       aircraftLayer.addAircraftFeature(newAircraft);
@@ -1257,10 +1300,14 @@ export default function ScenarioMap({
       airbaseId,
       aircraftClassName,
       aircraftTemplate?.speed,
-      aircraftTemplate?.maxFuel,
-      aircraftTemplate?.fuelRate,
-      aircraftTemplate?.range
-    );
+        aircraftTemplate?.maxFuel,
+        aircraftTemplate?.fuelRate,
+        aircraftTemplate?.range,
+        aircraftTemplate?.isTanker,
+        aircraftTemplate?.fuelOffloadCapacity,
+        aircraftTemplate?.fuelTransferRate,
+        aircraftTemplate?.refuelRange
+      );
   }
 
   function removeAircraftFromAirbase(airbaseId: string, aircraftIds: string[]) {
@@ -1441,7 +1488,11 @@ export default function ScenarioMap({
       aircraftTemplate?.speed,
       aircraftTemplate?.maxFuel,
       aircraftTemplate?.fuelRate,
-      aircraftTemplate?.range
+      aircraftTemplate?.range,
+      aircraftTemplate?.isTanker,
+      aircraftTemplate?.fuelOffloadCapacity,
+      aircraftTemplate?.fuelTransferRate,
+      aircraftTemplate?.refuelRange
     );
   }
 

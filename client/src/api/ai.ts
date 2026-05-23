@@ -1,5 +1,5 @@
 import { apiCall } from "./client";
-import type { RuntimeSnapshot } from "./types";
+import type { RuntimeAttackRequest, RuntimeSnapshot } from "./types";
 
 export async function getRuntimeScenario(): Promise<Record<string, unknown>> {
   return apiCall<Record<string, unknown>>("/api/ai/runtime/scenario");
@@ -40,5 +40,14 @@ export async function stepRuntime(steps: number = 1): Promise<RuntimeSnapshot> {
   return apiCall<RuntimeSnapshot>("/api/ai/runtime/step", {
     method: "POST",
     json: { steps },
+  });
+}
+
+export async function attackRuntime(
+  attack: RuntimeAttackRequest
+): Promise<RuntimeSnapshot> {
+  return apiCall<RuntimeSnapshot>("/api/ai/runtime/attack", {
+    method: "POST",
+    json: attack,
   });
 }

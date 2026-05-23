@@ -20,6 +20,14 @@ const forbiddenPatterns = [
     label: "frontend local simulation resume",
     pattern: /\bgame\.scenarioPaused\s*=\s*false\b/,
   },
+  {
+    label: "frontend aircraft attack invocation",
+    pattern: /\bgame\.handleAircraftAttack\s*\(/,
+  },
+  {
+    label: "frontend ship attack invocation",
+    pattern: /\bgame\.handleShipAttack\s*\(/,
+  },
 ];
 
 function collectSourceFiles(dir: string): string[] {
@@ -61,11 +69,21 @@ describe("backend runtime boundary", () => {
     expect(legacyTestFiles).toEqual([]);
   });
 
+  test("frontend weapon engagement engine is removed", () => {
+    expect(
+      existsSync(join(srcRoot, "game", "engine", "weaponEngagement.ts"))
+    ).toBe(false);
+  });
+
   test("Game render adapter does not expose local simulation controls", () => {
     const gameSource = readFileSync(join(srcRoot, "game", "Game.ts"), "utf-8");
 
     expect(gameSource).not.toMatch(/\n\s+(?:async\s+)?step\s*\(/);
     expect(gameSource).not.toMatch(/\n\s+checkGameEnded\s*\(/);
     expect(gameSource).not.toMatch(/\n\s+updateGameState\s*\(/);
+    expect(gameSource).not.toMatch(/\n\s+handleAircraftAttack\s*\(/);
+    expect(gameSource).not.toMatch(/\n\s+handleShipAttack\s*\(/);
+    expect(gameSource).not.toContain("launchWeapon");
+    expect(gameSource).not.toContain("weaponCanEngageTarget");
   });
 });

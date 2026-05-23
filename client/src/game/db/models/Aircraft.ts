@@ -4,6 +4,10 @@ export interface IAircraftModel {
   maxFuel: number;
   fuelRate: number;
   range: number;
+  isTanker?: boolean;
+  fuelOffloadCapacity?: number;
+  fuelTransferRate?: number;
+  refuelRange?: number;
   dataSource: {
     speedSrc: string;
     maxFuelSrc: string;

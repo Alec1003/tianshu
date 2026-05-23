@@ -25,6 +25,10 @@ AircraftDb = [
         "max_fuel": 200000,
         "fuel_rate": 5000,
         "range": 1303,
+        "is_tanker": True,
+        "fuel_offload_capacity": 150000,
+        "fuel_transfer_rate": 100,
+        "refuel_range": 2,
         "data_source": {
             "speed_src": "https://www.af.mil/About-Us/Fact-Sheets/Display/Article/174560/kc-135r-stratotanker/",
             "max_fuel_src": "https://www.af.mil/About-Us/Fact-Sheets/Display/Article/174560/kc-135r-stratotanker/",

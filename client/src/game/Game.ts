@@ -8,11 +8,6 @@ import {
   getDistanceBetweenTwoPoints,
   randomInt,
 } from "@/utils/mapFunctions";
-import {
-  launchWeapon,
-  weaponCanEngageTarget,
-  type Target,
-} from "@/game/engine/weaponEngagement";
 import Airbase from "@/game/units/Airbase";
 import Side from "@/game/Side";
 import Weapon from "@/game/units/Weapon";
@@ -421,7 +416,11 @@ export default class Game {
     speed?: number,
     maxFuel?: number,
     fuelRate?: number,
-    range?: number
+    range?: number,
+    isTanker?: boolean,
+    fuelOffloadCapacity?: number,
+    fuelTransferRate?: number,
+    refuelRange?: number
   ): Aircraft | undefined {
     if (!this.currentSideId) {
       return;
@@ -442,7 +441,7 @@ export default class Game {
       fuelRate: fuelRate ?? 5000.0,
       range: range ?? 100,
       sideColor: this.currentScenario.getSideColor(this.currentSideId),
-      weapons: this.demoMode
+      weapons: !isTanker && this.demoMode
         ? this.getDefaultAircraftWeapons(
             this.currentSideId,
             this.currentScenario.getSideColor(this.currentSideId)
@@ -451,6 +450,10 @@ export default class Game {
       homeBaseId: "",
       rtb: false,
       targetId: "",
+      isTanker,
+      fuelOffloadCapacity: fuelOffloadCapacity ?? 0,
+      fuelTransferRate: fuelTransferRate ?? 0,
+      refuelRange: refuelRange ?? 0,
     });
     this.currentScenario.aircraft.push(aircraft);
     return aircraft;
@@ -462,7 +465,11 @@ export default class Game {
     speed?: number,
     maxFuel?: number,
     fuelRate?: number,
-    range?: number
+    range?: number,
+    isTanker?: boolean,
+    fuelOffloadCapacity?: number,
+    fuelTransferRate?: number,
+    refuelRange?: number
   ) {
     let airbaseAircraft: Aircraft[] = [];
     if (!this.currentSideId) {
@@ -488,7 +495,7 @@ export default class Game {
         maxFuel: maxFuel,
         fuelRate: fuelRate,
         range: range,
-        weapons: this.demoMode
+        weapons: !isTanker && this.demoMode
           ? this.getDefaultAircraftWeapons(
               this.currentSideId,
               this.currentScenario.getSideColor(this.currentSideId)
@@ -497,6 +504,10 @@ export default class Game {
         homeBaseId: airbase.id,
         rtb: false,
         sideColor: airbase.sideColor,
+        isTanker,
+        fuelOffloadCapacity: fuelOffloadCapacity ?? 0,
+        fuelTransferRate: fuelTransferRate ?? 0,
+        refuelRange: refuelRange ?? 0,
       });
       airbase.aircraft.push(aircraft);
     }
@@ -714,6 +725,10 @@ export default class Game {
           rtb: false,
           targetId: aircraft.targetId,
           sideColor: aircraft.sideColor,
+          isTanker: aircraft.isTanker,
+          fuelOffloadCapacity: aircraft.fuelOffloadCapacity,
+          fuelTransferRate: aircraft.fuelTransferRate,
+          refuelRange: aircraft.refuelRange,
         });
         this.currentScenario.aircraft.push(newAircraft);
         return newAircraft;
@@ -727,7 +742,11 @@ export default class Game {
     speed?: number,
     maxFuel?: number,
     fuelRate?: number,
-    range?: number
+    range?: number,
+    isTanker?: boolean,
+    fuelOffloadCapacity?: number,
+    fuelTransferRate?: number,
+    refuelRange?: number
   ) {
     let shipAircraft: Aircraft[] = [];
     if (!this.currentSideId) {
@@ -753,7 +772,7 @@ export default class Game {
         maxFuel: maxFuel,
         fuelRate: fuelRate,
         range: range,
-        weapons: this.demoMode
+        weapons: !isTanker && this.demoMode
           ? this.getDefaultAircraftWeapons(
               this.currentSideId,
               this.currentScenario.getSideColor(this.currentSideId)
@@ -762,6 +781,10 @@ export default class Game {
         homeBaseId: ship.id,
         rtb: false,
         sideColor: ship.sideColor,
+        isTanker,
+        fuelOffloadCapacity: fuelOffloadCapacity ?? 0,
+        fuelTransferRate: fuelTransferRate ?? 0,
+        refuelRange: refuelRange ?? 0,
       });
       ship.aircraft.push(aircraft);
     }
@@ -1091,133 +1114,6 @@ export default class Game {
     return [];
   }
 
-  getAttackTarget(targetId: string): Target | undefined {
-    return (
-      this.currentScenario.getAircraft(targetId) ??
-      this.currentScenario.getFacility(targetId) ??
-      this.currentScenario.getWeapon(targetId) ??
-      this.currentScenario.getShip(targetId) ??
-      this.currentScenario.getAirbase(targetId)
-    );
-  }
-
-  canLaunchAt(
-    origin: Aircraft | Ship,
-    target: Target,
-    weapon: Weapon,
-    weaponQuantity: number
-  ): boolean {
-    return (
-      weaponQuantity > 0 &&
-      weapon.currentQuantity >= weaponQuantity &&
-      target.id !== origin.id &&
-      this.currentScenario.isHostile(origin.sideId, target.sideId) &&
-      weaponCanEngageTarget(target, weapon)
-    );
-  }
-
-  handleAircraftAttack(
-    aircraftId: string,
-    targetId: string,
-    weaponId: string,
-    weaponQuantity: number,
-    autoAttack: boolean = false
-  ) {
-    if (!autoAttack && weaponQuantity <= 0) return;
-    this.updateOnBoardWeaponPositions();
-    const target = this.getAttackTarget(targetId);
-    const aircraft = this.currentScenario.getAircraft(aircraftId);
-    if (autoAttack) {
-      if (target && aircraft) {
-        const weapons = aircraft.weapons.filter((weapon) =>
-          this.canLaunchAt(aircraft, target, weapon, weapon.currentQuantity)
-        );
-        if (weapons.length > 0) {
-          this.recordHistory();
-          weapons.forEach((weapon) => {
-            launchWeapon(
-              this.currentScenario,
-              aircraft,
-              target,
-              weapon,
-              weapon.currentQuantity,
-              this.simulationLogs
-            );
-          });
-        }
-      }
-      return;
-    }
-    const weapon = aircraft?.weapons.find((weapon) => weapon.id === weaponId);
-    if (
-      target &&
-      aircraft &&
-      weapon &&
-      this.canLaunchAt(aircraft, target, weapon, weaponQuantity)
-    ) {
-      this.recordHistory();
-      launchWeapon(
-        this.currentScenario,
-        aircraft,
-        target,
-        weapon,
-        weaponQuantity,
-        this.simulationLogs
-      );
-    }
-  }
-
-  handleShipAttack(
-    shipId: string,
-    targetId: string,
-    weaponId: string,
-    weaponQuantity: number,
-    autoAttack: boolean = false
-  ) {
-    if (!autoAttack && weaponQuantity <= 0) return;
-    this.updateOnBoardWeaponPositions();
-    const target = this.getAttackTarget(targetId);
-    const ship = this.currentScenario.getShip(shipId);
-    if (autoAttack) {
-      if (target && ship) {
-        const weapons = ship.weapons.filter((weapon) =>
-          this.canLaunchAt(ship, target, weapon, weapon.currentQuantity)
-        );
-        if (weapons.length > 0) {
-          this.recordHistory();
-          weapons.forEach((weapon) => {
-            launchWeapon(
-              this.currentScenario,
-              ship,
-              target,
-              weapon,
-              weapon.currentQuantity,
-              this.simulationLogs
-            );
-          });
-        }
-      }
-      return;
-    }
-    const weapon = ship?.weapons.find((weapon) => weapon.id === weaponId);
-    if (
-      target &&
-      ship &&
-      weapon &&
-      this.canLaunchAt(ship, target, weapon, weaponQuantity)
-    ) {
-      this.recordHistory();
-      launchWeapon(
-        this.currentScenario,
-        ship,
-        target,
-        weapon,
-        weaponQuantity,
-        this.simulationLogs
-      );
-    }
-  }
-
   aircraftReturnToBase(aircraftId: string) {
     const aircraft = this.currentScenario.getAircraft(aircraftId);
     if (aircraft) {
@@ -1401,6 +1297,10 @@ export default class Game {
         targetId: aircraft.targetId ?? "",
         sideColor: aircraft.sideColor,
         isObjective: aircraft.isObjective,
+        isTanker: aircraft.isTanker,
+        fuelOffloadCapacity: aircraft.fuelOffloadCapacity,
+        fuelTransferRate: aircraft.fuelTransferRate,
+        refuelRange: aircraft.refuelRange,
       });
       loadedScenario.aircraft.push(newAircraft);
     });
@@ -1436,6 +1336,10 @@ export default class Game {
           targetId: aircraft.targetId ?? "",
           sideColor: aircraft.sideColor,
           isObjective: aircraft.isObjective,
+          isTanker: aircraft.isTanker,
+          fuelOffloadCapacity: aircraft.fuelOffloadCapacity,
+          fuelTransferRate: aircraft.fuelTransferRate,
+          refuelRange: aircraft.refuelRange,
         });
         airbaseAircraft.push(newAircraft);
       });
@@ -1512,6 +1416,10 @@ export default class Game {
           targetId: aircraft.targetId ?? "",
           sideColor: aircraft.sideColor,
           isObjective: aircraft.isObjective,
+          isTanker: aircraft.isTanker,
+          fuelOffloadCapacity: aircraft.fuelOffloadCapacity,
+          fuelTransferRate: aircraft.fuelTransferRate,
+          refuelRange: aircraft.refuelRange,
         });
         shipAircraft.push(newAircraft);
       });

@@ -215,6 +215,15 @@ export default function CesiumUnitInfoCard({
         label: t("unit.field.rtb"),
         value: a.rtb ? t("common.yes") : t("common.no"),
       });
+      if (a.isTanker) {
+        extraRows.push({
+          label: "Tanker",
+          value: `${fmt(a.fuelOffloadCapacity, 0)} / ${fmt(
+            a.refuelRange,
+            0
+          )} ${t("unit.unit.nm")}`,
+        });
+      }
     }
     if (type === "ship") {
       const s = u as Ship;

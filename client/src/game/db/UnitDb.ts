@@ -34,6 +34,10 @@ export const AircraftDb: IAircraftModel[] = [
     maxFuel: 200000,
     fuelRate: 33500,
     range: 50, // original transit range was 1303 nm
+    isTanker: true,
+    fuelOffloadCapacity: 150000,
+    fuelTransferRate: 100,
+    refuelRange: 2,
     dataSource: {
       speedSrc:
         "https://www.af.mil/About-Us/Fact-Sheets/Display/Article/174560/kc-135r-stratotanker/",

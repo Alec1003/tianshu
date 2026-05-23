@@ -4,7 +4,7 @@ import json
 import logging
 from typing import Any
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import StreamingResponse
 
 from app.ai.model_checker import check_model_connectivity
@@ -13,6 +13,7 @@ from app.ai.models import (
     AICommandResponse,
     ModelCheckRequest,
     ModelCheckResponse,
+    RuntimeAttackRequest,
     RuntimeLoadScenarioRequest,
     RuntimeSnapshotResponse,
     RuntimeStepRequest,
@@ -199,6 +200,30 @@ def runtime_step(
     runtime = _runtime_for_user(request, user)
     state = runtime.step_simulation(payload.steps)
     return _runtime_snapshot(request, user, action="step", state=state)
+
+
+@router.post("/runtime/attack", response_model=RuntimeSnapshotResponse)
+def runtime_attack(
+    request: Request,
+    payload: RuntimeAttackRequest,
+    user: User = Depends(current_active_user),
+) -> RuntimeSnapshotResponse:
+    runtime = _runtime_for_user(request, user)
+    try:
+        state = runtime.attack_unit(
+            attacker_type=payload.attacker_type,
+            attacker_id=payload.attacker_id,
+            target_id=payload.target_id,
+            weapon_id=payload.weapon_id,
+            weapon_quantity=payload.weapon_quantity,
+            auto=payload.auto,
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+    return _runtime_snapshot(request, user, action="attack", state=state)
 
 
 @router.get("/skills")

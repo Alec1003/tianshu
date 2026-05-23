@@ -81,6 +81,10 @@ export default class Dba {
           maxFuel,
           fuelRate,
           range,
+          isTanker,
+          fuelOffloadCapacity,
+          fuelTransferRate,
+          refuelRange,
           dataSource,
           units,
         } = aircraft;
@@ -101,6 +105,10 @@ export default class Dba {
           maxFuel,
           fuelRate,
           range,
+          isTanker: Boolean(isTanker),
+          fuelOffloadCapacity: fuelOffloadCapacity ?? 0,
+          fuelTransferRate: fuelTransferRate ?? 0,
+          refuelRange: refuelRange ?? 0,
           dataSource: {
             speedSrc: dataSource?.speedSrc ?? "",
             maxFuelSrc: dataSource?.maxFuelSrc ?? "",

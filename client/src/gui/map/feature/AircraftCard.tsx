@@ -315,6 +315,17 @@ export default function AircraftCard(props: Readonly<AircraftCardProps>) {
                 {props.aircraft.fuelRate.toFixed(2)} LBS/HR
               </TableCell>
             </TableRow>
+            {props.aircraft.isTanker && (
+              <TableRow sx={tableRowStyle}>
+                <TableCell component="th" scope="row" sx={tableKeyCellStyle}>
+                  Tanker:
+                </TableCell>
+                <TableCell align="right" sx={tableValueCellStyle}>
+                  {props.aircraft.fuelOffloadCapacity.toFixed(0)} LBS /{" "}
+                  {props.aircraft.refuelRange.toFixed(0)} NM
+                </TableCell>
+              </TableRow>
+            )}
             <TableRow sx={tableRowStyle}>
               <TableCell component="th" scope="row" sx={tableKeyCellStyle}>
                 Detection Range:

@@ -5,8 +5,13 @@ import {
   resetRuntime,
   startRuntime,
   stepRuntime,
+  attackRuntime,
 } from "@/api/ai";
-import type { RuntimeOutcome, RuntimeSnapshot } from "@/api/types";
+import type {
+  RuntimeAttackRequest,
+  RuntimeOutcome,
+  RuntimeSnapshot,
+} from "@/api/types";
 
 export interface RuntimeApiClient {
   getSnapshot(): Promise<RuntimeSnapshot>;
@@ -15,6 +20,7 @@ export interface RuntimeApiClient {
   pause(): Promise<RuntimeSnapshot>;
   reset(): Promise<RuntimeSnapshot>;
   step(steps?: number): Promise<RuntimeSnapshot>;
+  attack(attack: RuntimeAttackRequest): Promise<RuntimeSnapshot>;
 }
 
 const defaultRuntimeApiClient: RuntimeApiClient = {
@@ -24,6 +30,7 @@ const defaultRuntimeApiClient: RuntimeApiClient = {
   pause: pauseRuntime,
   reset: resetRuntime,
   step: stepRuntime,
+  attack: attackRuntime,
 };
 
 export default class RuntimeController {
@@ -77,8 +84,14 @@ export default class RuntimeController {
     return this.setSnapshot(await this.api.step(steps));
   }
 
+  async attack(attack: RuntimeAttackRequest): Promise<RuntimeSnapshot> {
+    return this.setSnapshot(await this.api.attack(attack));
+  }
+
   private setSnapshot(snapshot: RuntimeSnapshot): RuntimeSnapshot {
     this.latestSnapshot = snapshot;
     return snapshot;
   }
 }
+
+export type { RuntimeAttackRequest };

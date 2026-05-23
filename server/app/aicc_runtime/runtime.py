@@ -130,6 +130,82 @@ class AICCRuntime:
                 self.game.step("")
             return {"steps": steps, "currentTime": self.game.current_scenario.current_time}
 
+    def attack_unit(
+        self,
+        *,
+        attacker_type: str,
+        attacker_id: str,
+        target_id: str,
+        weapon_id: str = "",
+        weapon_quantity: int = 1,
+        auto: bool = False,
+    ) -> dict[str, Any]:
+        with self._lock:
+            scenario = self.game.current_scenario
+            attacker_type = attacker_type.lower().strip()
+            target = scenario.get_target(target_id)
+            if target is None:
+                raise ValueError("Target not found")
+
+            if attacker_type == "aircraft":
+                attacker = scenario.get_aircraft(attacker_id)
+                attack = self.game.handle_aircraft_attack
+            elif attacker_type == "ship":
+                attacker = scenario.get_ship(attacker_id)
+                attack = self.game.handle_ship_attack
+            else:
+                raise ValueError(f"Unsupported attacker type: {attacker_type}")
+
+            if attacker is None:
+                raise ValueError(f"{attacker_type.title()} not found")
+
+            self.game.update_onboard_weapon_positions()
+            launched: list[dict[str, Any]] = []
+
+            if auto:
+                for weapon in list(attacker.weapons):
+                    quantity = int(getattr(weapon, "current_quantity", 0) or 0)
+                    if self.game.can_launch_at(attacker, target, weapon, quantity):
+                        attack(attacker_id, target_id, weapon.id, quantity)
+                        launched.append(
+                            {
+                                "weaponId": weapon.id,
+                                "weaponName": getattr(weapon, "name", ""),
+                                "quantity": quantity,
+                            }
+                        )
+            else:
+                if weapon_quantity <= 0:
+                    return {
+                        "attacked": False,
+                        "reason": "weapon_quantity_required",
+                        "attackerType": attacker_type,
+                        "attackerId": attacker_id,
+                        "targetId": target_id,
+                    }
+                weapon = attacker.get_weapon(weapon_id)
+                if weapon is None:
+                    raise ValueError("Weapon not found")
+                if self.game.can_launch_at(attacker, target, weapon, weapon_quantity):
+                    attack(attacker_id, target_id, weapon.id, weapon_quantity)
+                    launched.append(
+                        {
+                            "weaponId": weapon.id,
+                            "weaponName": getattr(weapon, "name", ""),
+                            "quantity": weapon_quantity,
+                        }
+                    )
+
+            return {
+                "attacked": len(launched) > 0,
+                "auto": auto,
+                "attackerType": attacker_type,
+                "attackerId": attacker_id,
+                "targetId": target_id,
+                "launched": launched,
+                "weaponCount": len(scenario.weapons),
+            }
+
     # ----------------------------- scenario / script control -----------------------------
     def load_scenario_from_file(self, scenario_path: Path | str) -> dict[str, Any]:
         with self._lock:
@@ -218,6 +294,12 @@ class AICCRuntime:
                 range=self._to_float(row.get("range"), 100.0),
                 side_color=side_color,
                 weapons=[],
+                is_tanker=bool(row.get("is_tanker", False)),
+                fuel_offload_capacity=self._to_float(
+                    row.get("fuel_offload_capacity"), 0.0
+                ),
+                fuel_transfer_rate=self._to_float(row.get("fuel_transfer_rate"), 0.0),
+                refuel_range=self._to_float(row.get("refuel_range"), 0.0),
             )
             self.game.current_scenario.aircraft.append(aircraft)
             return {"unitType": "aircraft", "unitId": aircraft.id, "name": aircraft.name}

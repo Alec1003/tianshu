@@ -59,6 +59,17 @@ class RuntimeStepRequest(BaseModel):
     )
 
 
+class RuntimeAttackRequest(BaseModel):
+    attacker_type: Literal["aircraft", "ship"] = Field(
+        description="Type of unit launching the weapon.",
+    )
+    attacker_id: str = Field(min_length=1)
+    target_id: str = Field(min_length=1)
+    weapon_id: str = ""
+    weapon_quantity: int = Field(default=1, ge=0, le=512)
+    auto: bool = False
+
+
 class RuntimeLoadScenarioRequest(BaseModel):
     scenario: dict[str, Any] = Field(
         description="Frontend-shaped scenario JSON to load into the backend runtime.",

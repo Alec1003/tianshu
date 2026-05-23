@@ -57,6 +57,15 @@ export interface RuntimeSnapshot {
   scenario: Record<string, unknown>;
 }
 
+export interface RuntimeAttackRequest {
+  attacker_type: "aircraft" | "ship";
+  attacker_id: string;
+  target_id: string;
+  weapon_id?: string;
+  weapon_quantity?: number;
+  auto?: boolean;
+}
+
 export interface ScenarioCreatePayload {
   name: string;
   description?: string;

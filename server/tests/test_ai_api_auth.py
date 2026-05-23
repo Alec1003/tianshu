@@ -57,6 +57,26 @@ class _FakeRuntime:
         self.game.current_scenario.current_time += steps
         return {"steps": steps, "currentTime": self.game.current_scenario.current_time}
 
+    def attack_unit(
+        self,
+        *,
+        attacker_type: str,
+        attacker_id: str,
+        target_id: str,
+        weapon_id: str = "",
+        weapon_quantity: int = 1,
+        auto: bool = False,
+    ) -> dict:
+        return {
+            "attacked": True,
+            "auto": auto,
+            "attackerType": attacker_type,
+            "attackerId": attacker_id,
+            "targetId": target_id,
+            "launched": [{"weaponId": weapon_id, "quantity": weapon_quantity}],
+            "weaponCount": 1,
+        }
+
     def load_scenario_from_json(self, scenario_json: str) -> dict:
         self.loaded_payload = scenario_json
         self.game.current_scenario.id = "loaded"
@@ -146,6 +166,17 @@ def test_ai_routes_reject_unauthenticated_requests() -> None:
         ("post", "/api/ai/runtime/pause", None),
         ("post", "/api/ai/runtime/reset", None),
         ("post", "/api/ai/runtime/step", {"steps": 1}),
+        (
+            "post",
+            "/api/ai/runtime/attack",
+            {
+                "attacker_type": "aircraft",
+                "attacker_id": "a-1",
+                "target_id": "t-1",
+                "weapon_id": "w-1",
+                "weapon_quantity": 1,
+            },
+        ),
         ("get", "/api/ai/skills", None),
         ("post", "/api/ai/command", {"command": "pause"}),
         (
@@ -214,6 +245,29 @@ def test_ai_runtime_control_endpoints_return_authoritative_snapshot() -> None:
     load_payload = load_response.json()
     assert load_payload["action"] == "load_scenario"
     assert load_payload["scenario"] == {"currentScenario": {"id": "loaded"}}
+
+    attack_response = client.post(
+        "/api/ai/runtime/attack",
+        json={
+            "attacker_type": "aircraft",
+            "attacker_id": "aircraft-1",
+            "target_id": "target-1",
+            "weapon_id": "weapon-1",
+            "weapon_quantity": 2,
+        },
+    )
+    assert attack_response.status_code == 200
+    attack_payload = attack_response.json()
+    assert attack_payload["action"] == "attack"
+    assert attack_payload["state"] == {
+        "attacked": True,
+        "auto": False,
+        "attackerType": "aircraft",
+        "attackerId": "aircraft-1",
+        "targetId": "target-1",
+        "launched": [{"weaponId": "weapon-1", "quantity": 2}],
+        "weaponCount": 1,
+    }
 
 
 def test_ai_runtime_step_rejects_invalid_step_count() -> None:

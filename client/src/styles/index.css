@@ -94,3 +94,109 @@
     display: none !important;
   }
 }
+
+.aicc-model-config-window {
+  background:
+    radial-gradient(
+      circle at 28% 0%,
+      rgba(34, 211, 238, 0.09),
+      transparent 32%
+    ),
+    linear-gradient(135deg, rgba(7, 13, 26, 0.98), rgba(2, 6, 23, 0.94));
+}
+
+.aicc-model-config-window * {
+  scrollbar-color: rgba(34, 211, 238, 0.26) rgba(15, 23, 42, 0.46);
+}
+
+.aicc-model-config-window ::-webkit-scrollbar {
+  height: 10px;
+  width: 10px;
+}
+
+.aicc-model-config-window ::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.5);
+}
+
+.aicc-model-config-window ::-webkit-scrollbar-thumb {
+  background: rgba(34, 211, 238, 0.24);
+  border: 2px solid rgba(15, 23, 42, 0.75);
+  border-radius: 999px;
+}
+
+.aicc-model-config-window .bg-white,
+.aicc-model-config-window .bg-white\/70,
+.aicc-model-config-window .bg-zinc-50,
+.aicc-model-config-window .bg-zinc-50\/70,
+.aicc-model-config-window .bg-zinc-100 {
+  background-color: rgba(15, 23, 42, 0.72) !important;
+}
+
+.aicc-model-config-window .bg-indigo-50 {
+  background-color: rgba(8, 145, 178, 0.16) !important;
+}
+
+.aicc-model-config-window .border-zinc-200,
+.aicc-model-config-window .border-zinc-300 {
+  border-color: rgba(103, 232, 249, 0.16) !important;
+}
+
+.aicc-model-config-window .text-zinc-950,
+.aicc-model-config-window .text-zinc-900,
+.aicc-model-config-window .text-zinc-800 {
+  color: #f8fafc !important;
+}
+
+.aicc-model-config-window .text-zinc-700,
+.aicc-model-config-window .text-zinc-600 {
+  color: #cbd5e1 !important;
+}
+
+.aicc-model-config-window .text-zinc-500,
+.aicc-model-config-window .text-zinc-400 {
+  color: #94a3b8 !important;
+}
+
+.aicc-model-config-window .text-red-700 {
+  color: #fca5a5 !important;
+}
+
+.aicc-model-config-window .text-red-600 {
+  color: #f87171 !important;
+}
+
+.aicc-model-config-window .text-emerald-600 {
+  color: #34d399 !important;
+}
+
+.aicc-model-config-window input {
+  background-color: rgba(2, 6, 23, 0.72) !important;
+  border-color: rgba(103, 232, 249, 0.16) !important;
+  color: #e2e8f0 !important;
+}
+
+.aicc-model-config-window input::placeholder {
+  color: #64748b !important;
+}
+
+.aicc-model-config-window input:focus {
+  border-color: rgba(103, 232, 249, 0.48) !important;
+  box-shadow: 0 0 0 4px rgba(34, 211, 238, 0.1) !important;
+}
+
+.aicc-model-config-window input[type="checkbox"] {
+  accent-color: #22d3ee;
+}
+
+.aicc-model-config-window button:hover:not(:disabled) {
+  border-color: rgba(103, 232, 249, 0.26);
+  background-color: rgba(15, 23, 42, 0.82);
+}
+
+.aicc-model-config-window .hover\:bg-red-50:hover {
+  background-color: rgba(220, 38, 38, 0.12) !important;
+}
+
+.aicc-model-config-window .shadow-sm {
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.16) !important;
+}

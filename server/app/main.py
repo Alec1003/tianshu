@@ -15,6 +15,8 @@ from app.mcp.http_auth import BearerAuthASGI
 from app.mcp.server import mcp, set_shared_runtime, set_shared_runtime_provider
 from app.scenarios.router import router as scenarios_router
 from app.scenarios.seed import seed_system_templates
+from app.unit_assets.router import router as unit_assets_router
+from app.unit_assets.seed import seed_system_unit_assets
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +48,10 @@ async def lifespan(app: FastAPI):
         # Seeding is best-effort; missing JSON files shouldn't take the API
         # down. We log so dev can spot the problem.
         logger.exception("seed_system_templates failed; continuing without templates")
+    try:
+        await seed_system_unit_assets()
+    except Exception:
+        logger.exception("seed_system_unit_assets failed; continuing without units")
 
     app.state.bridge_registry = AICCBridgeRegistry.from_env()
     set_shared_runtime_provider(app.state.bridge_registry.get_runtime_for_user)
@@ -88,6 +94,7 @@ def create_app() -> FastAPI:
     app.include_router(ai_router)
     app.include_router(auth_router)
     app.include_router(scenarios_router)
+    app.include_router(unit_assets_router)
 
     # Mount the MCP Streamable HTTP transport at /api/mcp behind a Bearer
     # gate. We pull ``mcp.streamable_http_app()`` *after* ``include_router``

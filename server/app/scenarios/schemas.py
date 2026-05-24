@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import uuid
 from datetime import datetime
 from typing import Any
 
@@ -40,7 +41,7 @@ class ScenarioListItem(BaseModel):
     name: str
     description: str
     is_template: bool
-    owner_id: str | None
+    owner_id: uuid.UUID | None
     version: int
     status: ScenarioStatus
     created_at: datetime
@@ -64,7 +65,7 @@ class AarRecordCreate(BaseModel):
 class AarRecordRead(BaseModel):
     id: str
     scenario_id: str | None
-    owner_id: str | None
+    owner_id: uuid.UUID | None
     outcome_reason: str
     winner_side_id: str
     summary: dict[str, Any]

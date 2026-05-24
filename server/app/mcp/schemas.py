@@ -10,6 +10,7 @@
 
 from __future__ import annotations
 
+import uuid
 from datetime import datetime
 from typing import Any, Literal
 
@@ -44,7 +45,7 @@ class ScenarioSummary(BaseModel):
     name: str
     description: str = ""
     is_template: bool
-    owner_id: str | None = None
+    owner_id: uuid.UUID | None = None
     version: int = 1
     status: str = "draft"
     created_at: datetime
@@ -135,7 +136,7 @@ class AarRecordOut(BaseModel):
 
     id: str
     scenario_id: str | None = None
-    owner_id: str | None = None
+    owner_id: uuid.UUID | None = None
     outcome_reason: str
     winner_side_id: str = ""
     summary: dict[str, Any]

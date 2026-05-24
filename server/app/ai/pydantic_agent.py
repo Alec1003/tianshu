@@ -14,7 +14,7 @@ from typing import Any, Literal
 
 from pydantic_ai import Agent, RunContext
 from pydantic_ai.models.anthropic import AnthropicModel
-from pydantic_ai.models.openai import OpenAIModel
+from pydantic_ai.models.openai import OpenAIModel, OpenAIResponsesModel
 from pydantic_ai.providers.anthropic import AnthropicProvider
 from pydantic_ai.providers.openai import OpenAIProvider
 
@@ -73,12 +73,36 @@ def _exec(deps: AgentDeps, skill: str, params: dict[str, Any]) -> dict[str, Any]
 # obvious endpoint when they pick a known provider.
 _OPENAI_COMPAT_DEFAULT_BASE_URL: dict[str, str] = {
     "deepseek": "https://api.deepseek.com/v1",
+    "glm": "https://open.bigmodel.cn/api/paas/v4",
     "qwen": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+    "minimax": "https://api.minimax.chat/v1",
+    "openrouter": "https://openrouter.ai/api/v1",
     "ollama": "http://localhost:11434/v1",
     # google supports an OpenAI-compatible endpoint:
     # https://generativelanguage.googleapis.com/v1beta/openai/
     "google": "https://generativelanguage.googleapis.com/v1beta/openai",
 }
+
+_NO_API_KEY_PROVIDERS = {"ollama", "custom"}
+
+
+def can_build_model_override(
+    provider: str,
+    model_name: str,
+    api_key: str = "",
+    base_url: str = "",
+) -> bool:
+    """Return whether a user-supplied model config is complete enough to try."""
+    provider_name = provider.strip().lower()
+    if not provider_name or not model_name.strip():
+        return False
+    if api_key.strip():
+        return True
+    if provider_name == "ollama":
+        return True
+    if provider_name == "custom" and base_url.strip():
+        return True
+    return False
 
 
 def resolve_model(model_id: str, api_key: str, base_url: str) -> Any:
@@ -89,9 +113,11 @@ def resolve_model(model_id: str, api_key: str, base_url: str) -> Any:
     pydantic-ai falls back to its own env-var lookup (OPENAI_API_KEY, etc.).
 
     Supported providers:
-      - ``openai``:    native OpenAI SDK + optional base_url override.
+      - ``openai``:    OpenAI Chat Completions-compatible SDK + optional base_url override.
+      - ``openai-responses``: OpenAI Responses API.
       - ``anthropic``: native Anthropic SDK.
-      - ``deepseek`` / ``qwen`` / ``ollama`` / ``google`` / ``custom``:
+      - ``deepseek`` / ``glm`` / ``qwen`` / ``minimax`` / ``openrouter`` /
+        ``ollama`` / ``google`` / ``custom``:
         treated as OpenAI-compatible; uses OpenAIModel + OpenAIProvider with
         an override base_url. Each known alias has a sensible default
         endpoint (see ``_OPENAI_COMPAT_DEFAULT_BASE_URL``); ``custom``
@@ -109,6 +135,17 @@ def resolve_model(model_id: str, api_key: str, base_url: str) -> Any:
         if base_url:
             kwargs["base_url"] = base_url
         return OpenAIModel(name or "gpt-4o", provider=OpenAIProvider(**kwargs))
+
+    if provider == "openai-responses":
+        kwargs = {}
+        if api_key:
+            kwargs["api_key"] = api_key
+        if base_url:
+            kwargs["base_url"] = base_url
+        return OpenAIResponsesModel(
+            name or "gpt-5-mini",
+            provider=OpenAIProvider(**kwargs),
+        )
 
     if provider == "anthropic":
         kwargs = {}

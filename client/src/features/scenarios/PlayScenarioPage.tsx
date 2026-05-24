@@ -64,22 +64,8 @@ export default function PlayScenarioPage() {
 
         // 把 DB 想定同步进后端 runtime，让 MCP 工具和 /api/ai/command
         // 操作的是当前打开的项目，而不是默认的 SCS 场景。best-effort。
-        await activateScenario(scenarioId).catch((err) => {
-          console.warn("[AICC] activateScenario failed (non-blocking)", err);
-        });
+        await activateScenario(scenarioId).catch(() => undefined);
         if (!cancelled) setScenario(sc);
-
-        // 项目状态自然演进：草稿 -> 推演中，一旦用户打开推演页。
-        // 仅限本人项目且状态为 draft 时升级；模板不在这里改。
-        if (!cancelled && sc && !sc.is_template && sc.status === "draft") {
-          try {
-            const promoted = await updateScenario(sc.id, { status: "running" });
-            if (!cancelled) setScenario(promoted);
-          } catch (err) {
-            // 状态推进失败不阻断进入，打个警告即可。
-            console.warn("[AICC] promote scenario to running failed", err);
-          }
-        }
       } catch (err) {
         if (!cancelled) {
           setError(err instanceof ApiError ? err.message : "加载失败");
@@ -167,13 +153,12 @@ export default function PlayScenarioPage() {
               status: "completed",
             });
             setScenario(promoted);
-          } catch (err) {
-            console.warn("[AICC] promote scenario to completed failed", err);
+          } catch {
+            // Best-effort status update; AAR save already succeeded.
           }
         }
-      } catch (err) {
-        // AAR posting is best-effort; surface but don't block.
-        console.warn("post aar failed", err);
+      } catch {
+        // AAR posting is best-effort and should not block the simulation UI.
       }
     },
     [scenario]

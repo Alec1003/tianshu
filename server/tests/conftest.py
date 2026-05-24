@@ -42,6 +42,7 @@ async def db_engine() -> AsyncIterator:
     )
     # Make sure tables are imported and registered on Base before create_all.
     from app.scenarios.models import AarRecord, Scenario  # noqa: F401
+    from app.unit_assets.models import UnitAsset  # noqa: F401
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)

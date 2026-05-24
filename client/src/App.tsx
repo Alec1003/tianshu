@@ -3,6 +3,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 
 import LoginPage from "@/features/auth/LoginPage";
 import RequireAuth from "@/features/auth/RequireAuth";
+import AIModelConfigPage from "@/features/ai/AIModelConfigPage";
 import PlayScenarioPage from "@/features/scenarios/PlayScenarioPage";
 import ScenarioListPage from "@/features/scenarios/ScenarioListPage";
 
@@ -89,6 +90,14 @@ export default function App() {
           element={
             <RequireAuth>
               <ScenarioListPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/ai-models"
+          element={
+            <RequireAuth>
+              <AIModelConfigPage />
             </RequireAuth>
           }
         />

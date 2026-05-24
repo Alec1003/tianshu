@@ -3,10 +3,12 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 from sqlalchemy.dialects import postgresql
-from sqlalchemy.schema import CreateTable
+from sqlalchemy.schema import CreateIndex, CreateTable
 
+from app.auth.models import User
 from app.db import session as db_session_mod
-from app.scenarios.models import Scenario
+from app.scenarios.models import AarRecord, Scenario
+from app.unit_assets.models import UnitAsset
 
 
 def _settings(database_url: str) -> SimpleNamespace:
@@ -49,5 +51,46 @@ def test_engine_kwargs_enable_pool_options_for_postgres(monkeypatch) -> None:
 
 def test_scenario_json_columns_compile_as_jsonb_for_postgres() -> None:
     ddl = str(CreateTable(Scenario.__table__).compile(dialect=postgresql.dialect()))
+    unit_ddl = str(
+        CreateTable(UnitAsset.__table__).compile(dialect=postgresql.dialect())
+    )
 
     assert "data JSONB NOT NULL" in ddl
+    assert "data JSONB NOT NULL" in unit_ddl
+
+
+def test_user_foreign_keys_compile_as_uuid_for_postgres() -> None:
+    user_ddl = str(CreateTable(User.__table__).compile(dialect=postgresql.dialect()))
+    scenario_ddl = str(
+        CreateTable(Scenario.__table__).compile(dialect=postgresql.dialect())
+    )
+    aar_ddl = str(
+        CreateTable(AarRecord.__table__).compile(dialect=postgresql.dialect())
+    )
+    unit_ddl = str(
+        CreateTable(UnitAsset.__table__).compile(dialect=postgresql.dialect())
+    )
+
+    assert "id UUID NOT NULL" in user_ddl
+    assert "owner_id UUID" in scenario_ddl
+    assert 'FOREIGN KEY(owner_id) REFERENCES "user" (id)' in scenario_ddl
+    assert "owner_id UUID" in aar_ddl
+    assert 'FOREIGN KEY(owner_id) REFERENCES "user" (id)' in aar_ddl
+    assert "owner_id UUID" in unit_ddl
+    assert 'FOREIGN KEY(owner_id) REFERENCES "user" (id)' in unit_ddl
+
+
+def test_unit_asset_has_scoped_unique_indexes_for_postgres() -> None:
+    index_ddls = {
+        index.name: str(CreateIndex(index).compile(dialect=postgresql.dialect()))
+        for index in UnitAsset.__table__.indexes
+    }
+
+    assert (
+        "CREATE UNIQUE INDEX uq_unit_asset_system_type_name "
+        "ON unit_asset (type, name) WHERE owner_id IS NULL"
+    ) in index_ddls["uq_unit_asset_system_type_name"]
+    assert (
+        "CREATE UNIQUE INDEX uq_unit_asset_owner_type_name "
+        "ON unit_asset (owner_id, type, name) WHERE owner_id IS NOT NULL"
+    ) in index_ddls["uq_unit_asset_owner_type_name"]

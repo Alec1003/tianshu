@@ -1,11 +1,8 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  BrainCircuit,
-  Cpu,
   Globe,
-  Loader2,
   Plug,
   RefreshCw,
   Settings,
@@ -13,27 +10,17 @@ import {
   Trash2,
   Wrench,
   X,
-  Server,
-  Activity,
   CheckCircle2,
   AlertCircle,
-  KeyRound,
-  XCircle,
   AlertTriangle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import type { CesiumBaseLayerKey } from "@/gui/map/CesiumToolbar";
-import type { TacticalSettingsProps, ModelConfig } from "./AISidebar";
+import type { TacticalSettingsProps } from "./AISidebar";
 
 const SETTINGS_TABS = [
-  {
-    id: "model",
-    label: "模型中枢",
-    icon: BrainCircuit,
-    desc: "配置战术推理模型与连通性",
-  },
   {
     id: "mcp",
     label: "MCP 管理",
@@ -61,14 +48,6 @@ export interface TacticalSettingsModalProps extends TacticalSettingsProps {
   onOpenChange: (open: boolean) => void;
 }
 
-const MODEL_PROVIDER_OPTIONS = [
-  "openai",
-  "anthropic",
-  "google",
-  "ollama",
-  "deepseek",
-];
-
 const INPUT_CLASS =
   "w-full rounded-md border border-cyan-400/20 bg-cyan-950/20 px-3 py-1.5 font-mono text-[11px] text-cyan-50 placeholder:text-cyan-600/30 focus:border-cyan-400/50 focus:outline-none focus:ring-1 focus:ring-cyan-400/20 transition-all";
 const SELECT_CLASS =
@@ -89,7 +68,7 @@ export default function TacticalSettingsModal(
   props: TacticalSettingsModalProps
 ) {
   const { open, onOpenChange } = props;
-  const [activeTab, setActiveTab] = useState<SettingsTabId>("model");
+  const [activeTab, setActiveTab] = useState<SettingsTabId>("mcp");
 
   useEffect(() => {
     if (!open) return;
@@ -219,7 +198,6 @@ export default function TacticalSettingsModal(
               </button>
 
               <div className="flex-1 overflow-y-auto p-8 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-cyan-900/50">
-                {activeTab === "model" && <ModelConfigSection {...props} />}
                 {activeTab === "mcp" && <McpConfigSection {...props} />}
                 {activeTab === "skills" && <SkillsConfigSection {...props} />}
                 {activeTab === "system" && <SystemConfigSection {...props} />}
@@ -236,189 +214,6 @@ export default function TacticalSettingsModal(
 // ──────────────────────────────────────────────────────────────────────────────
 // Sub-sections
 // ──────────────────────────────────────────────────────────────────────────────
-
-function ModelConfigSection({
-  modelConfig,
-  modelPresetOptions,
-  selectedPreset,
-  modelCheckResult,
-  checkingModel,
-  onModelConfigChange,
-  onCheckModel,
-}: TacticalSettingsProps) {
-  const update = (patch: Partial<ModelConfig>) =>
-    onModelConfigChange({ ...modelConfig, ...patch });
-
-  return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-      <div>
-        <h2 className="font-mono text-lg text-cyan-50">AI 模型中枢</h2>
-        <p className="mt-1 text-xs text-slate-400">
-          配置驱动战术辅助、命令解释与推演建议的主力大模型。
-        </p>
-      </div>
-
-      <div className="grid gap-6 md:grid-cols-2">
-        <div className="space-y-4 rounded-xl border border-cyan-400/10 bg-cyan-950/5 p-5 shadow-inner">
-          <div className="space-y-1.5">
-            <label className="font-mono text-[10px] uppercase text-cyan-500">
-              服务商
-            </label>
-            <select
-              className={SELECT_CLASS}
-              onChange={(e) => update({ provider: e.target.value })}
-              value={modelConfig.provider}
-            >
-              {MODEL_PROVIDER_OPTIONS.map((p) => (
-                <option key={p} value={p}>
-                  {p.toUpperCase()}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="space-y-1.5">
-            <label className="font-mono text-[10px] uppercase text-cyan-500">
-              预设模型
-            </label>
-            <select
-              className={SELECT_CLASS}
-              onChange={(e) => {
-                if (e.target.value !== "__custom__") {
-                  update({ model: e.target.value });
-                }
-              }}
-              value={selectedPreset}
-            >
-              <option value="__custom__">自定义</option>
-              {modelPresetOptions.map((m) => (
-                <option key={m} value={m}>
-                  {m}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="space-y-1.5">
-            <label className="font-mono text-[10px] uppercase text-cyan-500">
-              模型 ID
-            </label>
-            <input
-              className={INPUT_CLASS}
-              onChange={(e) => update({ model: e.target.value })}
-              placeholder="例如 gpt-4o-mini"
-              value={modelConfig.model}
-            />
-          </div>
-        </div>
-
-        <div className="space-y-4 rounded-xl border border-cyan-400/10 bg-cyan-950/5 p-5 shadow-inner">
-          <div className="space-y-1.5">
-            <label className="font-mono text-[10px] uppercase text-cyan-500">
-              Base URL 覆盖
-            </label>
-            <input
-              className={INPUT_CLASS}
-              onChange={(e) => update({ baseUrl: e.target.value })}
-              placeholder="https://api.openai.com/v1"
-              value={modelConfig.baseUrl}
-            />
-            <p className="text-[9px] text-slate-500">
-              留空时使用后端或服务商默认地址
-            </p>
-          </div>
-
-          <div className="space-y-1.5">
-            <label className="font-mono text-[10px] uppercase text-cyan-500">
-              API 密钥
-            </label>
-            <div className="relative">
-              <KeyRound className="absolute left-2.5 top-1/2 size-3 -translate-y-1/2 text-cyan-600" />
-              <input
-                className={cn(INPUT_CLASS, "pl-8")}
-                onChange={(e) => update({ apiKey: e.target.value })}
-                placeholder="sk-..."
-                type="password"
-                value={modelConfig.apiKey}
-              />
-            </div>
-          </div>
-
-          <div className="pt-2">
-            <Button
-              className="w-full gap-2 border border-cyan-400/30 bg-cyan-950/40 text-cyan-300 hover:bg-cyan-400/20"
-              disabled={checkingModel}
-              onClick={onCheckModel}
-              variant="ghost"
-            >
-              {checkingModel ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                <Activity className="size-4" />
-              )}
-              {checkingModel ? "正在验证连接..." : "测试模型连接"}
-            </Button>
-          </div>
-        </div>
-      </div>
-
-      {modelCheckResult && (
-        <div
-          className={cn(
-            "rounded-lg border p-4 backdrop-blur-sm",
-            modelCheckResult.status === "ok"
-              ? "border-emerald-400/30 bg-emerald-950/20 text-emerald-100"
-              : modelCheckResult.status === "partial"
-                ? "border-amber-400/30 bg-amber-950/20 text-amber-100"
-                : "border-red-400/30 bg-red-950/20 text-red-100"
-          )}
-        >
-          <div className="flex items-center gap-2 font-mono text-sm font-bold">
-            {modelCheckResult.status === "ok" ? (
-              <CheckCircle2 className="size-4 text-emerald-400" />
-            ) : modelCheckResult.status === "partial" ? (
-              <AlertCircle className="size-4 text-amber-400" />
-            ) : (
-              <XCircle className="size-4 text-red-400" />
-            )}
-            {modelCheckResult.status === "ok"
-              ? "连接已建立"
-              : modelCheckResult.status === "partial"
-                ? "连接部分可用"
-                : "连接异常"}
-          </div>
-          <div className="mt-3 grid grid-cols-3 gap-4 font-mono text-xs opacity-80">
-            <div>
-              <span className="block text-[9px] text-slate-400">端点</span>
-              {modelCheckResult.endpoint || "未返回"}
-            </div>
-            <div>
-              <span className="block text-[9px] text-slate-400">鉴权状态</span>
-              {modelCheckResult.auth_ok ? "已验证" : "失败"}
-            </div>
-            <div>
-              <span className="block text-[9px] text-slate-400">模型查询</span>
-              {modelCheckResult.models_listed ? "已验证" : "失败"}
-            </div>
-          </div>
-          {modelCheckResult.error && (
-            <div className="mt-3 rounded border border-red-500/20 bg-red-950/30 p-2 font-mono text-[10px] text-red-300">
-              {modelCheckResult.error}
-            </div>
-          )}
-        </div>
-      )}
-
-      <div className="rounded-lg border border-cyan-400/10 bg-cyan-950/10 p-3 font-mono text-[10px] text-cyan-400/60 flex items-start gap-2">
-        <Globe className="size-3.5 mt-0.5 shrink-0" />
-        <p>
-          模型配置会通过 X-AICC-Model-*
-          请求头传入后端运行时；留空字段会回退到后端环境变量默认值。
-        </p>
-      </div>
-    </div>
-  );
-}
 
 function McpSection({
   title,

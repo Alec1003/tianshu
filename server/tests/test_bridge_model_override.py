@@ -93,6 +93,69 @@ def test_fallback_to_env_agent_when_apiKey_missing(_stub_build_agent):
     assert _stub_build_agent == [], "must not call build_agent when apiKey empty"
 
 
+def test_keyless_ollama_model_override_is_built(_stub_build_agent):
+    self_like = _fake_self(SENTINEL_ENV_AGENT)
+    ctx = {
+        "model": {
+            "provider": "ollama",
+            "model": "llama3.1",
+            "apiKey": "",
+            "baseUrl": "http://localhost:11434/v1",
+        }
+    }
+
+    result = _resolve(self_like, ctx)
+
+    assert result is SENTINEL_PER_REQUEST_AGENT
+    assert _stub_build_agent == [
+        {
+            "model_id": "ollama:llama3.1",
+            "api_key": "",
+            "base_url": "http://localhost:11434/v1",
+        }
+    ]
+
+
+def test_keyless_custom_model_requires_base_url(_stub_build_agent):
+    self_like = _fake_self(SENTINEL_ENV_AGENT)
+
+    assert (
+        _resolve(
+            self_like,
+            {
+                "model": {
+                    "provider": "custom",
+                    "model": "local-model",
+                    "apiKey": "",
+                    "baseUrl": "",
+                }
+            },
+        )
+        is SENTINEL_ENV_AGENT
+    )
+
+    result = _resolve(
+        self_like,
+        {
+            "model": {
+                "provider": "custom",
+                "model": "local-model",
+                "apiKey": "",
+                "baseUrl": "http://127.0.0.1:8001/v1",
+            }
+        },
+    )
+
+    assert result is SENTINEL_PER_REQUEST_AGENT
+    assert _stub_build_agent == [
+        {
+            "model_id": "custom:local-model",
+            "api_key": "",
+            "base_url": "http://127.0.0.1:8001/v1",
+        }
+    ]
+
+
 def test_fallback_to_env_agent_when_model_missing(_stub_build_agent):
     self_like = _fake_self(SENTINEL_ENV_AGENT)
     ctx = {
@@ -175,6 +238,16 @@ def test_resolve_model_openai_compat_default_base_url():
     # 应当是 OpenAIModel 实例（具体类型断言用 type-name 而非 isinstance，避免
     # 引入额外 import 路径不稳定）。
     assert type(model).__name__ == "OpenAIModel"
+
+
+def test_resolve_model_openai_responses_provider():
+    model = pa_mod.resolve_model(
+        "openai-responses:gpt-5-mini",
+        api_key="sk",
+        base_url="https://api.openai.com/v1",
+    )
+
+    assert type(model).__name__ == "OpenAIResponsesModel"
 
 
 def test_resolve_model_custom_without_base_url_falls_back_to_string():

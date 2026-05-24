@@ -288,22 +288,19 @@ async def chat(
     """
     from pydantic_ai.ui.vercel_ai import VercelAIAdapter  # noqa: PLC0415
 
-    from app.ai.pydantic_agent import AgentDeps, build_agent  # noqa: PLC0415
+    from app.ai.pydantic_agent import (  # noqa: PLC0415
+        AgentDeps,
+        build_agent,
+        can_build_model_override,
+    )
 
     bridge = _bridge_for_user(request, user)
     chat_mode = _read_chat_mode_from_headers(request)
 
     # Per-request model override via headers (set by AI sidebar useChat).
     provider, model_name, api_key, base_url = _read_model_override_from_headers(request)
-    logger.info(
-        "chat: headers received provider=%r model=%r api_key=%s base_url=%r",
-        provider,
-        model_name,
-        ("***" + api_key[-4:]) if len(api_key) > 4 else ("set" if api_key else "EMPTY"),
-        base_url,
-    )
     per_request_agent = None
-    if provider and model_name and api_key:
+    if can_build_model_override(provider, model_name, api_key, base_url):
         model_id = f"{provider}:{model_name}"
         try:
             per_request_agent = build_agent(
@@ -312,7 +309,6 @@ async def chat(
                 base_url=base_url,
                 enable_tools=chat_mode == "command",
             )
-            logger.info("chat: per-request agent built (model=%s)", model_id)
         except Exception as exc:  # pragma: no cover - depends on SDK install
             logger.warning(
                 "chat: per-request agent build failed (%s): %s", model_id, exc

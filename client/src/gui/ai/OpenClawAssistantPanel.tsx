@@ -7,6 +7,17 @@ import {
   useState,
 } from "react";
 import { getStoredToken } from "@/api/client";
+import {
+  MODEL_PRESETS,
+  MODEL_PROVIDER_OPTIONS,
+  MODEL_STORAGE_KEY,
+  modelProfileLabel,
+  profileToConfig,
+  sameModelConfig,
+  type ModelConfig,
+  type ModelProfile,
+} from "@/features/ai/modelProfiles";
+import { useModelConfigStore } from "@/features/ai/modelStore";
 import "@/styles/AIAssistantPanel.css";
 
 type PanelTab = "chat" | "settings";
@@ -35,13 +46,6 @@ interface CustomSkillConfig {
   name: string;
   description: string;
   enabled: boolean;
-}
-
-interface ModelConfig {
-  provider: string;
-  baseUrl: string;
-  apiKey: string;
-  model: string;
 }
 
 interface OpenClawSkillDefinition {
@@ -89,35 +93,10 @@ const STORAGE_KEY = {
   messages: "aicc.ai.messages",
   mcpServers: "aicc.ai.mcpServers",
   customSkills: "aicc.ai.customSkills",
-  model: "aicc.ai.model",
+  model: MODEL_STORAGE_KEY.model,
+  modelProfiles: MODEL_STORAGE_KEY.modelProfiles,
+  activeModelProfileId: MODEL_STORAGE_KEY.activeModelProfileId,
   projectMcpEnabled: "aicc.ai.projectMcpEnabled",
-};
-
-const DEFAULT_MODEL: ModelConfig = {
-  provider: "openai",
-  baseUrl: "",
-  apiKey: "",
-  model: "gpt-4o-mini",
-};
-
-const MODEL_PROVIDER_OPTIONS = [
-  "openai",
-  "anthropic",
-  "google",
-  "deepseek",
-  "qwen",
-  "ollama",
-  "custom",
-] as const;
-
-const MODEL_PRESETS: Record<string, string[]> = {
-  openai: ["gpt-5", "gpt-5-mini", "gpt-4.1", "gpt-4o", "gpt-4o-mini"],
-  anthropic: ["claude-3-7-sonnet", "claude-3-5-sonnet", "claude-3-5-haiku"],
-  google: ["gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.0-flash"],
-  deepseek: ["deepseek-chat", "deepseek-reasoner"],
-  qwen: ["qwen-max", "qwen-plus", "qwen-turbo"],
-  ollama: ["llama3.1", "qwen2.5", "mistral"],
-  custom: [],
 };
 
 const DEFAULT_MCP_SERVERS: MCPServerConfig[] = [
@@ -179,6 +158,29 @@ export default function OpenClawAssistantPanel({
   )
     .trim()
     .replace(/\/+$/, "");
+  const modelConfig = useModelConfigStore((state) => state.activeModelConfig);
+  const modelProfiles = useModelConfigStore((state) => state.modelProfiles);
+  const activeModelProfileId = useModelConfigStore(
+    (state) => state.activeModelProfileId
+  );
+  const updateActiveModelConfig = useModelConfigStore(
+    (state) => state.updateActiveModelConfig
+  );
+  const selectModelProfile = useModelConfigStore(
+    (state) => state.selectModelProfile
+  );
+  const saveActiveProfile = useModelConfigStore(
+    (state) => state.saveActiveProfile
+  );
+  const createProfileFromActive = useModelConfigStore(
+    (state) => state.createProfileFromActive
+  );
+  const deleteModelProfile = useModelConfigStore(
+    (state) => state.deleteModelProfile
+  );
+  const markProviderChecked = useModelConfigStore(
+    (state) => state.markProviderChecked
+  );
   const [panelOpen, setPanelOpen] = useState(!mobileView);
   const [activeTab, setActiveTab] = useState<PanelTab>("chat");
   const [commandInput, setCommandInput] = useState("");
@@ -195,18 +197,6 @@ export default function OpenClawAssistantPanel({
   const [customSkills, setCustomSkills] = useState<CustomSkillConfig[]>(() =>
     safeLoad<CustomSkillConfig[]>(STORAGE_KEY.customSkills, [])
   );
-  const [modelConfig, setModelConfig] = useState<ModelConfig>(() => {
-    const loaded = safeLoad<Partial<ModelConfig>>(
-      STORAGE_KEY.model,
-      DEFAULT_MODEL
-    );
-    return {
-      provider: loaded.provider ?? DEFAULT_MODEL.provider,
-      baseUrl: loaded.baseUrl ?? DEFAULT_MODEL.baseUrl,
-      apiKey: loaded.apiKey ?? DEFAULT_MODEL.apiKey,
-      model: loaded.model ?? DEFAULT_MODEL.model,
-    };
-  });
   const [registeredSkills, setRegisteredSkills] = useState<
     OpenClawSkillDefinition[]
   >([]);
@@ -239,6 +229,20 @@ export default function OpenClawAssistantPanel({
   const selectedPreset = modelPresetOptions.includes(modelConfig.model)
     ? modelConfig.model
     : "__custom__";
+  const activeModelProfile = useMemo(
+    () => modelProfiles.find((profile) => profile.id === activeModelProfileId),
+    [activeModelProfileId, modelProfiles]
+  );
+  const activeModelProfileDirty = activeModelProfile
+    ? !sameModelConfig(profileToConfig(activeModelProfile), modelConfig)
+    : true;
+  const [modelProfileNameDraft, setModelProfileNameDraft] = useState(
+    activeModelProfile?.name ?? ""
+  );
+
+  useEffect(() => {
+    setModelProfileNameDraft(activeModelProfile?.name ?? "");
+  }, [activeModelProfile?.id, activeModelProfile?.name]);
 
   const refreshRegisteredSkills = useCallback(async (): Promise<void> => {
     setSkillsLoading(true);
@@ -276,10 +280,6 @@ export default function OpenClawAssistantPanel({
   useEffect(() => {
     safeSave(STORAGE_KEY.customSkills, customSkills);
   }, [customSkills]);
-
-  useEffect(() => {
-    safeSave(STORAGE_KEY.model, modelConfig);
-  }, [modelConfig]);
 
   useEffect(() => {
     safeSave(STORAGE_KEY.projectMcpEnabled, projectMcpEnabled);
@@ -397,6 +397,26 @@ export default function OpenClawAssistantPanel({
     void sendCommand(commandInput);
   }
 
+  function handleModelProfileSelect(profileId: string): void {
+    selectModelProfile(profileId);
+    setModelCheckResult(null);
+  }
+
+  function handleModelProfileSave(name: string): void {
+    saveActiveProfile(name.trim() || modelProfileLabel(modelConfig));
+    setModelCheckResult(null);
+  }
+
+  function handleModelProfileCreate(name: string): void {
+    createProfileFromActive(name.trim() || modelProfileLabel(modelConfig));
+    setModelCheckResult(null);
+  }
+
+  function handleModelProfileDelete(profileId: string): void {
+    deleteModelProfile(profileId);
+    setModelCheckResult(null);
+  }
+
   function handleAddServer(): void {
     const name = newServerName.trim();
     const endpoint = newServerEndpoint.trim();
@@ -468,6 +488,10 @@ export default function OpenClawAssistantPanel({
 
       const payload = (await response.json()) as ModelCheckResponse;
       setModelCheckResult(payload);
+      const activeProviderId =
+        modelProfiles.find((profile) => profile.id === activeModelProfileId)
+          ?.providerId ?? modelConfig.provider;
+      markProviderChecked(activeProviderId, payload.status !== "error");
     } catch (error) {
       setModelCheckResult({
         status: "error",
@@ -743,12 +767,53 @@ export default function OpenClawAssistantPanel({
           </header>
           <div className="openclaw-form-grid">
             <select
+              className="span-2"
+              value={activeModelProfileId}
+              onChange={(event) => handleModelProfileSelect(event.target.value)}
+            >
+              {modelProfiles.map((profile) => (
+                <option key={profile.id} value={profile.id}>
+                  {profile.name} · {profile.provider}/{profile.model}
+                </option>
+              ))}
+            </select>
+            <input
+              className="span-2"
+              value={modelProfileNameDraft}
+              onChange={(event) => setModelProfileNameDraft(event.target.value)}
+              placeholder="Profile name"
+            />
+            <button
+              type="button"
+              onClick={() => handleModelProfileSave(modelProfileNameDraft)}
+            >
+              {activeModelProfileDirty ? "Save Profile" : "Saved"}
+            </button>
+            <button
+              type="button"
+              onClick={() => handleModelProfileCreate(modelProfileNameDraft)}
+            >
+              Save As New
+            </button>
+            <button
+              type="button"
+              disabled={!activeModelProfile || modelProfiles.length <= 1}
+              onClick={() =>
+                activeModelProfile &&
+                handleModelProfileDelete(activeModelProfile.id)
+              }
+            >
+              Delete Profile
+            </button>
+          </div>
+          <div className="openclaw-form-grid">
+            <select
               value={modelConfig.provider}
               onChange={(event) =>
-                setModelConfig((prev) => ({
-                  ...prev,
+                updateActiveModelConfig({
+                  ...modelConfig,
                   provider: event.target.value,
-                }))
+                })
               }
             >
               {MODEL_PROVIDER_OPTIONS.map((provider) => (
@@ -763,10 +828,10 @@ export default function OpenClawAssistantPanel({
                 if (event.target.value === "__custom__") {
                   return;
                 }
-                setModelConfig((prev) => ({
-                  ...prev,
+                updateActiveModelConfig({
+                  ...modelConfig,
                   model: event.target.value,
-                }));
+                });
               }}
             >
               <option value="__custom__">Custom model name</option>
@@ -780,10 +845,10 @@ export default function OpenClawAssistantPanel({
               className="span-2"
               value={modelConfig.model}
               onChange={(event) =>
-                setModelConfig((prev) => ({
-                  ...prev,
+                updateActiveModelConfig({
+                  ...modelConfig,
                   model: event.target.value,
-                }))
+                })
               }
               placeholder="Model Name (editable)"
               autoComplete="off"
@@ -798,10 +863,10 @@ export default function OpenClawAssistantPanel({
               className="span-2"
               value={modelConfig.baseUrl}
               onChange={(event) =>
-                setModelConfig((prev) => ({
-                  ...prev,
+                updateActiveModelConfig({
+                  ...modelConfig,
                   baseUrl: event.target.value,
-                }))
+                })
               }
               placeholder="Base URL"
             />
@@ -809,10 +874,10 @@ export default function OpenClawAssistantPanel({
               className="span-2"
               value={modelConfig.apiKey}
               onChange={(event) =>
-                setModelConfig((prev) => ({
-                  ...prev,
+                updateActiveModelConfig({
+                  ...modelConfig,
                   apiKey: event.target.value,
-                }))
+                })
               }
               placeholder="API Key"
               type="password"

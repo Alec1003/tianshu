@@ -14,6 +14,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
+from fastapi_users_db_sqlalchemy.generics import GUID
 from sqlalchemy import (
     Boolean,
     DateTime,
@@ -51,7 +52,9 @@ class Scenario(Base):
     up in every user's "templates" list.
 
     ``owner_id`` is nullable so system templates (no human owner) coexist with
-    user-saved scenarios. List endpoints filter by ``owner_id == me OR
+    user-saved scenarios. It uses the same GUID type as ``User.id`` so
+    PostgreSQL can enforce the foreign key. List endpoints filter by
+    ``owner_id == me OR
     is_template == true`` to give the right scoping.
     """
 
@@ -76,8 +79,8 @@ class Scenario(Base):
         String(16), default="draft", nullable=False
     )
 
-    owner_id: Mapped[str | None] = mapped_column(
-        String(36),
+    owner_id: Mapped[uuid.UUID | None] = mapped_column(
+        GUID(),
         ForeignKey("user.id", ondelete="CASCADE"),
         nullable=True,
         index=True,
@@ -117,8 +120,8 @@ class AarRecord(Base):
         nullable=True,
         index=True,
     )
-    owner_id: Mapped[str | None] = mapped_column(
-        String(36),
+    owner_id: Mapped[uuid.UUID | None] = mapped_column(
+        GUID(),
         ForeignKey("user.id", ondelete="CASCADE"),
         nullable=True,
         index=True,

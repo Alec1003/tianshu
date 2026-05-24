@@ -36,7 +36,7 @@ async def test_create_then_get_happy(db_session, user):
     )
     assert sc.id
     assert sc.is_template is False
-    assert sc.owner_id == str(user.id)
+    assert sc.owner_id == user.id
 
     fetched = await svc.get_scenario(db_session, user, sc.id)
     assert fetched.id == sc.id
@@ -230,7 +230,7 @@ async def test_list_includes_own_and_templates(db_session, user, other_user):
     assert own.id in ids
     assert tpl.id in ids
     # Other user's scenario must NOT leak.
-    assert all(r.owner_id != str(other_user.id) for r in rows if not r.is_template)
+    assert all(r.owner_id != other_user.id for r in rows if not r.is_template)
 
 
 async def test_list_excludes_templates_when_flag_off(db_session, user):

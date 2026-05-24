@@ -2,13 +2,10 @@ import { motion } from "framer-motion";
 import {
   Activity,
   ArrowLeft,
-  Bell,
   BrainCircuit,
   Copy,
   Cpu,
-  Layers3,
   Save,
-  Search,
   Settings,
   Shield,
   Signal,
@@ -281,31 +278,6 @@ export default function TopTacticalBar({
             <span className="font-mono text-[10px] font-bold">
               {mapSceneMode === "3d" ? "2D" : "3D"}
             </span>
-          </button>
-          <button
-            aria-label="图层控制"
-            className="grid size-8 place-items-center rounded bg-transparent text-slate-400 transition-colors hover:bg-white/5 hover:text-cyan-300"
-            title="图层控制"
-            type="button"
-          >
-            <Layers3 className="size-4" />
-          </button>
-          <button
-            aria-label="战术搜索"
-            className="grid size-8 place-items-center rounded bg-transparent text-slate-400 transition-colors hover:bg-white/5 hover:text-cyan-300"
-            title="战术搜索"
-            type="button"
-          >
-            <Search className="size-4" />
-          </button>
-          <button
-            aria-label="告警中心"
-            className="relative grid size-8 place-items-center rounded bg-transparent text-slate-400 transition-colors hover:bg-white/5 hover:text-cyan-300"
-            title="告警中心"
-            type="button"
-          >
-            <Bell className="size-4" />
-            <span className="absolute right-2 top-2 size-1.5 rounded-full bg-amber-400" />
           </button>
         </div>
 

@@ -12,18 +12,24 @@ from __future__ import annotations
 
 import asyncio
 import json
-from typing import Any, Sequence
+from typing import Any, NoReturn, Sequence
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.models import User
 from app.auth.users import current_active_user
 from app.db.session import get_async_session
+from app.scenarios import service as scenario_service
+from app.scenarios.errors import (
+    ScenarioForbiddenError,
+    ScenarioInvalidError,
+    ScenarioNotFoundError,
+    ScenarioServiceError,
+    ScenarioTemplateReadOnlyError,
+)
 from app.scenarios.models import AarRecord, Scenario
 from app.scenarios.schemas import (
-    VALID_STATUSES,
     AarRecordCreate,
     AarRecordRead,
     ScenarioCreate,
@@ -42,6 +48,18 @@ def _bridge_for_user(request: Request, user: User) -> Any:
     return request.app.state.bridge
 
 
+def _raise_scenario_http(exc: ScenarioServiceError) -> NoReturn:
+    if isinstance(exc, ScenarioNotFoundError):
+        code = status.HTTP_404_NOT_FOUND
+    elif isinstance(exc, ScenarioForbiddenError | ScenarioTemplateReadOnlyError):
+        code = status.HTTP_403_FORBIDDEN
+    elif isinstance(exc, ScenarioInvalidError):
+        code = status.HTTP_422_UNPROCESSABLE_ENTITY
+    else:
+        code = status.HTTP_400_BAD_REQUEST
+    raise HTTPException(status_code=code, detail=exc.to_dict()) from exc
+
+
 # ---------- list / detail ----------
 @router.get("", response_model=list[ScenarioListItem])
 async def list_scenarios(
@@ -54,16 +72,11 @@ async def list_scenarios(
     The frontend "我的想定" page consumes this; templates show up alongside
     user-saved ones with an ``is_template`` badge.
     """
-    stmt = select(Scenario)
-    if include_templates:
-        stmt = stmt.where(
-            (Scenario.owner_id == str(user.id)) | (Scenario.is_template == True)  # noqa: E712
-        )
-    else:
-        stmt = stmt.where(Scenario.owner_id == str(user.id))
-    stmt = stmt.order_by(Scenario.is_template.desc(), Scenario.updated_at.desc())
-    result = await session.execute(stmt)
-    return result.scalars().all()
+    return await scenario_service.list_scenarios(
+        session,
+        user,
+        include_templates=include_templates,
+    )
 
 
 @router.get("/{scenario_id}", response_model=ScenarioDetail)
@@ -72,13 +85,10 @@ async def get_scenario(
     user: User = Depends(current_active_user),
     session: AsyncSession = Depends(get_async_session),
 ) -> Scenario:
-    sc = await session.get(Scenario, scenario_id)
-    if sc is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="not found")
-    # Visibility: owner OR template
-    if not sc.is_template and sc.owner_id != str(user.id):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="forbidden")
-    return sc
+    try:
+        return await scenario_service.get_scenario(session, user, scenario_id)
+    except ScenarioServiceError as exc:
+        _raise_scenario_http(exc)
 
 
 # ---------- create / update / delete ----------
@@ -88,18 +98,17 @@ async def create_scenario(
     user: User = Depends(current_active_user),
     session: AsyncSession = Depends(get_async_session),
 ) -> Scenario:
-    sc = Scenario(
-        name=payload.name,
-        description=payload.description,
-        data=payload.data,
-        is_template=False,
-        owner_id=str(user.id),
-        status=payload.status if payload.status in VALID_STATUSES else "draft",
-    )
-    session.add(sc)
-    await session.commit()
-    await session.refresh(sc)
-    return sc
+    try:
+        return await scenario_service.create_scenario(
+            session,
+            user,
+            name=payload.name,
+            description=payload.description,
+            data=payload.data,
+            status=payload.status,
+        )
+    except ScenarioServiceError as exc:
+        _raise_scenario_http(exc)
 
 
 @router.patch("/{scenario_id}", response_model=ScenarioDetail)
@@ -109,37 +118,18 @@ async def update_scenario(
     user: User = Depends(current_active_user),
     session: AsyncSession = Depends(get_async_session),
 ) -> Scenario:
-    sc = await session.get(Scenario, scenario_id)
-    if sc is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="not found")
-    if sc.is_template:
-        # Only superusers can edit system templates; regular users must "save
-        # as" to fork. Keeping the DRY rule explicit avoids accidental edits.
-        if not user.is_superuser:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="templates are read-only; use 'save as'",
-            )
-    elif sc.owner_id != str(user.id):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="forbidden")
-
-    if payload.name is not None:
-        sc.name = payload.name
-    if payload.description is not None:
-        sc.description = payload.description
-    if payload.data is not None:
-        sc.data = payload.data
-        sc.version += 1
-    if payload.status is not None:
-        if payload.status not in VALID_STATUSES:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=f"invalid status; expected one of {sorted(VALID_STATUSES)}",
-            )
-        sc.status = payload.status
-    await session.commit()
-    await session.refresh(sc)
-    return sc
+    try:
+        return await scenario_service.update_scenario(
+            session,
+            user,
+            scenario_id,
+            name=payload.name,
+            description=payload.description,
+            data=payload.data,
+            status=payload.status,
+        )
+    except ScenarioServiceError as exc:
+        _raise_scenario_http(exc)
 
 
 @router.delete(
@@ -152,18 +142,10 @@ async def delete_scenario(
     user: User = Depends(current_active_user),
     session: AsyncSession = Depends(get_async_session),
 ) -> Response:
-    sc = await session.get(Scenario, scenario_id)
-    if sc is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="not found")
-    if sc.is_template:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="templates cannot be deleted",
-        )
-    if sc.owner_id != str(user.id):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="forbidden")
-    await session.delete(sc)
-    await session.commit()
+    try:
+        await scenario_service.delete_scenario(session, user, scenario_id)
+    except ScenarioServiceError as exc:
+        _raise_scenario_http(exc)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -174,20 +156,10 @@ async def list_aar_records(
     user: User = Depends(current_active_user),
     session: AsyncSession = Depends(get_async_session),
 ) -> Sequence[AarRecord]:
-    sc = await session.get(Scenario, scenario_id)
-    if sc is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="not found")
-    if not sc.is_template and sc.owner_id != str(user.id):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="forbidden")
-    stmt = (
-        select(AarRecord)
-        .where(AarRecord.scenario_id == scenario_id)
-        .where(AarRecord.owner_id == str(user.id))
-        .order_by(AarRecord.created_at.desc())
-        .limit(50)
-    )
-    result = await session.execute(stmt)
-    return result.scalars().all()
+    try:
+        return await scenario_service.list_aar_records(session, user, scenario_id)
+    except ScenarioServiceError as exc:
+        _raise_scenario_http(exc)
 
 
 @router.post(
@@ -204,18 +176,18 @@ async def create_aar_record(
     # We don't gate on scenario existence: clients can post AARs against
     # imported scenarios that were never persisted to DB. ``scenario_id`` then
     # acts as a free-form correlation tag.
-    rec = AarRecord(
-        scenario_id=scenario_id,
-        owner_id=str(user.id),
-        outcome_reason=payload.outcome_reason,
-        winner_side_id=payload.winner_side_id,
-        summary=payload.summary,
-        ended_at=payload.ended_at,
-    )
-    session.add(rec)
-    await session.commit()
-    await session.refresh(rec)
-    return rec
+    try:
+        return await scenario_service.create_aar_record(
+            session,
+            user,
+            scenario_id,
+            outcome_reason=payload.outcome_reason,
+            winner_side_id=payload.winner_side_id,
+            summary=payload.summary,
+            ended_at=payload.ended_at,
+        )
+    except ScenarioServiceError as exc:
+        _raise_scenario_http(exc)
 
 
 # ---------- runtime activation ----------
@@ -234,11 +206,10 @@ async def activate_scenario(
     browser-side game is already loaded from the DB payload; this call only
     keeps the server-side runtime in sync.
     """
-    sc = await session.get(Scenario, scenario_id)
-    if sc is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="not found")
-    if not sc.is_template and sc.owner_id != str(user.id):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="forbidden")
+    try:
+        sc = await scenario_service.get_scenario(session, user, scenario_id)
+    except ScenarioServiceError as exc:
+        _raise_scenario_http(exc)
 
     bridge = _bridge_for_user(request, user)
 

@@ -8,9 +8,8 @@
  *   传到后端，后端 per-request 构造 pydantic-ai agent，让前端
  *   model 配置在流式路径上也真生效。流结束后拉
  *   /api/ai/runtime/scenario 刷新地图。
- * - 设置：Model（provider + baseUrl + apiKey + model + 连接测试）/
- *   MCP Servers（增删改 + enable toggle）/ Skills（后端已注册 + 用户
- *   自定义）三段。
+ * - 设置：MCP Servers（增删改 + enable toggle）/ Skills（后端已注册 + 用户
+ *   自定义）/ 系统操作三段。模型配置已拆到独立 AI 模型配置中心。
  * - 持久化：modelConfig / mcpServers / customSkills / projectMcpEnabled
  *   使用 aicc.ai.* keys；chat 消息由于类型从
  *   ChatMessage 迁移到 UIMessage，另存为 aicc.ai.messages.v2。
@@ -27,6 +26,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -52,6 +52,17 @@ import { Button } from "@/components/ui/button";
 import type { CesiumBaseLayerKey } from "@/gui/map/CesiumToolbar";
 import { cn } from "@/lib/utils";
 import { apiCall, getStoredToken } from "@/api/client";
+import {
+  MODEL_PRESETS,
+  MODEL_STORAGE_KEY,
+  modelProfileLabel,
+  profileToConfig,
+  sameModelConfig,
+  type ModelConfig,
+  type ModelProfile,
+} from "@/features/ai/modelProfiles";
+import ModelSwitcher from "@/features/ai/ModelSwitcher";
+import { useModelConfigStore } from "@/features/ai/modelStore";
 import TacticalSettingsModal from "./TacticalSettingsModal";
 
 export type AISidebarTab = "chat" | "settings";
@@ -70,13 +81,6 @@ interface CustomSkillConfig {
   name: string;
   description: string;
   enabled: boolean;
-}
-
-interface ModelConfig {
-  provider: string;
-  baseUrl: string;
-  apiKey: string;
-  model: string;
 }
 
 export interface RegisteredSkill {
@@ -141,26 +145,11 @@ const STORAGE_KEY = {
   messagesV2: "aicc.ai.messages.v2",
   mcpServers: "aicc.ai.mcpServers",
   customSkills: "aicc.ai.customSkills",
-  model: "aicc.ai.model",
+  model: MODEL_STORAGE_KEY.model,
+  modelProfiles: MODEL_STORAGE_KEY.modelProfiles,
+  activeModelProfileId: MODEL_STORAGE_KEY.activeModelProfileId,
   projectMcpEnabled: "aicc.ai.projectMcpEnabled",
 } as const;
-
-const DEFAULT_MODEL: ModelConfig = {
-  provider: "openai",
-  baseUrl: "",
-  apiKey: "",
-  model: "gpt-4o-mini",
-};
-
-const MODEL_PRESETS: Record<string, string[]> = {
-  openai: ["gpt-5", "gpt-5-mini", "gpt-4.1", "gpt-4o", "gpt-4o-mini"],
-  anthropic: ["claude-3-7-sonnet", "claude-3-5-sonnet", "claude-3-5-haiku"],
-  google: ["gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.0-flash"],
-  deepseek: ["deepseek-chat", "deepseek-reasoner"],
-  qwen: ["qwen-max", "qwen-plus", "qwen-turbo"],
-  ollama: ["llama3.1", "qwen2.5", "mistral"],
-  custom: [],
-};
 
 const DEFAULT_MCP_SERVERS: MCPServerConfig[] = [
   {
@@ -253,7 +242,7 @@ function formatChatError(error: Error): string {
     message.toLowerCase().includes("service unavailable") ||
     message.includes("No LLM configured")
   ) {
-    return "No LLM is configured. Fill API Key in Settings > 模型配置, or set AICC_LLM_MODEL and AICC_LLM_API_KEY in the server environment.";
+    return "No LLM is configured. Fill API Key in AI 模型配置中心, or set AICC_LLM_MODEL and AICC_LLM_API_KEY in the server environment.";
   }
   return message;
 }
@@ -340,6 +329,31 @@ export default function AISidebar({
   onMapBaseLayerChange,
   scenarioId,
 }: AISidebarProps) {
+  const navigate = useNavigate();
+  const modelConfig = useModelConfigStore((state) => state.activeModelConfig);
+  const modelProfiles = useModelConfigStore((state) => state.modelProfiles);
+  const activeModelProfileId = useModelConfigStore(
+    (state) => state.activeModelProfileId
+  );
+  const updateActiveModelConfig = useModelConfigStore(
+    (state) => state.updateActiveModelConfig
+  );
+  const selectModelProfile = useModelConfigStore(
+    (state) => state.selectModelProfile
+  );
+  const saveActiveProfile = useModelConfigStore(
+    (state) => state.saveActiveProfile
+  );
+  const createProfileFromActive = useModelConfigStore(
+    (state) => state.createProfileFromActive
+  );
+  const deleteModelProfile = useModelConfigStore(
+    (state) => state.deleteModelProfile
+  );
+  const markProviderChecked = useModelConfigStore(
+    (state) => state.markProviderChecked
+  );
+
   // —— 持久化状态 ——
   const [mcpServers, setMcpServers] = useState<MCPServerConfig[]>(() =>
     safeLoad<MCPServerConfig[]>(STORAGE_KEY.mcpServers, DEFAULT_MCP_SERVERS)
@@ -347,18 +361,6 @@ export default function AISidebar({
   const [customSkills, setCustomSkills] = useState<CustomSkillConfig[]>(() =>
     safeLoad<CustomSkillConfig[]>(STORAGE_KEY.customSkills, [])
   );
-  const [modelConfig, setModelConfig] = useState<ModelConfig>(() => {
-    const loaded = safeLoad<Partial<ModelConfig>>(
-      STORAGE_KEY.model,
-      DEFAULT_MODEL
-    );
-    return {
-      provider: loaded.provider ?? DEFAULT_MODEL.provider,
-      baseUrl: loaded.baseUrl ?? DEFAULT_MODEL.baseUrl,
-      apiKey: loaded.apiKey ?? DEFAULT_MODEL.apiKey,
-      model: loaded.model ?? DEFAULT_MODEL.model,
-    };
-  });
   const [projectMcpEnabled, setProjectMcpEnabled] = useState<boolean>(() =>
     safeLoad<boolean>(STORAGE_KEY.projectMcpEnabled, true)
   );
@@ -554,7 +556,6 @@ export default function AISidebar({
     () => safeSave(STORAGE_KEY.customSkills, customSkills),
     [customSkills]
   );
-  useEffect(() => safeSave(STORAGE_KEY.model, modelConfig), [modelConfig]);
   useEffect(
     () => safeSave(STORAGE_KEY.projectMcpEnabled, projectMcpEnabled),
     [projectMcpEnabled]
@@ -582,6 +583,54 @@ export default function AISidebar({
   const selectedPreset = modelPresetOptions.includes(modelConfig.model)
     ? modelConfig.model
     : "__custom__";
+
+  const activeModelProfile = useMemo(
+    () => modelProfiles.find((profile) => profile.id === activeModelProfileId),
+    [activeModelProfileId, modelProfiles]
+  );
+  const activeModelProfileDirty = activeModelProfile
+    ? !sameModelConfig(profileToConfig(activeModelProfile), modelConfig)
+    : true;
+
+  const handleModelConfigChange = useCallback(
+    (next: ModelConfig): void => {
+      updateActiveModelConfig(next);
+      setModelCheckResult(null);
+    },
+    [updateActiveModelConfig]
+  );
+
+  const handleModelProfileSelect = useCallback(
+    (profileId: string): void => {
+      selectModelProfile(profileId);
+      setModelCheckResult(null);
+    },
+    [selectModelProfile]
+  );
+
+  const handleModelProfileSave = useCallback(
+    (name: string): void => {
+      saveActiveProfile(name.trim() || modelProfileLabel(modelConfig));
+      setModelCheckResult(null);
+    },
+    [modelConfig, saveActiveProfile]
+  );
+
+  const handleModelProfileCreate = useCallback(
+    (name: string): void => {
+      createProfileFromActive(name.trim() || modelProfileLabel(modelConfig));
+      setModelCheckResult(null);
+    },
+    [createProfileFromActive, modelConfig]
+  );
+
+  const handleModelProfileDelete = useCallback(
+    (profileId: string): void => {
+      deleteModelProfile(profileId);
+      setModelCheckResult(null);
+    },
+    [deleteModelProfile]
+  );
 
   // ─── 后端技能拉取 ──────────────────────────────────────────────────────────
   const refreshRegisteredSkills = useCallback(async (): Promise<void> => {
@@ -693,6 +742,10 @@ export default function AISidebar({
         json: modelConfig,
       });
       setModelCheckResult(payload);
+      const activeProviderId =
+        modelProfiles.find((profile) => profile.id === activeModelProfileId)
+          ?.providerId ?? modelConfig.provider;
+      markProviderChecked(activeProviderId, payload.status !== "error");
     } catch (error) {
       setModelCheckResult({
         status: "error",
@@ -706,7 +759,7 @@ export default function AISidebar({
     } finally {
       setCheckingModel(false);
     }
-  }, [modelConfig]);
+  }, [activeModelProfileId, markProviderChecked, modelConfig, modelProfiles]);
 
   return (
     <>
@@ -718,7 +771,10 @@ export default function AISidebar({
         mcpServers={mcpServers}
         modelCheckResult={modelCheckResult}
         modelConfig={modelConfig}
+        modelProfiles={modelProfiles}
         modelPresetOptions={modelPresetOptions}
+        activeModelProfileDirty={activeModelProfileDirty}
+        activeModelProfileId={activeModelProfileId}
         mapBaseLayer={mapBaseLayer}
         newServerEndpoint={newServerEndpoint}
         newServerName={newServerName}
@@ -730,7 +786,11 @@ export default function AISidebar({
         onCheckModel={() => void checkModelConnection()}
         onClearMessages={() => setMessages([])}
         onMapBaseLayerChange={onMapBaseLayerChange}
-        onModelConfigChange={setModelConfig}
+        onModelConfigChange={handleModelConfigChange}
+        onModelProfileCreate={handleModelProfileCreate}
+        onModelProfileDelete={handleModelProfileDelete}
+        onModelProfileSave={handleModelProfileSave}
+        onModelProfileSelect={handleModelProfileSelect}
         onNewServerEndpointChange={setNewServerEndpoint}
         onNewServerNameChange={setNewServerName}
         onNewServerTransportChange={setNewServerTransport}
@@ -838,6 +898,7 @@ export default function AISidebar({
                 messages={messages}
                 onChatModeChange={setChatMode}
                 onCommandInputChange={setCommandInput}
+                onOpenModelSettings={() => navigate("/ai-models")}
                 onQuickCommand={sendChat}
                 onSubmit={onSubmitChat}
                 busy={busy}
@@ -898,6 +959,7 @@ interface ChatPanelProps {
   stop: () => void;
   onChatModeChange: (mode: AIChatMode) => void;
   onCommandInputChange: (next: string) => void;
+  onOpenModelSettings: () => void;
   onQuickCommand: (cmd: string) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }
@@ -913,6 +975,7 @@ function ChatPanel({
   stop,
   onChatModeChange,
   onCommandInputChange,
+  onOpenModelSettings,
   onQuickCommand,
   onSubmit,
 }: ChatPanelProps) {
@@ -990,14 +1053,21 @@ function ChatPanel({
             value={commandInput}
             rows={2}
           />
-          <div className="flex items-center justify-between text-[10px] text-slate-500">
-            <span>
-              {busy
-                ? "Thinking…"
-                : chatMode === "ask"
-                  ? "Ask mode: answer-only guidance"
-                  : "Command mode: scenario changes allowed"}
-            </span>
+          <div className="flex min-w-0 items-center justify-between gap-2 text-[10px] text-slate-500">
+            <div className="flex min-w-0 items-center gap-2">
+              <ModelSwitcher
+                className="min-w-0"
+                disabled={busy}
+                onOpenSettings={onOpenModelSettings}
+              />
+              <span className="hidden truncate sm:inline">
+                {busy
+                  ? "Thinking..."
+                  : chatMode === "ask"
+                    ? "Ask mode"
+                    : "Command mode"}
+              </span>
+            </div>
             {busy ? (
               <Button
                 className="h-6 gap-1 px-2 text-[10px]"
@@ -1239,7 +1309,7 @@ function MessageBlock({ message }: { message: UIMessage }) {
   );
 }
 
-export type { MCPServerConfig, CustomSkillConfig, ModelConfig };
+export type { MCPServerConfig, CustomSkillConfig, ModelConfig, ModelProfile };
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Settings Panel Props
@@ -1247,6 +1317,9 @@ export type { MCPServerConfig, CustomSkillConfig, ModelConfig };
 
 export interface TacticalSettingsProps {
   modelConfig: ModelConfig;
+  modelProfiles: ModelProfile[];
+  activeModelProfileId: string;
+  activeModelProfileDirty: boolean;
   modelPresetOptions: string[];
   selectedPreset: string;
   modelCheckResult: ModelCheckResponse | null;
@@ -1265,6 +1338,10 @@ export interface TacticalSettingsProps {
   newSkillName: string;
   newSkillDescription: string;
   onModelConfigChange: (next: ModelConfig) => void;
+  onModelProfileSelect: (id: string) => void;
+  onModelProfileSave: (name: string) => void;
+  onModelProfileCreate: (name: string) => void;
+  onModelProfileDelete: (id: string) => void;
   onCheckModel: () => void;
   mapBaseLayer: CesiumBaseLayerKey;
   onMapBaseLayerChange: (key: CesiumBaseLayerKey) => void;

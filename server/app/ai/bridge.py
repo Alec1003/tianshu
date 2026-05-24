@@ -94,9 +94,9 @@ class AICCOpenClawBridge:
 
         Priority:
           1. ``context["model"]`` – user-supplied model config from the AI
-             sidebar. When ``provider`` + ``model`` + ``apiKey`` are all
-             present we build a one-off agent so the user's editor truly
-             takes effect.
+             sidebar. When the provider/model pair is complete and either an
+             API key is present or the provider supports keyless local access,
+             we build a one-off agent so the user's editor truly takes effect.
           2. ``self.pydantic_agent`` – the env-var–configured global agent
              from ``from_env``.
           3. ``None`` – caller falls back to the regex planner.
@@ -112,7 +112,9 @@ class AICCOpenClawBridge:
             model_name = str(model_cfg.get("model") or "").strip()
             api_key = str(model_cfg.get("apiKey") or "").strip()
             base_url = str(model_cfg.get("baseUrl") or "").strip()
-            if provider and model_name and api_key:
+            from app.ai.pydantic_agent import can_build_model_override  # noqa: PLC0415
+
+            if can_build_model_override(provider, model_name, api_key, base_url):
                 model_id = f"{provider}:{model_name}"
                 try:
                     from app.ai.pydantic_agent import build_agent  # noqa: PLC0415

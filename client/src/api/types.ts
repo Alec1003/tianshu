@@ -93,3 +93,64 @@ export interface AarRecord extends AarRecordCreatePayload {
   owner_id: string | null;
   created_at: string;
 }
+
+export type UnitAssetType =
+  | "aircraft"
+  | "ship"
+  | "facility"
+  | "airbase"
+  | "weapon";
+
+export interface UnitAsset {
+  id: string;
+  type: UnitAssetType;
+  name: string;
+  data: Record<string, unknown>;
+  is_system: boolean;
+  owner_id: string | null;
+  version: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UnitAssetCreatePayload {
+  type: UnitAssetType;
+  data: Record<string, unknown>;
+}
+
+export interface UnitAssetGeneratePayload {
+  type: UnitAssetType;
+  query: string;
+  context?: string;
+}
+
+export interface UnitAssetGenerateResult {
+  type: UnitAssetType;
+  data: Record<string, unknown>;
+  source: "llm" | "estimate";
+  confidence: number;
+  warnings: string[];
+}
+
+export interface UnitAssetUpdatePayload {
+  data: Record<string, unknown>;
+}
+
+export interface UnitAssetCatalogPayload {
+  aircraftDb: Record<string, unknown>[];
+  airbaseDb: Record<string, unknown>[];
+  facilityDb: Record<string, unknown>[];
+  shipDb: Record<string, unknown>[];
+  weaponDb: Record<string, unknown>[];
+}
+
+export interface UnitAssetImportPayload extends UnitAssetCatalogPayload {
+  replace_existing?: boolean;
+}
+
+export interface UnitAssetImportResult {
+  created: number;
+  updated: number;
+  skipped: number;
+  assets: UnitAsset[];
+}

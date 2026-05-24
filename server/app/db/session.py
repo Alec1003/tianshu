@@ -65,13 +65,15 @@ async def create_db_and_tables() -> None:
     """
     # Imported here to avoid circular imports when this module is reused by
     # the migration env.py. v1 keeps the schema flat: User + Scenario +
-    # AarRecord. Workspace/Member tables are deferred to S4 (multi-user
-    # collaboration) -- adding them now would only inflate code surface.
+    # AarRecord + UnitAsset. Workspace/Member tables are deferred to S4
+    # (multi-user collaboration) -- adding them now would only inflate code
+    # surface.
     from app.auth.models import User  # noqa: F401
     from app.scenarios.models import (  # noqa: F401
         AarRecord,
         Scenario,
     )
+    from app.unit_assets.models import UnitAsset  # noqa: F401
     from app.db.base import Base
 
     async with engine.begin() as conn:
@@ -93,13 +95,15 @@ async def _bootstrap_schema_migrations(conn) -> None:
     Once we ship Alembic this whole helper goes away and the migration moves
     to a versioned revision file.
     """
-    # We only know how to introspect SQLite cheaply right now. Postgres in
-    # prod will run alembic anyway, so noop here is the correct fallback.
     backend = conn.engine.dialect.name
-    if backend != "sqlite":
+    if backend == "postgresql":
+        await _migrate_unit_asset_scope_postgres(conn)
         return
 
     from sqlalchemy import text
+
+    if backend != "sqlite":
+        return
 
     # Each row = (table, column, sql to add). Order matters only when one
     # column references another (none today).
@@ -118,3 +122,56 @@ async def _bootstrap_schema_migrations(conn) -> None:
         if column in existing_cols:
             continue
         await conn.execute(text(ddl))
+
+    await _migrate_unit_asset_scope_sqlite(conn)
+
+
+async def _migrate_unit_asset_scope_postgres(conn) -> None:
+    """Replace the old global unit-asset unique constraint with scoped indexes."""
+    from sqlalchemy import text
+
+    await conn.execute(
+        text("ALTER TABLE unit_asset DROP CONSTRAINT IF EXISTS uq_unit_asset_type_name")
+    )
+    await conn.execute(
+        text(
+            "CREATE UNIQUE INDEX IF NOT EXISTS uq_unit_asset_system_type_name "
+            "ON unit_asset (type, name) WHERE owner_id IS NULL"
+        )
+    )
+    await conn.execute(
+        text(
+            "CREATE UNIQUE INDEX IF NOT EXISTS uq_unit_asset_owner_type_name "
+            "ON unit_asset (owner_id, type, name) WHERE owner_id IS NOT NULL"
+        )
+    )
+
+
+async def _migrate_unit_asset_scope_sqlite(conn) -> None:
+    """Rebuild SQLite unit_asset table if it still has the old global unique key."""
+    from sqlalchemy import text
+
+    result = await conn.execute(
+        text("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'unit_asset'")
+    )
+    create_sql = result.scalar_one_or_none() or ""
+    if "uq_unit_asset_type_name" not in create_sql and "UNIQUE (type, name)" not in create_sql:
+        return
+
+    from app.unit_assets.models import UnitAsset
+
+    await conn.execute(text("ALTER TABLE unit_asset RENAME TO unit_asset_legacy"))
+    await conn.run_sync(lambda sync_conn: UnitAsset.__table__.create(sync_conn))
+    await conn.execute(
+        text(
+            """
+            INSERT INTO unit_asset (
+                id, type, name, data, is_system, owner_id, version, created_at, updated_at
+            )
+            SELECT
+                id, type, name, data, is_system, owner_id, version, created_at, updated_at
+            FROM unit_asset_legacy
+            """
+        )
+    )
+    await conn.execute(text("DROP TABLE unit_asset_legacy"))

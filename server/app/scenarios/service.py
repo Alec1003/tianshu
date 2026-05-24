@@ -38,7 +38,7 @@ async def _load_or_404(session: AsyncSession, scenario_id: str) -> Scenario:
 
 
 def _ensure_can_read(sc: Scenario, user: User) -> None:
-    if not sc.is_template and sc.owner_id != str(user.id):
+    if not sc.is_template and str(sc.owner_id) != str(user.id):
         raise ScenarioForbiddenError(sc.id, "not the owner")
 
 
@@ -48,7 +48,7 @@ def _ensure_can_write(sc: Scenario, user: User) -> None:
         if not user.is_superuser:
             raise ScenarioTemplateReadOnlyError(sc.id)
         return
-    if sc.owner_id != str(user.id):
+    if str(sc.owner_id) != str(user.id):
         raise ScenarioForbiddenError(sc.id, "not the owner")
 
 
@@ -65,10 +65,10 @@ async def list_scenarios(
     stmt = select(Scenario)
     if include_templates:
         stmt = stmt.where(
-            (Scenario.owner_id == str(user.id)) | (Scenario.is_template == True)  # noqa: E712
+            (Scenario.owner_id == user.id) | (Scenario.is_template == True)  # noqa: E712
         )
     else:
-        stmt = stmt.where(Scenario.owner_id == str(user.id))
+        stmt = stmt.where(Scenario.owner_id == user.id)
     stmt = stmt.order_by(Scenario.is_template.desc(), Scenario.updated_at.desc())
     rows = await session.execute(stmt)
     return rows.scalars().all()
@@ -110,7 +110,7 @@ async def create_scenario(
         description=description or "",
         data=data,
         is_template=False,
-        owner_id=str(user.id),
+        owner_id=user.id,
         status=safe_status,
     )
     session.add(sc)
@@ -172,7 +172,7 @@ async def delete_scenario(
     sc = await _load_or_404(session, scenario_id)
     if sc.is_template:
         raise ScenarioForbiddenError(sc.id, "templates cannot be deleted")
-    if sc.owner_id != str(user.id):
+    if str(sc.owner_id) != str(user.id):
         raise ScenarioForbiddenError(sc.id, "not the owner")
     await session.delete(sc)
     await session.commit()
@@ -194,7 +194,7 @@ async def list_aar_records(
     stmt = (
         select(AarRecord)
         .where(AarRecord.scenario_id == scenario_id)
-        .where(AarRecord.owner_id == str(user.id))
+        .where(AarRecord.owner_id == user.id)
         .order_by(AarRecord.created_at.desc())
         .limit(limit)
     )
@@ -225,7 +225,7 @@ async def create_aar_record(
 
     rec = AarRecord(
         scenario_id=scenario_id,
-        owner_id=str(user.id),
+        owner_id=user.id,
         outcome_reason=outcome_reason,
         winner_side_id=winner_side_id or "",
         summary=summary,

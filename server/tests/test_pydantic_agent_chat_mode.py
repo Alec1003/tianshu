@@ -15,6 +15,34 @@ class RecordingRegistry:
         return {"ok": True}
 
 
+class RecordingApprovalQueue:
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, dict]] = []
+
+    def create_single_step_proposal(
+        self,
+        *,
+        command: str,
+        skill: str,
+        parameters: dict,
+        source: str,
+    ):
+        self.calls.append((skill, parameters))
+        return type(
+            "Proposal",
+            (),
+            {
+                "id": "proposal-1",
+                "status": "pending",
+                "adjudication": type(
+                    "Adjudication",
+                    (),
+                    {"model_dump": lambda _self, mode=None: {"status": "needs_review"}},
+                )(),
+            },
+        )()
+
+
 def test_exec_allows_tools_in_command_mode():
     registry = RecordingRegistry()
     deps = AgentDeps(registry=registry, chat_mode="command")
@@ -25,6 +53,25 @@ def test_exec_allows_tools_in_command_mode():
     assert registry.calls == [("simulation_start", {})]
     assert len(deps.call_log) == 1
     assert deps.call_log[0].status == "ok"
+
+
+def test_exec_creates_approval_proposal_when_queue_is_present():
+    registry = RecordingRegistry()
+    queue = RecordingApprovalQueue()
+    deps = AgentDeps(
+        registry=registry,
+        chat_mode="command",
+        approval_queue=queue,
+        source_command="start simulation",
+    )
+
+    result = _exec(deps, "simulation_start", {})
+
+    assert result["proposalId"] == "proposal-1"
+    assert result["requiresApproval"] is True
+    assert registry.calls == []
+    assert queue.calls == [("simulation_start", {})]
+    assert deps.call_log[0].output["proposalStatus"] == "pending"
 
 
 def test_exec_blocks_tools_in_ask_mode():

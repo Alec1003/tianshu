@@ -35,6 +35,56 @@ class AgentExecutionSummary(BaseModel):
     error: str | None = None
 
 
+class StructuredCommandStep(BaseModel):
+    id: str
+    skill: str
+    parameters: dict[str, Any] = Field(default_factory=dict)
+    source_text: str = ""
+    summary: str = ""
+    risk: Literal["low", "medium", "high"] = "medium"
+    writes_runtime: bool = True
+
+
+class CommandAdjudicationIssue(BaseModel):
+    severity: Literal["info", "warning", "blocking"]
+    code: str
+    message: str
+    field: str | None = None
+    step_id: str | None = None
+
+
+class CommandAdjudicationResult(BaseModel):
+    status: Literal["needs_review", "blocked"] = "needs_review"
+    requires_human_approval: bool = True
+    summary: str = ""
+    issues: list[CommandAdjudicationIssue] = Field(default_factory=list)
+
+
+class CommandProposal(BaseModel):
+    id: str
+    command: str
+    source: Literal["regex", "llm_tool", "api"] = "api"
+    status: Literal[
+        "pending",
+        "blocked",
+        "approved",
+        "rejected",
+        "executed",
+        "partial",
+        "failed",
+    ] = "pending"
+    created_at: str
+    updated_at: str
+    steps: list[StructuredCommandStep] = Field(default_factory=list)
+    adjudication: CommandAdjudicationResult
+    execution: list[SkillExecutionResult] = Field(default_factory=list)
+    error: str | None = None
+
+
+class CommandProposalListResponse(BaseModel):
+    proposals: list[CommandProposal] = Field(default_factory=list)
+
+
 class AICommandRequest(BaseModel):
     command: str = Field(min_length=1, description="Natural language command")
     context: dict[str, Any] = Field(
@@ -48,6 +98,7 @@ class AICommandResponse(BaseModel):
     message: str
     execution: AgentExecutionSummary
     scenario: dict[str, Any] | None = None
+    proposals: list[CommandProposal] = Field(default_factory=list)
 
 
 class RuntimeStepRequest(BaseModel):
@@ -199,6 +250,11 @@ class RuntimeSnapshotResponse(BaseModel):
     visibility: RuntimeVisibilityResponse = Field(
         default_factory=RuntimeVisibilityResponse
     )
+
+
+class CommandApprovalResponse(BaseModel):
+    proposal: CommandProposal
+    snapshot: RuntimeSnapshotResponse | None = None
 
 
 class ModelCheckRequest(BaseModel):

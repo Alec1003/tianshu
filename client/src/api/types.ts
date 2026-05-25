@@ -80,6 +80,68 @@ export interface RuntimeSnapshot {
   visibility: RuntimeVisibility;
 }
 
+export interface SkillExecutionResult {
+  skill: string;
+  status: "ok" | "error";
+  parameters: Record<string, unknown>;
+  output?: Record<string, unknown>;
+  error?: string | null;
+}
+
+export interface StructuredCommandStep {
+  id: string;
+  skill: string;
+  parameters: Record<string, unknown>;
+  source_text: string;
+  summary: string;
+  risk: "low" | "medium" | "high";
+  writes_runtime: boolean;
+}
+
+export interface CommandAdjudicationIssue {
+  severity: "info" | "warning" | "blocking";
+  code: string;
+  message: string;
+  field?: string | null;
+  step_id?: string | null;
+}
+
+export interface CommandAdjudicationResult {
+  status: "needs_review" | "blocked";
+  requires_human_approval: boolean;
+  summary: string;
+  issues: CommandAdjudicationIssue[];
+}
+
+export interface CommandProposal {
+  id: string;
+  command: string;
+  source: "regex" | "llm_tool" | "api";
+  status:
+    | "pending"
+    | "blocked"
+    | "approved"
+    | "rejected"
+    | "executed"
+    | "partial"
+    | "failed";
+  created_at: string;
+  updated_at: string;
+  steps: StructuredCommandStep[];
+  adjudication: CommandAdjudicationResult;
+  execution: SkillExecutionResult[];
+  error?: string | null;
+}
+
+export interface CommandProposalListResponse {
+  proposals: CommandProposal[];
+}
+
+export interface CommandApprovalResponse {
+  proposal: CommandProposal;
+  snapshot?: RuntimeSnapshot | null;
+}
+
 export interface RuntimeAttackRequest {
   attacker_type: "aircraft" | "ship";
   attacker_id: string;

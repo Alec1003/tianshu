@@ -33,6 +33,8 @@ import {
   Loader2,
   MessageSquare,
   Send,
+  ShieldAlert,
+  ShieldCheck,
   Sparkles,
   Square,
   Wrench,
@@ -47,8 +49,14 @@ import {
   type UIMessage,
 } from "ai";
 
-import { getRuntimeScenario } from "@/api/ai";
+import {
+  approveCommandProposal,
+  getRuntimeScenario,
+  listCommandProposals,
+  rejectCommandProposal,
+} from "@/api/ai";
 import { Button } from "@/components/ui/button";
+import type { CommandProposal } from "@/api/types";
 import type { CesiumBaseLayerKey } from "@/gui/map/CesiumToolbar";
 import { cn } from "@/lib/utils";
 import { apiCall, getStoredToken } from "@/api/client";
@@ -375,6 +383,11 @@ export default function AISidebar({
   // —— 聊天 / 流式状态 ——
   const [commandInput, setCommandInput] = useState("");
   const [chatMode, setChatMode] = useState<AIChatMode>("command");
+  const [commandProposals, setCommandProposals] = useState<CommandProposal[]>(
+    []
+  );
+  const [proposalBusyId, setProposalBusyId] = useState<string | null>(null);
+  const [proposalError, setProposalError] = useState<string | null>(null);
   const chatLogRef = useRef<HTMLDivElement | null>(null);
 
   // headers 函数需要读最新 modelConfig，但 transport 有状态不能重建；
@@ -422,6 +435,24 @@ export default function AISidebar({
     () => summarizeChatRun(messages, busy, Boolean(chatError)),
     [messages, busy, chatError]
   );
+
+  const refreshCommandProposals = useCallback(async (): Promise<void> => {
+    try {
+      const payload = await listCommandProposals();
+      setCommandProposals(payload.proposals);
+      setProposalError(null);
+    } catch (error) {
+      setProposalError(
+        error instanceof Error ? error.message : "命令审批队列刷新失败"
+      );
+    }
+  }, []);
+
+  useEffect(() => {
+    if (open) {
+      void refreshCommandProposals();
+    }
+  }, [open, refreshCommandProposals]);
 
   // ─── 按 scenario 隔离 chat 历史 ─────────────────────────────────────────
   // 设计：localStorage key = `aicc.ai.messages.v2:<scenarioId>`。
@@ -535,8 +566,17 @@ export default function AISidebar({
           console.error("[AICC] auto-resume play after AI start failed", err);
         }
       }
+      await refreshCommandProposals();
     })();
-  }, [busy, status, chatMode, messages, onApplyScenario, onResumePlay]);
+  }, [
+    busy,
+    status,
+    chatMode,
+    messages,
+    onApplyScenario,
+    onResumePlay,
+    refreshCommandProposals,
+  ]);
 
   // —— 设置表单局部状态 ——
   const [newServerName, setNewServerName] = useState("");
@@ -682,6 +722,45 @@ export default function AISidebar({
     setCommandInput("");
     sendChat(text);
   };
+
+  const handleApproveProposal = useCallback(
+    async (proposalId: string): Promise<void> => {
+      setProposalBusyId(proposalId);
+      setProposalError(null);
+      try {
+        const response = await approveCommandProposal(proposalId);
+        if (response.snapshot?.scenario) {
+          onApplyScenario?.(response.snapshot.scenario);
+        }
+        await refreshCommandProposals();
+      } catch (error) {
+        setProposalError(
+          error instanceof Error ? error.message : "命令审批执行失败"
+        );
+      } finally {
+        setProposalBusyId(null);
+      }
+    },
+    [onApplyScenario, refreshCommandProposals]
+  );
+
+  const handleRejectProposal = useCallback(
+    async (proposalId: string): Promise<void> => {
+      setProposalBusyId(proposalId);
+      setProposalError(null);
+      try {
+        await rejectCommandProposal(proposalId);
+        await refreshCommandProposals();
+      } catch (error) {
+        setProposalError(
+          error instanceof Error ? error.message : "命令提案驳回失败"
+        );
+      } finally {
+        setProposalBusyId(null);
+      }
+    },
+    [refreshCommandProposals]
+  );
 
   // activeMcpServers / activeCustomSkills 仍供 settings section 计数；
   // 流式 chat 的 request body 现在不再带 context，留给后续 advisor /
@@ -895,11 +974,16 @@ export default function AISidebar({
                 chatRunSummary={chatRunSummary}
                 chatMode={chatMode}
                 commandInput={commandInput}
+                commandProposals={commandProposals}
+                proposalBusyId={proposalBusyId}
+                proposalError={proposalError}
                 messages={messages}
+                onApproveProposal={(id) => void handleApproveProposal(id)}
                 onChatModeChange={setChatMode}
                 onCommandInputChange={setCommandInput}
                 onOpenModelSettings={() => navigate("/ai-models")}
                 onQuickCommand={sendChat}
+                onRejectProposal={(id) => void handleRejectProposal(id)}
                 onSubmit={onSubmitChat}
                 busy={busy}
                 stop={stop}
@@ -955,12 +1039,17 @@ interface ChatPanelProps {
   chatRunSummary: ChatRunSummary;
   chatMode: AIChatMode;
   commandInput: string;
+  commandProposals: CommandProposal[];
+  proposalBusyId: string | null;
+  proposalError: string | null;
   busy: boolean;
   stop: () => void;
+  onApproveProposal: (proposalId: string) => void;
   onChatModeChange: (mode: AIChatMode) => void;
   onCommandInputChange: (next: string) => void;
   onOpenModelSettings: () => void;
   onQuickCommand: (cmd: string) => void;
+  onRejectProposal: (proposalId: string) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }
 
@@ -971,12 +1060,17 @@ function ChatPanel({
   chatRunSummary,
   chatMode,
   commandInput,
+  commandProposals,
+  proposalBusyId,
+  proposalError,
   busy,
   stop,
+  onApproveProposal,
   onChatModeChange,
   onCommandInputChange,
   onOpenModelSettings,
   onQuickCommand,
+  onRejectProposal,
   onSubmit,
 }: ChatPanelProps) {
   const chatErrorMessage = chatError ? formatChatError(chatError) : "";
@@ -1017,6 +1111,13 @@ function ChatPanel({
       </div>
 
       <div className="border-t border-slate-700/50 px-3 py-2">
+        <ApprovalQueuePanel
+          busyId={proposalBusyId}
+          error={proposalError}
+          onApprove={onApproveProposal}
+          onReject={onRejectProposal}
+          proposals={commandProposals}
+        />
         <ModeSwitcher
           disabled={busy}
           mode={chatMode}
@@ -1097,6 +1198,108 @@ function ChatPanel({
   );
 }
 
+function ApprovalQueuePanel({
+  proposals,
+  busyId,
+  error,
+  onApprove,
+  onReject,
+}: {
+  proposals: CommandProposal[];
+  busyId: string | null;
+  error: string | null;
+  onApprove: (proposalId: string) => void;
+  onReject: (proposalId: string) => void;
+}) {
+  const visible = proposals
+    .filter((proposal) =>
+      ["pending", "blocked", "failed"].includes(proposal.status)
+    )
+    .slice(0, 3);
+
+  if (visible.length === 0 && !error) return null;
+
+  return (
+    <div className="mb-2 space-y-1.5">
+      {error && (
+        <div className="rounded-lg border border-red-300/20 bg-red-300/[0.05] px-2.5 py-2 text-[11px] text-red-100">
+          {error}
+        </div>
+      )}
+      {visible.map((proposal) => {
+        const blocked = proposal.status === "blocked";
+        const busy = busyId === proposal.id;
+        const issueCount = proposal.adjudication.issues.length;
+        return (
+          <div
+            className={cn(
+              "rounded-lg border px-2.5 py-2 text-[11px]",
+              blocked
+                ? "border-red-300/20 bg-red-300/[0.04] text-red-100"
+                : "border-cyan-300/20 bg-cyan-300/[0.04] text-cyan-50"
+            )}
+            key={proposal.id}
+          >
+            <div className="flex items-start gap-2">
+              {blocked ? (
+                <ShieldAlert className="mt-0.5 size-3.5 shrink-0" />
+              ) : (
+                <ShieldCheck className="mt-0.5 size-3.5 shrink-0" />
+              )}
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="truncate font-medium">
+                    {blocked ? "规则未通过" : "待人工审批"}
+                  </span>
+                  <span className="rounded border border-white/10 px-1.5 py-0.5 font-mono text-[9px] uppercase opacity-70">
+                    {proposal.source}
+                  </span>
+                </div>
+                <div className="mt-1 line-clamp-2 text-[10px] opacity-75">
+                  {proposal.steps
+                    .map((step) => step.summary || step.skill)
+                    .join(" / ")}
+                </div>
+                {issueCount > 0 && (
+                  <div className="mt-1 space-y-0.5 text-[10px] opacity-80">
+                    {proposal.adjudication.issues.slice(0, 2).map((issue) => (
+                      <div key={`${issue.code}-${issue.step_id ?? ""}`}>
+                        {issue.severity === "blocking" ? "阻断" : "提示"}：
+                        {issue.message}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div className="mt-2 flex items-center justify-end gap-1.5">
+                  <Button
+                    className="h-6 px-2 text-[10px]"
+                    disabled={busy}
+                    onClick={() => onReject(proposal.id)}
+                    size="sm"
+                    type="button"
+                    variant="ghost"
+                  >
+                    驳回
+                  </Button>
+                  <Button
+                    className="h-6 px-2 text-[10px]"
+                    disabled={blocked || busy}
+                    onClick={() => onApprove(proposal.id)}
+                    size="sm"
+                    type="button"
+                  >
+                    {busy ? "执行中" : "审批执行"}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function ModeSwitcher({
   disabled,
   mode,
@@ -1133,7 +1336,7 @@ function ModeSwitcher({
         ))}
       </div>
       <span className="truncate">
-        {mode === "ask" ? "Explain and plan" : "Tools can change scenario"}
+        {mode === "ask" ? "Explain and plan" : "Commands require approval"}
       </span>
     </div>
   );

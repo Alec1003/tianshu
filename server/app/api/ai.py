@@ -11,6 +11,8 @@ from app.ai.model_checker import check_model_connectivity
 from app.ai.models import (
     AICommandRequest,
     AICommandResponse,
+    CommandApprovalResponse,
+    CommandProposalListResponse,
     ModelCheckRequest,
     ModelCheckResponse,
     RuntimeAddWeaponRequest,
@@ -124,11 +126,22 @@ async def command(
     user: User = Depends(current_active_user),
 ) -> AICommandResponse:
     bridge = _bridge_for_user(request, user)
-    execution = await bridge.process_command_async(payload.command, payload.context)
+    if hasattr(bridge, "propose_command_async"):
+        execution, proposals = await bridge.propose_command_async(
+            payload.command,
+            payload.context,
+        )
+    else:
+        execution = await bridge.process_command_async(payload.command, payload.context)
+        proposals = []
     scenario = bridge.exported_scenario()
 
     if execution.status == "ok":
-        message = "Command executed successfully."
+        message = (
+            "Command proposal created. Human approval is required before execution."
+            if proposals
+            else "Command executed successfully."
+        )
     elif execution.status == "partial":
         message = "Command partially executed. Check skill call results."
     else:
@@ -139,7 +152,69 @@ async def command(
         message=message,
         execution=execution,
         scenario=scenario,
+        proposals=proposals,
     )
+
+
+def _approval_queue_for_user(request: Request, user: User) -> Any:
+    bridge = _bridge_for_user(request, user)
+    queue = getattr(bridge, "command_approvals", None)
+    if queue is None:
+        raise RuntimeError("AI bridge does not expose command approvals")
+    return queue
+
+
+@router.get("/command/proposals", response_model=CommandProposalListResponse)
+def list_command_proposals(
+    request: Request,
+    status_filter: str | None = None,
+    limit: int = 50,
+    user: User = Depends(current_active_user),
+) -> CommandProposalListResponse:
+    queue = _approval_queue_for_user(request, user)
+    return CommandProposalListResponse(
+        proposals=queue.list_proposals(status=status_filter, limit=limit)
+    )
+
+
+@router.post(
+    "/command/proposals/{proposal_id}/approve",
+    response_model=CommandApprovalResponse,
+)
+def approve_command_proposal(
+    request: Request,
+    proposal_id: str,
+    user: User = Depends(current_active_user),
+) -> CommandApprovalResponse:
+    queue = _approval_queue_for_user(request, user)
+    try:
+        proposal = queue.approve_and_execute(proposal_id)
+    except ValueError as exc:
+        raise _runtime_value_error(exc) from exc
+    snapshot = _runtime_snapshot(
+        request,
+        user,
+        action="approve_command_proposal",
+        state={"proposalId": proposal.id, "proposalStatus": proposal.status},
+    )
+    return CommandApprovalResponse(proposal=proposal, snapshot=snapshot)
+
+
+@router.post(
+    "/command/proposals/{proposal_id}/reject",
+    response_model=CommandApprovalResponse,
+)
+def reject_command_proposal(
+    request: Request,
+    proposal_id: str,
+    user: User = Depends(current_active_user),
+) -> CommandApprovalResponse:
+    queue = _approval_queue_for_user(request, user)
+    try:
+        proposal = queue.reject(proposal_id)
+    except ValueError as exc:
+        raise _runtime_value_error(exc) from exc
+    return CommandApprovalResponse(proposal=proposal, snapshot=None)
 
 
 @router.get("/runtime/scenario")
@@ -703,7 +778,15 @@ async def chat(
             media_type="application/json",
         )
 
-    deps = AgentDeps(registry=bridge.skill_registry, chat_mode=chat_mode)
+    deps = AgentDeps(
+        registry=bridge.skill_registry,
+        chat_mode=chat_mode,
+        approval_queue=(
+            getattr(bridge, "command_approvals", None)
+            if chat_mode == "command"
+            else None
+        ),
+    )
     return await VercelAIAdapter.dispatch_request(
         request,
         agent=agent,

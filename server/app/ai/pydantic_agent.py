@@ -34,16 +34,31 @@ Rules:
 - If a tool fails, note the failure in your summary but continue with remaining operations.
 """.strip()
 
+SYSTEM_PROMPT = """
+You are the AICC Commander Agent, an AI operator for a tactical simulation and training platform.
+Your job is to parse natural-language tactical intent into structured simulation actions.
+
+Rules:
+- Only call the registered tools; never invent tool names.
+- For compound commands separated by "then", ";", or "然后", call tools in sequence.
+- When a required parameter is ambiguous, make the most tactically sensible simulation assumption.
+- Tool calls create command proposals for human approval; they do not directly mutate the simulation.
+- After all tools have been called, respond with a concise single-sentence summary of what was proposed.
+- If a tool fails, note the failure in your summary but continue with remaining operations.
+""".strip()
+
 
 @dataclass
 class AgentDeps:
     registry: AICCSkillRegistry
     chat_mode: Literal["ask", "command"] = "command"
     call_log: list[SkillExecutionResult] = field(default_factory=list)
+    approval_queue: Any | None = None
+    source_command: str = ""
 
 
 def _exec(deps: AgentDeps, skill: str, params: dict[str, Any]) -> dict[str, Any]:
-    """Execute a skill, log the result, and re-raise on error so pydantic-ai sees it."""
+    """Execute directly or create an approval proposal, then log the result."""
     if deps.chat_mode == "ask":
         error = "Tool execution is disabled in Ask mode."
         deps.call_log.append(
@@ -55,6 +70,28 @@ def _exec(deps: AgentDeps, skill: str, params: dict[str, Any]) -> dict[str, Any]
             )
         )
         raise PermissionError(error)
+    if deps.approval_queue is not None:
+        proposal = deps.approval_queue.create_single_step_proposal(
+            command=deps.source_command or skill,
+            skill=skill,
+            parameters=params,
+            source="llm_tool",
+        )
+        output = {
+            "proposalId": proposal.id,
+            "proposalStatus": proposal.status,
+            "requiresApproval": True,
+            "adjudication": proposal.adjudication.model_dump(mode="json"),
+        }
+        deps.call_log.append(
+            SkillExecutionResult(
+                skill=skill,
+                status="ok",
+                parameters=params,
+                output=output,
+            )
+        )
+        return output
     try:
         result = deps.registry.execute(skill, params)
         deps.call_log.append(
@@ -383,9 +420,16 @@ async def run_agent(
     agent: Agent[AgentDeps, str],
     command: str,
     registry: AICCSkillRegistry,
+    approval_queue: Any | None = None,
+    chat_mode: Literal["ask", "command"] = "command",
 ) -> AgentExecutionSummary:
     """Run the pydantic-ai agent and wrap the result in AgentExecutionSummary."""
-    deps = AgentDeps(registry=registry)
+    deps = AgentDeps(
+        registry=registry,
+        chat_mode=chat_mode,
+        approval_queue=approval_queue,
+        source_command=command,
+    )
     summary = AgentExecutionSummary(command=command, decomposition=[command])
 
     try:

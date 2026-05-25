@@ -61,15 +61,7 @@ class AICCCommanderAgent:
     ) -> AgentExecutionSummary:
         summary = AgentExecutionSummary(command=command)
         summary.decomposition = self._decompose(command)
-
-        planned_calls: list[PlannedSkillCall] = []
-
-        sdk_calls = self._plan_with_sdk(command)
-        if sdk_calls:
-            planned_calls.extend(sdk_calls)
-
-        for segment in summary.decomposition:
-            planned_calls.extend(self._plan_segment(segment))
+        planned_calls = self.plan_command(command)
 
         if not planned_calls:
             summary.status = "error"
@@ -106,6 +98,19 @@ class AICCCommanderAgent:
         else:
             summary.status = "ok"
         return summary
+
+    def plan_command(self, command: str) -> list[PlannedSkillCall]:
+        """Convert natural language into structured skill calls without executing."""
+        planned_calls: list[PlannedSkillCall] = []
+
+        sdk_calls = self._plan_with_sdk(command)
+        if sdk_calls:
+            planned_calls.extend(sdk_calls)
+
+        for segment in self._decompose(command):
+            planned_calls.extend(self._plan_segment(segment))
+
+        return planned_calls
 
     def _plan_with_sdk(self, command: str) -> list[PlannedSkillCall]:
         if self.sdk_adapter is None:

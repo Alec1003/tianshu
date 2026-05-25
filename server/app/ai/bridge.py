@@ -6,10 +6,16 @@ from pathlib import Path
 from typing import Any
 
 from app.ai.agent import AICCCommanderAgent
+from app.ai.command_governance import CommandApprovalQueue
 from app.ai.mcp_client import MCPClientSkeleton, MCPServerConfig
-from app.ai.models import AgentExecutionSummary
+from app.ai.models import (
+    AgentExecutionSummary,
+    CommandProposal,
+    SkillExecutionResult,
+    StructuredCommandStep,
+)
 from app.ai.openclaw_sdk_adapter import OpenClawSDKAdapter
-from app.ai.pydantic_agent import AgentDeps, build_agent
+from app.ai.pydantic_agent import build_agent
 from app.ai.skill_registry import AICCSkillRegistry
 from app.aicc_runtime.runtime import ROOT_DIR, AICCRuntime
 
@@ -30,6 +36,10 @@ class AICCOpenClawBridge:
     ) -> None:
         self.runtime = AICCRuntime(scenario_path=scenario_path)
         self.skill_registry = AICCSkillRegistry(runtime=self.runtime)
+        self.command_approvals = CommandApprovalQueue(
+            runtime=self.runtime,
+            registry=self.skill_registry,
+        )
         self.mcp_client = MCPClientSkeleton()
         self.sdk_adapter = OpenClawSDKAdapter()
         self.agent = AICCCommanderAgent(
@@ -146,6 +156,73 @@ class AICCOpenClawBridge:
 
             return await run_agent(agent, command, self.skill_registry)
         return self.agent.process_command(command=command, context=context)
+
+    async def propose_command_async(
+        self, command: str, context: dict[str, Any] | None = None
+    ) -> tuple[AgentExecutionSummary, list[CommandProposal]]:
+        """Create structured command proposals without mutating runtime state."""
+        agent = self._resolve_agent_for_request(context)
+        if agent is not None:
+            from app.ai.pydantic_agent import run_agent  # noqa: PLC0415
+
+            summary = await run_agent(
+                agent,
+                command,
+                self.skill_registry,
+                approval_queue=self.command_approvals,
+            )
+            proposals = [
+                proposal
+                for result in summary.skill_calls
+                if (proposal_id := result.output.get("proposalId"))
+                for proposal in [self.command_approvals.get(str(proposal_id))]
+                if proposal is not None
+            ]
+            return summary, proposals
+
+        planned_calls = self.agent.plan_command(command)
+        summary = AgentExecutionSummary(
+            command=command,
+            decomposition=self.agent._decompose(command),
+        )
+        if not planned_calls:
+            summary.status = "error"
+            summary.error = self.agent._build_no_skill_message(command)
+            return summary, []
+
+        steps = [
+            StructuredCommandStep(
+                id=f"step-{index + 1}",
+                skill=call.name,
+                parameters=call.parameters,
+                source_text=call.source_text,
+                summary=call.name.replace("_", " "),
+                risk="medium",
+            )
+            for index, call in enumerate(planned_calls)
+        ]
+        proposal = self.command_approvals.create_proposal(
+            command=command,
+            steps=steps,
+            source="regex",
+        )
+        summary.skill_calls = [
+            SkillExecutionResult(
+                skill=step.skill,
+                status="ok",
+                parameters=step.parameters,
+                output={
+                    "proposalId": proposal.id,
+                    "proposalStatus": proposal.status,
+                    "requiresApproval": True,
+                },
+            )
+            for step in steps
+        ]
+        summary.status = "partial" if proposal.status == "blocked" else "ok"
+        if proposal.status == "blocked":
+            summary.error = proposal.adjudication.summary
+        return summary, [proposal]
 
     def exported_scenario(self) -> dict[str, Any]:
         return self.runtime.get_exported_scenario()

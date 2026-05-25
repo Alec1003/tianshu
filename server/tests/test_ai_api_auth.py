@@ -307,6 +307,9 @@ def test_ai_routes_reject_unauthenticated_requests() -> None:
         ),
         ("get", "/api/ai/skills", None),
         ("post", "/api/ai/command", {"command": "pause"}),
+        ("get", "/api/ai/command/proposals", None),
+        ("post", "/api/ai/command/proposals/proposal-1/approve", None),
+        ("post", "/api/ai/command/proposals/proposal-1/reject", None),
         (
             "post",
             "/api/ai/model/check",

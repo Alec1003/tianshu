@@ -1,5 +1,7 @@
 import { apiCall } from "./client";
 import type {
+  CommandApprovalResponse,
+  CommandProposalListResponse,
   RuntimeAttackRequest,
   RuntimeAddWeaponRequest,
   RuntimeCreateSideRequest,
@@ -22,6 +24,35 @@ export async function getRuntimeScenario(): Promise<Record<string, unknown>> {
 
 export async function getRuntimeSnapshot(): Promise<RuntimeSnapshot> {
   return apiCall<RuntimeSnapshot>("/api/ai/runtime");
+}
+
+export async function listCommandProposals(
+  statusFilter?: string
+): Promise<CommandProposalListResponse> {
+  const query = statusFilter
+    ? `?status_filter=${encodeURIComponent(statusFilter)}`
+    : "";
+  return apiCall<CommandProposalListResponse>(
+    `/api/ai/command/proposals${query}`
+  );
+}
+
+export async function approveCommandProposal(
+  proposalId: string
+): Promise<CommandApprovalResponse> {
+  return apiCall<CommandApprovalResponse>(
+    `/api/ai/command/proposals/${encodeURIComponent(proposalId)}/approve`,
+    { method: "POST" }
+  );
+}
+
+export async function rejectCommandProposal(
+  proposalId: string
+): Promise<CommandApprovalResponse> {
+  return apiCall<CommandApprovalResponse>(
+    `/api/ai/command/proposals/${encodeURIComponent(proposalId)}/reject`,
+    { method: "POST" }
+  );
 }
 
 export async function loadRuntimeScenario(

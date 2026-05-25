@@ -25,7 +25,7 @@ import { ApiError } from "@/api/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import { useAuth } from "./AuthContext";
+import { useAuth } from "./useAuth";
 
 type Tab = "login" | "register";
 type LocationState = { from?: { pathname?: string } } | null;
@@ -152,7 +152,8 @@ export default function LoginPage() {
                 </h1>
 
                 <p className="mt-5 max-w-[620px] text-base leading-7 text-slate-400">
-                  AICC 将场景、模型与推演流程连接成一个克制、高效、可协作的 AI 平台。
+                  AICC 将场景、模型与推演流程连接成一个克制、高效、可协作的 AI
+                  平台。
                 </p>
               </motion.div>
 
@@ -559,7 +560,7 @@ function humanizeError(err: unknown, tab: Tab): string {
   const code =
     typeof detail === "string"
       ? detail
-      : (detail as { code?: string } | null)?.code ?? null;
+      : ((detail as { code?: string } | null)?.code ?? null);
 
   if (tab === "login") {
     if (code === "LOGIN_BAD_CREDENTIALS") return "邮箱或密码不正确。";

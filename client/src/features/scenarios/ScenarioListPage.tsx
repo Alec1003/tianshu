@@ -14,13 +14,11 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
-import { motion } from "framer-motion";
 import {
   Activity,
   Bot,
   Box,
   BrainCircuit,
-  CheckCircle2,
   ChevronDown,
   Clock3,
   Copy as CopyIcon,
@@ -72,7 +70,7 @@ import type {
 } from "@/api/types";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { useAuth } from "@/features/auth/AuthContext";
+import { useAuth } from "@/features/auth/useAuth";
 import Dba from "@/game/db/Dba";
 import type { IAircraftModel } from "@/game/db/models/Aircraft";
 import type { IAirbaseModel } from "@/game/db/models/Airbase";
@@ -84,6 +82,7 @@ import {
   SetUnitDbContext,
   UnitDbContext,
 } from "@/gui/contextProviders/contexts/UnitDbContext";
+import { localizeUnitAssetName } from "@/i18n/entityNames";
 import { cn } from "@/lib/utils";
 import blankScenarioJson from "@/scenarios/blank_scenario.json";
 
@@ -93,15 +92,6 @@ type ViewMode = "grid" | "list";
 type WorkspaceModule = "projects" | "templates" | "assets";
 type VisualStatus = "live" | "simulation" | "draft" | "archived";
 type UnitAssetType = "aircraft" | "ship" | "facility" | "airbase" | "weapon";
-type ActivityItem = {
-  id: string;
-  scenarioId?: string;
-  time: string;
-  title: string;
-  desc: string;
-  type: string;
-  color: string;
-};
 type UnitAssetRecord = {
   id: string;
   assetId: string;
@@ -116,6 +106,7 @@ type UnitAssetRecord = {
   version: number;
   updatedAt: string;
   searchable: string;
+  canonicalName?: string;
   raw:
     | IAircraftModel
     | IShipModel
@@ -353,14 +344,6 @@ function relativeTime(iso: string): string {
   return new Date(iso).toLocaleDateString();
 }
 
-function shortTime(iso: string): string {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return "--:--";
-  return `${String(date.getHours()).padStart(2, "0")}:${String(
-    date.getMinutes()
-  ).padStart(2, "0")}`;
-}
-
 function thumbStyle(id: string, status: VisualStatus): CSSProperties {
   const h = hashString(id);
   const hue = status === "draft" ? 42 : status === "archived" ? 218 : h % 360;
@@ -381,19 +364,6 @@ function thumbStyle(id: string, status: VisualStatus): CSSProperties {
   };
 }
 
-function getScenarioDisplayName(
-  data: Record<string, unknown>,
-  fallback: string
-) {
-  const currentScenario = data.currentScenario as
-    | Record<string, unknown>
-    | undefined;
-  return typeof currentScenario?.name === "string" &&
-    currentScenario.name.trim()
-    ? currentScenario.name.trim()
-    : fallback;
-}
-
 export default function ScenarioListPage() {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
@@ -406,9 +376,7 @@ export default function ScenarioListPage() {
   const [activeModule, setActiveModule] = useState<WorkspaceModule>("projects");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
-  const [busyAction, setBusyAction] = useState<string | null>(null);
   const accountRef = useRef<HTMLDivElement | null>(null);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     if (!accountOpen) return;
@@ -461,17 +429,11 @@ export default function ScenarioListPage() {
 
   const filteredItems = moduleItems;
 
-  const activities = useMemo(
-    () => buildActivities(items, templates.length),
-    [items, templates.length]
-  );
-
   const activeCopy = MODULE_COPY[activeModule];
   const activeModuleLabel =
     MODULES.find((module) => module.id === activeModule)?.label ?? "项目管理";
   const isProjectWorkspace = activeModule === "projects";
   const isTemplateWorkspace = activeModule === "templates";
-  const systemOnline = items.length >= 0;
 
   const handleOpen = (id: string) => navigate(`/play/${id}`);
 
@@ -500,100 +462,9 @@ export default function ScenarioListPage() {
     }
   };
 
-  const handleGenerateScenario = async () => {
-    const name = `AI 生成推演 ${new Date().toLocaleDateString()}`;
-    setBusyAction("generate");
-    setError(null);
-    try {
-      const created = await createScenario({
-        name,
-        description:
-          "由 AI Tactical Workspace 创建的初始推演项目，可进入后继续配置单位、任务与态势。",
-        data: cloneScenarioData(name),
-        status: "draft",
-      });
-      navigate(`/play/${created.id}`);
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "AI 生成项目失败");
-    } finally {
-      setBusyAction(null);
-    }
-  };
-
-  const handleImportProjectFile = async (
-    event: ChangeEvent<HTMLInputElement>
-  ) => {
-    const input = event.currentTarget;
-    const file = input.files?.[0];
-    if (!file) return;
-    setBusyAction("import");
-    setError(null);
-    try {
-      const parsed = JSON.parse(await file.text()) as unknown;
-      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-        throw new Error("文件内容不是有效的场景 JSON 对象");
-      }
-      const data = parsed as Record<string, unknown>;
-      const fallbackName = file.name.replace(/\.[^.]+$/, "") || "导入项目";
-      const name = getScenarioDisplayName(data, fallbackName);
-      setScenarioClockToNow(data);
-      const created = await createScenario({
-        name,
-        description: `从 ${file.name} 导入的场景文件`,
-        data,
-        status: "draft",
-      });
-      navigate(`/play/${created.id}`);
-    } catch (err) {
-      window.alert(err instanceof Error ? err.message : "导入项目失败");
-    } finally {
-      setBusyAction(null);
-      input.value = "";
-    }
-  };
-
-  const quickStartCards = [
-    {
-      title: "新建推演项目",
-      desc: "从空白工作区启动一次新的战术推演。",
-      icon: Plus,
-      tone: "from-sky-500/22 to-blue-500/10",
-      onClick: () => setDialogOpen(true),
-    },
-    {
-      title: "导入场景文件",
-      desc: "导入已有 JSON 场景配置并保存为项目。",
-      icon: UploadCloud,
-      tone: "from-cyan-400/20 to-emerald-400/10",
-      onClick: () => fileInputRef.current?.click(),
-    },
-    {
-      title: "AI 生成场景",
-      desc: "让 AI 先生成一个可继续编辑的初始项目。",
-      icon: Sparkles,
-      tone: "from-violet-500/22 to-blue-500/10",
-      onClick: handleGenerateScenario,
-      busy: busyAction === "generate",
-    },
-    {
-      title: "使用模板创建",
-      desc: "基于系统模板快速复制出新项目。",
-      icon: Box,
-      tone: "from-blue-500/22 to-cyan-500/10",
-      onClick: () => setDialogOpen(true),
-    },
-  ];
-
   return (
     <div className="dark relative min-h-screen overflow-hidden bg-[#020612] text-slate-100">
       <WorkspaceBackdrop />
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept=".json,application/json"
-        className="hidden"
-        onChange={handleImportProjectFile}
-      />
 
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-[248px] border-r border-cyan-200/10 bg-[#030814]/78 px-5 py-5 backdrop-blur-2xl lg:flex lg:flex-col">
         <Brand />
@@ -640,26 +511,7 @@ export default function ScenarioListPage() {
           })}
         </nav>
 
-        <div className="mt-auto rounded-2xl border border-cyan-200/10 bg-white/[0.035] p-4 shadow-[0_20px_70px_rgba(0,0,0,0.25)]">
-          <div className="mb-4 flex items-center justify-between">
-            <div className="text-sm font-semibold text-slate-100">系统状态</div>
-            <ChevronDown className="size-4 text-slate-500" />
-          </div>
-          <SystemStatus label="AI 引擎" value="在线" ok={systemOnline} />
-          <SystemStatus label="推演服务" value="运行中" ok />
-          <SystemStatus label="数据服务" value="正常" ok />
-          <div className="mt-4">
-            <div className="mb-2 flex justify-between text-xs text-slate-500">
-              <span>存储空间</span>
-              <span className="text-cyan-200">204.8 GB</span>
-            </div>
-            <div className="h-2 rounded-full bg-slate-900">
-              <div className="h-full w-[42%] rounded-full bg-gradient-to-r from-cyan-400 to-sky-500 shadow-[0_0_16px_rgba(56,189,248,0.48)]" />
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-6 text-xs leading-7 text-slate-600">
+        <div className="mt-auto text-xs leading-7 text-slate-600">
           <div>AICC Tactical Workspace</div>
           <div>v0.2.0</div>
         </div>
@@ -673,16 +525,6 @@ export default function ScenarioListPage() {
             </div>
 
             <div className="flex-1" />
-
-            <Button
-              type="button"
-              variant="ghost"
-              className="hidden h-11 rounded-xl border border-cyan-200/15 bg-white/[0.035] px-4 text-slate-200 hover:bg-white/[0.07] sm:inline-flex"
-              onClick={() => navigate("/ai-models")}
-            >
-              <BrainCircuit className="size-4 text-cyan-200" />
-              AI 模型
-            </Button>
 
             <AccountMenu
               userEmail={user?.email}
@@ -718,43 +560,16 @@ export default function ScenarioListPage() {
                 <div className="flex flex-wrap gap-3">
                   <Button
                     type="button"
-                    variant="ghost"
-                    className="h-12 rounded-xl border border-cyan-200/15 bg-slate-950/35 px-5 text-slate-200 hover:border-cyan-200/35 hover:bg-white/[0.06]"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={busyAction === "import"}
-                  >
-                    <UploadCloud className="size-4" />
-                    导入项目
-                  </Button>
-                  <Button
-                    type="button"
                     className="h-12 rounded-xl border border-cyan-200/25 bg-gradient-to-r from-cyan-400 to-blue-600 px-5 text-white shadow-[0_18px_46px_rgba(14,165,233,0.28)] hover:shadow-[0_22px_56px_rgba(14,165,233,0.38)]"
                     onClick={() => setDialogOpen(true)}
                   >
                     <Plus className="size-4" />
                     新建项目
                   </Button>
-                  <Button
-                    type="button"
-                    className="h-12 rounded-xl border border-violet-300/30 bg-gradient-to-r from-blue-600/90 to-violet-600/80 px-5 text-white shadow-[0_18px_46px_rgba(99,102,241,0.26)]"
-                    onClick={handleGenerateScenario}
-                    disabled={busyAction === "generate"}
-                  >
-                    <Sparkles className="size-4" />
-                    AI 生成项目
-                  </Button>
                 </div>
               )}
             </div>
           </section>
-
-          {isProjectWorkspace && (
-            <section className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-4">
-              {quickStartCards.map((card, index) => (
-                <QuickStartCard key={card.title} {...card} index={index} />
-              ))}
-            </section>
-          )}
 
           {error && (
             <div className="mt-5 rounded-xl border border-red-400/25 bg-red-500/[0.08] px-4 py-3 text-sm text-red-100">
@@ -857,19 +672,11 @@ export default function ScenarioListPage() {
               />
             )}
           </section>
-
-          {isProjectWorkspace && (
-            <RecentActivityTimeline
-              activities={activities}
-              onOpen={handleOpen}
-            />
-          )}
         </main>
       </div>
 
       {dialogOpen && (
         <CreateScenarioDialog
-          templates={templates}
           onClose={() => setDialogOpen(false)}
           onCreated={(id) => {
             setDialogOpen(false);
@@ -915,25 +722,6 @@ function Brand({ compact = false }: { compact?: boolean }) {
           </div>
         </div>
       )}
-    </div>
-  );
-}
-
-function SystemStatus({
-  label,
-  value,
-  ok,
-}: {
-  label: string;
-  value: string;
-  ok: boolean;
-}) {
-  return (
-    <div className="mb-3 flex items-center justify-between text-xs">
-      <span className="text-slate-500">{label}</span>
-      <span className={ok ? "text-emerald-300" : "text-amber-300"}>
-        {value}
-      </span>
     </div>
   );
 }
@@ -998,52 +786,6 @@ function AccountMenu({
         </div>
       )}
     </div>
-  );
-}
-
-function QuickStartCard({
-  title,
-  desc,
-  icon: Icon,
-  tone,
-  onClick,
-  index,
-  busy,
-}: {
-  title: string;
-  desc: string;
-  icon: typeof Plus;
-  tone: string;
-  onClick: () => void;
-  index: number;
-  busy?: boolean;
-}) {
-  return (
-    <motion.button
-      type="button"
-      onClick={onClick}
-      disabled={busy}
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.04, duration: 0.35 }}
-      className="group relative overflow-hidden rounded-2xl border border-cyan-200/10 bg-white/[0.035] p-4 text-left backdrop-blur-xl transition-all hover:-translate-y-0.5 hover:border-cyan-200/30 hover:bg-white/[0.055] hover:shadow-[0_22px_70px_rgba(14,165,233,0.13)] disabled:opacity-60"
-    >
-      <div className={cn("absolute inset-0 bg-gradient-to-br", tone)} />
-      <div className="relative flex items-center gap-4">
-        <span className="grid size-12 shrink-0 place-items-center rounded-2xl border border-white/12 bg-white/[0.08] text-cyan-100 shadow-[0_0_28px_rgba(56,189,248,0.18)]">
-          <Icon className="size-6" />
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="block text-base font-semibold text-slate-100">
-            {busy ? "处理中..." : title}
-          </span>
-          <span className="mt-1 block text-sm leading-5 text-slate-500">
-            {desc}
-          </span>
-        </span>
-        <ChevronDown className="size-5 -rotate-90 text-cyan-300 transition-transform group-hover:translate-x-1" />
-      </div>
-    </motion.button>
   );
 }
 
@@ -2347,6 +2089,110 @@ function unitAssetFormFromData(
   };
 }
 
+const UNIT_ASSET_STATUS_LABELS: Record<string, string> = {
+  "TANKER READY": "加油机就绪",
+  "AIR ASSET": "空中单位",
+  "SURFACE ASSET": "水面舰艇",
+  "GROUND ASSET": "地面设施",
+  AIRBASE: "机场节点",
+  "BASE ASSET": "基地资产",
+  WEAPON: "武器模型",
+  "WEAPON ASSET": "武器资产",
+};
+
+const UNIT_ASSET_FIELD_LABELS: Record<string, string> = {
+  className: "型号名称",
+  name: "名称",
+  speed: "速度",
+  maxFuel: "最大燃料",
+  fuelRate: "燃料消耗",
+  range: "航程 / 射程",
+  lethality: "杀伤值",
+  latitude: "纬度",
+  longitude: "经度",
+  country: "国家 / 地区",
+  isTanker: "加油能力",
+  fuelOffloadCapacity: "可卸载燃油",
+  fuelTransferRate: "输油速率",
+  refuelRange: "加油半径",
+};
+
+const UNIT_ASSET_SOURCE_LABELS: Record<string, string> = {
+  speedSrc: "速度来源",
+  maxFuelSrc: "燃料来源",
+  fuelRateSrc: "消耗来源",
+  rangeSrc: "航程来源",
+};
+
+const COUNTRY_LABELS: Record<string, string> = {
+  Australia: "澳大利亚",
+  Germany: "德国",
+  Greenland: "格陵兰",
+  Guam: "关岛",
+  Italy: "意大利",
+  Japan: "日本",
+  Qatar: "卡塔尔",
+  Spain: "西班牙",
+  "South Korea": "韩国",
+  Turkey: "土耳其",
+  "United Kingdom": "英国",
+  Unknown: "未知",
+  USA: "美国",
+};
+
+function localizeAssetDisplayName(type: UnitAssetType, name: string) {
+  return localizeUnitAssetName(type, name);
+}
+
+function localizeAssetStatus(status: string) {
+  return UNIT_ASSET_STATUS_LABELS[status] ?? status;
+}
+
+function localizeCountry(country: string) {
+  return COUNTRY_LABELS[country] ?? country;
+}
+
+function localizeMeasureUnit(unit: string | undefined) {
+  const normalized = unit?.toLowerCase();
+  if (!normalized) return "";
+  if (normalized === "knots" || normalized === "kts") return "节";
+  if (normalized === "nm") return "海里";
+  if (normalized === "km") return "公里";
+  if (normalized === "lbs" || normalized === "lb") return "磅";
+  if (normalized === "lbs/hr" || normalized === "lb/hr") return "磅/小时";
+  if (normalized === "kg") return "千克";
+  if (normalized === "kg/h") return "千克/小时";
+  return unit ?? "";
+}
+
+function formatSpeedMetric(value: number, unit?: string) {
+  const unitLabel = localizeMeasureUnit(unit || "kts");
+  return unitLabel ? `${value} ${unitLabel}` : String(value);
+}
+
+function formatRangeMetric(prefix: string, value: number, unit?: string) {
+  const unitLabel = localizeMeasureUnit(unit || "nm");
+  return unitLabel ? `${prefix} ${value} ${unitLabel}` : `${prefix} ${value}`;
+}
+
+function formatAssetFieldValue(
+  asset: UnitAssetRecord,
+  key: string,
+  value: unknown
+) {
+  if (typeof value === "boolean") return value ? "是" : "否";
+  if (typeof value === "string") {
+    if (key === "className") return localizeAssetDisplayName(asset.type, value);
+    if (key === "name" && asset.type === "airbase") {
+      return localizeAssetDisplayName("airbase", value);
+    }
+    if (key === "country") return localizeCountry(value);
+    if (value === "Manual") return "手动录入";
+    if (value === "missing") return "未提供";
+  }
+  return String(value);
+}
+
 function unitAssetFormFromRecord(asset: UnitAssetRecord): AddUnitForm {
   const raw = asset.raw as unknown as Record<string, unknown>;
   return {
@@ -2363,18 +2209,24 @@ function buildUnitAssetRecords(apiAssets: ApiUnitAsset[]): UnitAssetRecord[] {
   return apiAssets.map((asset) => {
     if (asset.type === "aircraft") {
       const unit = asset.data as unknown as IAircraftModel;
+      const canonicalName = unit.className;
       const role = unit.isTanker
         ? "空中加油机"
-        : classifyAircraft(unit.className);
+        : classifyAircraft(canonicalName);
       return makeAssetRecord({
         id: asset.id,
         assetId: asset.id,
         type: "aircraft",
         typeLabel: "飞机",
-        name: unit.className,
+        name: localizeAssetDisplayName("aircraft", canonicalName),
+        canonicalName,
         role,
-        primaryMetric: `${unit.speed} ${unit.units?.speedUnit || "kts"}`,
-        secondaryMetric: `航程 ${unit.range} ${unit.units?.rangeUnit || "nm"}`,
+        primaryMetric: formatSpeedMetric(unit.speed, unit.units?.speedUnit),
+        secondaryMetric: formatRangeMetric(
+          "航程",
+          unit.range,
+          unit.units?.rangeUnit
+        ),
         status: unit.isTanker ? "TANKER READY" : "AIR ASSET",
         raw: unit,
         isSystem: asset.is_system,
@@ -2390,15 +2242,21 @@ function buildUnitAssetRecords(apiAssets: ApiUnitAsset[]): UnitAssetRecord[] {
 
     if (asset.type === "ship") {
       const unit = asset.data as unknown as IShipModel;
+      const canonicalName = unit.className;
       return makeAssetRecord({
         id: asset.id,
         assetId: asset.id,
         type: "ship",
         typeLabel: "舰艇",
-        name: unit.className,
-        role: classifyShip(unit.className),
-        primaryMetric: `${unit.speed} ${unit.units?.speedUnit || "kts"}`,
-        secondaryMetric: `航程 ${unit.range} ${unit.units?.rangeUnit || "nm"}`,
+        name: localizeAssetDisplayName("ship", canonicalName),
+        canonicalName,
+        role: classifyShip(canonicalName),
+        primaryMetric: formatSpeedMetric(unit.speed, unit.units?.speedUnit),
+        secondaryMetric: formatRangeMetric(
+          "航程",
+          unit.range,
+          unit.units?.rangeUnit
+        ),
         status: "SURFACE ASSET",
         raw: unit,
         isSystem: asset.is_system,
@@ -2410,14 +2268,16 @@ function buildUnitAssetRecords(apiAssets: ApiUnitAsset[]): UnitAssetRecord[] {
 
     if (asset.type === "facility") {
       const unit = asset.data as unknown as IFacilityModel;
+      const canonicalName = unit.className;
       return makeAssetRecord({
         id: asset.id,
         assetId: asset.id,
         type: "facility",
         typeLabel: "地面设施",
-        name: unit.className,
+        name: localizeAssetDisplayName("facility", canonicalName),
+        canonicalName,
         role: "防空 / 雷达 / 地面节点",
-        primaryMetric: `${unit.range} km`,
+        primaryMetric: `${unit.range} 公里`,
         secondaryMetric: "探测 / 交战半径",
         status: "GROUND ASSET",
         raw: unit,
@@ -2430,13 +2290,15 @@ function buildUnitAssetRecords(apiAssets: ApiUnitAsset[]): UnitAssetRecord[] {
 
     if (asset.type === "airbase") {
       const unit = asset.data as unknown as IAirbaseModel;
+      const canonicalName = unit.name;
       return makeAssetRecord({
         id: asset.id,
         assetId: asset.id,
         type: "airbase",
         typeLabel: "机场",
-        name: unit.name,
-        role: unit.country || "Airbase",
+        name: localizeAssetDisplayName("airbase", canonicalName),
+        canonicalName,
+        role: unit.country ? localizeCountry(unit.country) : "机场节点",
         primaryMetric: `${unit.latitude.toFixed(2)}, ${unit.longitude.toFixed(2)}`,
         secondaryMetric: "部署 / 起降节点",
         status: "AIRBASE",
@@ -2449,15 +2311,17 @@ function buildUnitAssetRecords(apiAssets: ApiUnitAsset[]): UnitAssetRecord[] {
     }
 
     const unit = asset.data as unknown as IWeaponModel;
+    const canonicalName = unit.className;
     return makeAssetRecord({
       id: asset.id,
       assetId: asset.id,
       type: "weapon",
       typeLabel: "武器",
-      name: unit.className,
+      name: localizeAssetDisplayName("weapon", canonicalName),
+      canonicalName,
       role: "导弹 / 武器模型",
-      primaryMetric: `${unit.speed} kts`,
-      secondaryMetric: `射程 ${unit.range} nm`,
+      primaryMetric: formatSpeedMetric(unit.speed, "kts"),
+      secondaryMetric: formatRangeMetric("射程", unit.range, "nm"),
       status: "WEAPON",
       raw: unit,
       isSystem: asset.is_system,
@@ -2470,16 +2334,20 @@ function buildUnitAssetRecords(apiAssets: ApiUnitAsset[]): UnitAssetRecord[] {
 
 function buildUnitAssets(unitDb: Dba): UnitAssetRecord[] {
   const aircraft = unitDb.getAircraftDb().map((unit) => {
-    const role = unit.isTanker
-      ? "空中加油机"
-      : classifyAircraft(unit.className);
+    const canonicalName = unit.className;
+    const role = unit.isTanker ? "空中加油机" : classifyAircraft(canonicalName);
     return makeAssetRecord({
       type: "aircraft",
       typeLabel: "飞机",
-      name: unit.className,
+      name: localizeAssetDisplayName("aircraft", canonicalName),
+      canonicalName,
       role,
-      primaryMetric: `${unit.speed} ${unit.units?.speedUnit || "kts"}`,
-      secondaryMetric: `航程 ${unit.range} ${unit.units?.rangeUnit || "nm"}`,
+      primaryMetric: formatSpeedMetric(unit.speed, unit.units?.speedUnit),
+      secondaryMetric: formatRangeMetric(
+        "航程",
+        unit.range,
+        unit.units?.rangeUnit
+      ),
       status: unit.isTanker ? "TANKER READY" : "AIR ASSET",
       raw: unit,
       extra: [
@@ -2494,10 +2362,15 @@ function buildUnitAssets(unitDb: Dba): UnitAssetRecord[] {
     makeAssetRecord({
       type: "ship",
       typeLabel: "舰艇",
-      name: unit.className,
+      name: localizeAssetDisplayName("ship", unit.className),
+      canonicalName: unit.className,
       role: classifyShip(unit.className),
-      primaryMetric: `${unit.speed} ${unit.units?.speedUnit || "kts"}`,
-      secondaryMetric: `航程 ${unit.range} ${unit.units?.rangeUnit || "nm"}`,
+      primaryMetric: formatSpeedMetric(unit.speed, unit.units?.speedUnit),
+      secondaryMetric: formatRangeMetric(
+        "航程",
+        unit.range,
+        unit.units?.rangeUnit
+      ),
       status: "SURFACE ASSET",
       raw: unit,
       extra: [unit.maxFuel, unit.fuelRate].join(" "),
@@ -2508,9 +2381,10 @@ function buildUnitAssets(unitDb: Dba): UnitAssetRecord[] {
     makeAssetRecord({
       type: "facility",
       typeLabel: "地面设施",
-      name: unit.className,
+      name: localizeAssetDisplayName("facility", unit.className),
+      canonicalName: unit.className,
       role: "防空 / 雷达 / 地面节点",
-      primaryMetric: `${unit.range} km`,
+      primaryMetric: `${unit.range} 公里`,
       secondaryMetric: "探测 / 交战半径",
       status: "GROUND ASSET",
       raw: unit,
@@ -2522,9 +2396,10 @@ function buildUnitAssets(unitDb: Dba): UnitAssetRecord[] {
     makeAssetRecord({
       type: "airbase",
       typeLabel: "机场",
-      name: unit.name,
-      role: unit.country,
-      primaryMetric: unit.country,
+      name: localizeAssetDisplayName("airbase", unit.name),
+      canonicalName: unit.name,
+      role: unit.country ? localizeCountry(unit.country) : "机场节点",
+      primaryMetric: unit.country ? localizeCountry(unit.country) : "未知",
       secondaryMetric: `${unit.latitude.toFixed(2)}, ${unit.longitude.toFixed(2)}`,
       status: "BASE ASSET",
       raw: unit,
@@ -2536,10 +2411,11 @@ function buildUnitAssets(unitDb: Dba): UnitAssetRecord[] {
     makeAssetRecord({
       type: "weapon",
       typeLabel: "武器",
-      name: unit.className,
+      name: localizeAssetDisplayName("weapon", unit.className),
+      canonicalName: unit.className,
       role: "武器挂载 / 弹药",
       primaryMetric: `杀伤 ${unit.lethality}`,
-      secondaryMetric: `射程 ${unit.range} km`,
+      secondaryMetric: `射程 ${unit.range} 公里`,
       status: "WEAPON ASSET",
       raw: unit,
       extra: [unit.speed, unit.maxFuel, unit.fuelRate].join(" "),
@@ -2563,6 +2439,7 @@ function makeAssetRecord({
   version,
   updatedAt,
   raw,
+  canonicalName,
   extra,
 }: Omit<
   UnitAssetRecord,
@@ -2575,16 +2452,19 @@ function makeAssetRecord({
   updatedAt?: string;
   extra?: string;
 }) {
+  const recordKey = canonicalName || name;
+  const statusLabel = localizeAssetStatus(status);
   return {
-    id: id ?? `${type}:${name}`,
-    assetId: assetId ?? `${type}:${name}`,
+    id: id ?? `${type}:${recordKey}`,
+    assetId: assetId ?? `${type}:${recordKey}`,
     type,
     typeLabel,
     name,
+    canonicalName,
     role,
     primaryMetric,
     secondaryMetric,
-    status,
+    status: statusLabel,
     isSystem: isSystem ?? true,
     version: version ?? 1,
     updatedAt: updatedAt ?? "",
@@ -2593,10 +2473,12 @@ function makeAssetRecord({
       type,
       typeLabel,
       name,
+      canonicalName ?? "",
       role,
       primaryMetric,
       secondaryMetric,
       status,
+      statusLabel,
       extra ?? "",
     ].join(" "),
   };
@@ -2705,6 +2587,11 @@ function UnitAssetDetail({
   const entries = Object.entries(asset.raw).filter(
     ([, value]) => typeof value !== "object" || value === null
   );
+  const detailEntries = entries.map(([key, value]) => ({
+    key,
+    label: UNIT_ASSET_FIELD_LABELS[key] ?? key,
+    value: formatAssetFieldValue(asset, key, value),
+  }));
   const source =
     "dataSource" in asset.raw && asset.raw.dataSource
       ? Object.entries(asset.raw.dataSource as Record<string, string>).filter(
@@ -2719,7 +2606,7 @@ function UnitAssetDetail({
         <div className="mb-5 flex items-start justify-between gap-4">
           <div>
             <div className="text-xs font-semibold uppercase tracking-[0.22em] text-cyan-200/80">
-              Unit Asset Detail
+              单位资产详情
             </div>
             <h3 className="mt-2 text-xl font-semibold text-white">
               {asset.name}
@@ -2769,14 +2656,14 @@ function UnitAssetDetail({
         <div className="mt-5">
           <div className="mb-3 text-sm font-medium text-slate-200">参数</div>
           <div className="space-y-2">
-            {entries.map(([key, value]) => (
+            {detailEntries.map((entry) => (
               <div
-                key={key}
+                key={entry.key}
                 className="flex items-center justify-between gap-3 rounded-xl border border-white/8 bg-white/[0.035] px-3 py-2 text-sm"
               >
-                <span className="text-slate-500">{key}</span>
+                <span className="text-slate-500">{entry.label}</span>
                 <span className="max-w-[12rem] truncate text-right text-slate-100">
-                  {String(value)}
+                  {entry.value}
                 </span>
               </div>
             ))}
@@ -2794,8 +2681,10 @@ function UnitAssetDetail({
                   key={key}
                   className="rounded-xl border border-cyan-200/10 bg-cyan-200/[0.035] px-3 py-2 text-xs text-slate-400"
                 >
-                  <span className="mr-2 text-cyan-200">{key}</span>
-                  {value}
+                  <span className="mr-2 text-cyan-200">
+                    {UNIT_ASSET_SOURCE_LABELS[key] ?? key}
+                  </span>
+                  {formatAssetFieldValue(asset, key, value)}
                 </div>
               ))}
             </div>
@@ -2815,141 +2704,6 @@ function DetailMetric({ label, value }: { label: string; value: string }) {
       </div>
     </div>
   );
-}
-
-function buildActivities(
-  items: ScenarioListItem[],
-  templateCount: number
-): ActivityItem[] {
-  const source = items.slice(0, 4);
-  if (source.length === 0) {
-    return [
-      {
-        id: "seed-ai",
-        time: "14:32",
-        title: "AI 生成了新的场景建议",
-        desc: "基于当前态势生成 3 个可选推演方向",
-        type: "ai",
-        color: "emerald",
-      },
-      {
-        id: "seed-import",
-        time: "12:20",
-        title: "导入了新的场景文件",
-        desc: "SCS_Complex_EW_20240523.json",
-        type: "import",
-        color: "violet",
-      },
-    ];
-  }
-
-  return source.map((item, index) => {
-    const type = index % 4;
-    return {
-      id: item.id,
-      scenarioId: item.id,
-      time: shortTime(item.updated_at),
-      title:
-        type === 0
-          ? "AI 分析完成"
-          : type === 1
-            ? "更新了项目"
-            : type === 2
-              ? "运行了战术推演模拟"
-              : "创建了新项目",
-      desc:
-        type === 0
-          ? `${item.name} · 生成了风险评估报告和建议方案`
-          : type === 1
-            ? `${item.name} · 修改了任务编排和单位配置`
-            : type === 2
-              ? `${item.name} · 模拟时长 ${24 + templateCount * 6} 分钟`
-              : item.name,
-      type: ["ai", "update", "simulation", "create"][type],
-      color: ["emerald", "sky", "amber", "blue"][type],
-    };
-  });
-}
-
-function RecentActivityTimeline({
-  activities,
-  onOpen,
-}: {
-  activities: ActivityItem[];
-  onOpen: (id: string) => void;
-}) {
-  return (
-    <section className="mt-5 rounded-2xl border border-cyan-200/10 bg-white/[0.03] p-5 shadow-[0_24px_90px_rgba(0,0,0,0.22)] backdrop-blur-xl">
-      <div className="mb-5 flex items-center justify-between">
-        <div>
-          <h2 className="text-lg font-semibold text-slate-100">最近活动</h2>
-          <p className="mt-1 text-sm text-slate-500">
-            AI 生成、导入文件、推演运行与分析完成事件流
-          </p>
-        </div>
-        <button
-          type="button"
-          className="hidden items-center gap-1 text-sm text-cyan-200 hover:text-white sm:inline-flex"
-        >
-          查看全部活动
-          <ChevronDown className="size-4 -rotate-90" />
-        </button>
-      </div>
-
-      <div className="grid grid-cols-1 gap-x-6 gap-y-2 xl:grid-cols-2">
-        {activities.map((activity) => (
-          <div
-            key={activity.id}
-            className="group grid grid-cols-[64px_34px_minmax(0,1fr)_auto] items-center gap-3 rounded-xl border border-transparent px-3 py-3 transition-colors hover:border-cyan-200/10 hover:bg-white/[0.035]"
-          >
-            <div className="text-sm text-slate-500">{activity.time}</div>
-            <span
-              className={cn(
-                "relative grid size-8 place-items-center rounded-full border",
-                activity.color === "emerald" &&
-                  "border-emerald-300/35 bg-emerald-400/15 text-emerald-200",
-                activity.color === "sky" &&
-                  "border-sky-300/35 bg-sky-400/15 text-sky-200",
-                activity.color === "amber" &&
-                  "border-amber-300/35 bg-amber-400/15 text-amber-200",
-                activity.color === "blue" &&
-                  "border-blue-300/35 bg-blue-400/15 text-blue-200",
-                activity.color === "violet" &&
-                  "border-violet-300/35 bg-violet-400/15 text-violet-200"
-              )}
-            >
-              <ActivityIcon type={activity.type} />
-            </span>
-            <div className="min-w-0">
-              <div className="truncate text-sm font-medium text-slate-100">
-                {activity.title}
-              </div>
-              <div className="mt-1 truncate text-sm text-slate-500">
-                {activity.desc}
-              </div>
-            </div>
-            {activity.scenarioId && (
-              <button
-                type="button"
-                onClick={() => onOpen(activity.scenarioId!)}
-                className="rounded-xl border border-cyan-200/10 bg-cyan-200/[0.04] px-3 py-2 text-xs text-cyan-100 opacity-0 transition-opacity group-hover:opacity-100"
-              >
-                打开项目
-              </button>
-            )}
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function ActivityIcon({ type }: { type: string }) {
-  if (type === "ai") return <Sparkles className="size-4" />;
-  if (type === "simulation") return <Activity className="size-4" />;
-  if (type === "import") return <UploadCloud className="size-4" />;
-  if (type === "update") return <Edit3 className="size-4" />;
-  return <CheckCircle2 className="size-4" />;
 }
 
 function Empty({
@@ -3024,17 +2778,14 @@ function Skeleton({ view }: { view: ViewMode }) {
 }
 
 function CreateScenarioDialog({
-  templates,
   onClose,
   onCreated,
 }: {
-  templates: ScenarioListItem[];
   onClose: () => void;
   onCreated: (id: string) => void;
 }) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [templateId, setTemplateId] = useState<string>("__blank__");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -3056,25 +2807,11 @@ function CreateScenarioDialog({
 
     setSubmitting(true);
     try {
-      let data = cloneScenarioData(name.trim());
-      if (templateId !== "__blank__") {
-        const template = await getScenario(templateId);
-        data = JSON.parse(JSON.stringify(template.data)) as Record<
-          string,
-          unknown
-        >;
-        const currentScenario = data.currentScenario as
-          | Record<string, unknown>
-          | undefined;
-        if (currentScenario) currentScenario.name = name.trim();
-        setScenarioClockToNow(data);
-      }
-
       const created = await createScenario({
         name: name.trim(),
         description: description.trim(),
         status: "draft",
-        data,
+        data: cloneScenarioData(name.trim()),
       });
       onCreated(created.id);
     } catch (err) {
@@ -3100,9 +2837,7 @@ function CreateScenarioDialog({
             <div className="text-lg font-semibold text-slate-100">
               新建推演项目
             </div>
-            <div className="text-sm text-slate-500">
-              基于空白工作区或模板创建项目
-            </div>
+            <div className="text-sm text-slate-500">基于空白工作区创建项目</div>
           </div>
         </div>
 
@@ -3134,24 +2869,6 @@ function CreateScenarioDialog({
               placeholder="简要说明本项目的推演目标、想定背景或评估方向"
               className="w-full resize-none rounded-xl border border-cyan-200/15 bg-slate-950/50 px-3 py-3 text-sm text-slate-100 outline-none placeholder:text-slate-600 focus:border-cyan-200/45"
             />
-          </div>
-
-          <div>
-            <label className="mb-2 block text-sm text-slate-400">
-              基于模板
-            </label>
-            <select
-              value={templateId}
-              onChange={(event) => setTemplateId(event.target.value)}
-              className="w-full rounded-xl border border-cyan-200/15 bg-slate-950/50 px-3 py-3 text-sm text-slate-100 outline-none focus:border-cyan-200/45"
-            >
-              <option value="__blank__">空白项目</option>
-              {templates.map((template) => (
-                <option key={template.id} value={template.id}>
-                  {template.name}
-                </option>
-              ))}
-            </select>
           </div>
 
           {error && (

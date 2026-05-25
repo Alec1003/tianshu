@@ -20,12 +20,6 @@ import Facility from "@/game/units/Facility";
 import ReferencePoint from "@/game/units/ReferencePoint";
 import Scenario from "@/game/Scenario";
 import Ship from "@/game/units/Ship";
-import {
-  isOperationalDetailVisible,
-  isScenarioObjectVisible,
-  type ScenarioMapUnit,
-  type ScenarioVisibility,
-} from "@/game/scenarioVisibility";
 import { NAUTICAL_MILES_TO_METERS } from "@/utils/constants";
 
 import { localizeUnitName } from "@/i18n/entityNames";
@@ -113,14 +107,41 @@ export type ScenarioUnit =
   | { type: "airbase"; unit: Airbase }
   | { type: "referencePoint"; unit: ReferencePoint };
 
+type ScenarioMapUnit = Aircraft | Ship | Facility | Airbase | ReferencePoint;
+
 interface TypedUnit {
   unit: ScenarioMapUnit;
   type: UnitType;
 }
 
+export interface AuthoritativeScenarioVisibility {
+  godMode: boolean;
+  visibleObjectIds: ReadonlySet<string> | null;
+  operationalDetailObjectIds: ReadonlySet<string> | null;
+}
+
 export interface CesiumScenarioRenderOptions {
   showRoutes?: boolean;
   showRanges?: boolean;
+}
+
+function isObjectVisible(
+  object: { id: string },
+  visibility: AuthoritativeScenarioVisibility
+): boolean {
+  return (
+    visibility.godMode || visibility.visibleObjectIds?.has(object.id) === true
+  );
+}
+
+function isOperationalDetailVisible(
+  object: { id: string },
+  visibility: AuthoritativeScenarioVisibility
+): boolean {
+  return (
+    visibility.godMode ||
+    visibility.operationalDetailObjectIds?.has(object.id) === true
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -215,42 +236,43 @@ export class CesiumScenarioEntities {
 
   async sync(
     scenario: Scenario,
-    visibility: ScenarioVisibility = {
+    visibility: AuthoritativeScenarioVisibility = {
       godMode: true,
-      currentSideId: "",
+      visibleObjectIds: null,
+      operationalDetailObjectIds: null,
     },
     renderOptions: CesiumScenarioRenderOptions = {}
   ): Promise<void> {
     const { showRoutes = true, showRanges = true } = renderOptions;
     const all = this.collect(scenario);
     const visibleUnits = all.filter(({ unit }) =>
-      isScenarioObjectVisible(scenario, unit, visibility)
+      isObjectVisible(unit, visibility)
     );
 
     // Refresh typed unit index for popup lookup.
     this.unitIndex.clear();
     for (const aircraft of scenario.aircraft.filter((unit) =>
-      isScenarioObjectVisible(scenario, unit, visibility)
+      isObjectVisible(unit, visibility)
     )) {
       this.unitIndex.set(aircraft.id, { type: "aircraft", unit: aircraft });
     }
     for (const ship of scenario.ships.filter((unit) =>
-      isScenarioObjectVisible(scenario, unit, visibility)
+      isObjectVisible(unit, visibility)
     )) {
       this.unitIndex.set(ship.id, { type: "ship", unit: ship });
     }
     for (const facility of scenario.facilities.filter((unit) =>
-      isScenarioObjectVisible(scenario, unit, visibility)
+      isObjectVisible(unit, visibility)
     )) {
       this.unitIndex.set(facility.id, { type: "facility", unit: facility });
     }
     for (const airbase of scenario.airbases.filter((unit) =>
-      isScenarioObjectVisible(scenario, unit, visibility)
+      isObjectVisible(unit, visibility)
     )) {
       this.unitIndex.set(airbase.id, { type: "airbase", unit: airbase });
     }
     for (const rp of scenario.referencePoints.filter((unit) =>
-      isScenarioObjectVisible(scenario, unit, visibility)
+      isObjectVisible(unit, visibility)
     )) {
       this.unitIndex.set(rp.id, { type: "referencePoint", unit: rp });
     }
@@ -265,7 +287,7 @@ export class CesiumScenarioEntities {
       if (!combos.has(key)) combos.set(key, [svg, unit.sideColor]);
     }
     for (const weapon of scenario.weapons.filter((unit) =>
-      isScenarioObjectVisible(scenario, unit, visibility)
+      isObjectVisible(unit, visibility)
     )) {
       const key = `${WeaponSvg}|${weapon.sideColor}`;
       if (!combos.has(key)) combos.set(key, [WeaponSvg, weapon.sideColor]);
@@ -388,11 +410,11 @@ export class CesiumScenarioEntities {
   // Pickable as `weapon:<id>` but lookupUnit returns null (popup ignores it).
   private syncWeapons(
     scenario: Scenario,
-    visibility: ScenarioVisibility
+    visibility: AuthoritativeScenarioVisibility
   ): void {
     const want = new Set<string>();
     for (const weapon of scenario.weapons.filter((unit) =>
-      isScenarioObjectVisible(scenario, unit, visibility)
+      isObjectVisible(unit, visibility)
     )) {
       want.add(weapon.id);
       const iconUrl =
@@ -434,11 +456,14 @@ export class CesiumScenarioEntities {
   // Route polylines: aircraft + ship `route: number[][]` (each waypoint is
   // [lat, lon] per OL `RouteLayer.generateRouteWaypoints`). We start the line
   // at the unit's current position and dash it in `sideColor`.
-  private syncRoutes(scenario: Scenario, visibility: ScenarioVisibility): void {
+  private syncRoutes(
+    scenario: Scenario,
+    visibility: AuthoritativeScenarioVisibility
+  ): void {
     const movers: { id: string; sideColor: string; positions: Cartesian3[] }[] =
       [];
     const collect = (unit: Aircraft | Ship) => {
-      if (!isOperationalDetailVisible(scenario, unit, visibility)) return;
+      if (!isOperationalDetailVisible(unit, visibility)) return;
       if (!unit.route || unit.route.length === 0) return;
       const positions = [
         Cartesian3.fromDegrees(unit.longitude, unit.latitude),
@@ -483,7 +508,10 @@ export class CesiumScenarioEntities {
 
   // Threat / detection range rings: aircraft + ship + facility expose
   // `getDetectionRange()` in nautical miles. Cesium ellipse sized in meters.
-  private syncRanges(scenario: Scenario, visibility: ScenarioVisibility): void {
+  private syncRanges(
+    scenario: Scenario,
+    visibility: AuthoritativeScenarioVisibility
+  ): void {
     const ranged = [
       ...scenario.aircraft,
       ...scenario.ships,
@@ -492,7 +520,7 @@ export class CesiumScenarioEntities {
 
     const want = new Set<string>();
     for (const u of ranged.filter((unit) =>
-      isOperationalDetailVisible(scenario, unit, visibility)
+      isOperationalDetailVisible(unit, visibility)
     )) {
       const rangeNm = u.getDetectionRange();
       if (!rangeNm || rangeNm <= 0) continue;

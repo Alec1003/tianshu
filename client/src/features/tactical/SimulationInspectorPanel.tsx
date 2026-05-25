@@ -7,10 +7,7 @@ import {
   Terminal,
 } from "lucide-react";
 import Game, { type Mission } from "@/game/Game";
-import {
-  isHostileToCurrentSide,
-  isScenarioObjectVisible,
-} from "@/game/scenarioVisibility";
+import { isHostileToCurrentSide } from "@/game/scenarioVisibility";
 import type { SimulationSnapshot } from "./SimulationSidebar";
 
 interface SimulationInspectorPanelProps {
@@ -81,10 +78,15 @@ export default function SimulationInspectorPanel({
   snapshot,
 }: SimulationInspectorPanelProps) {
   const scenario = game.currentScenario;
-  const visibility = {
-    godMode: snapshot.godMode,
-    currentSideId: snapshot.currentSideId,
-  };
+  const runtimeSideVisibility =
+    snapshot.visibility?.by_side[snapshot.currentSideId] ??
+    snapshot.visibility?.by_side[snapshot.visibility.current_side_id] ??
+    null;
+  const visibleObjectIds = new Set(
+    runtimeSideVisibility?.visible_object_ids ?? []
+  );
+  const isVisible = (id: string) =>
+    snapshot.godMode || visibleObjectIds.has(id);
   const progress =
     snapshot.duration > 0
       ? Math.min(100, (snapshot.elapsedSeconds / snapshot.duration) * 100)
@@ -98,19 +100,13 @@ export default function SimulationInspectorPanel({
     );
     const restricted = !snapshot.godMode && hostile;
     const visibleAircraft = scenario.aircraft.filter(
-      (unit) =>
-        unit.sideId === side.id &&
-        isScenarioObjectVisible(scenario, unit, visibility)
+      (unit) => unit.sideId === side.id && isVisible(unit.id)
     ).length;
     const visibleShips = scenario.ships.filter(
-      (unit) =>
-        unit.sideId === side.id &&
-        isScenarioObjectVisible(scenario, unit, visibility)
+      (unit) => unit.sideId === side.id && isVisible(unit.id)
     ).length;
     const visibleFacilities = scenario.facilities.filter(
-      (unit) =>
-        unit.sideId === side.id &&
-        isScenarioObjectVisible(scenario, unit, visibility)
+      (unit) => unit.sideId === side.id && isVisible(unit.id)
     ).length;
     const detectedCount = visibleAircraft + visibleShips + visibleFacilities;
 

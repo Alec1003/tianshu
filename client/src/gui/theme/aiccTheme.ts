@@ -38,9 +38,17 @@ const SHARED_TYPOGRAPHY = {
     "Arial",
     "sans-serif",
   ].join(","),
-  h6: { fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase" as const },
+  h6: {
+    fontWeight: 600,
+    letterSpacing: "0.06em",
+    textTransform: "uppercase" as const,
+  },
   body2: { fontSize: 12 },
-  button: { fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase" as const },
+  button: {
+    fontWeight: 600,
+    letterSpacing: "0.05em",
+    textTransform: "uppercase" as const,
+  },
 };
 
 export const aiccDarkTheme: Theme = createTheme({

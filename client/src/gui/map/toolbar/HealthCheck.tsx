@@ -36,7 +36,7 @@ export default function HealthCheck() {
       active = false;
       clearTimeout(timer);
     };
-  }, [apiUrl]);
+  }, [apiUrl, env]);
 
   let content;
   if (!env || env === "standalone") {

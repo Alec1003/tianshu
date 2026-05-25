@@ -28,6 +28,25 @@ const forbiddenPatterns = [
     label: "frontend ship attack invocation",
     pattern: /\bgame\.handleShipAttack\s*\(/,
   },
+  {
+    label: "frontend local mission mutation",
+    pattern:
+      /\bgame\.(?:createPatrolMission|createStrikeMission|updatePatrolMission|updateStrikeMission|deleteMission)\s*\(/,
+  },
+  {
+    label: "frontend local unit add/delete mutation",
+    pattern:
+      /\bgame\.(?:addAircraft|addShip|addFacility|addAirbase|addReferencePoint|removeAircraft|removeShip|removeFacility|removeAirbase|removeReferencePoint)\s*\(/,
+  },
+  {
+    label: "frontend local route commit",
+    pattern: /\bgame\.commitRoute\s*\(/,
+  },
+  {
+    label: "frontend local weapon mutation",
+    pattern:
+      /\bs\.(?:addWeaponToAircraft|addWeaponToShip|addWeaponToFacility|deleteWeaponFromAircraft|deleteWeaponFromShip|deleteWeaponFromFacility|updateAircraftWeaponQuantity|updateShipWeaponQuantity|updateFacilityWeaponQuantity)\s*\(/,
+  },
 ];
 
 function collectSourceFiles(dir: string): string[] {
@@ -67,6 +86,15 @@ describe("backend runtime boundary", () => {
       ? collectSourceFiles(legacyTestDir)
       : [];
     expect(legacyTestFiles).toEqual([]);
+  });
+
+  test("legacy local-engine map views are removed", () => {
+    expect(existsSync(join(srcRoot, "gui", "map", "ScenarioMap.tsx"))).toBe(
+      false
+    );
+    expect(
+      existsSync(join(srcRoot, "gui", "map", "OpenLayersScenarioMap.tsx"))
+    ).toBe(false);
   });
 
   test("frontend weapon engagement engine is removed", () => {

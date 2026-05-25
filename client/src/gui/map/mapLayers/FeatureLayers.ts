@@ -588,7 +588,9 @@ export class ShipLayer extends FeatureLayer {
       const feature = this.layerSource.getFeatureById(ship.id);
       if (feature) {
         feature.setGeometry(
-          new Point(fromLonLat([ship.longitude, ship.latitude], this.projection))
+          new Point(
+            fromLonLat([ship.longitude, ship.latitude], this.projection)
+          )
         );
       }
     });

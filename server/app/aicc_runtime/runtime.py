@@ -17,17 +17,126 @@ if str(GYM_DIR) not in sys.path:
 from blade.Game import Game  # type: ignore  # noqa: E402
 from blade.Scenario import Scenario  # type: ignore  # noqa: E402
 from blade.db.UnitDb import AirbaseDb, AircraftDb, FacilityDb, ShipDb  # type: ignore  # noqa: E402
+from blade.Side import Side  # type: ignore  # noqa: E402
 from blade.units.Airbase import Airbase  # type: ignore  # noqa: E402
 from blade.units.Aircraft import Aircraft  # type: ignore  # noqa: E402
 from blade.units.Facility import Facility  # type: ignore  # noqa: E402
 from blade.units.ReferencePoint import ReferencePoint  # type: ignore  # noqa: E402
 from blade.units.Ship import Ship  # type: ignore  # noqa: E402
+from blade.units.Weapon import Weapon  # type: ignore  # noqa: E402
 
 from app.aicc_runtime._doctrine import (  # noqa: E402
     _DEFAULT_SIDE_DOCTRINE,
     default_doctrine_for_sides as _default_doctrine_for_sides,
     normalize_scenario_payload as _normalize_scenario_payload_impl,
 )
+
+
+DEFAULT_AIRCRAFT_WEAPON_KEYS = {
+    "AIM-120 AMRAAM": 4,
+    "AIM-9 Sidewinder": 2,
+    "AGM-65 Maverick": 2,
+}
+DEFAULT_FACILITY_WEAPON_KEYS = {
+    "48N6 (S-400 Triumf)": 8,
+    "9M96 (S-300V4)": 12,
+    "57E6E (Pantsir-S1)": 16,
+}
+DEFAULT_SHIP_WEAPON_KEYS = {
+    "RIM-174 Standard SM-6": 96,
+    "RIM-116 RAM": 42,
+    "RGM-84 Harpoon": 8,
+}
+FALLBACK_WEAPON_TEMPLATES = {
+    "AIM-120 AMRAAM": {
+        "speed": 2600.0,
+        "max_fuel": 480.0,
+        "fuel_rate": 350.0,
+        "range": 86.0,
+        "lethality": 0.65,
+    },
+    "AIM-9 Sidewinder": {
+        "speed": 1500.0,
+        "max_fuel": 100.0,
+        "fuel_rate": 80.0,
+        "range": 19.0,
+        "lethality": 0.60,
+    },
+    "AGM-65 Maverick": {
+        "speed": 600.0,
+        "max_fuel": 200.0,
+        "fuel_rate": 120.0,
+        "range": 12.0,
+        "lethality": 0.70,
+    },
+    "48N6 (S-400 Triumf)": {
+        "speed": 3966.0,
+        "max_fuel": 1543.0,
+        "fuel_rate": 300.0,
+        "range": 135.0,
+        "lethality": 0.90,
+    },
+    "9M96 (S-300V4)": {
+        "speed": 2644.0,
+        "max_fuel": 1000.0,
+        "fuel_rate": 200.0,
+        "range": 65.0,
+        "lethality": 0.85,
+    },
+    "57E6E (Pantsir-S1)": {
+        "speed": 2313.0,
+        "max_fuel": 250.0,
+        "fuel_rate": 80.0,
+        "range": 10.8,
+        "lethality": 0.70,
+    },
+    "RIM-174 Standard SM-6": {
+        "speed": 2313.0,
+        "max_fuel": 1100.0,
+        "fuel_rate": 300.0,
+        "range": 130.0,
+        "lethality": 0.90,
+    },
+    "RIM-116 RAM": {
+        "speed": 1653.0,
+        "max_fuel": 250.0,
+        "fuel_rate": 100.0,
+        "range": 5.5,
+        "lethality": 0.80,
+    },
+    "RGM-84 Harpoon": {
+        "speed": 475.0,
+        "max_fuel": 700.0,
+        "fuel_rate": 150.0,
+        "range": 67.0,
+        "lethality": 0.80,
+    },
+}
+
+
+def _load_weapon_templates() -> dict[str, dict[str, float]]:
+    templates = dict(FALLBACK_WEAPON_TEMPLATES)
+    source = ROOT_DIR / "server" / "app" / "unit_assets" / "default_unit_assets.json"
+    try:
+        data = json.loads(source.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return templates
+
+    for row in data.get("weaponDb", []):
+        class_name = row.get("className") or row.get("class_name")
+        if not class_name:
+            continue
+        templates[str(class_name)] = {
+            "speed": float(row.get("speed", 0.0) or 0.0),
+            "max_fuel": float(row.get("maxFuel", row.get("max_fuel", 0.0)) or 0.0),
+            "fuel_rate": float(row.get("fuelRate", row.get("fuel_rate", 1.0)) or 1.0),
+            "range": float(row.get("range", 0.0) or 0.0),
+            "lethality": float(row.get("lethality", 0.0) or 0.0),
+        }
+    return templates
+
+
+WEAPON_TEMPLATES = _load_weapon_templates()
 
 
 class AICCRuntime:
@@ -101,6 +210,163 @@ class AICCRuntime:
                 return row
         return rows[0] if rows else {}
 
+    def _make_weapon(
+        self,
+        class_name: str,
+        quantity: int,
+        side_id: str,
+        side_color: Any,
+        *,
+        latitude: float = 0.0,
+        longitude: float = 0.0,
+        altitude: float = 10000.0,
+    ) -> Weapon:
+        template = WEAPON_TEMPLATES.get(class_name)
+        if template is None:
+            raise ValueError(f"Unsupported weapon class: {class_name}")
+        return Weapon(
+            id=str(uuid4()),
+            name=class_name,
+            side_id=side_id,
+            class_name=class_name,
+            latitude=latitude,
+            longitude=longitude,
+            altitude=altitude,
+            heading=90.0,
+            speed=self._to_float(template.get("speed"), 0.0),
+            current_fuel=self._to_float(template.get("max_fuel"), 0.0),
+            max_fuel=self._to_float(template.get("max_fuel"), 0.0),
+            fuel_rate=self._to_float(template.get("fuel_rate"), 1.0),
+            range=self._to_float(template.get("range"), 0.0),
+            side_color=side_color,
+            target_id="",
+            lethality=self._to_float(template.get("lethality"), 0.0),
+            max_quantity=quantity,
+            current_quantity=quantity,
+        )
+
+    def _default_weapons(
+        self,
+        weapon_keys: dict[str, int],
+        side_id: str,
+        side_color: Any,
+        *,
+        latitude: float = 0.0,
+        longitude: float = 0.0,
+        altitude: float = 10000.0,
+    ) -> list[Weapon]:
+        weapons: list[Weapon] = []
+        for class_name, quantity in weapon_keys.items():
+            weapons.append(
+                self._make_weapon(
+                    class_name,
+                    quantity,
+                    side_id,
+                    side_color,
+                    latitude=latitude,
+                    longitude=longitude,
+                    altitude=altitude,
+                )
+            )
+        return weapons
+
+    def _get_unit(self, unit_type: str, unit_id: str) -> Any:
+        scenario = self.game.current_scenario
+        normalized = unit_type.lower().strip()
+        if normalized == "aircraft":
+            return scenario.get_aircraft(unit_id)
+        if normalized == "ship":
+            return scenario.get_ship(unit_id)
+        if normalized == "facility":
+            return scenario.get_facility(unit_id)
+        if normalized == "airbase":
+            return scenario.get_airbase(unit_id)
+        if normalized in {"reference_point", "referencepoint"}:
+            return scenario.get_reference_point(unit_id)
+        if normalized == "weapon":
+            return scenario.get_weapon(unit_id)
+        raise ValueError(f"Unsupported unit type: {unit_type}")
+
+    @staticmethod
+    def _unique_side_refs(refs: list[str] | None, side_id: str) -> list[str]:
+        out: list[str] = []
+        for ref in refs or []:
+            if ref and ref != side_id and ref not in out:
+                out.append(ref)
+        return out
+
+    def _sync_side_color(self, side_id: str, color: Any) -> None:
+        scenario = self.game.current_scenario
+        for airbase in scenario.airbases:
+            if airbase.side_id != side_id:
+                continue
+            airbase.side_color = color
+            for aircraft in airbase.aircraft:
+                aircraft.side_color = color
+                for weapon in aircraft.weapons:
+                    weapon.side_color = color
+        for ship in scenario.ships:
+            if ship.side_id != side_id:
+                continue
+            ship.side_color = color
+            for aircraft in ship.aircraft:
+                aircraft.side_color = color
+                for weapon in aircraft.weapons:
+                    weapon.side_color = color
+            for weapon in ship.weapons:
+                weapon.side_color = color
+        for facility in scenario.facilities:
+            if facility.side_id != side_id:
+                continue
+            facility.side_color = color
+            for weapon in facility.weapons:
+                weapon.side_color = color
+        for aircraft in scenario.aircraft:
+            if aircraft.side_id != side_id:
+                continue
+            aircraft.side_color = color
+            for weapon in aircraft.weapons:
+                weapon.side_color = color
+        for weapon in scenario.weapons:
+            if weapon.side_id == side_id:
+                weapon.side_color = color
+        for point in scenario.reference_points:
+            if point.side_id == side_id:
+                point.side_color = color
+        for mission in scenario.missions:
+            assigned_area = getattr(mission, "assigned_area", None)
+            if assigned_area:
+                for point in assigned_area:
+                    if point.side_id == side_id:
+                        point.side_color = color
+
+    def _remove_unit_references(self, unit_id: str) -> None:
+        scenario = self.game.current_scenario
+        for aircraft in scenario.aircraft:
+            if aircraft.home_base_id == unit_id:
+                aircraft.home_base_id = ""
+                aircraft.rtb = False
+                aircraft.route = []
+            if aircraft.target_id == unit_id:
+                aircraft.target_id = ""
+        for mission in scenario.missions:
+            if hasattr(mission, "assigned_unit_ids"):
+                mission.assigned_unit_ids = [
+                    item for item in mission.assigned_unit_ids if item != unit_id
+                ]
+            if hasattr(mission, "assigned_target_ids"):
+                mission.assigned_target_ids = [
+                    item for item in mission.assigned_target_ids if item != unit_id
+                ]
+            assigned_area = getattr(mission, "assigned_area", None)
+            if assigned_area:
+                mission.assigned_area = [
+                    point for point in assigned_area if point.id != unit_id
+                ]
+                update_geometry = getattr(mission, "update_patrol_area_geometry", None)
+                if callable(update_geometry) and len(mission.assigned_area) >= 3:
+                    update_geometry()
+
     # ----------------------------- simulation lifecycle -----------------------------
     def start_simulation(self) -> dict[str, Any]:
         with self._lock:
@@ -125,10 +391,18 @@ class AICCRuntime:
 
     def step_simulation(self, steps: int = 1) -> dict[str, Any]:
         with self._lock:
-            steps = max(1, steps)
-            for _ in range(steps):
+            requested_steps = max(1, steps)
+            executed_steps = 0
+            for _ in range(requested_steps):
+                if self.game.check_game_ended():
+                    break
                 self.game.step("")
-            return {"steps": steps, "currentTime": self.game.current_scenario.current_time}
+                executed_steps += 1
+            return {
+                "steps": executed_steps,
+                "requestedSteps": requested_steps,
+                "currentTime": self.game.current_scenario.current_time,
+            }
 
     def attack_unit(
         self,
@@ -293,7 +567,18 @@ class AICCRuntime:
                 fuel_rate=self._to_float(row.get("fuel_rate"), 1000.0),
                 range=self._to_float(row.get("range"), 100.0),
                 side_color=side_color,
-                weapons=[],
+                weapons=(
+                    []
+                    if bool(row.get("is_tanker", False))
+                    else self._default_weapons(
+                        DEFAULT_AIRCRAFT_WEAPON_KEYS,
+                        side_id,
+                        side_color,
+                        latitude=latitude,
+                        longitude=longitude,
+                        altitude=altitude,
+                    )
+                ),
                 is_tanker=bool(row.get("is_tanker", False)),
                 fuel_offload_capacity=self._to_float(
                     row.get("fuel_offload_capacity"), 0.0
@@ -331,7 +616,14 @@ class AICCRuntime:
                 fuel_rate=self._to_float(row.get("fuel_rate"), 10000.0),
                 range=self._to_float(row.get("range"), 1000.0),
                 side_color=side_color,
-                weapons=[],
+                weapons=self._default_weapons(
+                    DEFAULT_SHIP_WEAPON_KEYS,
+                    side_id,
+                    side_color,
+                    latitude=latitude,
+                    longitude=longitude,
+                    altitude=0.0,
+                ),
                 aircraft=[],
             )
             self.game.current_scenario.ships.append(ship)
@@ -359,7 +651,14 @@ class AICCRuntime:
                 altitude=0.0,
                 range=self._to_float(row.get("range"), 50.0),
                 side_color=side_color,
-                weapons=[],
+                weapons=self._default_weapons(
+                    DEFAULT_FACILITY_WEAPON_KEYS,
+                    side_id,
+                    side_color,
+                    latitude=latitude,
+                    longitude=longitude,
+                    altitude=10000.0,
+                ),
             )
             self.game.current_scenario.facilities.append(facility)
             return {"unitType": "facility", "unitId": facility.id, "name": facility.name}
@@ -428,6 +727,7 @@ class AICCRuntime:
                 ]
             else:
                 raise ValueError(f"Unsupported unit type for delete: {unit_type}")
+            self._remove_unit_references(unit_id)
             return {"deleted": True, "unitType": unit_type, "unitId": unit_id}
 
     def move_unit(
@@ -435,13 +735,62 @@ class AICCRuntime:
     ) -> dict[str, Any]:
         with self._lock:
             unit_type = unit_type.lower().strip()
+            normalized_route = [
+                [self._to_float(point[0] if len(point) > 0 else None, 0.0),
+                 self._to_float(point[1] if len(point) > 1 else None, 0.0)]
+                for point in route
+            ]
             if unit_type == "aircraft":
-                self.game.move_aircraft(unit_id, route)
+                if self.game.current_scenario.get_aircraft(unit_id) is None:
+                    raise ValueError("Aircraft not found")
+                self.game.move_aircraft(unit_id, normalized_route)
             elif unit_type == "ship":
-                self.game.move_ship(unit_id, route)
+                if self.game.current_scenario.get_ship(unit_id) is None:
+                    raise ValueError("Ship not found")
+                self.game.move_ship(unit_id, normalized_route)
             else:
                 raise ValueError("move_unit only supports aircraft and ship")
             return {"moved": True, "unitType": unit_type, "unitId": unit_id}
+
+    def set_unit_position(
+        self,
+        unit_type: str,
+        unit_id: str,
+        latitude: float,
+        longitude: float,
+    ) -> dict[str, Any]:
+        with self._lock:
+            unit = self._get_unit(unit_type, unit_id)
+            if unit is None:
+                raise ValueError("Unit not found")
+            unit.latitude = latitude
+            unit.longitude = longitude
+
+            normalized = unit_type.lower().strip()
+            if normalized in {"airbase", "ship"}:
+                for aircraft in getattr(unit, "aircraft", []):
+                    aircraft.latitude = latitude - 0.5
+                    aircraft.longitude = longitude - 0.5
+            if normalized in {"reference_point", "referencepoint"}:
+                scenario = self.game.current_scenario
+                for mission in scenario.missions:
+                    assigned_area = getattr(mission, "assigned_area", None)
+                    if not assigned_area:
+                        continue
+                    mission.assigned_area = [
+                        unit if point.id == unit.id else point for point in assigned_area
+                    ]
+                    update_geometry = getattr(mission, "update_patrol_area_geometry", None)
+                    if callable(update_geometry):
+                        update_geometry()
+
+            return {
+                "positioned": True,
+                "unitType": normalized,
+                "unitId": unit_id,
+                "latitude": latitude,
+                "longitude": longitude,
+            }
 
     def update_unit_state(
         self, unit_type: str, unit_id: str, patch: dict[str, Any]
@@ -464,6 +813,16 @@ class AICCRuntime:
                         patch.get("fuel_rate"), aircraft.fuel_rate
                     ),
                 )
+                aircraft.is_objective = bool(
+                    patch.get("is_objective", aircraft.is_objective)
+                )
+                if "latitude" in patch or "longitude" in patch:
+                    aircraft.latitude = self._to_float(
+                        patch.get("latitude"), aircraft.latitude
+                    )
+                    aircraft.longitude = self._to_float(
+                        patch.get("longitude"), aircraft.longitude
+                    )
             elif unit_type == "ship":
                 ship = self.game.current_scenario.get_ship(unit_id)
                 if ship is None:
@@ -479,6 +838,14 @@ class AICCRuntime:
                     ship_fuel_rate=self._to_float(patch.get("fuel_rate"), ship.fuel_rate),
                     ship_range=self._to_float(patch.get("range"), ship.range),
                 )
+                ship.is_objective = bool(patch.get("is_objective", ship.is_objective))
+                if "latitude" in patch or "longitude" in patch:
+                    self.set_unit_position(
+                        "ship",
+                        unit_id,
+                        self._to_float(patch.get("latitude"), ship.latitude),
+                        self._to_float(patch.get("longitude"), ship.longitude),
+                    )
             elif unit_type == "facility":
                 facility = self.game.current_scenario.get_facility(unit_id)
                 if facility is None:
@@ -489,6 +856,16 @@ class AICCRuntime:
                     facility_class_name=str(patch.get("class_name", facility.class_name)),
                     facility_range=self._to_float(patch.get("range"), facility.range),
                 )
+                facility.is_objective = bool(
+                    patch.get("is_objective", facility.is_objective)
+                )
+                if "latitude" in patch or "longitude" in patch:
+                    facility.latitude = self._to_float(
+                        patch.get("latitude"), facility.latitude
+                    )
+                    facility.longitude = self._to_float(
+                        patch.get("longitude"), facility.longitude
+                    )
             elif unit_type == "airbase":
                 airbase = self.game.current_scenario.get_airbase(unit_id)
                 if airbase is None:
@@ -497,6 +874,16 @@ class AICCRuntime:
                     airbase_id=unit_id,
                     airbase_name=str(patch.get("name", airbase.name)),
                 )
+                airbase.is_objective = bool(
+                    patch.get("is_objective", airbase.is_objective)
+                )
+                if "latitude" in patch or "longitude" in patch:
+                    self.set_unit_position(
+                        "airbase",
+                        unit_id,
+                        self._to_float(patch.get("latitude"), airbase.latitude),
+                        self._to_float(patch.get("longitude"), airbase.longitude),
+                    )
             elif unit_type in {"reference_point", "referencepoint"}:
                 point = self.game.current_scenario.get_reference_point(unit_id)
                 if point is None:
@@ -505,9 +892,289 @@ class AICCRuntime:
                     reference_point_id=unit_id,
                     reference_point_name=str(patch.get("name", point.name)),
                 )
+                if "latitude" in patch or "longitude" in patch:
+                    self.set_unit_position(
+                        "reference_point",
+                        unit_id,
+                        self._to_float(patch.get("latitude"), point.latitude),
+                        self._to_float(patch.get("longitude"), point.longitude),
+                    )
             else:
                 raise ValueError(f"Unsupported unit type for update: {unit_type}")
             return {"updated": True, "unitType": unit_type, "unitId": unit_id}
+
+    def set_current_side(self, side: str) -> dict[str, Any]:
+        with self._lock:
+            side_id = self._resolve_side_id(side)
+            self.game.current_side_id = side_id
+            return {"currentSideId": side_id}
+
+    def add_side(
+        self,
+        name: str,
+        color: str = "blue",
+        hostiles: list[str] | None = None,
+        allies: list[str] | None = None,
+        doctrine: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        with self._lock:
+            scenario = self.game.current_scenario
+            side = Side(id=str(uuid4()), name=name, color=color)
+            scenario.sides.append(side)
+            hostiles = self._unique_side_refs(hostiles, side.id)
+            allies = [
+                item
+                for item in self._unique_side_refs(allies, side.id)
+                if item not in hostiles
+            ]
+            scenario.relationships.update_relationship(side.id, hostiles, allies)
+            scenario.update_side_doctrine(
+                side.id, doctrine or scenario.get_default_side_doctrine()
+            )
+            self.game.current_side_id = side.id
+            return {"sideId": side.id, "name": side.name}
+
+    def update_side(
+        self,
+        side_id: str,
+        name: str,
+        color: str,
+        hostiles: list[str] | None = None,
+        allies: list[str] | None = None,
+        doctrine: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        with self._lock:
+            scenario = self.game.current_scenario
+            side = scenario.get_side(side_id)
+            if side is None:
+                raise ValueError("Side not found")
+            side.name = name
+            side.color = color
+            self._sync_side_color(side_id, color)
+            next_hostiles = self._unique_side_refs(hostiles, side_id)
+            next_allies = [
+                item
+                for item in self._unique_side_refs(allies, side_id)
+                if item not in next_hostiles
+            ]
+            scenario.relationships.update_relationship(
+                side_id, next_hostiles, next_allies
+            )
+            scenario.update_side_doctrine(side_id, doctrine or {})
+            return {"sideId": side.id, "name": side.name}
+
+    def delete_side(self, side_id: str) -> dict[str, Any]:
+        with self._lock:
+            scenario = self.game.current_scenario
+            if scenario.get_side(side_id) is None:
+                raise ValueError("Side not found")
+            scenario.sides = [side for side in scenario.sides if side.id != side_id]
+            scenario.aircraft = [
+                aircraft for aircraft in scenario.aircraft if aircraft.side_id != side_id
+            ]
+            scenario.airbases = [
+                airbase for airbase in scenario.airbases if airbase.side_id != side_id
+            ]
+            scenario.facilities = [
+                facility for facility in scenario.facilities if facility.side_id != side_id
+            ]
+            scenario.ships = [ship for ship in scenario.ships if ship.side_id != side_id]
+            scenario.missions = [
+                mission for mission in scenario.missions if mission.side_id != side_id
+            ]
+            scenario.weapons = [
+                weapon for weapon in scenario.weapons if weapon.side_id != side_id
+            ]
+            scenario.reference_points = [
+                point for point in scenario.reference_points if point.side_id != side_id
+            ]
+            scenario.relationships.delete_side(side_id)
+            scenario.remove_side_doctrine(side_id)
+            if self.game.current_side_id == side_id:
+                self.game.current_side_id = scenario.sides[0].id if scenario.sides else ""
+            return {"deleted": True, "sideId": side_id}
+
+    def delete_mission(self, mission_id: str) -> dict[str, Any]:
+        with self._lock:
+            before = len(self.game.current_scenario.missions)
+            self.game.delete_mission(mission_id)
+            return {
+                "deleted": len(self.game.current_scenario.missions) < before,
+                "missionId": mission_id,
+            }
+
+    def create_patrol_mission(
+        self,
+        name: str,
+        assigned_unit_ids: list[str],
+        reference_point_ids: list[str],
+    ) -> dict[str, Any]:
+        with self._lock:
+            scenario = self.game.current_scenario
+            area = [
+                point
+                for point_id in reference_point_ids
+                if (point := scenario.get_reference_point(point_id)) is not None
+            ]
+            before = len(scenario.missions)
+            self.game.create_patrol_mission(name, assigned_unit_ids, area)
+            mission = scenario.missions[-1] if len(scenario.missions) > before else None
+            return {
+                "created": mission is not None,
+                "missionId": getattr(mission, "id", ""),
+                "type": "patrol",
+            }
+
+    def update_patrol_mission(
+        self,
+        mission_id: str,
+        name: str,
+        assigned_unit_ids: list[str],
+        reference_point_ids: list[str],
+    ) -> dict[str, Any]:
+        with self._lock:
+            scenario = self.game.current_scenario
+            if scenario.get_patrol_mission(mission_id) is None:
+                raise ValueError("Patrol mission not found")
+            area = [
+                point
+                for point_id in reference_point_ids
+                if (point := scenario.get_reference_point(point_id)) is not None
+            ]
+            self.game.update_patrol_mission(
+                mission_id,
+                name,
+                assigned_unit_ids,
+                area,
+            )
+            return {"updated": True, "missionId": mission_id, "type": "patrol"}
+
+    def create_strike_mission(
+        self,
+        name: str,
+        assigned_unit_ids: list[str],
+        assigned_target_ids: list[str],
+    ) -> dict[str, Any]:
+        with self._lock:
+            scenario = self.game.current_scenario
+            before = len(scenario.missions)
+            self.game.create_strike_mission(
+                name,
+                assigned_unit_ids,
+                assigned_target_ids,
+            )
+            mission = scenario.missions[-1] if len(scenario.missions) > before else None
+            return {
+                "created": mission is not None,
+                "missionId": getattr(mission, "id", ""),
+                "type": "strike",
+            }
+
+    def update_strike_mission(
+        self,
+        mission_id: str,
+        name: str,
+        assigned_unit_ids: list[str],
+        assigned_target_ids: list[str],
+    ) -> dict[str, Any]:
+        with self._lock:
+            if self.game.current_scenario.get_strike_mission(mission_id) is None:
+                raise ValueError("Strike mission not found")
+            self.game.update_strike_mission(
+                mission_id,
+                name,
+                assigned_unit_ids,
+                assigned_target_ids,
+            )
+            return {"updated": True, "missionId": mission_id, "type": "strike"}
+
+    def add_weapon_to_unit(
+        self,
+        unit_type: str,
+        unit_id: str,
+        class_name: str,
+        speed: float,
+        max_fuel: float,
+        fuel_rate: float,
+        range_nm: float,
+        lethality: float,
+        quantity: int = 1,
+    ) -> dict[str, Any]:
+        with self._lock:
+            unit = self._get_unit(unit_type, unit_id)
+            if unit is None or not hasattr(unit, "weapons"):
+                raise ValueError("Weapon carrier not found")
+            for weapon in unit.weapons:
+                if weapon.class_name == class_name:
+                    return {
+                        "added": False,
+                        "reason": "duplicate_weapon",
+                        "unitType": unit_type,
+                        "unitId": unit_id,
+                        "weaponId": weapon.id,
+                    }
+            weapon = self._make_weapon(
+                class_name,
+                quantity,
+                unit.side_id,
+                unit.side_color,
+                latitude=unit.latitude,
+                longitude=unit.longitude,
+                altitude=getattr(unit, "altitude", 10000.0) or 10000.0,
+            )
+            unit.weapons.append(weapon)
+            return {
+                "added": True,
+                "unitType": unit_type,
+                "unitId": unit_id,
+                "weaponId": weapon.id,
+            }
+
+    def delete_weapon_from_unit(
+        self,
+        unit_type: str,
+        unit_id: str,
+        weapon_id: str,
+    ) -> dict[str, Any]:
+        with self._lock:
+            unit = self._get_unit(unit_type, unit_id)
+            if unit is None or not hasattr(unit, "weapons"):
+                raise ValueError("Weapon carrier not found")
+            before = len(unit.weapons)
+            unit.weapons = [weapon for weapon in unit.weapons if weapon.id != weapon_id]
+            return {
+                "deleted": len(unit.weapons) < before,
+                "unitType": unit_type,
+                "unitId": unit_id,
+                "weaponId": weapon_id,
+            }
+
+    def update_weapon_quantity(
+        self,
+        unit_type: str,
+        unit_id: str,
+        weapon_id: str,
+        increment: int,
+    ) -> dict[str, Any]:
+        with self._lock:
+            unit = self._get_unit(unit_type, unit_id)
+            if unit is None or not hasattr(unit, "weapons"):
+                raise ValueError("Weapon carrier not found")
+            for weapon in unit.weapons:
+                if weapon.id != weapon_id:
+                    continue
+                weapon.current_quantity = max(
+                    0,
+                    min(weapon.max_quantity, weapon.current_quantity + increment),
+                )
+                return {
+                    "updated": True,
+                    "unitType": unit_type,
+                    "unitId": unit_id,
+                    "weaponId": weapon_id,
+                    "currentQuantity": weapon.current_quantity,
+                }
+            raise ValueError("Weapon not found")
 
     # ----------------------------- situation / event control -----------------------------
     def trigger_tactical_event(

@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useState } from "react";
+import React, { useCallback, useContext, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   AppBar,
@@ -177,8 +177,12 @@ interface CloudScenario {
 export default function Toolbar(props: Readonly<ToolBarProps>) {
   const { t } = useTranslation();
   const { isAuthenticated, getAccessTokenSilently } = useAuth0();
+  const toastContext = useContext(ToastContext);
+  const addToast = toastContext?.addToast;
+  const unitDbContext = useContext(UnitDbContext);
+  const setUnitDbContext = useContext(SetUnitDbContext);
   const [cloudScenarios, setCloudScenarios] = useState<CloudScenario[]>([]);
-  const getCloudScenarios = async () => {
+  const getCloudScenarios = useCallback(async () => {
     if (!import.meta.env.VITE_ENV || import.meta.env.VITE_ENV === "standalone")
       return;
     if (!isAuthenticated) return;
@@ -197,39 +201,18 @@ export default function Toolbar(props: Readonly<ToolBarProps>) {
       const rawCloudScenarios: CloudScenario[] = await resp.json();
       setCloudScenarios(rawCloudScenarios);
     } else {
-      toastContext?.addToast(
+      addToast?.(
         "Failed to load scenarios from cloud. Please try again later.",
         "error"
       );
     }
-  };
+  }, [addToast, getAccessTokenSilently, isAuthenticated]);
   useEffect(() => {
     if (!isAuthenticated) return;
     getCloudScenarios();
-  }, [isAuthenticated]);
-  const toastContext = useContext(ToastContext);
-  const unitDbContext = useContext(UnitDbContext);
-  const setUnitDbContext = useContext(SetUnitDbContext);
+  }, [getCloudScenarios, isAuthenticated]);
   const [selectedSideId, setSelectedSideId] = useState<string>(
     props.scenarioCurrentSideId
-  );
-  useEffect(() => {
-    setSelectedSideId(props.scenarioCurrentSideId);
-    handleEntitySideChange(
-      props.game.godMode
-        ? props.game.currentScenario.sides.map((side) => side.id)
-        : [props.scenarioCurrentSideId]
-    );
-  }, [props.scenarioCurrentSideId]);
-  const [scenarioName, setScenarioName] = useState<string>(
-    props.game.currentScenario.name ?? "New Scenario"
-  );
-  const [scenarioNameError, setScenarioNameError] = useState<boolean>(false);
-  const [scenarioPaused, setScenarioPaused] = useState<boolean>(
-    props.game.scenarioPaused
-  );
-  const [recordingScenario, setRecordingScenario] = useState<boolean>(
-    props.game.recordingScenario
   );
   const [entityFilterSelectedOptions, setEntityFilterSelectedOptions] =
     useState<string[]>([
@@ -242,6 +225,40 @@ export default function Toolbar(props: Readonly<ToolBarProps>) {
       "facility",
       "referencePoint",
     ]);
+  useEffect(() => {
+    setSelectedSideId(props.scenarioCurrentSideId);
+    const selectedSideIds = props.game.godMode
+      ? props.game.currentScenario.sides.map((side) => side.id)
+      : [props.scenarioCurrentSideId];
+
+    setEntityFilterSelectedOptions((prevItems: string[]) => {
+      const nonSideFilters = [
+        "aircraft",
+        "airbase",
+        "ship",
+        "facility",
+        "referencePoint",
+      ];
+      const filtersWithNewSide = prevItems.filter((item) =>
+        nonSideFilters.includes(item)
+      );
+      return [...filtersWithNewSide, ...selectedSideIds];
+    });
+  }, [
+    props.game.currentScenario.sides,
+    props.game.godMode,
+    props.scenarioCurrentSideId,
+  ]);
+  const [scenarioName, setScenarioName] = useState<string>(
+    props.game.currentScenario.name ?? "New Scenario"
+  );
+  const [scenarioNameError, setScenarioNameError] = useState<boolean>(false);
+  const [scenarioPaused, setScenarioPaused] = useState<boolean>(
+    props.game.scenarioPaused
+  );
+  const [recordingScenario, setRecordingScenario] = useState<boolean>(
+    props.game.recordingScenario
+  );
   const [scenarioEditNameAnchorEl, setScenarioEditNameAnchorEl] =
     useState<null | HTMLElement>(null);
 
@@ -734,14 +751,18 @@ export default function Toolbar(props: Readonly<ToolBarProps>) {
       handleEntitySideChange([props.game.currentSideId]);
     }
     toastContext?.addToast(
-      props.game.godMode ? t("toolbar.toast.godModeOn") : t("toolbar.toast.godModeOff")
+      props.game.godMode
+        ? t("toolbar.toast.godModeOn")
+        : t("toolbar.toast.godModeOff")
     );
   };
 
   const handleEraserModeToggle = () => {
     props.game.toggleEraserMode();
     toastContext?.addToast(
-      props.game.eraserMode ? t("toolbar.toast.eraserOn") : t("toolbar.toast.eraserOff")
+      props.game.eraserMode
+        ? t("toolbar.toast.eraserOn")
+        : t("toolbar.toast.eraserOff")
     );
   };
 
@@ -964,7 +985,11 @@ export default function Toolbar(props: Readonly<ToolBarProps>) {
         >
           <Chip
             variant="outlined"
-            label={recordingScenario ? t("toolbar.recording.stop") : t("toolbar.recording.record")}
+            label={
+              recordingScenario
+                ? t("toolbar.recording.stop")
+                : t("toolbar.recording.record")
+            }
             onClick={handleRecordScenarioClick}
           />
           <Chip
@@ -1752,7 +1777,9 @@ export default function Toolbar(props: Readonly<ToolBarProps>) {
                   <TextField
                     error={scenarioNameError}
                     helperText={
-                      scenarioNameError ? t("toolbar.validation.scenarioName") : ""
+                      scenarioNameError
+                        ? t("toolbar.validation.scenarioName")
+                        : ""
                     }
                     autoComplete="off"
                     id="scenario-name-text-field"
@@ -1877,11 +1904,20 @@ export default function Toolbar(props: Readonly<ToolBarProps>) {
               enableFilter={true}
               filterProps={{
                 options: [
-                  { label: t("toolbar.unit.filter.aircraft"), value: "aircraft" },
+                  {
+                    label: t("toolbar.unit.filter.aircraft"),
+                    value: "aircraft",
+                  },
                   { label: t("toolbar.unit.filter.airbase"), value: "airbase" },
-                  { label: t("toolbar.unit.filter.facility"), value: "facility" },
+                  {
+                    label: t("toolbar.unit.filter.facility"),
+                    value: "facility",
+                  },
                   { label: t("toolbar.unit.filter.ship"), value: "ship" },
-                  { label: t("toolbar.unit.filter.referencePoint"), value: "referencePoint" },
+                  {
+                    label: t("toolbar.unit.filter.referencePoint"),
+                    value: "referencePoint",
+                  },
                 ],
                 onApplyFilterOptions: (selectedOptions: string[]) => {
                   const sideIds = props.game.currentScenario.sides.map(

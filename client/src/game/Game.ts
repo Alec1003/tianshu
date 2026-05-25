@@ -441,12 +441,13 @@ export default class Game {
       fuelRate: fuelRate ?? 5000.0,
       range: range ?? 100,
       sideColor: this.currentScenario.getSideColor(this.currentSideId),
-      weapons: !isTanker && this.demoMode
-        ? this.getDefaultAircraftWeapons(
-            this.currentSideId,
-            this.currentScenario.getSideColor(this.currentSideId)
-          )
-        : [],
+      weapons:
+        !isTanker && this.demoMode
+          ? this.getDefaultAircraftWeapons(
+              this.currentSideId,
+              this.currentScenario.getSideColor(this.currentSideId)
+            )
+          : [],
       homeBaseId: "",
       rtb: false,
       targetId: "",
@@ -495,12 +496,13 @@ export default class Game {
         maxFuel: maxFuel,
         fuelRate: fuelRate,
         range: range,
-        weapons: !isTanker && this.demoMode
-          ? this.getDefaultAircraftWeapons(
-              this.currentSideId,
-              this.currentScenario.getSideColor(this.currentSideId)
-            )
-          : [],
+        weapons:
+          !isTanker && this.demoMode
+            ? this.getDefaultAircraftWeapons(
+                this.currentSideId,
+                this.currentScenario.getSideColor(this.currentSideId)
+              )
+            : [],
         homeBaseId: airbase.id,
         rtb: false,
         sideColor: airbase.sideColor,
@@ -772,12 +774,13 @@ export default class Game {
         maxFuel: maxFuel,
         fuelRate: fuelRate,
         range: range,
-        weapons: !isTanker && this.demoMode
-          ? this.getDefaultAircraftWeapons(
-              this.currentSideId,
-              this.currentScenario.getSideColor(this.currentSideId)
-            )
-          : [],
+        weapons:
+          !isTanker && this.demoMode
+            ? this.getDefaultAircraftWeapons(
+                this.currentSideId,
+                this.currentScenario.getSideColor(this.currentSideId)
+              )
+            : [],
         homeBaseId: ship.id,
         rtb: false,
         sideColor: ship.sideColor,

@@ -1,9 +1,4 @@
-import {
-  useCallback,
-  useContext,
-  useMemo,
-  useState,
-} from "react";
+import { useCallback, useContext, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Box,
@@ -46,12 +41,7 @@ import { SIDE_COLOR } from "@/utils/colors";
 import Side from "@/game/Side";
 import SideEditor from "@/gui/map/toolbar/SideEditor";
 import { ThemeModeContext } from "@/gui/contextProviders/contexts/ThemeModeContext";
-import {
-  AircraftDb,
-  FacilityDb,
-  ShipDb,
-  AirbaseDb,
-} from "@/game/db/UnitDb";
+import { AircraftDb, FacilityDb, ShipDb, AirbaseDb } from "@/game/db/UnitDb";
 import {
   localizeAirbaseName,
   localizeClassName,
@@ -267,8 +257,7 @@ export default function CesiumToolbar({
 
   const exportScenario = useCallback(() => {
     const json = game.exportCurrentScenario();
-    const dataStr =
-      "data:text/json;charset=utf-8," + encodeURIComponent(json);
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(json);
     const ts = new Date().toISOString().replace(/[:.]/g, "_");
     const a = document.createElement("a");
     a.setAttribute("href", dataStr);
@@ -287,11 +276,10 @@ export default function CesiumToolbar({
   const [createSideOpen, setCreateSideOpen] = useState(false);
   const [newSideName, setNewSideName] = useState("");
   // Side editor (hostiles / allies / doctrine). Reuses OL Popover-based card.
-  const [sideEditorAnchor, setSideEditorAnchor] =
-    useState<HTMLElement | null>(null);
-  const [newSideColor, setNewSideColor] = useState<SIDE_COLOR>(
-    SIDE_COLOR.BLUE
+  const [sideEditorAnchor, setSideEditorAnchor] = useState<HTMLElement | null>(
+    null
   );
+  const [newSideColor, setNewSideColor] = useState<SIDE_COLOR>(SIDE_COLOR.BLUE);
 
   const sides: Side[] = game.currentScenario.sides;
   const currentSideId = game.currentSideId;
@@ -557,9 +545,7 @@ export default function CesiumToolbar({
           },
         }}
       >
-        {sides.length === 0 && (
-          <MenuItem disabled>{t("common.na")}</MenuItem>
-        )}
+        {sides.length === 0 && <MenuItem disabled>{t("common.na")}</MenuItem>}
         {sides.map((s) => (
           <MenuItem
             key={s.id}
@@ -816,9 +802,7 @@ export default function CesiumToolbar({
               transition:
                 "transform 180ms cubic-bezier(.2,1.4,.4,1), background-color 180ms, color 180ms",
               transform: speedPulse ? "scale(1.18)" : "scale(1)",
-              backgroundColor: speedPulse
-                ? "primary.main"
-                : "transparent",
+              backgroundColor: speedPulse ? "primary.main" : "transparent",
               color: speedPulse ? "background.paper" : "text.primary",
               borderColor: speedPulse ? "primary.main" : "divider",
             }}
@@ -861,9 +845,7 @@ export default function CesiumToolbar({
       <Stack direction="row" spacing={0.5} sx={{ px: 1, pb: 1.5 }}>
         <ToolButton
           title={
-            mode === "dark"
-              ? t("toolbar.theme.light")
-              : t("toolbar.theme.dark")
+            mode === "dark" ? t("toolbar.theme.light") : t("toolbar.theme.dark")
           }
           icon={
             mode === "dark" ? (
@@ -917,20 +899,18 @@ export default function CesiumToolbar({
             "satellite",
             "sentinel",
           ] as CesiumBaseLayerKey[]
-        ).map(
-          (key) => (
-            <MenuItem
-              key={key}
-              selected={baseLayer === key}
-              onClick={() => {
-                onBaseLayerChange(key);
-                setBaseMenuAnchor(null);
-              }}
-            >
-              {t(`map.baseLayer.${key}`)}
-            </MenuItem>
-          )
-        )}
+        ).map((key) => (
+          <MenuItem
+            key={key}
+            selected={baseLayer === key}
+            onClick={() => {
+              onBaseLayerChange(key);
+              setBaseMenuAnchor(null);
+            }}
+          >
+            {t(`map.baseLayer.${key}`)}
+          </MenuItem>
+        ))}
       </Menu>
 
       {/* Theme indicator strip at bottom */}

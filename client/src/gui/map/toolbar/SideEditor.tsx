@@ -275,7 +275,9 @@ const SideEditor = (props: SideEditorProps) => {
     setSideName(props.side?.name ?? "");
     setSideNameDirty(false);
     setSideColor(props.side?.color ?? SIDE_COLOR.BLUE);
-    setSideHostiles(sanitizeSideIds(props.hostiles, props.sides, props.side?.id));
+    setSideHostiles(
+      sanitizeSideIds(props.hostiles, props.sides, props.side?.id)
+    );
     setSideAllies(sanitizeSideIds(props.allies, props.sides, props.side?.id));
     setSideDoctrine(props.doctrine);
   }, [props.side, props.hostiles, props.allies, props.doctrine, props.sides]);
@@ -360,7 +362,12 @@ const SideEditor = (props: SideEditorProps) => {
             sx={darkCompactSelectStyle}
             MenuProps={darkSelectMenuProps}
             renderValue={() => (
-              <Box display="flex" alignItems="center" justifyContent="center" gap={1}>
+              <Box
+                display="flex"
+                alignItems="center"
+                justifyContent="center"
+                gap={1}
+              >
                 <EntityIcon
                   type="circle"
                   color={sideColor}

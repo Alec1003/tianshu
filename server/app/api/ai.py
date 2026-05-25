@@ -13,11 +13,24 @@ from app.ai.models import (
     AICommandResponse,
     ModelCheckRequest,
     ModelCheckResponse,
+    RuntimeAddWeaponRequest,
     RuntimeAttackRequest,
+    RuntimeCreateSideRequest,
+    RuntimeDeleteWeaponRequest,
+    RuntimeDeployUnitRequest,
     RuntimeLoadScenarioRequest,
+    RuntimeMoveUnitRequest,
+    RuntimePatrolMissionRequest,
+    RuntimeSetCurrentSideRequest,
+    RuntimeSetUnitPositionRequest,
     RuntimeSnapshotResponse,
+    RuntimeStrikeMissionRequest,
     RuntimeStepRequest,
+    RuntimeUpdateSideRequest,
+    RuntimeUpdateUnitRequest,
+    RuntimeUpdateWeaponQuantityRequest,
 )
+from app.aicc_runtime.visibility import compute_runtime_visibility
 from app.auth.models import User
 from app.auth.users import current_active_user
 
@@ -91,6 +104,16 @@ def _runtime_snapshot(
         duration_left=max(0, start + duration - current),
         outcome=_runtime_outcome_payload(runtime),
         scenario=bridge.exported_scenario(),
+        visibility=compute_runtime_visibility(
+            scenario, getattr(runtime.game, "current_side_id", "")
+        ),
+    )
+
+
+def _runtime_value_error(exc: ValueError) -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail=str(exc),
     )
 
 
@@ -224,6 +247,347 @@ def runtime_attack(
             detail=str(exc),
         ) from exc
     return _runtime_snapshot(request, user, action="attack", state=state)
+
+
+@router.post("/runtime/units", response_model=RuntimeSnapshotResponse)
+def runtime_deploy_unit(
+    request: Request,
+    payload: RuntimeDeployUnitRequest,
+    user: User = Depends(current_active_user),
+) -> RuntimeSnapshotResponse:
+    runtime = _runtime_for_user(request, user)
+    try:
+        if payload.unit_type == "aircraft":
+            state = runtime.deploy_aircraft(
+                payload.class_name,
+                payload.latitude,
+                payload.longitude,
+                side=payload.side,
+                name=payload.name,
+                altitude=payload.altitude or 10000.0,
+            )
+        elif payload.unit_type == "ship":
+            state = runtime.deploy_ship(
+                payload.class_name,
+                payload.latitude,
+                payload.longitude,
+                side=payload.side,
+                name=payload.name,
+            )
+        elif payload.unit_type == "facility":
+            state = runtime.deploy_facility(
+                payload.class_name,
+                payload.latitude,
+                payload.longitude,
+                side=payload.side,
+                name=payload.name,
+            )
+        elif payload.unit_type == "airbase":
+            state = runtime.deploy_airbase(
+                payload.class_name,
+                payload.latitude,
+                payload.longitude,
+                side=payload.side,
+                name=payload.name,
+            )
+        else:
+            state = runtime.deploy_reference_point(
+                payload.name or payload.class_name,
+                payload.latitude,
+                payload.longitude,
+                side=payload.side,
+            )
+    except ValueError as exc:
+        raise _runtime_value_error(exc) from exc
+    return _runtime_snapshot(request, user, action="deploy_unit", state=state)
+
+
+@router.delete(
+    "/runtime/units/{unit_type}/{unit_id}",
+    response_model=RuntimeSnapshotResponse,
+)
+def runtime_delete_unit(
+    request: Request,
+    unit_type: str,
+    unit_id: str,
+    user: User = Depends(current_active_user),
+) -> RuntimeSnapshotResponse:
+    runtime = _runtime_for_user(request, user)
+    try:
+        state = runtime.delete_unit(unit_type, unit_id)
+    except ValueError as exc:
+        raise _runtime_value_error(exc) from exc
+    return _runtime_snapshot(request, user, action="delete_unit", state=state)
+
+
+@router.patch("/runtime/units/route", response_model=RuntimeSnapshotResponse)
+def runtime_move_unit(
+    request: Request,
+    payload: RuntimeMoveUnitRequest,
+    user: User = Depends(current_active_user),
+) -> RuntimeSnapshotResponse:
+    runtime = _runtime_for_user(request, user)
+    try:
+        state = runtime.move_unit(
+            payload.unit_type,
+            payload.unit_id,
+            payload.route,
+        )
+    except ValueError as exc:
+        raise _runtime_value_error(exc) from exc
+    return _runtime_snapshot(request, user, action="move_unit", state=state)
+
+
+@router.patch("/runtime/units/position", response_model=RuntimeSnapshotResponse)
+def runtime_set_unit_position(
+    request: Request,
+    payload: RuntimeSetUnitPositionRequest,
+    user: User = Depends(current_active_user),
+) -> RuntimeSnapshotResponse:
+    runtime = _runtime_for_user(request, user)
+    try:
+        state = runtime.set_unit_position(
+            payload.unit_type,
+            payload.unit_id,
+            payload.latitude,
+            payload.longitude,
+        )
+    except ValueError as exc:
+        raise _runtime_value_error(exc) from exc
+    return _runtime_snapshot(request, user, action="set_unit_position", state=state)
+
+
+@router.patch("/runtime/units", response_model=RuntimeSnapshotResponse)
+def runtime_update_unit(
+    request: Request,
+    payload: RuntimeUpdateUnitRequest,
+    user: User = Depends(current_active_user),
+) -> RuntimeSnapshotResponse:
+    runtime = _runtime_for_user(request, user)
+    try:
+        state = runtime.update_unit_state(
+            payload.unit_type,
+            payload.unit_id,
+            payload.patch,
+        )
+    except ValueError as exc:
+        raise _runtime_value_error(exc) from exc
+    return _runtime_snapshot(request, user, action="update_unit", state=state)
+
+
+@router.patch("/runtime/side/current", response_model=RuntimeSnapshotResponse)
+def runtime_set_current_side(
+    request: Request,
+    payload: RuntimeSetCurrentSideRequest,
+    user: User = Depends(current_active_user),
+) -> RuntimeSnapshotResponse:
+    runtime = _runtime_for_user(request, user)
+    try:
+        state = runtime.set_current_side(payload.side)
+    except ValueError as exc:
+        raise _runtime_value_error(exc) from exc
+    return _runtime_snapshot(request, user, action="set_current_side", state=state)
+
+
+@router.post("/runtime/sides", response_model=RuntimeSnapshotResponse)
+def runtime_create_side(
+    request: Request,
+    payload: RuntimeCreateSideRequest,
+    user: User = Depends(current_active_user),
+) -> RuntimeSnapshotResponse:
+    runtime = _runtime_for_user(request, user)
+    state = runtime.add_side(
+        payload.name,
+        payload.color,
+        payload.hostiles,
+        payload.allies,
+        payload.doctrine,
+    )
+    return _runtime_snapshot(request, user, action="create_side", state=state)
+
+
+@router.patch("/runtime/sides/{side_id}", response_model=RuntimeSnapshotResponse)
+def runtime_update_side(
+    request: Request,
+    side_id: str,
+    payload: RuntimeUpdateSideRequest,
+    user: User = Depends(current_active_user),
+) -> RuntimeSnapshotResponse:
+    runtime = _runtime_for_user(request, user)
+    try:
+        state = runtime.update_side(
+            side_id,
+            payload.name,
+            payload.color,
+            payload.hostiles,
+            payload.allies,
+            payload.doctrine,
+        )
+    except ValueError as exc:
+        raise _runtime_value_error(exc) from exc
+    return _runtime_snapshot(request, user, action="update_side", state=state)
+
+
+@router.delete("/runtime/sides/{side_id}", response_model=RuntimeSnapshotResponse)
+def runtime_delete_side(
+    request: Request,
+    side_id: str,
+    user: User = Depends(current_active_user),
+) -> RuntimeSnapshotResponse:
+    runtime = _runtime_for_user(request, user)
+    try:
+        state = runtime.delete_side(side_id)
+    except ValueError as exc:
+        raise _runtime_value_error(exc) from exc
+    return _runtime_snapshot(request, user, action="delete_side", state=state)
+
+
+@router.delete("/runtime/missions/{mission_id}", response_model=RuntimeSnapshotResponse)
+def runtime_delete_mission(
+    request: Request,
+    mission_id: str,
+    user: User = Depends(current_active_user),
+) -> RuntimeSnapshotResponse:
+    runtime = _runtime_for_user(request, user)
+    state = runtime.delete_mission(mission_id)
+    return _runtime_snapshot(request, user, action="delete_mission", state=state)
+
+
+@router.post("/runtime/missions/patrol", response_model=RuntimeSnapshotResponse)
+def runtime_create_patrol_mission(
+    request: Request,
+    payload: RuntimePatrolMissionRequest,
+    user: User = Depends(current_active_user),
+) -> RuntimeSnapshotResponse:
+    runtime = _runtime_for_user(request, user)
+    state = runtime.create_patrol_mission(
+        payload.name,
+        payload.assigned_unit_ids,
+        payload.reference_point_ids,
+    )
+    return _runtime_snapshot(request, user, action="create_patrol_mission", state=state)
+
+
+@router.patch(
+    "/runtime/missions/patrol/{mission_id}",
+    response_model=RuntimeSnapshotResponse,
+)
+def runtime_update_patrol_mission(
+    request: Request,
+    mission_id: str,
+    payload: RuntimePatrolMissionRequest,
+    user: User = Depends(current_active_user),
+) -> RuntimeSnapshotResponse:
+    runtime = _runtime_for_user(request, user)
+    try:
+        state = runtime.update_patrol_mission(
+            mission_id,
+            payload.name,
+            payload.assigned_unit_ids,
+            payload.reference_point_ids,
+        )
+    except ValueError as exc:
+        raise _runtime_value_error(exc) from exc
+    return _runtime_snapshot(request, user, action="update_patrol_mission", state=state)
+
+
+@router.post("/runtime/missions/strike", response_model=RuntimeSnapshotResponse)
+def runtime_create_strike_mission(
+    request: Request,
+    payload: RuntimeStrikeMissionRequest,
+    user: User = Depends(current_active_user),
+) -> RuntimeSnapshotResponse:
+    runtime = _runtime_for_user(request, user)
+    state = runtime.create_strike_mission(
+        payload.name,
+        payload.assigned_unit_ids,
+        payload.assigned_target_ids,
+    )
+    return _runtime_snapshot(request, user, action="create_strike_mission", state=state)
+
+
+@router.patch(
+    "/runtime/missions/strike/{mission_id}",
+    response_model=RuntimeSnapshotResponse,
+)
+def runtime_update_strike_mission(
+    request: Request,
+    mission_id: str,
+    payload: RuntimeStrikeMissionRequest,
+    user: User = Depends(current_active_user),
+) -> RuntimeSnapshotResponse:
+    runtime = _runtime_for_user(request, user)
+    try:
+        state = runtime.update_strike_mission(
+            mission_id,
+            payload.name,
+            payload.assigned_unit_ids,
+            payload.assigned_target_ids,
+        )
+    except ValueError as exc:
+        raise _runtime_value_error(exc) from exc
+    return _runtime_snapshot(request, user, action="update_strike_mission", state=state)
+
+
+@router.post("/runtime/weapons", response_model=RuntimeSnapshotResponse)
+def runtime_add_weapon(
+    request: Request,
+    payload: RuntimeAddWeaponRequest,
+    user: User = Depends(current_active_user),
+) -> RuntimeSnapshotResponse:
+    runtime = _runtime_for_user(request, user)
+    try:
+        state = runtime.add_weapon_to_unit(
+            payload.unit_type,
+            payload.unit_id,
+            payload.class_name,
+            payload.speed,
+            payload.max_fuel,
+            payload.fuel_rate,
+            payload.range,
+            payload.lethality,
+            payload.quantity,
+        )
+    except ValueError as exc:
+        raise _runtime_value_error(exc) from exc
+    return _runtime_snapshot(request, user, action="add_weapon", state=state)
+
+
+@router.delete("/runtime/weapons", response_model=RuntimeSnapshotResponse)
+def runtime_delete_weapon(
+    request: Request,
+    payload: RuntimeDeleteWeaponRequest,
+    user: User = Depends(current_active_user),
+) -> RuntimeSnapshotResponse:
+    runtime = _runtime_for_user(request, user)
+    try:
+        state = runtime.delete_weapon_from_unit(
+            payload.unit_type,
+            payload.unit_id,
+            payload.weapon_id,
+        )
+    except ValueError as exc:
+        raise _runtime_value_error(exc) from exc
+    return _runtime_snapshot(request, user, action="delete_weapon", state=state)
+
+
+@router.patch("/runtime/weapons/quantity", response_model=RuntimeSnapshotResponse)
+def runtime_update_weapon_quantity(
+    request: Request,
+    payload: RuntimeUpdateWeaponQuantityRequest,
+    user: User = Depends(current_active_user),
+) -> RuntimeSnapshotResponse:
+    runtime = _runtime_for_user(request, user)
+    try:
+        state = runtime.update_weapon_quantity(
+            payload.unit_type,
+            payload.unit_id,
+            payload.weapon_id,
+            payload.increment,
+        )
+    except ValueError as exc:
+        raise _runtime_value_error(exc) from exc
+    return _runtime_snapshot(request, user, action="update_weapon_quantity", state=state)
 
 
 @router.get("/skills")

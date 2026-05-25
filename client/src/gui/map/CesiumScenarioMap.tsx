@@ -30,6 +30,17 @@ import {
 } from "cesium";
 import "cesium/Build/Cesium/Widgets/widgets.css";
 import Game from "@/game/Game";
+import type {
+  RuntimeDeployUnitRequest,
+  RuntimeAddWeaponRequest,
+  RuntimeDeleteWeaponRequest,
+  RuntimeSetUnitPositionRequest,
+  RuntimeUnitType,
+  RuntimeUpdateUnitRequest,
+  RuntimeUpdateWeaponQuantityRequest,
+  RuntimeVisibility,
+  RuntimeWeaponCarrierType,
+} from "@/api/types";
 import { SetMouseMapCoordinatesContext } from "@/gui/contextProviders/contexts/MouseMapCoordinatesContext";
 import { SetScenarioTimeContext } from "@/gui/contextProviders/contexts/ScenarioTimeContext";
 import BottomInfoDisplay from "@/gui/map/toolbar/BottomInfoDisplay";
@@ -68,6 +79,49 @@ interface CesiumScenarioMapProps {
   onPause?: () => void | Promise<void>;
   onStep?: () => void | Promise<void>;
   onReset?: () => void | Promise<void>;
+  runtimeVisibility?: RuntimeVisibility | null;
+  onDeployUnit?: (unit: RuntimeDeployUnitRequest) => void | Promise<void>;
+  onDeleteUnit?: (
+    unitType: RuntimeUnitType,
+    unitId: string
+  ) => void | Promise<void>;
+  onMoveUnit?: (
+    unitType: "aircraft" | "ship",
+    unitId: string,
+    route: number[][]
+  ) => void | Promise<void>;
+  onSetUnitPosition?: (
+    position: RuntimeSetUnitPositionRequest
+  ) => void | Promise<void>;
+  onUpdateUnit?: (update: RuntimeUpdateUnitRequest) => void | Promise<void>;
+  onCreatePatrolMission?: (
+    name: string,
+    assignedUnitIds: string[],
+    referencePointIds: string[]
+  ) => void | Promise<void>;
+  onCreateStrikeMission?: (
+    name: string,
+    assignedUnitIds: string[],
+    assignedTargetIds: string[]
+  ) => void | Promise<void>;
+  onUpdatePatrolMission?: (
+    missionId: string,
+    name: string,
+    assignedUnitIds: string[],
+    referencePointIds: string[]
+  ) => void | Promise<void>;
+  onUpdateStrikeMission?: (
+    missionId: string,
+    name: string,
+    assignedUnitIds: string[],
+    assignedTargetIds: string[]
+  ) => void | Promise<void>;
+  onDeleteMission?: (missionId: string) => void | Promise<void>;
+  onAddWeapon?: (weapon: RuntimeAddWeaponRequest) => void | Promise<void>;
+  onDeleteWeapon?: (weapon: RuntimeDeleteWeaponRequest) => void | Promise<void>;
+  onUpdateWeaponQuantity?: (
+    weapon: RuntimeUpdateWeaponQuantityRequest
+  ) => void | Promise<void>;
 }
 
 // CesiumToolbar rail width. Keep in sync with CesiumToolbar.tsx Paper width.
@@ -79,6 +133,10 @@ const olZoomToAltitude = (zoom: number) =>
   EARTH_CIRCUMFERENCE_M / Math.pow(2, zoom);
 const altitudeToOlZoom = (altitude: number) =>
   altitude > 0 ? Math.log2(EARTH_CIRCUMFERENCE_M / altitude) : 0;
+
+function toRuntimeUnitType(unitType: ScenarioUnit["type"]): RuntimeUnitType {
+  return unitType === "referencePoint" ? "reference_point" : unitType;
+}
 
 // Cesium Ion access token. Provide via client/.env -> VITE_CESIUM_ION_TOKEN=<your-token>
 const ionToken = import.meta.env.VITE_CESIUM_ION_TOKEN ?? "";
@@ -123,6 +181,26 @@ function imageryProviderFor(
   }
 }
 
+const RUNTIME_ACTION_LABELS = {
+  addWeapon: "添加武器",
+  clearRoute: "清除航线",
+  createPatrolMission: "创建巡逻任务",
+  createStrikeMission: "创建打击任务",
+  deleteMission: "删除任务",
+  deleteUnit: "删除单位",
+  deleteWeapon: "删除武器",
+  deployUnit: "部署单位",
+  moveUnit: "移动单位",
+  planRoute: "规划航线",
+  submitRoute: "提交航线",
+  updatePatrolMission: "更新巡逻任务",
+  updateStrikeMission: "更新打击任务",
+  updateUnit: "更新单位",
+  updateWeaponQuantity: "更新武器数量",
+} as const;
+
+type RuntimeActionKey = keyof typeof RUNTIME_ACTION_LABELS;
+
 export default function CesiumScenarioMap({
   game,
   mobileView,
@@ -145,6 +223,20 @@ export default function CesiumScenarioMap({
   onPause,
   onStep,
   onReset,
+  runtimeVisibility = null,
+  onDeployUnit,
+  onDeleteUnit,
+  onMoveUnit,
+  onSetUnitPosition,
+  onUpdateUnit,
+  onCreatePatrolMission,
+  onCreateStrikeMission,
+  onUpdatePatrolMission,
+  onUpdateStrikeMission,
+  onDeleteMission,
+  onAddWeapon,
+  onDeleteWeapon,
+  onUpdateWeaponQuantity,
 }: Readonly<CesiumScenarioMapProps>) {
   const { t } = useTranslation();
   // Localized className -> label dictionaries for the right-click add-unit
@@ -225,12 +317,27 @@ export default function CesiumScenarioMap({
     setScenarioTick((n) => n + 1);
     onScenarioMutation?.();
   }, [onScenarioMutation]);
+  const reportRuntimeUnavailable = useCallback((action: RuntimeActionKey) => {
+    const label = RUNTIME_ACTION_LABELS[action];
+    console.error(`[AICC] runtime handler missing: ${action}`);
+    window.alert(`后端仿真接口未就绪，无法${label}。请刷新页面后重试。`);
+  }, []);
+  const reportRuntimeFailure = useCallback(
+    (action: RuntimeActionKey, err: unknown) => {
+      const label = RUNTIME_ACTION_LABELS[action];
+      console.error(`[AICC] runtime ${action} failed:`, err);
+      window.alert(`${label}失败，请检查后端服务后重试。`);
+    },
+    []
+  );
 
   // Interaction state. Refs so the long-lived Cesium event handlers can read
   // / mutate without re-binding on every React render.
   const dragRef = useRef<{
     unitId: string;
     type: ScenarioUnit["type"];
+    latitude?: number;
+    longitude?: number;
   } | null>(null);
   // Click-to-plot route mode. Active when the user pressed "Plot Route" on
   // the unit card; LEFT_CLICK on the map adds a waypoint, LEFT_DOUBLE_CLICK
@@ -322,6 +429,10 @@ export default function CesiumScenarioMap({
   // arms click-to-plot mode, and installs a live polyline preview.
   const startPlotRoute = useCallback(
     (unitId: string, type: "aircraft" | "ship") => {
+      if (!onMoveUnit) {
+        reportRuntimeUnavailable("planRoute");
+        return;
+      }
       const viewer = viewerRef.current;
       if (!viewer) return;
       // Clear existing desiredRoute so the user plots from scratch starting
@@ -369,7 +480,7 @@ export default function CesiumScenarioMap({
         },
       });
     },
-    [game]
+    [game, onMoveUnit, reportRuntimeUnavailable]
   );
 
   const cancelPlotRoute = useCallback(() => {
@@ -394,17 +505,15 @@ export default function CesiumScenarioMap({
 
   const clearUnitRoute = useCallback(
     (unitId: string, type: "aircraft" | "ship") => {
-      const u =
-        type === "aircraft"
-          ? game.currentScenario.getAircraft(unitId)
-          : game.currentScenario.getShip(unitId);
-      if (u) {
-        u.route = [];
-        u.desiredRoute = [];
+      if (!onMoveUnit) {
+        reportRuntimeUnavailable("clearRoute");
+        return;
       }
-      bumpScenario();
+      void Promise.resolve(onMoveUnit(type, unitId, [])).catch((err) => {
+        reportRuntimeFailure("clearRoute", err);
+      });
     },
-    [game, bumpScenario]
+    [onMoveUnit, reportRuntimeFailure, reportRuntimeUnavailable]
   );
 
   // Esc to cancel plot mode or any pending placement.
@@ -429,11 +538,71 @@ export default function CesiumScenarioMap({
   const setScenarioTimeRef = useRef(setCurrentScenarioTimeToContext);
   const showRoutesRef = useRef(showRoutes);
   const showRangesRef = useRef(showRanges);
+  const runtimeVisibilityRef = useRef<RuntimeVisibility | null>(
+    runtimeVisibility
+  );
+  const deployUnitRef = useRef(onDeployUnit);
+  const deleteUnitRef = useRef(onDeleteUnit);
+  const moveUnitRef = useRef(onMoveUnit);
+  const setUnitPositionRef = useRef(onSetUnitPosition);
+  const updateUnitRef = useRef(onUpdateUnit);
   gameRef.current = game;
   setCoordsRef.current = setCurrentMouseMapCoordinatesToContext;
   setScenarioTimeRef.current = setCurrentScenarioTimeToContext;
   showRoutesRef.current = showRoutes;
   showRangesRef.current = showRanges;
+  runtimeVisibilityRef.current = runtimeVisibility;
+  deployUnitRef.current = onDeployUnit;
+  deleteUnitRef.current = onDeleteUnit;
+  moveUnitRef.current = onMoveUnit;
+  setUnitPositionRef.current = onSetUnitPosition;
+  updateUnitRef.current = onUpdateUnit;
+
+  const refreshSelectedUnitFromScenario = useCallback(() => {
+    const current = selectedUnitRef.current;
+    if (!current) return;
+    const scenario = game.currentScenario;
+    const unit =
+      current.type === "aircraft"
+        ? scenario.getAircraft(current.unit.id)
+        : current.type === "ship"
+          ? scenario.getShip(current.unit.id)
+          : current.type === "facility"
+            ? scenario.getFacility(current.unit.id)
+            : current.type === "airbase"
+              ? scenario.getAirbase(current.unit.id)
+              : scenario.getReferencePoint(current.unit.id);
+    if (!unit) {
+      entitiesRef.current?.setSelected(null);
+      selectedUnitRef.current = null;
+      setSelectedUnit(null);
+      return;
+    }
+    const next = { ...current, unit } as ScenarioUnit;
+    selectedUnitRef.current = next;
+    setSelectedUnit(next);
+  }, [game]);
+
+  const applyRuntimeUpdateUnit = useCallback(
+    async (update: RuntimeUpdateUnitRequest) => {
+      if (!onUpdateUnit) {
+        reportRuntimeUnavailable("updateUnit");
+        return;
+      }
+      try {
+        await onUpdateUnit(update);
+        refreshSelectedUnitFromScenario();
+      } catch (err) {
+        reportRuntimeFailure("updateUnit", err);
+      }
+    },
+    [
+      onUpdateUnit,
+      refreshSelectedUnitFromScenario,
+      reportRuntimeFailure,
+      reportRuntimeUnavailable,
+    ]
+  );
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -555,6 +724,8 @@ export default function CesiumScenarioMap({
       const drag = dragRef.current;
       if (drag && ll) {
         gameRef.current.teleportUnit(drag.unitId, ll[1], ll[0]);
+        drag.latitude = ll[1];
+        drag.longitude = ll[0];
       }
     }, ScreenSpaceEventType.MOUSE_MOVE);
 
@@ -580,12 +751,23 @@ export default function CesiumScenarioMap({
       if (syncInFlight) return;
       syncInFlight = true;
       const currentGame = gameRef.current;
+      const runtimeSideVisibility =
+        runtimeVisibilityRef.current?.by_side[currentGame.currentSideId] ??
+        runtimeVisibilityRef.current?.by_side[
+          runtimeVisibilityRef.current.current_side_id
+        ] ??
+        null;
       scenarioEntities
         .sync(
           currentGame.currentScenario,
           {
             godMode: currentGame.godMode,
-            currentSideId: currentGame.currentSideId,
+            visibleObjectIds: runtimeSideVisibility
+              ? new Set(runtimeSideVisibility.visible_object_ids)
+              : null,
+            operationalDetailObjectIds: runtimeSideVisibility
+              ? new Set(runtimeSideVisibility.operational_detail_object_ids)
+              : null,
           },
           {
             showRoutes: showRoutesRef.current,
@@ -614,24 +796,66 @@ export default function CesiumScenarioMap({
     // Helper: remove a unit by id, regardless of type. Used by eraser mode and
     // by the right-click context menu's "delete" action.
     const removeUnitById = (unitType: ScenarioUnit["type"], id: string) => {
-      const g = gameRef.current;
-      switch (unitType) {
-        case "aircraft":
-          g.removeAircraft(id);
-          break;
-        case "ship":
-          g.removeShip(id);
-          break;
-        case "facility":
-          g.removeFacility(id);
-          break;
-        case "airbase":
-          g.removeAirbase(id);
-          break;
-        case "referencePoint":
-          g.removeReferencePoint(id);
-          break;
+      const runtimeDelete = deleteUnitRef.current;
+      if (!runtimeDelete) {
+        reportRuntimeUnavailable("deleteUnit");
+        return;
       }
+      void Promise.resolve(
+        runtimeDelete(toRuntimeUnitType(unitType), id)
+      ).catch((err) => {
+        reportRuntimeFailure("deleteUnit", err);
+      });
+    };
+
+    const deployUnitAt = (
+      unitType: RuntimeUnitType,
+      className: string,
+      latitude: number,
+      longitude: number,
+      name = className
+    ) => {
+      const runtimeDeploy = deployUnitRef.current;
+      if (!runtimeDeploy) {
+        reportRuntimeUnavailable("deployUnit");
+        return;
+      }
+      void Promise.resolve(
+        runtimeDeploy({
+          unit_type: unitType,
+          class_name: className,
+          latitude,
+          longitude,
+          name,
+        })
+      ).catch((err) => {
+        reportRuntimeFailure("deployUnit", err);
+      });
+    };
+
+    const commitRuntimeRoute = (plot: {
+      unitId: string;
+      type: "aircraft" | "ship";
+    }) => {
+      const u =
+        plot.type === "aircraft"
+          ? gameRef.current.currentScenario.getAircraft(plot.unitId)
+          : gameRef.current.currentScenario.getShip(plot.unitId);
+      if (!u) return;
+      const route = u.desiredRoute.map(([latitude, longitude]) => [
+        latitude,
+        longitude,
+      ]);
+      const runtimeMove = moveUnitRef.current;
+      if (!runtimeMove) {
+        reportRuntimeUnavailable("submitRoute");
+        return;
+      }
+      void Promise.resolve(runtimeMove(plot.type, plot.unitId, route)).catch(
+        (err) => {
+          reportRuntimeFailure("submitRoute", err);
+        }
+      );
     };
 
     // LEFT_DOWN: if a unit is hit and we're not placing/erasing/plotting,
@@ -643,6 +867,10 @@ export default function CesiumScenarioMap({
       if (gameRef.current.eraserMode) return;
       const hit = pickUnit(evt.position);
       if (!hit) return;
+      if (!setUnitPositionRef.current) {
+        reportRuntimeUnavailable("moveUnit");
+        return;
+      }
       dragRef.current = { unitId: hit.unit.id, type: hit.type };
       viewer.scene.screenSpaceCameraController.enableRotate = false;
       viewer.scene.screenSpaceCameraController.enableTranslate = false;
@@ -652,11 +880,27 @@ export default function CesiumScenarioMap({
     // LEFT_UP: always restore camera and clear drag state.
     ssHandler.setInputAction(() => {
       if (dragRef.current) {
+        const drag = dragRef.current;
+        if (
+          drag.latitude !== undefined &&
+          drag.longitude !== undefined &&
+          setUnitPositionRef.current
+        ) {
+          void Promise.resolve(
+            setUnitPositionRef.current({
+              unit_type: toRuntimeUnitType(drag.type),
+              unit_id: drag.unitId,
+              latitude: drag.latitude,
+              longitude: drag.longitude,
+            })
+          ).catch((err) => {
+            reportRuntimeFailure("moveUnit", err);
+          });
+        }
         dragRef.current = null;
         viewer.scene.screenSpaceCameraController.enableRotate = true;
         viewer.scene.screenSpaceCameraController.enableTranslate = true;
         viewer.canvas.style.cursor = placementRef.current ? "crosshair" : "";
-        bumpScenario();
       }
     }, ScreenSpaceEventType.LEFT_UP);
 
@@ -682,28 +926,10 @@ export default function CesiumScenarioMap({
         const ll = screenToLonLat(evt.position);
         if (!ll) return;
         const [lon2, lat2] = ll;
-        const g = gameRef.current;
         const cls = place.className ?? place.type;
-        switch (place.type) {
-          case "aircraft":
-            g.addAircraft(cls, cls, lat2, lon2);
-            break;
-          case "ship":
-            g.addShip(cls, cls, lat2, lon2);
-            break;
-          case "facility":
-            g.addFacility(cls, cls, lat2, lon2);
-            break;
-          case "airbase":
-            g.addAirbase(cls, cls, lat2, lon2);
-            break;
-          case "referencePoint":
-            g.addReferencePoint("RP", lat2, lon2);
-            break;
-        }
+        deployUnitAt(toRuntimeUnitType(place.type), cls, lat2, lon2);
         placementRef.current = null;
         setPlacement(null);
-        bumpScenario();
         return;
       }
       const found = pickUnit(evt.position);
@@ -716,7 +942,6 @@ export default function CesiumScenarioMap({
             selectedUnitRef.current = null;
             setSelectedUnit(null);
           }
-          bumpScenario();
         }
         return;
       }
@@ -787,7 +1012,7 @@ export default function CesiumScenarioMap({
           ? gameRef.current.currentScenario.getAircraft(plot.unitId)
           : gameRef.current.currentScenario.getShip(plot.unitId);
       if (u && u.desiredRoute.length > 0) {
-        gameRef.current.commitRoute(plot.unitId);
+        commitRuntimeRoute(plot);
       }
       if (routeEntityRef.current) {
         viewer.entities.remove(routeEntityRef.current);
@@ -796,7 +1021,6 @@ export default function CesiumScenarioMap({
       routePlotRef.current = null;
       setRoutePlotting(null);
       viewer.canvas.style.cursor = "";
-      bumpScenario();
     }, ScreenSpaceEventType.LEFT_DOUBLE_CLICK);
 
     return () => {
@@ -1032,12 +1256,14 @@ export default function CesiumScenarioMap({
                               ? s.getFacility(sel.unit.id)
                               : s.getAirbase(sel.unit.id);
                       if (!u) return;
-                      u.isObjective = !u.isObjective;
+                      void applyRuntimeUpdateUnit({
+                        unit_type: toRuntimeUnitType(sel.type),
+                        unit_id: sel.unit.id,
+                        patch: { is_objective: !u.isObjective },
+                      });
                       // ScenarioUnit 联合类型；使用 setSelectedUnit 重新装载
                       // 让 React 重渲染 InfoCard。
                       selectedUnitRef.current = sel;
-                      setSelectedUnit({ ...sel, unit: u } as typeof sel);
-                      bumpScenario();
                     }
                   : undefined
               }
@@ -1055,7 +1281,18 @@ export default function CesiumScenarioMap({
                             ? game.currentScenario.getAircraft(plot.unitId)
                             : game.currentScenario.getShip(plot.unitId);
                         if (u && u.desiredRoute.length > 0) {
-                          game.commitRoute(plot.unitId);
+                          const route = u.desiredRoute.map(
+                            ([latitude, longitude]) => [latitude, longitude]
+                          );
+                          if (onMoveUnit) {
+                            void Promise.resolve(
+                              onMoveUnit(plot.type, plot.unitId, route)
+                            ).catch((err) => {
+                              reportRuntimeFailure("submitRoute", err);
+                            });
+                          } else {
+                            reportRuntimeUnavailable("submitRoute");
+                          }
                         }
                         if (viewerRef.current && routeEntityRef.current) {
                           viewerRef.current.entities.remove(
@@ -1067,7 +1304,6 @@ export default function CesiumScenarioMap({
                         setRoutePlotting(null);
                         if (viewerRef.current)
                           viewerRef.current.canvas.style.cursor = "";
-                        bumpScenario();
                       } else {
                         startPlotRoute(
                           selectedUnit.unit.id,
@@ -1097,39 +1333,35 @@ export default function CesiumScenarioMap({
                       );
                       if (!tmpl) return [];
                       const kind = selectedUnit.type;
+                      const carrierType = kind as RuntimeWeaponCarrierType;
                       const s = game.currentScenario;
-                      const out =
+                      const currentUnit =
                         kind === "aircraft"
-                          ? s.addWeaponToAircraft(
-                              unitId,
-                              tmpl.className,
-                              tmpl.speed,
-                              tmpl.maxFuel,
-                              tmpl.fuelRate,
-                              tmpl.range,
-                              tmpl.lethality
-                            )
+                          ? s.getAircraft(unitId)
                           : kind === "ship"
-                            ? s.addWeaponToShip(
-                                unitId,
-                                tmpl.className,
-                                tmpl.speed,
-                                tmpl.maxFuel,
-                                tmpl.fuelRate,
-                                tmpl.range,
-                                tmpl.lethality
-                              )
-                            : s.addWeaponToFacility(
-                                unitId,
-                                tmpl.className,
-                                tmpl.speed,
-                                tmpl.maxFuel,
-                                tmpl.fuelRate,
-                                tmpl.range,
-                                tmpl.lethality
-                              );
-                      bumpScenario();
-                      return out;
+                            ? s.getShip(unitId)
+                            : s.getFacility(unitId);
+                      if (!onAddWeapon) {
+                        reportRuntimeUnavailable("addWeapon");
+                        return currentUnit?.weapons ?? [];
+                      }
+                      void Promise.resolve(
+                        onAddWeapon({
+                          unit_type: carrierType,
+                          unit_id: unitId,
+                          class_name: tmpl.className,
+                          speed: tmpl.speed,
+                          max_fuel: tmpl.maxFuel,
+                          fuel_rate: tmpl.fuelRate,
+                          range: tmpl.range,
+                          lethality: tmpl.lethality,
+                        })
+                      )
+                        .then(refreshSelectedUnitFromScenario)
+                        .catch((err) => {
+                          reportRuntimeFailure("addWeapon", err);
+                        });
+                      return currentUnit?.weapons ?? [];
                     }
                   : undefined
               }
@@ -1139,15 +1371,30 @@ export default function CesiumScenarioMap({
                 selectedUnit.type === "facility"
                   ? (unitId: string, weaponId: string) => {
                       const kind = selectedUnit.type;
+                      const carrierType = kind as RuntimeWeaponCarrierType;
                       const s = game.currentScenario;
-                      const out =
+                      const currentUnit =
                         kind === "aircraft"
-                          ? s.deleteWeaponFromAircraft(unitId, weaponId)
+                          ? s.getAircraft(unitId)
                           : kind === "ship"
-                            ? s.deleteWeaponFromShip(unitId, weaponId)
-                            : s.deleteWeaponFromFacility(unitId, weaponId);
-                      bumpScenario();
-                      return out;
+                            ? s.getShip(unitId)
+                            : s.getFacility(unitId);
+                      if (!onDeleteWeapon) {
+                        reportRuntimeUnavailable("deleteWeapon");
+                        return currentUnit?.weapons ?? [];
+                      }
+                      void Promise.resolve(
+                        onDeleteWeapon({
+                          unit_type: carrierType,
+                          unit_id: unitId,
+                          weapon_id: weaponId,
+                        })
+                      )
+                        .then(refreshSelectedUnitFromScenario)
+                        .catch((err) => {
+                          reportRuntimeFailure("deleteWeapon", err);
+                        });
+                      return currentUnit?.weapons ?? [];
                     }
                   : undefined
               }
@@ -1157,27 +1404,31 @@ export default function CesiumScenarioMap({
                 selectedUnit.type === "facility"
                   ? (unitId: string, weaponId: string, increment: number) => {
                       const kind = selectedUnit.type;
+                      const carrierType = kind as RuntimeWeaponCarrierType;
                       const s = game.currentScenario;
-                      const out =
+                      const currentUnit =
                         kind === "aircraft"
-                          ? s.updateAircraftWeaponQuantity(
-                              unitId,
-                              weaponId,
-                              increment
-                            )
+                          ? s.getAircraft(unitId)
                           : kind === "ship"
-                            ? s.updateShipWeaponQuantity(
-                                unitId,
-                                weaponId,
-                                increment
-                              )
-                            : s.updateFacilityWeaponQuantity(
-                                unitId,
-                                weaponId,
-                                increment
-                              );
-                      bumpScenario();
-                      return out;
+                            ? s.getShip(unitId)
+                            : s.getFacility(unitId);
+                      if (!onUpdateWeaponQuantity) {
+                        reportRuntimeUnavailable("updateWeaponQuantity");
+                        return currentUnit?.weapons ?? [];
+                      }
+                      void Promise.resolve(
+                        onUpdateWeaponQuantity({
+                          unit_type: carrierType,
+                          unit_id: unitId,
+                          weapon_id: weaponId,
+                          increment,
+                        })
+                      )
+                        .then(refreshSelectedUnitFromScenario)
+                        .catch((err) => {
+                          reportRuntimeFailure("updateWeaponQuantity", err);
+                        });
+                      return currentUnit?.weapons ?? [];
                     }
                   : undefined
               }
@@ -1208,15 +1459,10 @@ export default function CesiumScenarioMap({
                 if (contextMenu.kind !== "unit") return;
                 const c = contextMenu;
                 setContextMenu(null);
-                const u =
-                  c.unit.type === "aircraft"
-                    ? game.currentScenario.getAircraft(c.unit.unit.id)
-                    : game.currentScenario.getShip(c.unit.unit.id);
-                if (u) {
-                  u.route = [];
-                  u.desiredRoute = [];
-                  bumpScenario();
-                }
+                clearUnitRoute(
+                  c.unit.unit.id,
+                  c.unit.type as "aircraft" | "ship"
+                );
               }}
             >
               {t("toolbar.context.clearRoute")}
@@ -1242,14 +1488,11 @@ export default function CesiumScenarioMap({
                         ? s.getFacility(c.unit.unit.id)
                         : s.getAirbase(c.unit.unit.id);
                 if (!u) return;
-                u.isObjective = !u.isObjective;
-                if (selectedUnitRef.current?.unit.id === c.unit.unit.id) {
-                  setSelectedUnit({
-                    ...selectedUnitRef.current,
-                    unit: u,
-                  } as typeof selectedUnitRef.current);
-                }
-                bumpScenario();
+                void applyRuntimeUpdateUnit({
+                  unit_type: toRuntimeUnitType(c.unit.type),
+                  unit_id: c.unit.unit.id,
+                  patch: { is_objective: !u.isObjective },
+                });
               }}
               sx={{ color: "warning.main" }}
             >
@@ -1274,29 +1517,23 @@ export default function CesiumScenarioMap({
               if (contextMenu.kind !== "unit") return;
               const c = contextMenu;
               setContextMenu(null);
-              switch (c.unit.type) {
-                case "aircraft":
-                  game.removeAircraft(c.unit.unit.id);
-                  break;
-                case "ship":
-                  game.removeShip(c.unit.unit.id);
-                  break;
-                case "facility":
-                  game.removeFacility(c.unit.unit.id);
-                  break;
-                case "airbase":
-                  game.removeAirbase(c.unit.unit.id);
-                  break;
-                case "referencePoint":
-                  game.removeReferencePoint(c.unit.unit.id);
-                  break;
+              if (!onDeleteUnit) {
+                reportRuntimeUnavailable("deleteUnit");
+                return;
               }
-              if (selectedUnitRef.current?.unit.id === c.unit.unit.id) {
-                entitiesRef.current?.setSelected(null);
-                selectedUnitRef.current = null;
-                setSelectedUnit(null);
-              }
-              bumpScenario();
+              void Promise.resolve(
+                onDeleteUnit(toRuntimeUnitType(c.unit.type), c.unit.unit.id)
+              )
+                .then(() => {
+                  if (selectedUnitRef.current?.unit.id === c.unit.unit.id) {
+                    entitiesRef.current?.setSelected(null);
+                    selectedUnitRef.current = null;
+                    setSelectedUnit(null);
+                  }
+                })
+                .catch((err) => {
+                  reportRuntimeFailure("deleteUnit", err);
+                });
             }}
             sx={{ color: "error.main" }}
           >
@@ -1324,8 +1561,21 @@ export default function CesiumScenarioMap({
                 options: AircraftDb.map((a) => a.className),
                 labelOf: labelFromDict(aircraftLabels),
                 onPick: (cls) => {
-                  game.addAircraft(cls, cls, c.lat, c.lon);
-                  bumpScenario();
+                  if (onDeployUnit) {
+                    void Promise.resolve(
+                      onDeployUnit({
+                        unit_type: "aircraft",
+                        class_name: cls,
+                        name: cls,
+                        latitude: c.lat,
+                        longitude: c.lon,
+                      })
+                    ).catch((err) => {
+                      reportRuntimeFailure("deployUnit", err);
+                    });
+                  } else {
+                    reportRuntimeUnavailable("deployUnit");
+                  }
                 },
               });
             }}
@@ -1344,8 +1594,21 @@ export default function CesiumScenarioMap({
                 options: ShipDb.map((s) => s.className),
                 labelOf: labelFromDict(shipLabels),
                 onPick: (cls) => {
-                  game.addShip(cls, cls, c.lat, c.lon);
-                  bumpScenario();
+                  if (onDeployUnit) {
+                    void Promise.resolve(
+                      onDeployUnit({
+                        unit_type: "ship",
+                        class_name: cls,
+                        name: cls,
+                        latitude: c.lat,
+                        longitude: c.lon,
+                      })
+                    ).catch((err) => {
+                      reportRuntimeFailure("deployUnit", err);
+                    });
+                  } else {
+                    reportRuntimeUnavailable("deployUnit");
+                  }
                 },
               });
             }}
@@ -1364,8 +1627,21 @@ export default function CesiumScenarioMap({
                 options: FacilityDb.map((f) => f.className),
                 labelOf: labelFromDict(facilityLabels),
                 onPick: (cls) => {
-                  game.addFacility(cls, cls, c.lat, c.lon);
-                  bumpScenario();
+                  if (onDeployUnit) {
+                    void Promise.resolve(
+                      onDeployUnit({
+                        unit_type: "facility",
+                        class_name: cls,
+                        name: cls,
+                        latitude: c.lat,
+                        longitude: c.lon,
+                      })
+                    ).catch((err) => {
+                      reportRuntimeFailure("deployUnit", err);
+                    });
+                  } else {
+                    reportRuntimeUnavailable("deployUnit");
+                  }
                 },
               });
             }}
@@ -1384,8 +1660,21 @@ export default function CesiumScenarioMap({
                 options: AirbaseDb.map((a) => a.name),
                 labelOf: localizeAirbaseName,
                 onPick: (cls) => {
-                  game.addAirbase(cls, cls, c.lat, c.lon);
-                  bumpScenario();
+                  if (onDeployUnit) {
+                    void Promise.resolve(
+                      onDeployUnit({
+                        unit_type: "airbase",
+                        class_name: cls,
+                        name: cls,
+                        latitude: c.lat,
+                        longitude: c.lon,
+                      })
+                    ).catch((err) => {
+                      reportRuntimeFailure("deployUnit", err);
+                    });
+                  } else {
+                    reportRuntimeUnavailable("deployUnit");
+                  }
                 },
               });
             }}
@@ -1401,8 +1690,21 @@ export default function CesiumScenarioMap({
               const c = contextMenu;
               setContextMenu(null);
               setClassChooser(null);
-              game.addReferencePoint("RP", c.lat, c.lon);
-              bumpScenario();
+              if (onDeployUnit) {
+                void Promise.resolve(
+                  onDeployUnit({
+                    unit_type: "reference_point",
+                    class_name: "RP",
+                    name: "RP",
+                    latitude: c.lat,
+                    longitude: c.lon,
+                  })
+                ).catch((err) => {
+                  reportRuntimeFailure("deployUnit", err);
+                });
+              } else {
+                reportRuntimeUnavailable("deployUnit");
+              }
             }}
           >
             {t("toolbar.addAt.referencePoint")}
@@ -1477,19 +1779,34 @@ export default function CesiumScenarioMap({
             units: string[],
             referencePoints: string[]
           ) => {
-            const area = referencePoints
-              .map((id) => game.currentScenario.getReferencePoint(id))
-              .filter((rp): rp is NonNullable<typeof rp> => Boolean(rp));
-            game.createPatrolMission(name, units, area);
-            bumpScenario();
+            if (onCreatePatrolMission) {
+              void Promise.resolve(
+                onCreatePatrolMission(name, units, referencePoints)
+              )
+                .then(() => setMissionCreatorVisible(false))
+                .catch((err) => {
+                  reportRuntimeFailure("createPatrolMission", err);
+                });
+              return;
+            }
+            reportRuntimeUnavailable("createPatrolMission");
           }}
           createStrikeMission={(
             name: string,
             attackers: string[],
             targets: string[]
           ) => {
-            game.createStrikeMission(name, attackers, targets);
-            bumpScenario();
+            if (onCreateStrikeMission) {
+              void Promise.resolve(
+                onCreateStrikeMission(name, attackers, targets)
+              )
+                .then(() => setMissionCreatorVisible(false))
+                .catch((err) => {
+                  reportRuntimeFailure("createStrikeMission", err);
+                });
+              return;
+            }
+            reportRuntimeUnavailable("createStrikeMission");
           }}
           handleCloseOnMap={() => setMissionCreatorVisible(false)}
         />
@@ -1527,11 +1844,17 @@ export default function CesiumScenarioMap({
               units: string[],
               referencePoints: string[]
             ) => {
-              const area = referencePoints
-                .map((id) => game.currentScenario.getReferencePoint(id))
-                .filter((rp): rp is NonNullable<typeof rp> => Boolean(rp));
-              game.updatePatrolMission(missionId, name, units, area);
-              bumpScenario();
+              if (onUpdatePatrolMission) {
+                void Promise.resolve(
+                  onUpdatePatrolMission(missionId, name, units, referencePoints)
+                )
+                  .then(() => setVisibleMissionEditorMissionId(null))
+                  .catch((err) => {
+                    reportRuntimeFailure("updatePatrolMission", err);
+                  });
+                return;
+              }
+              reportRuntimeUnavailable("updatePatrolMission");
             }}
             updateStrikeMission={(
               missionId: string,
@@ -1539,8 +1862,17 @@ export default function CesiumScenarioMap({
               units: string[],
               targets: string[]
             ) => {
-              game.updateStrikeMission(missionId, name, units, targets);
-              bumpScenario();
+              if (onUpdateStrikeMission) {
+                void Promise.resolve(
+                  onUpdateStrikeMission(missionId, name, units, targets)
+                )
+                  .then(() => setVisibleMissionEditorMissionId(null))
+                  .catch((err) => {
+                    reportRuntimeFailure("updateStrikeMission", err);
+                  });
+                return;
+              }
+              reportRuntimeUnavailable("updateStrikeMission");
             }}
             deleteMission={(missionId: string) => {
               const mission = game.currentScenario.missions.find(
@@ -1549,9 +1881,14 @@ export default function CesiumScenarioMap({
               if (!mission) return;
               if (!window.confirm(`确认删除任务「${mission.name}」？`)) return;
 
-              game.deleteMission(missionId);
+              if (!onDeleteMission) {
+                reportRuntimeUnavailable("deleteMission");
+                return;
+              }
               setVisibleMissionEditorMissionId(null);
-              bumpScenario();
+              void Promise.resolve(onDeleteMission(missionId)).catch((err) => {
+                reportRuntimeFailure("deleteMission", err);
+              });
             }}
             handleCloseOnMap={() => setVisibleMissionEditorMissionId(null)}
           />

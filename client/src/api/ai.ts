@@ -1,5 +1,20 @@
 import { apiCall } from "./client";
-import type { RuntimeAttackRequest, RuntimeSnapshot } from "./types";
+import type {
+  RuntimeAttackRequest,
+  RuntimeAddWeaponRequest,
+  RuntimeCreateSideRequest,
+  RuntimeDeleteWeaponRequest,
+  RuntimeDeployUnitRequest,
+  RuntimeMoveUnitRequest,
+  RuntimePatrolMissionRequest,
+  RuntimeSetUnitPositionRequest,
+  RuntimeSnapshot,
+  RuntimeStrikeMissionRequest,
+  RuntimeUnitType,
+  RuntimeUpdateSideRequest,
+  RuntimeUpdateUnitRequest,
+  RuntimeUpdateWeaponQuantityRequest,
+} from "./types";
 
 export async function getRuntimeScenario(): Promise<Record<string, unknown>> {
   return apiCall<Record<string, unknown>>("/api/ai/runtime/scenario");
@@ -49,5 +64,167 @@ export async function attackRuntime(
   return apiCall<RuntimeSnapshot>("/api/ai/runtime/attack", {
     method: "POST",
     json: attack,
+  });
+}
+
+export async function deployRuntimeUnit(
+  unit: RuntimeDeployUnitRequest
+): Promise<RuntimeSnapshot> {
+  return apiCall<RuntimeSnapshot>("/api/ai/runtime/units", {
+    method: "POST",
+    json: unit,
+  });
+}
+
+export async function deleteRuntimeUnit(
+  unitType: RuntimeUnitType,
+  unitId: string
+): Promise<RuntimeSnapshot> {
+  return apiCall<RuntimeSnapshot>(
+    `/api/ai/runtime/units/${encodeURIComponent(unitType)}/${encodeURIComponent(
+      unitId
+    )}`,
+    { method: "DELETE" }
+  );
+}
+
+export async function moveRuntimeUnit(
+  move: RuntimeMoveUnitRequest
+): Promise<RuntimeSnapshot> {
+  return apiCall<RuntimeSnapshot>("/api/ai/runtime/units/route", {
+    method: "PATCH",
+    json: move,
+  });
+}
+
+export async function setRuntimeUnitPosition(
+  position: RuntimeSetUnitPositionRequest
+): Promise<RuntimeSnapshot> {
+  return apiCall<RuntimeSnapshot>("/api/ai/runtime/units/position", {
+    method: "PATCH",
+    json: position,
+  });
+}
+
+export async function updateRuntimeUnit(
+  update: RuntimeUpdateUnitRequest
+): Promise<RuntimeSnapshot> {
+  return apiCall<RuntimeSnapshot>("/api/ai/runtime/units", {
+    method: "PATCH",
+    json: update,
+  });
+}
+
+export async function setRuntimeCurrentSide(
+  side: string
+): Promise<RuntimeSnapshot> {
+  return apiCall<RuntimeSnapshot>("/api/ai/runtime/side/current", {
+    method: "PATCH",
+    json: { side },
+  });
+}
+
+export async function createRuntimeSide(
+  side: RuntimeCreateSideRequest
+): Promise<RuntimeSnapshot> {
+  return apiCall<RuntimeSnapshot>("/api/ai/runtime/sides", {
+    method: "POST",
+    json: side,
+  });
+}
+
+export async function updateRuntimeSide(
+  sideId: string,
+  side: RuntimeUpdateSideRequest
+): Promise<RuntimeSnapshot> {
+  return apiCall<RuntimeSnapshot>(
+    `/api/ai/runtime/sides/${encodeURIComponent(sideId)}`,
+    {
+      method: "PATCH",
+      json: side,
+    }
+  );
+}
+
+export async function deleteRuntimeSide(
+  sideId: string
+): Promise<RuntimeSnapshot> {
+  return apiCall<RuntimeSnapshot>(
+    `/api/ai/runtime/sides/${encodeURIComponent(sideId)}`,
+    { method: "DELETE" }
+  );
+}
+
+export async function deleteRuntimeMission(
+  missionId: string
+): Promise<RuntimeSnapshot> {
+  return apiCall<RuntimeSnapshot>(
+    `/api/ai/runtime/missions/${encodeURIComponent(missionId)}`,
+    { method: "DELETE" }
+  );
+}
+
+export async function createRuntimePatrolMission(
+  mission: RuntimePatrolMissionRequest
+): Promise<RuntimeSnapshot> {
+  return apiCall<RuntimeSnapshot>("/api/ai/runtime/missions/patrol", {
+    method: "POST",
+    json: mission,
+  });
+}
+
+export async function updateRuntimePatrolMission(
+  missionId: string,
+  mission: RuntimePatrolMissionRequest
+): Promise<RuntimeSnapshot> {
+  return apiCall<RuntimeSnapshot>(
+    `/api/ai/runtime/missions/patrol/${encodeURIComponent(missionId)}`,
+    { method: "PATCH", json: mission }
+  );
+}
+
+export async function createRuntimeStrikeMission(
+  mission: RuntimeStrikeMissionRequest
+): Promise<RuntimeSnapshot> {
+  return apiCall<RuntimeSnapshot>("/api/ai/runtime/missions/strike", {
+    method: "POST",
+    json: mission,
+  });
+}
+
+export async function updateRuntimeStrikeMission(
+  missionId: string,
+  mission: RuntimeStrikeMissionRequest
+): Promise<RuntimeSnapshot> {
+  return apiCall<RuntimeSnapshot>(
+    `/api/ai/runtime/missions/strike/${encodeURIComponent(missionId)}`,
+    { method: "PATCH", json: mission }
+  );
+}
+
+export async function addRuntimeWeapon(
+  weapon: RuntimeAddWeaponRequest
+): Promise<RuntimeSnapshot> {
+  return apiCall<RuntimeSnapshot>("/api/ai/runtime/weapons", {
+    method: "POST",
+    json: weapon,
+  });
+}
+
+export async function deleteRuntimeWeapon(
+  weapon: RuntimeDeleteWeaponRequest
+): Promise<RuntimeSnapshot> {
+  return apiCall<RuntimeSnapshot>("/api/ai/runtime/weapons", {
+    method: "DELETE",
+    json: weapon,
+  });
+}
+
+export async function updateRuntimeWeaponQuantity(
+  weapon: RuntimeUpdateWeaponQuantityRequest
+): Promise<RuntimeSnapshot> {
+  return apiCall<RuntimeSnapshot>("/api/ai/runtime/weapons/quantity", {
+    method: "PATCH",
+    json: weapon,
   });
 }

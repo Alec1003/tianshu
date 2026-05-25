@@ -1,4 +1,11 @@
-import { useContext, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import Draggable from "react-draggable";
 import Card from "@mui/material/Card";
 import CardContent from "@mui/material/CardContent";
@@ -56,22 +63,15 @@ interface SimulationLogsProps {
 export default function SimulationLogs(props: SimulationLogsProps) {
   const nodeRef = useRef(null);
   const logsContainerRef = useRef<HTMLDivElement>(null);
-  const lastRenderedLogIdRef = useRef<string | null>(null);
   const simulationLogs = useContext(SimulationLogsContext);
-  const [simulationLogElements, setSimulationLogElements] = useState<
-    JSX.Element[]
-  >([]);
   const scenarioSides = useContext(ScenarioSidesContext);
-  const getScenarioSidesMap = () => {
+  const scenarioSidesMap = useMemo(() => {
     const sidesMap: Record<string, Side> = {};
     scenarioSides.forEach((side) => {
       sidesMap[side.id] = side;
     });
     return sidesMap;
-  };
-  const [scenarioSidesMap, setScenarioSidesMap] = useState<
-    Record<string, Side>
-  >(getScenarioSidesMap());
+  }, [scenarioSides]);
   const [openFilterMenuAnchorEl, setOpenFilterMenuAnchorEl] =
     useState<boolean>(false);
   const [filterMenuAnchorEl, setFilterMenuAnchorEl] =
@@ -86,87 +86,78 @@ export default function SimulationLogs(props: SimulationLogsProps) {
     props.handleCloseOnMap();
   };
 
-  const scrollToBottom = () => {
+  const scrollToBottom = useCallback(() => {
     const container = logsContainerRef.current;
     if (container) {
       container.scrollTop = container.scrollHeight;
     }
-  };
+  }, []);
 
-  useEffect(() => {
-    setScenarioSidesMap(getScenarioSidesMap());
-  }, [scenarioSides]);
+  const filterSimulationLogs = useCallback(
+    (logs: SimulationLog[]) => {
+      if (
+        sideFilterSelections.length === 0 &&
+        messageTypeFilterSelections.length === 0
+      ) {
+        return logs;
+      }
 
-  useEffect(() => {
-    if (simulationLogs.length === 0) {
-      lastRenderedLogIdRef.current = null;
-      setSimulationLogElements([]);
-      return;
-    } else if (simulationLogs.length > simulationLogElements.length) {
-      const lastIndex = simulationLogs.findIndex(
-        (log) => log.id === lastRenderedLogIdRef.current
+      return logs.filter((log) => {
+        const sideMatch =
+          sideFilterSelections.length === 0 ||
+          sideFilterSelections.includes(log.sideId);
+        const messageTypeMatch =
+          messageTypeFilterSelections.length === 0 ||
+          messageTypeFilterSelections.includes(log.type);
+        return sideMatch && messageTypeMatch;
+      });
+    },
+    [messageTypeFilterSelections, sideFilterSelections]
+  );
+
+  const createMessageLogComponent = useCallback(
+    (log: SimulationLog) => {
+      const side = scenarioSidesMap[log.sideId];
+      const sideName = side?.name ?? "UNKNOWN";
+      const sideColor = side?.color ?? SIDE_COLOR.BLACK;
+      return (
+        <Typography
+          key={log.id}
+          variant="body2"
+          sx={{
+            whiteSpace: "pre-wrap",
+            mb: 0.5,
+          }}
+        >
+          [
+          <Typography
+            component="span"
+            sx={{ color: "black", fontSize: "inherit" }}
+          >
+            {unixToLocalTime(log.timestamp)}
+          </Typography>
+          ][
+          <Typography
+            component="span"
+            sx={{ color: sideColor, fontSize: "inherit" }}
+          >
+            {sideName}
+          </Typography>
+          ] {log.message}
+        </Typography>
       );
-      const newSimulationLogElements: JSX.Element[] = simulationLogs
-        .slice(lastIndex + 1, simulationLogs.length)
-        .filter((log) => {
-          if (filterSimulationLogs([log]).length > 0) {
-            lastRenderedLogIdRef.current = log.id;
-            return true;
-          }
-          return false;
-        })
-        .map((log) => {
-          return createMessageLogComponent(log);
-        });
-      setSimulationLogElements((prev) => [
-        ...prev,
-        ...newSimulationLogElements,
-      ]);
-      scrollToBottom();
-      return;
-    } else if (simulationLogs.length < simulationLogElements.length) {
-      const newSimulationLogElements: JSX.Element[] = simulationLogs.map(
-        (log) => {
-          return createMessageLogComponent(log);
-        }
-      );
-      lastRenderedLogIdRef.current =
-        simulationLogs[simulationLogs.length - 1]?.id;
-      setSimulationLogElements(newSimulationLogElements);
-      scrollToBottom();
-      return;
-    } else {
-      return;
-    }
-  }, [simulationLogs]);
+    },
+    [scenarioSidesMap]
+  );
+
+  const simulationLogElements = useMemo(
+    () => filterSimulationLogs(simulationLogs).map(createMessageLogComponent),
+    [createMessageLogComponent, filterSimulationLogs, simulationLogs]
+  );
 
   useEffect(() => {
-    const filteredLogs = filterSimulationLogs(simulationLogs);
-    lastRenderedLogIdRef.current = filteredLogs[filteredLogs.length - 1]?.id;
-    setSimulationLogElements(
-      filteredLogs.map((log) => createMessageLogComponent(log))
-    );
     scrollToBottom();
-  }, [sideFilterSelections, messageTypeFilterSelections]);
-
-  const filterSimulationLogs = (simulationLogs: SimulationLog[]) => {
-    if (
-      sideFilterSelections.length === 0 &&
-      messageTypeFilterSelections.length === 0
-    ) {
-      return simulationLogs;
-    }
-
-    return simulationLogs.filter((log) => {
-      const sideMatch =
-        sideFilterSelections.length === 0 ||
-        sideFilterSelections.includes(log.sideId);
-      const messageTypeMatch =
-        messageTypeFilterSelections.length === 0 ||
-        messageTypeFilterSelections.includes(log.type);
-      return sideMatch && messageTypeMatch;
-    });
-  };
+  }, [scrollToBottom, simulationLogElements.length]);
 
   const handleOpenFilterMenu = (event: React.MouseEvent<HTMLButtonElement>) => {
     setFilterMenuAnchorEl(event.currentTarget);
@@ -260,38 +251,6 @@ export default function SimulationLogs(props: SimulationLogsProps) {
           <Card sx={cardStyle}>{cardContent()}</Card>
         </Box>
       </Popover>
-    );
-  };
-
-  const createMessageLogComponent = (log: SimulationLog) => {
-    const side = scenarioSidesMap[log.sideId];
-    const sideName = side?.name ?? "UNKNOWN";
-    const sideColor = side?.color ?? SIDE_COLOR.BLACK;
-    return (
-      <Typography
-        key={log.id}
-        variant="body2"
-        sx={{
-          whiteSpace: "pre-wrap",
-          mb: 0.5,
-        }}
-      >
-        [
-        <Typography
-          component="span"
-          sx={{ color: "black", fontSize: "inherit" }}
-        >
-          {unixToLocalTime(log.timestamp)}
-        </Typography>
-        ][
-        <Typography
-          component="span"
-          sx={{ color: sideColor, fontSize: "inherit" }}
-        >
-          {sideName}
-        </Typography>
-        ] {log.message}
-      </Typography>
     );
   };
 

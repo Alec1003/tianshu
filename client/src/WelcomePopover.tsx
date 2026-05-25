@@ -84,9 +84,7 @@ const WelcomePopover: React.FC<WelcomePopoverProps> = ({ open, onClose }) => {
               {t("welcome.title")}
             </Typography>
             <Typography gutterBottom>{t("welcome.intro")}</Typography>
-            <Typography gutterBottom>
-              {t("welcome.classification")}
-            </Typography>
+            <Typography gutterBottom>{t("welcome.classification")}</Typography>
           </Box>
 
           {/* RIGHT SIDE */}

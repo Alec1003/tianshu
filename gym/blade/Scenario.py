@@ -26,7 +26,7 @@ class Scenario:
         name: str = "",
         start_time: int = 0,
         duration: int = 1,
-        sides: list[Side] = [],
+        sides: list[Side] | None = None,
         current_time: int = None,
         time_compression: int = 1,
         aircraft: list[Aircraft] = None,
@@ -36,7 +36,7 @@ class Scenario:
         weapons: list[Weapon] = None,
         reference_points: list[ReferencePoint] = None,
         missions: list[PatrolMission | StrikeMission] = None,
-        relationships: Relationships = Relationships(),
+        relationships: Relationships | None = None,
         doctrine: Doctrine = None,
         last_objective_destroyed: dict | None = None,
     ):
@@ -45,7 +45,7 @@ class Scenario:
         self.start_time = start_time
         self.current_time = current_time if current_time is not None else start_time
         self.duration = duration
-        self.sides = sides
+        self.sides = sides if sides is not None else []
         self.time_compression = time_compression
         self.aircraft = aircraft if aircraft is not None else []
         self.ships = ships if ships is not None else []
@@ -54,7 +54,9 @@ class Scenario:
         self.weapons = weapons if weapons is not None else []
         self.reference_points = reference_points if reference_points is not None else []
         self.missions = missions if missions is not None else []
-        self.relationships = relationships
+        self.relationships = (
+            relationships if relationships is not None else Relationships()
+        )
         self.doctrine = doctrine if doctrine is not None else self.get_default_doctrine()
         self.last_objective_destroyed = last_objective_destroyed
 

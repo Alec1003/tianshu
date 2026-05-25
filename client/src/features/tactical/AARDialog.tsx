@@ -165,7 +165,10 @@ export default function AARDialog({
               <div className="space-y-2">
                 {sortedSides.map((side, index) => {
                   const remainingUnits =
-                    side.aircraft + side.ships + side.facilities + side.airbases;
+                    side.aircraft +
+                    side.ships +
+                    side.facilities +
+                    side.airbases;
                   const isWinner = side.id === outcome.winnerSideId;
                   return (
                     <div

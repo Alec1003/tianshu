@@ -4,7 +4,7 @@ import {
   SetUnitDbContext,
 } from "@/gui/contextProviders/contexts/UnitDbContext";
 import { getUnitAssetCatalog } from "@/api/unitAssets";
-import { useAuth } from "@/features/auth/AuthContext";
+import { useAuth } from "@/features/auth/useAuth";
 import Dba from "@/game/db/Dba";
 import { catalogToDba } from "@/game/db/unitAssetCatalog";
 

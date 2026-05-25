@@ -13,7 +13,9 @@ import type {
 export async function listScenarios(
   includeTemplates = true
 ): Promise<ScenarioListItem[]> {
-  const q = includeTemplates ? "?include_templates=true" : "?include_templates=false";
+  const q = includeTemplates
+    ? "?include_templates=true"
+    : "?include_templates=false";
   return apiCall<ScenarioListItem[]>(`/api/scenarios${q}`);
 }
 
@@ -53,10 +55,9 @@ export async function listAarRecords(scenarioId: string): Promise<AarRecord[]> {
 }
 
 export async function activateScenario(id: string): Promise<void> {
-  await apiCall<unknown>(
-    `/api/scenarios/${encodeURIComponent(id)}/activate`,
-    { method: "POST" }
-  );
+  await apiCall<unknown>(`/api/scenarios/${encodeURIComponent(id)}/activate`, {
+    method: "POST",
+  });
 }
 
 export async function createAarRecord(

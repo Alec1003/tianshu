@@ -14,6 +14,10 @@ export const ToastProvider = ({ children }: { children: React.ReactNode }) => {
   const toastContainerEl =
     document.getElementById("toast-container") || document.body || null;
 
+  const removeToast = useCallback((id: string): void => {
+    setToasts((prev) => prev.filter((toast) => toast.id !== id));
+  }, []);
+
   const addToast = useCallback(
     (
       message: string,
@@ -33,12 +37,8 @@ export const ToastProvider = ({ children }: { children: React.ReactNode }) => {
         removeToast(id);
       }, delay);
     },
-    []
+    [removeToast]
   );
-
-  const removeToast = useCallback((id: string): void => {
-    setToasts((prev) => prev.filter((toast) => toast.id !== id));
-  }, []);
 
   const getToastPosition = (index: number) => {
     const basePosition = 20;

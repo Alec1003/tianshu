@@ -41,11 +41,12 @@ import {
 import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { DoctrineType } from "@/game/Doctrine";
+import { DoctrineType, type SideDoctrine } from "@/game/Doctrine";
 import type Game from "@/game/Game";
 import type { GameOutcome, Mission } from "@/game/Game";
 import type Scenario from "@/game/Scenario";
 import type Side from "@/game/Side";
+import type { RuntimeVisibility } from "@/api/types";
 import type { CesiumPlacement } from "@/gui/map/CesiumToolbar";
 import SideEditor from "@/gui/map/toolbar/SideEditor";
 import { AirbaseDb, AircraftDb, FacilityDb, ShipDb } from "@/game/db/UnitDb";
@@ -92,6 +93,7 @@ export interface SimulationSnapshot {
   // 胜负判定状态 + 各阵营实时评分，供「战况」Section 与 AAR 弹窗复用。
   outcome: GameOutcome;
   sideStats: SimulationSideStats[];
+  visibility: RuntimeVisibility | null;
 }
 
 interface SimulationSidebarProps {
@@ -114,6 +116,23 @@ interface SimulationSidebarProps {
   onDeleteMission: (missionId: string) => void;
   onBeginPlacement: (placement: CesiumPlacement) => void;
   onScenarioMutation: () => void;
+  onSwitchSide?: (sideId: string) => void | Promise<void>;
+  onCreateSide?: (
+    name: string,
+    color: string,
+    hostiles: string[],
+    allies: string[],
+    doctrine: SideDoctrine
+  ) => void | Promise<void>;
+  onUpdateSide?: (
+    sideId: string,
+    name: string,
+    color: string,
+    hostiles: string[],
+    allies: string[],
+    doctrine: SideDoctrine
+  ) => void | Promise<void>;
+  onDeleteSide?: (sideId: string) => void | Promise<void>;
   onNewScenario: () => void;
   onLoadDemoScenario: () => void;
   onLoadSCSScenario: () => void;
@@ -621,9 +640,7 @@ function PlacementFloatingMenu({
   const itemHeight = 84;
   const listPadding = 24;
   const estimatedContentHeight =
-    options.length === 0
-      ? 120
-      : options.length * itemHeight + listPadding;
+    options.length === 0 ? 120 : options.length * itemHeight + listPadding;
   const estimatedHeight = Math.min(
     maxHeight,
     headerHeight + estimatedContentHeight
@@ -1022,8 +1039,8 @@ function renderBattleStatusSection(snapshot: SimulationSnapshot): ReactNode {
                 <div className="mt-1 flex items-center justify-between text-[10px] text-slate-500">
                   <span>剩余 {remaining} 单位</span>
                   <span>
-                    ✈ {side.aircraft} · 🚢 {side.ships} · 🛰 {side.facilities} · 🏭{" "}
-                    {side.airbases}
+                    ✈ {side.aircraft} · 🚢 {side.ships} · 🛰 {side.facilities}{" "}
+                    · 🏭 {side.airbases}
                   </span>
                 </div>
               </div>
@@ -1072,6 +1089,10 @@ export default function SimulationSidebar({
   onDeleteMission,
   onBeginPlacement,
   onScenarioMutation,
+  onSwitchSide,
+  onCreateSide,
+  onUpdateSide,
+  onDeleteSide,
   onNewScenario,
   onLoadDemoScenario,
   onLoadSCSScenario,
@@ -1261,8 +1282,18 @@ export default function SimulationSidebar({
                     key={side.id}
                     onEdit={(event) => openSideEditor(event, side.id)}
                     onSelect={() => {
-                      game.switchCurrentSide(side.id);
-                      onScenarioMutation();
+                      if (onSwitchSide) {
+                        void Promise.resolve(onSwitchSide(side.id)).catch(
+                          (err) =>
+                            console.error(
+                              "[AICC] runtime side switch failed",
+                              err
+                            )
+                        );
+                      } else {
+                        game.switchCurrentSide(side.id);
+                        onScenarioMutation();
+                      }
                     }}
                     side={side}
                     unitCount={countUnitsForSide(scenario, side.id)}
@@ -1759,12 +1790,22 @@ export default function SimulationSidebar({
 
       <SideEditor
         addSide={(name, color, hostiles, allies, doctrine) => {
-          game.addSide(name, color, hostiles, allies, doctrine);
-          const createdSide = scenario.sides[scenario.sides.length - 1];
-          if (createdSide) {
-            game.switchCurrentSide(createdSide.id);
+          if (onCreateSide) {
+            void Promise.resolve(
+              onCreateSide(name, color, hostiles, allies, doctrine)
+            )
+              .then(closeSideEditor)
+              .catch((err) =>
+                console.error("[AICC] runtime side create failed", err)
+              );
+          } else {
+            game.addSide(name, color, hostiles, allies, doctrine);
+            const createdSide = scenario.sides[scenario.sides.length - 1];
+            if (createdSide) {
+              game.switchCurrentSide(createdSide.id);
+            }
+            refreshScenarioAfterSideMutation();
           }
-          refreshScenarioAfterSideMutation();
         }}
         allies={
           editorSideId ? scenario.relationships.getAllies(editorSideId) : []
@@ -1780,8 +1821,16 @@ export default function SimulationSidebar({
           ) {
             return;
           }
-          game.deleteSide(sideId);
-          refreshScenarioAfterSideMutation();
+          if (onDeleteSide) {
+            void Promise.resolve(onDeleteSide(sideId))
+              .then(closeSideEditor)
+              .catch((err) =>
+                console.error("[AICC] runtime side delete failed", err)
+              );
+          } else {
+            game.deleteSide(sideId);
+            refreshScenarioAfterSideMutation();
+          }
         }}
         doctrine={
           editorSideId
@@ -1796,8 +1845,18 @@ export default function SimulationSidebar({
         side={selectedSideForEditor}
         sides={scenario.sides}
         updateSide={(sideId, name, color, hostiles, allies, doctrine) => {
-          game.updateSide(sideId, name, color, hostiles, allies, doctrine);
-          refreshScenarioAfterSideMutation();
+          if (onUpdateSide) {
+            void Promise.resolve(
+              onUpdateSide(sideId, name, color, hostiles, allies, doctrine)
+            )
+              .then(closeSideEditor)
+              .catch((err) =>
+                console.error("[AICC] runtime side update failed", err)
+              );
+          } else {
+            game.updateSide(sideId, name, color, hostiles, allies, doctrine);
+            refreshScenarioAfterSideMutation();
+          }
         }}
       />
       {typeof document !== "undefined" &&

@@ -35,6 +35,30 @@ export function localizeWeaponName(name: string): string {
   return name;
 }
 
+export type UnitAssetClassType = "aircraft" | "ship" | "facility" | "weapon";
+
+export function localizeUnitAssetClassName(
+  type: UnitAssetClassType,
+  className: string
+): string {
+  if (!className) return "";
+  const label = i18n.t(`unitClass.${type}.${className}`, {
+    defaultValue: "",
+  });
+  if (typeof label === "string" && label) return label;
+  if (type === "weapon") return localizeWeaponName(className);
+  return localizeClassName(className);
+}
+
+export function localizeUnitAssetName(
+  type: UnitAssetClassType | "airbase",
+  name: string
+): string {
+  if (!name) return "";
+  if (type === "airbase") return localizeAirbaseName(name);
+  return localizeUnitAssetClassName(type, name);
+}
+
 // Unit names in scenarios usually look like "Beaver #1" or "Raptor #420".
 // We try an exact match first; otherwise we strip the "#<n>" suffix and
 // translate the callsign prefix, preserving the suffix unchanged.

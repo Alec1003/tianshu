@@ -25,7 +25,23 @@ import {
 import { Button } from "@/components/ui/button";
 import Game, { type GameOutcome, type GameOutcomeReason } from "@/game/Game";
 import Scenario from "@/game/Scenario";
-import type { RuntimeOutcome, RuntimeSnapshot } from "@/api/types";
+import type {
+  RuntimeOutcome,
+  RuntimeCreateSideRequest,
+  RuntimeAddWeaponRequest,
+  RuntimeDeleteWeaponRequest,
+  RuntimeDeployUnitRequest,
+  RuntimeMoveUnitRequest,
+  RuntimeSetUnitPositionRequest,
+  RuntimeSnapshot,
+  RuntimeUnitType,
+  RuntimeUpdateSideRequest,
+  RuntimeUpdateUnitRequest,
+  RuntimeUpdateWeaponQuantityRequest,
+  RuntimeVisibility,
+  RuntimeVisibilitySide,
+  RuntimeVisibleObjectType,
+} from "@/api/types";
 import RuntimeController from "@/runtime/RuntimeController";
 import { SetScenarioTimeContext } from "@/gui/contextProviders/contexts/ScenarioTimeContext";
 import CesiumScenarioMap, {
@@ -38,7 +54,6 @@ import type {
 import SCSScenarioJson from "@/scenarios/SCS.json";
 import blankScenarioJson from "@/scenarios/blank_scenario.json";
 import defaultScenarioJson from "@/scenarios/default_scenario.json";
-import { isScenarioObjectVisible } from "@/game/scenarioVisibility";
 import { cn } from "@/lib/utils";
 import { randomUUID } from "@/utils/generateUUID";
 import AISidebar from "./AISidebar";
@@ -52,6 +67,7 @@ import SimulationSidebar, {
 } from "./SimulationSidebar";
 import AARDialog, { type AARSideEntry } from "./AARDialog";
 import { SIDE_COLOR } from "@/utils/colors";
+import type { SideDoctrine } from "@/game/Doctrine";
 
 const railItems: Array<{
   id: SimulationPanelId;
@@ -157,16 +173,39 @@ function buildSideStats(game: Game): SimulationSideStats[] {
   }));
 }
 
+function getRuntimeSideVisibility(
+  visibility: RuntimeVisibility | null | undefined,
+  currentSideId: string
+): RuntimeVisibilitySide | null {
+  if (!visibility) return null;
+  return (
+    visibility.by_side[currentSideId] ??
+    visibility.by_side[visibility.current_side_id] ??
+    null
+  );
+}
+
+function visibilityCount(
+  sideVisibility: RuntimeVisibilitySide | null,
+  key: RuntimeVisibleObjectType,
+  fallback: number,
+  godMode: boolean
+): number {
+  if (godMode) return fallback;
+  return sideVisibility?.visible_counts?.[key] ?? 0;
+}
+
 function buildSimulationSnapshot(
   game: Game,
-  runState: SimulationRunState
+  runState: SimulationRunState,
+  runtimeVisibility: RuntimeVisibility | null = null
 ): SimulationSnapshot {
   const scenario = game.currentScenario;
   const elapsedSeconds = Math.max(0, scenario.currentTime - scenario.startTime);
-  const visibility = {
-    godMode: game.godMode,
-    currentSideId: game.currentSideId,
-  };
+  const sideVisibility = getRuntimeSideVisibility(
+    runtimeVisibility,
+    game.currentSideId
+  );
 
   return {
     runState,
@@ -175,24 +214,42 @@ function buildSimulationSnapshot(
     currentTime: scenario.currentTime,
     elapsedSeconds,
     duration: scenario.duration,
-    aircraft: scenario.aircraft.filter((unit) =>
-      isScenarioObjectVisible(scenario, unit, visibility)
-    ).length,
-    ships: scenario.ships.filter((unit) =>
-      isScenarioObjectVisible(scenario, unit, visibility)
-    ).length,
-    facilities: scenario.facilities.filter((unit) =>
-      isScenarioObjectVisible(scenario, unit, visibility)
-    ).length,
-    airbases: scenario.airbases.filter((unit) =>
-      isScenarioObjectVisible(scenario, unit, visibility)
-    ).length,
-    referencePoints: scenario.referencePoints.filter((unit) =>
-      isScenarioObjectVisible(scenario, unit, visibility)
-    ).length,
-    weapons: scenario.weapons.filter((unit) =>
-      isScenarioObjectVisible(scenario, unit, visibility)
-    ).length,
+    aircraft: visibilityCount(
+      sideVisibility,
+      "aircraft",
+      scenario.aircraft.length,
+      game.godMode
+    ),
+    ships: visibilityCount(
+      sideVisibility,
+      "ships",
+      scenario.ships.length,
+      game.godMode
+    ),
+    facilities: visibilityCount(
+      sideVisibility,
+      "facilities",
+      scenario.facilities.length,
+      game.godMode
+    ),
+    airbases: visibilityCount(
+      sideVisibility,
+      "airbases",
+      scenario.airbases.length,
+      game.godMode
+    ),
+    referencePoints: visibilityCount(
+      sideVisibility,
+      "referencePoints",
+      scenario.referencePoints.length,
+      game.godMode
+    ),
+    weapons: visibilityCount(
+      sideVisibility,
+      "weapons",
+      scenario.weapons.length,
+      game.godMode
+    ),
     missions: game.godMode
       ? scenario.missions.length
       : scenario.missions.filter(
@@ -204,6 +261,7 @@ function buildSimulationSnapshot(
     eraserMode: game.eraserMode,
     outcome: { ...game.gameOutcome },
     sideStats: buildSideStats(game),
+    visibility: runtimeVisibility,
   };
 }
 
@@ -274,6 +332,7 @@ export default function AITacticalCommandPlatform({
   const [placement, setPlacement] = useState<CesiumPlacement | null>(null);
   const runStateRef = useRef<SimulationRunState>("idle");
   const playLoopRunning = useRef(false);
+  const runtimeVisibilityRef = useRef<RuntimeVisibility | null>(null);
   const runtimeScenarioSignatureRef = useRef("");
   const runtimeBootstrappedRef = useRef(false);
   const runtimeReadyRef = useRef(false);
@@ -300,7 +359,9 @@ export default function AITacticalCommandPlatform({
     (runState: SimulationRunState = runStateRef.current) => {
       runStateRef.current = runState;
       setScenarioTime(game.currentScenario.currentTime);
-      setSnapshot(buildSimulationSnapshot(game, runState));
+      setSnapshot(
+        buildSimulationSnapshot(game, runState, runtimeVisibilityRef.current)
+      );
       setScenarioId(game.currentScenario.id);
     },
     [game, setScenarioTime]
@@ -317,6 +378,7 @@ export default function AITacticalCommandPlatform({
       if (options.preserveTimeCompression) {
         game.currentScenario.timeCompression = previousTimeCompression;
       }
+      runtimeVisibilityRef.current = runtimeSnapshot.visibility ?? null;
       game.scenarioPaused = runtimeSnapshot.paused;
       game.gameOutcome = runtimeOutcomeToGameOutcome(runtimeSnapshot.outcome);
       runtimeScenarioSignatureRef.current = scenarioSignature(
@@ -360,9 +422,8 @@ export default function AITacticalCommandPlatform({
           Math.floor(game.currentScenario.timeCompression || 1)
         );
 
-        const runtimeSnapshot = await runtimeControllerRef.current?.step(
-          compression
-        );
+        const runtimeSnapshot =
+          await runtimeControllerRef.current?.step(compression);
         if (!runtimeSnapshot) break;
 
         applyRuntimeSnapshot(
@@ -439,6 +500,7 @@ export default function AITacticalCommandPlatform({
       try {
         game.scenarioPaused = true;
         game.loadScenario(JSON.stringify(cloned));
+        runtimeVisibilityRef.current = null;
       } catch (err) {
         console.error("[AICC] loadScenario failed:", err);
         window.alert("场景加载失败：文件可能不是合法的 AICC 场景。");
@@ -455,7 +517,7 @@ export default function AITacticalCommandPlatform({
         const runtimeSnapshot =
           await runtimeControllerRef.current?.loadScenario(
             cloned as Record<string, unknown>
-        );
+          );
         if (runtimeSnapshot) {
           applyRuntimeSnapshot(runtimeSnapshot, "idle");
           runtimeReadyRef.current = true;
@@ -487,9 +549,10 @@ export default function AITacticalCommandPlatform({
 
     let currentScenario: Record<string, unknown>;
     try {
-      currentScenario = JSON.parse(
-        game.exportCurrentScenario()
-      ) as Record<string, unknown>;
+      currentScenario = JSON.parse(game.exportCurrentScenario()) as Record<
+        string,
+        unknown
+      >;
     } catch (err) {
       console.error("[AICC] initial scenario export failed:", err);
       return;
@@ -585,9 +648,10 @@ export default function AITacticalCommandPlatform({
     }
   }, [game]);
 
-  const exportCurrentScenarioObject = useCallback(():
-    | Record<string, unknown>
-    | null => {
+  const exportCurrentScenarioObject = useCallback((): Record<
+    string,
+    unknown
+  > | null => {
     try {
       return JSON.parse(game.exportCurrentScenario()) as Record<
         string,
@@ -624,6 +688,192 @@ export default function AITacticalCommandPlatform({
     );
   }, [refreshSnapshot, syncCurrentScenarioToRuntime]);
 
+  const applyRuntimeMutation = useCallback(
+    async (
+      mutation: (controller: RuntimeController) => Promise<RuntimeSnapshot>
+    ) => {
+      const controller = runtimeControllerRef.current;
+      if (!controller) return;
+      const runtimeSnapshot = await mutation(controller);
+      applyRuntimeSnapshot(runtimeSnapshot, runtimeRunState(runtimeSnapshot), {
+        preserveTimeCompression: true,
+      });
+      runtimeReadyRef.current = true;
+    },
+    [applyRuntimeSnapshot]
+  );
+
+  const deployRuntimeUnit = useCallback(
+    (unit: RuntimeDeployUnitRequest) =>
+      applyRuntimeMutation((controller) => controller.deployUnit(unit)),
+    [applyRuntimeMutation]
+  );
+
+  const deleteRuntimeUnit = useCallback(
+    (unitType: RuntimeUnitType, unitId: string) =>
+      applyRuntimeMutation((controller) =>
+        controller.deleteUnit(unitType, unitId)
+      ),
+    [applyRuntimeMutation]
+  );
+
+  const moveRuntimeUnit = useCallback(
+    (
+      unitType: RuntimeMoveUnitRequest["unit_type"],
+      unitId: string,
+      route: number[][]
+    ) =>
+      applyRuntimeMutation((controller) =>
+        controller.moveUnit({ unit_type: unitType, unit_id: unitId, route })
+      ),
+    [applyRuntimeMutation]
+  );
+
+  const setRuntimeUnitPosition = useCallback(
+    (position: RuntimeSetUnitPositionRequest) =>
+      applyRuntimeMutation((controller) =>
+        controller.setUnitPosition(position)
+      ),
+    [applyRuntimeMutation]
+  );
+
+  const updateRuntimeUnit = useCallback(
+    (update: RuntimeUpdateUnitRequest) =>
+      applyRuntimeMutation((controller) => controller.updateUnit(update)),
+    [applyRuntimeMutation]
+  );
+
+  const addRuntimeWeapon = useCallback(
+    (weapon: RuntimeAddWeaponRequest) =>
+      applyRuntimeMutation((controller) => controller.addWeapon(weapon)),
+    [applyRuntimeMutation]
+  );
+
+  const deleteRuntimeWeapon = useCallback(
+    (weapon: RuntimeDeleteWeaponRequest) =>
+      applyRuntimeMutation((controller) => controller.deleteWeapon(weapon)),
+    [applyRuntimeMutation]
+  );
+
+  const updateRuntimeWeaponQuantity = useCallback(
+    (weapon: RuntimeUpdateWeaponQuantityRequest) =>
+      applyRuntimeMutation((controller) =>
+        controller.updateWeaponQuantity(weapon)
+      ),
+    [applyRuntimeMutation]
+  );
+
+  const switchRuntimeSide = useCallback(
+    (sideId: string) =>
+      applyRuntimeMutation((controller) => controller.setCurrentSide(sideId)),
+    [applyRuntimeMutation]
+  );
+
+  const createRuntimeSide = useCallback(
+    (
+      name: string,
+      color: string,
+      hostiles: string[],
+      allies: string[],
+      doctrine: SideDoctrine
+    ) =>
+      applyRuntimeMutation((controller) =>
+        controller.createSide({
+          name,
+          color,
+          hostiles,
+          allies,
+          doctrine: doctrine as unknown as RuntimeCreateSideRequest["doctrine"],
+        })
+      ),
+    [applyRuntimeMutation]
+  );
+
+  const updateRuntimeSide = useCallback(
+    (
+      sideId: string,
+      name: string,
+      color: string,
+      hostiles: string[],
+      allies: string[],
+      doctrine: SideDoctrine
+    ) =>
+      applyRuntimeMutation((controller) =>
+        controller.updateSide(sideId, {
+          name,
+          color,
+          hostiles,
+          allies,
+          doctrine: doctrine as unknown as RuntimeUpdateSideRequest["doctrine"],
+        })
+      ),
+    [applyRuntimeMutation]
+  );
+
+  const deleteRuntimeSide = useCallback(
+    (sideId: string) =>
+      applyRuntimeMutation((controller) => controller.deleteSide(sideId)),
+    [applyRuntimeMutation]
+  );
+
+  const createRuntimePatrolMission = useCallback(
+    (name: string, assignedUnitIds: string[], referencePointIds: string[]) =>
+      applyRuntimeMutation((controller) =>
+        controller.createPatrolMission({
+          name,
+          assigned_unit_ids: assignedUnitIds,
+          reference_point_ids: referencePointIds,
+        })
+      ),
+    [applyRuntimeMutation]
+  );
+
+  const createRuntimeStrikeMission = useCallback(
+    (name: string, assignedUnitIds: string[], assignedTargetIds: string[]) =>
+      applyRuntimeMutation((controller) =>
+        controller.createStrikeMission({
+          name,
+          assigned_unit_ids: assignedUnitIds,
+          assigned_target_ids: assignedTargetIds,
+        })
+      ),
+    [applyRuntimeMutation]
+  );
+
+  const updateRuntimePatrolMission = useCallback(
+    (
+      missionId: string,
+      name: string,
+      assignedUnitIds: string[],
+      referencePointIds: string[]
+    ) =>
+      applyRuntimeMutation((controller) =>
+        controller.updatePatrolMission(missionId, {
+          name,
+          assigned_unit_ids: assignedUnitIds,
+          reference_point_ids: referencePointIds,
+        })
+      ),
+    [applyRuntimeMutation]
+  );
+
+  const updateRuntimeStrikeMission = useCallback(
+    (
+      missionId: string,
+      name: string,
+      assignedUnitIds: string[],
+      assignedTargetIds: string[]
+    ) =>
+      applyRuntimeMutation((controller) =>
+        controller.updateStrikeMission(missionId, {
+          name,
+          assigned_unit_ids: assignedUnitIds,
+          assigned_target_ids: assignedTargetIds,
+        })
+      ),
+    [applyRuntimeMutation]
+  );
+
   const setSpeed = useCallback(
     (speed: number) => {
       game.currentScenario.timeCompression = speed;
@@ -642,6 +892,12 @@ export default function AITacticalCommandPlatform({
     refreshSnapshot();
   }, [game, refreshSnapshot]);
 
+  const deleteRuntimeMission = useCallback(
+    (missionId: string) =>
+      applyRuntimeMutation((controller) => controller.deleteMission(missionId)),
+    [applyRuntimeMutation]
+  );
+
   const deleteMission = useCallback(
     (missionId: string) => {
       const mission = game.currentScenario.missions.find(
@@ -650,13 +906,15 @@ export default function AITacticalCommandPlatform({
       if (!mission) return;
       if (!window.confirm(`确认删除任务「${mission.name}」？`)) return;
 
-      game.deleteMission(missionId);
       setMissionEditorMissionId((openMissionId) =>
         openMissionId === missionId ? null : openMissionId
       );
-      handleLocalScenarioMutation();
+      void deleteRuntimeMission(missionId).catch((err) => {
+        console.error("[AICC] runtime mission delete failed:", err);
+        window.alert("后端删除任务失败，请稍后重试。");
+      });
     },
-    [game, handleLocalScenarioMutation]
+    [deleteRuntimeMission, game]
   );
 
   useEffect(() => {
@@ -667,7 +925,9 @@ export default function AITacticalCommandPlatform({
       game.scenarioPaused = true;
       void runtimeControllerRef.current
         ?.pause()
-        .catch((err) => console.error("[AICC] runtime cleanup pause failed", err));
+        .catch((err) =>
+          console.error("[AICC] runtime cleanup pause failed", err)
+        );
     };
   }, [game, refreshSnapshot]);
 
@@ -680,15 +940,18 @@ export default function AITacticalCommandPlatform({
 
     const sync = async () => {
       try {
-        const runtimeSnapshot =
-          await runtimeControllerRef.current?.refresh();
+        const runtimeSnapshot = await runtimeControllerRef.current?.refresh();
         if (!runtimeSnapshot) return;
 
         const nextSignature = scenarioSignature(runtimeSnapshot.scenario);
         if (runtimeScenarioSignatureRef.current !== nextSignature) {
-          applyRuntimeSnapshot(runtimeSnapshot, runtimeRunState(runtimeSnapshot), {
-            preserveTimeCompression: true,
-          });
+          applyRuntimeSnapshot(
+            runtimeSnapshot,
+            runtimeRunState(runtimeSnapshot),
+            {
+              preserveTimeCompression: true,
+            }
+          );
         }
       } catch {
         // best-effort，网络错误不影响前端正常运行
@@ -823,9 +1086,13 @@ export default function AITacticalCommandPlatform({
       void runtimeControllerRef.current
         ?.refresh()
         .then((runtimeSnapshot) =>
-          applyRuntimeSnapshot(runtimeSnapshot, runtimeRunState(runtimeSnapshot), {
-            preserveTimeCompression: true,
-          })
+          applyRuntimeSnapshot(
+            runtimeSnapshot,
+            runtimeRunState(runtimeSnapshot),
+            {
+              preserveTimeCompression: true,
+            }
+          )
         )
         .catch((err) => {
           console.error("[AICC] AI runtime refresh failed", err);
@@ -987,6 +1254,10 @@ export default function AITacticalCommandPlatform({
             onDeleteMission={deleteMission}
             onBeginPlacement={setPlacement}
             onScenarioMutation={handleLocalScenarioMutation}
+            onSwitchSide={switchRuntimeSide}
+            onCreateSide={createRuntimeSide}
+            onUpdateSide={updateRuntimeSide}
+            onDeleteSide={deleteRuntimeSide}
             onNewScenario={handleNewScenario}
             onLoadDemoScenario={handleLoadDemoScenario}
             onLoadSCSScenario={handleLoadSCSScenario}
@@ -1049,7 +1320,21 @@ export default function AITacticalCommandPlatform({
             onStep={stepSimulation}
             onReset={resetSimulation}
             onScenarioMutation={handleLocalScenarioMutation}
+            onDeployUnit={deployRuntimeUnit}
+            onDeleteUnit={deleteRuntimeUnit}
+            onMoveUnit={moveRuntimeUnit}
+            onSetUnitPosition={setRuntimeUnitPosition}
+            onUpdateUnit={updateRuntimeUnit}
+            onAddWeapon={addRuntimeWeapon}
+            onDeleteWeapon={deleteRuntimeWeapon}
+            onUpdateWeaponQuantity={updateRuntimeWeaponQuantity}
+            onCreatePatrolMission={createRuntimePatrolMission}
+            onCreateStrikeMission={createRuntimeStrikeMission}
+            onUpdatePatrolMission={updateRuntimePatrolMission}
+            onUpdateStrikeMission={updateRuntimeStrikeMission}
+            onDeleteMission={deleteRuntimeMission}
             onSceneModeChange={setMapSceneMode}
+            runtimeVisibility={snapshot.visibility}
             sceneMode={mapSceneMode}
             showToolbar={false}
             showRanges={showRanges}

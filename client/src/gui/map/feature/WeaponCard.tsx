@@ -204,9 +204,7 @@ export default function WeaponCard(props: Readonly<WeaponCardProps>) {
               spacing={0}
               sx={{ color: colorPalette.lightGray }}
             >
-              <Typography variant="caption">
-                Type: {weaponClassName}
-              </Typography>
+              <Typography variant="caption">Type: {weaponClassName}</Typography>
               <Typography variant="caption">
                 Side:{" "}
                 <Typography variant="caption" component={"span"}>

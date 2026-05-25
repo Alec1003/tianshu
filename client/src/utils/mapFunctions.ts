@@ -68,13 +68,12 @@ export function getTerminalCoordinatesFromDistanceAndBearing(
   const initialLatitude = toRadians(startLatitude);
   const initialLongitude = toRadians(startLongitude);
 
-  const finalLatitudeInRadians =
-    Math.asin(
-      Math.sin(initialLatitude) * Math.cos(distance / EARTH_RADIUS_KM) +
-        Math.cos(initialLatitude) *
-          Math.sin(distance / EARTH_RADIUS_KM) *
-          Math.cos(bearingInRadians)
-    );
+  const finalLatitudeInRadians = Math.asin(
+    Math.sin(initialLatitude) * Math.cos(distance / EARTH_RADIUS_KM) +
+      Math.cos(initialLatitude) *
+        Math.sin(distance / EARTH_RADIUS_KM) *
+        Math.cos(bearingInRadians)
+  );
   const finalLatitude = toDegrees(finalLatitudeInRadians);
 
   const finalLongitude = toDegrees(

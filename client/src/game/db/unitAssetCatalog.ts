@@ -1,7 +1,4 @@
-import type {
-  UnitAsset,
-  UnitAssetCatalogPayload,
-} from "@/api/types";
+import type { UnitAsset, UnitAssetCatalogPayload } from "@/api/types";
 import Dba from "@/game/db/Dba";
 import type { IAircraftModel } from "@/game/db/models/Aircraft";
 import type { IAirbaseModel } from "@/game/db/models/Airbase";

@@ -8,9 +8,7 @@
 //      every component having to poll.
 
 import {
-  createContext,
   useCallback,
-  useContext,
   useEffect,
   useMemo,
   useRef,
@@ -21,28 +19,13 @@ import {
 import * as authApi from "@/api/auth";
 import { getStoredToken } from "@/api/client";
 import type { AuthUser } from "@/api/types";
-
-interface AuthContextValue {
-  user: AuthUser | null;
-  /** True until the initial me() probe resolves. Routes should render a
-   * splash instead of redirecting while this is true to avoid bouncing
-   * authenticated users to /login on hard refresh. */
-  loading: boolean;
-  login: (email: string, password: string) => Promise<AuthUser>;
-  register: (
-    email: string,
-    password: string,
-    displayName?: string
-  ) => Promise<AuthUser>;
-  logout: () => void;
-  refresh: () => Promise<void>;
-}
-
-const AuthContext = createContext<AuthContextValue | null>(null);
+import { AuthContext, type AuthContextValue } from "./AuthContextCore";
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
-  const [loading, setLoading] = useState<boolean>(() => Boolean(getStoredToken()));
+  const [loading, setLoading] = useState<boolean>(() =>
+    Boolean(getStoredToken())
+  );
   // Guards against double-fetch in React 18 StrictMode dev.
   const probedRef = useRef(false);
 
@@ -116,12 +99,4 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-}
-
-export function useAuth(): AuthContextValue {
-  const ctx = useContext(AuthContext);
-  if (!ctx) {
-    throw new Error("useAuth must be used inside <AuthProvider>");
-  }
-  return ctx;
 }

@@ -143,9 +143,7 @@ export default function CesiumUnitInfoCard({
     type === "facility" ||
     type === "airbase";
   const isObjective = supportsObjective
-    ? Boolean(
-        (unit as Aircraft | Ship | Facility | Airbase).isObjective
-      )
+    ? Boolean((unit as Aircraft | Ship | Facility | Airbase).isObjective)
     : false;
   const canEditWeapons =
     supportsWeapons &&

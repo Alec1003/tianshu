@@ -872,13 +872,13 @@ async def runtime_step(ctx: Context, steps: int = 1) -> dict[str, Any]:
             details={"steps": steps, "max": 7200},
         ).model_dump()
     runtime = _get_runtime(ctx)
-    await run_in_runtime(runtime.step_simulation, steps=steps)
+    state = await run_in_runtime(runtime.step_simulation, steps=steps)
     scenario = runtime.game.current_scenario
     start = int(scenario.start_time or 0)
     current = int(scenario.current_time or start)
     duration = int(scenario.duration or 0)
     return RuntimeStepResult(
-        steps_executed=steps,
+        steps_executed=int(state.get("steps", 0)),
         current_time=current,
         elapsed=max(0, current - start),
         duration_left=max(0, start + duration - current),

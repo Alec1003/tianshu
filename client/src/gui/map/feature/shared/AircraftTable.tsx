@@ -317,7 +317,7 @@ export default function AircraftTable(props: AircraftTableProps) {
 
   React.useEffect(() => {
     setRows(getDataRows(props.unitWithAircraft.aircraft));
-  }, []);
+  }, [props.unitWithAircraft.aircraft]);
 
   const _handleAddAircraft = (aircraftClassName: string) => {
     const baseAircraft = props.handleAddAircraft(

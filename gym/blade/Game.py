@@ -1,7 +1,8 @@
+import ast
 import json
 import copy
 from uuid import uuid4
-from typing import Tuple, Optional
+from typing import Any, Tuple, Optional
 from blade.units.Aircraft import Aircraft
 from blade.units.Airbase import Airbase
 from blade.units.Facility import Facility
@@ -36,6 +37,22 @@ from blade.engine.weaponEngagement import (
 
 
 class Game:
+    SAFE_ACTION_METHODS = {
+        "add_reference_point",
+        "remove_reference_point",
+        "launch_aircraft_from_ship",
+        "launch_aircraft_from_airbase",
+        "create_patrol_mission",
+        "update_patrol_mission",
+        "create_strike_mission",
+        "update_strike_mission",
+        "delete_mission",
+        "move_aircraft",
+        "move_ship",
+        "handle_aircraft_attack",
+        "handle_ship_attack",
+        "aircraft_return_to_base",
+    }
 
     def __init__(
         self,
@@ -167,14 +184,26 @@ class Game:
                 used.add(unit_id)
         return used
 
+    def _get_active_side_id(self) -> str:
+        current_side = self.current_scenario.get_side(self.current_side_id)
+        return current_side.id if current_side else self.current_side_id
+
     def _filter_assignable_attackers(
-        self, candidates: list[str], exclude_mission_id: str = ""
+        self,
+        candidates: list[str],
+        exclude_mission_id: str = "",
+        side_id: str | None = None,
     ) -> list[str]:
         used = self._aircraft_ids_assigned_to_other_missions(exclude_mission_id)
         seen: set[str] = set()
         result: list[str] = []
         for unit_id in candidates:
             if not unit_id or unit_id in used or unit_id in seen:
+                continue
+            aircraft = self.current_scenario.get_aircraft(unit_id)
+            if aircraft is None:
+                continue
+            if side_id is not None and aircraft.side_id != side_id:
                 continue
             seen.add(unit_id)
             result.append(unit_id)
@@ -188,10 +217,12 @@ class Game:
     ) -> None:
         if len(assigned_area) < 3:
             return
-        filtered_units = self._filter_assignable_attackers(assigned_units)
-        if len(filtered_units) < 1:
+        current_side_id = self._get_active_side_id()
+        filtered_units = self._filter_assignable_attackers(
+            assigned_units, side_id=current_side_id
+        )
+        if len(filtered_units) < 1 or not current_side_id:
             return
-        current_side_id = self.current_scenario.get_side(self.current_side_id).id
         mission = PatrolMission(
             id=str(uuid4()),
             name=mission_name,
@@ -215,7 +246,9 @@ class Game:
                 patrol_mission.name = mission_name
             if assigned_units and len(assigned_units) > 0:
                 filtered_units = self._filter_assignable_attackers(
-                    assigned_units, exclude_mission_id=mission_id
+                    assigned_units,
+                    exclude_mission_id=mission_id,
+                    side_id=patrol_mission.side_id,
                 )
                 if len(filtered_units) > 0:
                     patrol_mission.assigned_unit_ids = filtered_units
@@ -229,10 +262,16 @@ class Game:
         assigned_attackers: list[str],
         assigned_targets: list[str],
     ) -> None:
-        filtered_attackers = self._filter_assignable_attackers(assigned_attackers)
-        if len(filtered_attackers) < 1:
+        current_side_id = self._get_active_side_id()
+        filtered_attackers = self._filter_assignable_attackers(
+            assigned_attackers, side_id=current_side_id
+        )
+        if (
+            len(filtered_attackers) < 1
+            or len(assigned_targets) < 1
+            or not current_side_id
+        ):
             return
-        current_side_id = self.current_scenario.get_side(self.current_side_id).id
         strike_mission = StrikeMission(
             id=str(uuid4()),
             name=mission_name,
@@ -256,7 +295,9 @@ class Game:
                 strike_mission.name = mission_name
             if assigned_attackers and len(assigned_attackers) > 0:
                 filtered_attackers = self._filter_assignable_attackers(
-                    assigned_attackers, exclude_mission_id=mission_id
+                    assigned_attackers,
+                    exclude_mission_id=mission_id,
+                    side_id=strike_mission.side_id,
                 )
                 if len(filtered_attackers) > 0:
                     strike_mission.assigned_unit_ids = filtered_attackers
@@ -297,14 +338,11 @@ class Game:
             return
         target = self.current_scenario.get_target(target_id)
         aircraft = self.current_scenario.get_aircraft(aircraft_id)
-        if (
-            target
-            and aircraft
-            and target.side_id != aircraft.side_id
-            and target.id != aircraft.id
-        ):
+        if target and aircraft:
             weapon = aircraft.get_weapon(weapon_id)
-            if weapon:
+            if weapon and self.can_launch_at(
+                aircraft, target, weapon, weapon_quantity
+            ):
                 launch_weapon(
                     self.current_scenario, aircraft, target, weapon, weapon_quantity
                 )
@@ -316,9 +354,9 @@ class Game:
             return
         target = self.current_scenario.get_target(target_id)
         ship = self.current_scenario.get_ship(ship_id)
-        if target and ship and target.side_id != ship.side_id and target.id != ship.id:
+        if target and ship:
             weapon = ship.get_weapon(weapon_id)
-            if weapon:
+            if weapon and self.can_launch_at(ship, target, weapon, weapon_quantity):
                 launch_weapon(
                     self.current_scenario, ship, target, weapon, weapon_quantity
                 )
@@ -488,7 +526,7 @@ class Game:
 
     def can_launch_at(
         self,
-        origin: Aircraft | Ship,
+        origin: Aircraft | Ship | Facility,
         target: Aircraft | Facility | Weapon | Airbase | Ship,
         weapon: Weapon,
         weapon_quantity: int,
@@ -501,6 +539,29 @@ class Game:
             and weapon_can_engage_target(target, weapon)
         )
 
+    def get_best_weapon_against_target(
+        self,
+        origin: Aircraft | Ship | Facility,
+        target: Aircraft | Facility | Weapon | Airbase | Ship,
+        *,
+        require_in_range: bool = False,
+    ) -> Weapon | None:
+        weapons = []
+        for weapon in origin.weapons:
+            if require_in_range:
+                if not self.can_launch_at(origin, target, weapon, 1):
+                    continue
+            elif (
+                weapon.current_quantity <= 0
+                or target.id == origin.id
+                or not self.current_scenario.is_hostile(origin.side_id, target.side_id)
+            ):
+                continue
+            weapons.append(weapon)
+        if len(weapons) == 0:
+            return None
+        return max(weapons, key=lambda weapon: weapon.get_engagement_range())
+
     def facility_auto_defense(self) -> None:
         for facility in self.current_scenario.facilities:
             if self.current_scenario.check_side_doctrine(
@@ -508,14 +569,15 @@ class Game:
             ):
                 for aircraft in self.current_scenario.aircraft:
                     if self.current_scenario.is_hostile(facility.side_id, aircraft.side_id):
-                        facility_weapon = (
-                            facility.get_weapon_with_highest_engagement_range()
+                        facility_weapon = self.get_best_weapon_against_target(
+                            facility,
+                            aircraft,
+                            require_in_range=True,
                         )
                         if facility_weapon is None:
                             continue
                         if (
                             is_threat_detected(aircraft, facility)
-                            and weapon_can_engage_target(aircraft, facility_weapon)
                             and check_target_tracked_by_count(
                                 self.current_scenario, aircraft
                             )
@@ -530,15 +592,16 @@ class Game:
                             )
             for weapon in self.current_scenario.weapons:
                 if self.current_scenario.is_hostile(facility.side_id, weapon.side_id):
-                    facility_weapon = (
-                        facility.get_weapon_with_highest_engagement_range()
+                    facility_weapon = self.get_best_weapon_against_target(
+                        facility,
+                        weapon,
+                        require_in_range=True,
                     )
                     if facility_weapon is None:
                         continue
                     if (
                         weapon.target_id == facility.id
                         and is_threat_detected(weapon, facility)
-                        and weapon_can_engage_target(weapon, facility_weapon)
                         and check_target_tracked_by_count(self.current_scenario, weapon)
                         < 5
                     ):
@@ -557,12 +620,15 @@ class Game:
             ):
                 for aircraft in self.current_scenario.aircraft:
                     if self.current_scenario.is_hostile(ship.side_id, aircraft.side_id):
-                        ship_weapon = ship.get_weapon_with_highest_engagement_range()
+                        ship_weapon = self.get_best_weapon_against_target(
+                            ship,
+                            aircraft,
+                            require_in_range=True,
+                        )
                         if ship_weapon is None:
                             continue
                         if (
                             is_threat_detected(aircraft, ship)
-                            and weapon_can_engage_target(aircraft, ship_weapon)
                             and check_target_tracked_by_count(
                                 self.current_scenario, aircraft
                             )
@@ -577,13 +643,16 @@ class Game:
                             )
             for weapon in self.current_scenario.weapons:
                 if self.current_scenario.is_hostile(ship.side_id, weapon.side_id):
-                    ship_weapon = ship.get_weapon_with_highest_engagement_range()
+                    ship_weapon = self.get_best_weapon_against_target(
+                        ship,
+                        weapon,
+                        require_in_range=True,
+                    )
                     if ship_weapon is None:
                         continue
                     if (
                         weapon.target_id == ship.id
                         and is_threat_detected(weapon, ship)
-                        and weapon_can_engage_target(weapon, ship_weapon)
                         and check_target_tracked_by_count(self.current_scenario, weapon)
                         < 5
                     ):
@@ -599,11 +668,6 @@ class Game:
         for aircraft in self.current_scenario.aircraft:
             if len(aircraft.weapons) == 0:
                 continue
-            aircraft_weapon_with_max_range = (
-                aircraft.get_weapon_with_highest_engagement_range()
-            )
-            if aircraft_weapon_with_max_range is None:
-                continue
             if self.current_scenario.check_side_doctrine(
                 aircraft.side_id, DoctrineType.AIRCRAFT_ATTACK_HOSTILE
             ):
@@ -613,11 +677,12 @@ class Game:
                     ) and (
                         aircraft.target_id == "" or aircraft.target_id == enemy_aircraft.id
                     ):
+                        launchable_weapon = self.get_best_weapon_against_target(
+                            aircraft, enemy_aircraft, require_in_range=True
+                        )
                         if (
-                            is_threat_detected(enemy_aircraft, aircraft)
-                            and weapon_can_engage_target(
-                                enemy_aircraft, aircraft_weapon_with_max_range
-                            )
+                            launchable_weapon is not None
+                            and is_threat_detected(enemy_aircraft, aircraft)
                             and check_target_tracked_by_count(
                                 self.current_scenario, enemy_aircraft
                             )
@@ -627,7 +692,7 @@ class Game:
                                 self.current_scenario,
                                 aircraft,
                                 enemy_aircraft,
-                                aircraft_weapon_with_max_range,
+                                launchable_weapon,
                                 1,
                             )
                             aircraft.target_id = enemy_aircraft.id
@@ -635,12 +700,13 @@ class Game:
                 if self.current_scenario.is_hostile(
                     aircraft.side_id, enemy_weapon.side_id
                 ):
+                    launchable_weapon = self.get_best_weapon_against_target(
+                        aircraft, enemy_weapon, require_in_range=True
+                    )
                     if (
-                        enemy_weapon.target_id == aircraft.id
+                        launchable_weapon is not None
+                        and enemy_weapon.target_id == aircraft.id
                         and is_threat_detected(enemy_weapon, aircraft)
-                        and weapon_can_engage_target(
-                            enemy_weapon, aircraft_weapon_with_max_range
-                        )
                         and check_target_tracked_by_count(
                             self.current_scenario, enemy_weapon
                         )
@@ -650,7 +716,7 @@ class Game:
                             self.current_scenario,
                             aircraft,
                             enemy_weapon,
-                            aircraft_weapon_with_max_range,
+                            launchable_weapon,
                             1,
                         )
             if self.current_scenario.check_side_doctrine(
@@ -668,13 +734,7 @@ class Game:
             ):
                 continue
 
-            aircraft_weapon_with_max_range = (
-                aircraft.get_weapon_with_highest_engagement_range()
-            )
-            if aircraft_weapon_with_max_range is None:
-                continue
-
-            candidates: list[tuple[int, float, Facility | Ship | Airbase]] = []
+            candidates: list[tuple[int, float, Facility | Ship | Airbase, Weapon]] = []
             for candidate in (
                 self.current_scenario.facilities
                 + self.current_scenario.ships
@@ -691,24 +751,27 @@ class Game:
                 ) / NAUTICAL_MILES_TO_METERS
                 if distance_nm > aircraft.get_detection_range() * 1.1:
                     continue
-                if not self.can_launch_at(
-                    aircraft, candidate, aircraft_weapon_with_max_range, 1
-                ):
+                launchable_weapon = self.get_best_weapon_against_target(
+                    aircraft, candidate, require_in_range=True
+                )
+                if launchable_weapon is None:
                     continue
                 priority = 0 if isinstance(candidate, Facility) else 1
-                candidates.append((priority, distance_nm, candidate))
+                candidates.append((priority, distance_nm, candidate, launchable_weapon))
 
             if len(candidates) == 0:
                 continue
 
-            target = sorted(candidates, key=lambda item: (item[0], item[1]))[0][2]
+            selected = sorted(candidates, key=lambda item: (item[0], item[1]))[0]
+            target = selected[2]
+            launched_weapon = selected[3]
             if check_target_tracked_by_count(self.current_scenario, target) > 0:
                 continue
             launch_weapon(
                 self.current_scenario,
                 aircraft,
                 target,
-                aircraft_weapon_with_max_range,
+                launched_weapon,
                 1,
             )
 
@@ -749,9 +812,13 @@ class Game:
             if isinstance(mission, StrikeMission):
                 is_mission_ongoing = True
 
-                target = self.current_scenario.get_target(
-                    mission.assigned_target_ids[0]
-                )
+                if len(mission.assigned_target_ids) < 1:
+                    is_mission_ongoing = False
+                    target = None
+                else:
+                    target = self.current_scenario.get_target(
+                        mission.assigned_target_ids[0]
+                    )
 
                 if not target:
                     is_mission_ongoing = False
@@ -811,10 +878,14 @@ class Game:
                 attacker = self.current_scenario.get_aircraft(attacker_id)
                 if attacker is None:
                     continue
+                if attacker.side_id != mission.side_id:
+                    continue
                 target = self.current_scenario.get_target(
                     mission.assigned_target_ids[0]
                 )
                 if target is None:
+                    continue
+                if not self.current_scenario.is_hostile(attacker.side_id, target.side_id):
                     continue
                 distance_between_weapon_launch_position_and_target_nm = None
                 if len(attacker.route) > 0:
@@ -837,8 +908,10 @@ class Game:
                     )
                     * 1000
                 ) / NAUTICAL_MILES_TO_METERS
-                aircraft_weapon_with_max_range = (
-                    attacker.get_weapon_with_highest_engagement_range()
+                aircraft_weapon_with_max_range = self.get_best_weapon_against_target(
+                    attacker,
+                    target,
+                    require_in_range=False,
                 )
                 if aircraft_weapon_with_max_range is None:
                     continue
@@ -874,8 +947,10 @@ class Game:
                     and distance_between_attacker_and_target_nm
                     <= aircraft_weapon_with_max_range.get_engagement_range() * 1.1
                 ):
-                    launched_weapon = (
-                        attacker.get_weapon_with_highest_engagement_range()
+                    launched_weapon = self.get_best_weapon_against_target(
+                        attacker,
+                        target,
+                        require_in_range=True,
                     )
                     if launched_weapon is None:
                         continue
@@ -885,7 +960,7 @@ class Game:
                     attacker.target_id = target.id
 
     def update_all_aircraft_position(self) -> None:
-        for aircraft in self.current_scenario.aircraft:
+        for aircraft in list(self.current_scenario.aircraft):
             if aircraft.rtb:
                 aircraft_homebase = (
                     self.current_scenario.get_aircraft_homebase(aircraft.id)
@@ -958,7 +1033,7 @@ class Game:
                 self.aircraft_return_to_base(aircraft.id)
 
     def update_all_ship_position(self) -> None:
-        for ship in self.current_scenario.ships:
+        for ship in list(self.current_scenario.ships):
             route = ship.route
             if len(route) < 1:
                 continue
@@ -1025,24 +1100,70 @@ class Game:
         self.clear_completed_strike_missions()
         self.update_units_on_strike_mission()
 
-        for weapon in self.current_scenario.weapons:
+        for weapon in list(self.current_scenario.weapons):
             weapon_engagement(self.current_scenario, weapon)
 
         self.update_all_aircraft_position()
         self.update_all_ship_position()
         self.update_onboard_weapon_positions()
 
-    def handle_action(self, action: list | str) -> None:
-        if not action or action == "" or len(action) == 0:
-            return
+    def _parse_action_call(self, action: str) -> tuple[str, list[Any], dict[str, Any]]:
         try:
-            if isinstance(action, str):
-                exec(f"{"self." if "self." not in action else ""}{action}")
-            elif isinstance(action, list):
-                for sub_action in action:
-                    exec(f"{"self." if "self." not in sub_action else ""}{sub_action}")
-        except Exception as e:
-            print(e)
+            expression = ast.parse(action, mode="eval")
+        except SyntaxError as exc:
+            raise ValueError("Action must be a single method call") from exc
+
+        if not isinstance(expression.body, ast.Call):
+            raise ValueError("Action must be a single method call")
+
+        function = expression.body.func
+        if isinstance(function, ast.Name):
+            method_name = function.id
+        elif (
+            isinstance(function, ast.Attribute)
+            and isinstance(function.value, ast.Name)
+            and function.value.id == "self"
+        ):
+            method_name = function.attr
+        else:
+            raise ValueError("Action target is not allowed")
+
+        if method_name not in self.SAFE_ACTION_METHODS:
+            raise ValueError(f"Action method is not allowed: {method_name}")
+
+        try:
+            args = [ast.literal_eval(arg) for arg in expression.body.args]
+            kwargs: dict[str, Any] = {}
+            for keyword in expression.body.keywords:
+                if keyword.arg is None:
+                    raise ValueError("Expanded keyword arguments are not allowed")
+                kwargs[keyword.arg] = ast.literal_eval(keyword.value)
+        except (SyntaxError, ValueError) as exc:
+            raise ValueError("Action arguments must be literal values") from exc
+
+        return method_name, args, kwargs
+
+    def _execute_action_string(self, action: str) -> Any:
+        method_name, args, kwargs = self._parse_action_call(action)
+        method = getattr(self, method_name)
+        return method(*args, **kwargs)
+
+    def handle_action(self, action: list | str) -> None:
+        if not action:
+            return
+        if isinstance(action, str):
+            if action.strip() == "":
+                return
+            self._execute_action_string(action)
+            return
+        if isinstance(action, list):
+            for sub_action in action:
+                if not isinstance(sub_action, str):
+                    raise ValueError("Action list entries must be strings")
+                if sub_action.strip() != "":
+                    self._execute_action_string(sub_action)
+            return
+        raise ValueError("Action must be a string or a list of strings")
 
     def _get_observation(self) -> Scenario:
         return self.current_scenario
@@ -1051,6 +1172,8 @@ class Game:
         return {}
 
     def step(self, action) -> Tuple[Scenario, float, bool, bool, None]:
+        if self.check_game_ended():
+            return self._get_observation(), 0, False, True, self._get_info()
         self.handle_action(action)
         self.update_game_state()
         terminated = False

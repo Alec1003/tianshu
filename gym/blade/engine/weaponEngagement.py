@@ -4,7 +4,6 @@ from blade.units.Facility import Facility
 from blade.units.Airbase import Airbase
 from blade.units.Weapon import Weapon
 from blade.Scenario import Scenario
-from shapely.geometry import Point
 from uuid import uuid4
 
 from blade.utils.constants import NAUTICAL_MILES_TO_METERS
@@ -32,12 +31,21 @@ OBJECTIVE_BONUS_SCORE = 200
 def is_threat_detected(
     threat: Aircraft | Weapon, detector: Facility | Ship | Aircraft
 ) -> bool:
-    detector_geometry = Point([detector.latitude, detector.longitude]).buffer(
-        detector.get_detection_range()
-        / 60  # rough conversion from nautical miles to degrees
+    distance_to_threat_km = get_distance_between_two_points(
+        detector.latitude,
+        detector.longitude,
+        threat.latitude,
+        threat.longitude,
     )
-    threat_geometry = Point([threat.latitude, threat.longitude])
-    return detector_geometry.contains(threat_geometry)
+    distance_to_threat_nm = (
+        distance_to_threat_km * 1000
+    ) / NAUTICAL_MILES_TO_METERS
+    return distance_to_threat_nm <= detector.get_detection_range()
+
+
+def _remove_if_present(items: list, item) -> None:
+    if item in items:
+        items.remove(item)
 
 
 def weapon_can_engage_target(target: Target, weapon: Weapon) -> bool:
@@ -99,18 +107,18 @@ def on_unit_destroyed(
 
 
 def weapon_endgame(current_scenario: Scenario, weapon: Weapon, target: Target) -> bool:
-    current_scenario.weapons.remove(weapon)
+    _remove_if_present(current_scenario.weapons, weapon)
     if random_float(0, 1) <= weapon.lethality:
         if isinstance(target, Aircraft):
-            current_scenario.aircraft.remove(target)
+            _remove_if_present(current_scenario.aircraft, target)
         elif isinstance(target, Ship):
-            current_scenario.ships.remove(target)
+            _remove_if_present(current_scenario.ships, target)
         elif isinstance(target, Facility):
-            current_scenario.facilities.remove(target)
+            _remove_if_present(current_scenario.facilities, target)
         elif isinstance(target, Airbase):
-            current_scenario.airbases.remove(target)
+            _remove_if_present(current_scenario.airbases, target)
         elif isinstance(target, Weapon):
-            current_scenario.weapons.remove(target)
+            _remove_if_present(current_scenario.weapons, target)
         on_unit_destroyed(current_scenario, weapon.side_id, target)
         return True
     return False
@@ -174,7 +182,7 @@ def launch_weapon(
 def weapon_engagement(current_scenario: Scenario, weapon: Weapon) -> None:
     target = current_scenario.get_target(weapon.target_id)
     if target is None:
-        current_scenario.weapons.remove(weapon)
+        _remove_if_present(current_scenario.weapons, weapon)
     else:
         weapon_route = weapon.route
         if len(weapon_route) > 0:
@@ -209,7 +217,7 @@ def weapon_engagement(current_scenario: Scenario, weapon: Weapon) -> None:
                 weapon.longitude = next_weapon_longitude
                 weapon.current_fuel -= weapon.fuel_rate / 3600
                 if weapon.current_fuel <= 0:
-                    current_scenario.weapons.remove(weapon)
+                    _remove_if_present(current_scenario.weapons, weapon)
 
 
 def aircraft_pursuit(

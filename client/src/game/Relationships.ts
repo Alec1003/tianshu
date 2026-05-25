@@ -98,9 +98,7 @@ export default class Relationships {
     );
     const nextAllies = Array.from(
       new Set(
-        allies.filter(
-          (id) => id && id !== sideId && !nextHostiles.includes(id)
-        )
+        allies.filter((id) => id && id !== sideId && !nextHostiles.includes(id))
       )
     );
     const prevHostiles = this.hostiles[sideId] ?? [];
@@ -118,16 +116,12 @@ export default class Relationships {
     const addedAllies = nextAllies.filter((id) => !prevAllies.includes(id));
     const removedAllies = prevAllies.filter((id) => !nextAllies.includes(id));
 
-    addedHostiles.forEach((otherId) =>
-      this._addHostileOneWay(otherId, sideId)
-    );
+    addedHostiles.forEach((otherId) => this._addHostileOneWay(otherId, sideId));
     removedHostiles.forEach((otherId) =>
       this._removeHostileOneWay(otherId, sideId)
     );
     addedAllies.forEach((otherId) => this._addAllyOneWay(otherId, sideId));
-    removedAllies.forEach((otherId) =>
-      this._removeAllyOneWay(otherId, sideId)
-    );
+    removedAllies.forEach((otherId) => this._removeAllyOneWay(otherId, sideId));
   }
 
   deleteSide(sideId: string) {

@@ -175,18 +175,17 @@ describe("testing distance math functions", () => {
 });
 
 describe("testing miscellaneous utility functions", () => {
-  it.each([1712279806, 0, 86400, 86401, 1732475866, -1732475866, 2147483647.546])(
-    `formatted unix time %i is local time`,
-    (unixTime) => {
-      const date = new Date(unixTime * 1000);
-      const formattedTime = [
-        date.getHours().toString().padStart(2, "0"),
-        date.getMinutes().toString().padStart(2, "0"),
-        date.getSeconds().toString().padStart(2, "0"),
-      ].join(":");
-      expect(unixToLocalTime(unixTime)).toBe(formattedTime);
-    }
-  );
+  it.each([
+    1712279806, 0, 86400, 86401, 1732475866, -1732475866, 2147483647.546,
+  ])(`formatted unix time %i is local time`, (unixTime) => {
+    const date = new Date(unixTime * 1000);
+    const formattedTime = [
+      date.getHours().toString().padStart(2, "0"),
+      date.getMinutes().toString().padStart(2, "0"),
+      date.getSeconds().toString().padStart(2, "0"),
+    ].join(":");
+    expect(unixToLocalTime(unixTime)).toBe(formattedTime);
+  });
 
   test("local date time includes date and time", () => {
     const formattedDateTime = unixToLocalDateTime(1699073110);

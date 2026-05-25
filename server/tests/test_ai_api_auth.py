@@ -77,6 +77,46 @@ class _FakeRuntime:
             "weaponCount": 1,
         }
 
+    def add_weapon_to_unit(
+        self,
+        unit_type: str,
+        unit_id: str,
+        class_name: str,
+        speed: float,
+        max_fuel: float,
+        fuel_rate: float,
+        range_nm: float,
+        lethality: float,
+        quantity: int = 1,
+    ) -> dict:
+        return {
+            "added": True,
+            "unitType": unit_type,
+            "unitId": unit_id,
+            "weaponId": f"{class_name}:{quantity}",
+        }
+
+    def delete_weapon_from_unit(
+        self, unit_type: str, unit_id: str, weapon_id: str
+    ) -> dict:
+        return {
+            "deleted": True,
+            "unitType": unit_type,
+            "unitId": unit_id,
+            "weaponId": weapon_id,
+        }
+
+    def update_weapon_quantity(
+        self, unit_type: str, unit_id: str, weapon_id: str, increment: int
+    ) -> dict:
+        return {
+            "updated": True,
+            "unitType": unit_type,
+            "unitId": unit_id,
+            "weaponId": weapon_id,
+            "currentQuantity": increment,
+        }
+
     def load_scenario_from_json(self, scenario_json: str) -> dict:
         self.loaded_payload = scenario_json
         self.game.current_scenario.id = "loaded"
@@ -168,6 +208,94 @@ def test_ai_routes_reject_unauthenticated_requests() -> None:
         ("post", "/api/ai/runtime/step", {"steps": 1}),
         (
             "post",
+            "/api/ai/runtime/units",
+            {
+                "unit_type": "aircraft",
+                "class_name": "F-35A Lightning II",
+                "latitude": 0,
+                "longitude": 0,
+            },
+        ),
+        ("delete", "/api/ai/runtime/units/aircraft/a-1", None),
+        (
+            "patch",
+            "/api/ai/runtime/units/route",
+            {"unit_type": "aircraft", "unit_id": "a-1", "route": []},
+        ),
+        (
+            "patch",
+            "/api/ai/runtime/units/position",
+            {
+                "unit_type": "aircraft",
+                "unit_id": "a-1",
+                "latitude": 0,
+                "longitude": 0,
+            },
+        ),
+        (
+            "patch",
+            "/api/ai/runtime/side/current",
+            {"side": "blue"},
+        ),
+        ("post", "/api/ai/runtime/sides", {"name": "BLUE", "color": "blue"}),
+        (
+            "patch",
+            "/api/ai/runtime/sides/blue",
+            {"name": "BLUE", "color": "blue"},
+        ),
+        ("delete", "/api/ai/runtime/sides/blue", None),
+        ("delete", "/api/ai/runtime/missions/mission-1", None),
+        (
+            "post",
+            "/api/ai/runtime/missions/patrol",
+            {"name": "Patrol", "assigned_unit_ids": [], "reference_point_ids": []},
+        ),
+        (
+            "patch",
+            "/api/ai/runtime/missions/patrol/mission-1",
+            {"name": "Patrol", "assigned_unit_ids": [], "reference_point_ids": []},
+        ),
+        (
+            "post",
+            "/api/ai/runtime/missions/strike",
+            {"name": "Strike", "assigned_unit_ids": [], "assigned_target_ids": []},
+        ),
+        (
+            "patch",
+            "/api/ai/runtime/missions/strike/mission-1",
+            {"name": "Strike", "assigned_unit_ids": [], "assigned_target_ids": []},
+        ),
+        (
+            "post",
+            "/api/ai/runtime/weapons",
+            {
+                "unit_type": "aircraft",
+                "unit_id": "a-1",
+                "class_name": "AIM-120 AMRAAM",
+                "quantity": 1,
+            },
+        ),
+        (
+            "delete",
+            "/api/ai/runtime/weapons",
+            {
+                "unit_type": "aircraft",
+                "unit_id": "a-1",
+                "weapon_id": "w-1",
+            },
+        ),
+        (
+            "patch",
+            "/api/ai/runtime/weapons/quantity",
+            {
+                "unit_type": "aircraft",
+                "unit_id": "a-1",
+                "weapon_id": "w-1",
+                "increment": 1,
+            },
+        ),
+        (
+            "post",
             "/api/ai/runtime/attack",
             {
                 "attacker_type": "aircraft",
@@ -188,8 +316,11 @@ def test_ai_routes_reject_unauthenticated_requests() -> None:
     ]
 
     for method, path, body in cases:
-        request = getattr(client, method)
-        response = request(path, json=body) if body is not None else request(path)
+        if method == "delete" and body is not None:
+            response = client.request("DELETE", path, json=body)
+        else:
+            request = getattr(client, method)
+            response = request(path, json=body) if body is not None else request(path)
         assert response.status_code == 401, path
 
 
@@ -268,6 +399,42 @@ def test_ai_runtime_control_endpoints_return_authoritative_snapshot() -> None:
         "launched": [{"weaponId": "weapon-1", "quantity": 2}],
         "weaponCount": 1,
     }
+
+    add_weapon_response = client.post(
+        "/api/ai/runtime/weapons",
+        json={
+            "unit_type": "aircraft",
+            "unit_id": "aircraft-1",
+            "class_name": "AIM-120 AMRAAM",
+            "quantity": 2,
+        },
+    )
+    assert add_weapon_response.status_code == 200
+    assert add_weapon_response.json()["action"] == "add_weapon"
+
+    update_weapon_response = client.patch(
+        "/api/ai/runtime/weapons/quantity",
+        json={
+            "unit_type": "aircraft",
+            "unit_id": "aircraft-1",
+            "weapon_id": "weapon-1",
+            "increment": -1,
+        },
+    )
+    assert update_weapon_response.status_code == 200
+    assert update_weapon_response.json()["action"] == "update_weapon_quantity"
+
+    delete_weapon_response = client.request(
+        "DELETE",
+        "/api/ai/runtime/weapons",
+        json={
+            "unit_type": "aircraft",
+            "unit_id": "aircraft-1",
+            "weapon_id": "weapon-1",
+        },
+    )
+    assert delete_weapon_response.status_code == 200
+    assert delete_weapon_response.json()["action"] == "delete_weapon"
 
 
 def test_ai_runtime_step_rejects_invalid_step_count() -> None:

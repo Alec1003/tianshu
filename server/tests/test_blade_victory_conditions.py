@@ -113,3 +113,26 @@ def test_timeout_uses_highest_score_side() -> None:
         "reason": "TIMEOUT",
         "ended_at": 60,
     }
+
+
+def test_step_does_not_advance_after_game_has_ended() -> None:
+    scenario = Scenario(
+        id="s1",
+        name="Ended",
+        start_time=0,
+        current_time=60,
+        duration=60,
+        sides=[_side("blue", score=50), _side("red", score=30)],
+    )
+    game = _game(scenario)
+
+    _observation, _reward, _terminated, truncated, _info = game.step("")
+
+    assert truncated is True
+    assert scenario.current_time == 60
+    assert game.game_outcome == {
+        "ended": True,
+        "winner_side_id": "blue",
+        "reason": "TIMEOUT",
+        "ended_at": 60,
+    }

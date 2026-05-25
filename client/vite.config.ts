@@ -16,11 +16,17 @@ function cesiumEngineOverlay(): Plugin {
   const overlays: Array<{ prefix: string; root: string }> = [
     {
       prefix: "/cesium/Workers/",
-      root: path.resolve(__dirname, "node_modules/@cesium/engine/Build/Workers"),
+      root: path.resolve(
+        __dirname,
+        "node_modules/@cesium/engine/Build/Workers"
+      ),
     },
     {
       prefix: "/cesium/ThirdParty/",
-      root: path.resolve(__dirname, "node_modules/@cesium/engine/Build/ThirdParty"),
+      root: path.resolve(
+        __dirname,
+        "node_modules/@cesium/engine/Build/ThirdParty"
+      ),
     },
   ];
   const mimeByExt: Record<string, string> = {
@@ -44,7 +50,10 @@ function cesiumEngineOverlay(): Plugin {
         if (!fp.startsWith(overlay.root)) return next();
         if (!fs.existsSync(fp) || !fs.statSync(fp).isFile()) return next();
         const ext = path.extname(fp).toLowerCase();
-        res.setHeader("Content-Type", mimeByExt[ext] ?? "application/octet-stream");
+        res.setHeader(
+          "Content-Type",
+          mimeByExt[ext] ?? "application/octet-stream"
+        );
         res.setHeader("Access-Control-Allow-Origin", "*");
         fs.createReadStream(fp).pipe(res);
       });

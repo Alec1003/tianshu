@@ -44,6 +44,28 @@ export interface RuntimeOutcome {
   time_up: boolean;
 }
 
+export type RuntimeVisibleObjectType =
+  | "aircraft"
+  | "ships"
+  | "facilities"
+  | "airbases"
+  | "referencePoints"
+  | "weapons";
+
+export interface RuntimeVisibilitySide {
+  side_id: string;
+  visible_object_ids: string[];
+  operational_detail_object_ids: string[];
+  detected_hostile_object_ids: string[];
+  visible_counts: Record<RuntimeVisibleObjectType, number>;
+  total_counts: Record<RuntimeVisibleObjectType, number>;
+}
+
+export interface RuntimeVisibility {
+  current_side_id: string;
+  by_side: Record<string, RuntimeVisibilitySide>;
+}
+
 export interface RuntimeSnapshot {
   ok: true;
   action: string;
@@ -55,6 +77,7 @@ export interface RuntimeSnapshot {
   duration_left: number;
   outcome: RuntimeOutcome;
   scenario: Record<string, unknown>;
+  visibility: RuntimeVisibility;
 }
 
 export interface RuntimeAttackRequest {
@@ -64,6 +87,89 @@ export interface RuntimeAttackRequest {
   weapon_id?: string;
   weapon_quantity?: number;
   auto?: boolean;
+}
+
+export type RuntimeUnitType =
+  | "aircraft"
+  | "ship"
+  | "facility"
+  | "airbase"
+  | "reference_point";
+
+export interface RuntimeDeployUnitRequest {
+  unit_type: RuntimeUnitType;
+  class_name: string;
+  latitude: number;
+  longitude: number;
+  side?: string | null;
+  name?: string | null;
+  altitude?: number | null;
+}
+
+export interface RuntimeMoveUnitRequest {
+  unit_type: "aircraft" | "ship";
+  unit_id: string;
+  route: number[][];
+}
+
+export interface RuntimeSetUnitPositionRequest {
+  unit_type: RuntimeUnitType;
+  unit_id: string;
+  latitude: number;
+  longitude: number;
+}
+
+export interface RuntimeUpdateUnitRequest {
+  unit_type: RuntimeUnitType;
+  unit_id: string;
+  patch: Record<string, unknown>;
+}
+
+export interface RuntimeCreateSideRequest {
+  name: string;
+  color: string;
+  hostiles: string[];
+  allies: string[];
+  doctrine: Record<string, unknown>;
+}
+
+export interface RuntimeUpdateSideRequest extends RuntimeCreateSideRequest {}
+
+export interface RuntimePatrolMissionRequest {
+  name: string;
+  assigned_unit_ids: string[];
+  reference_point_ids: string[];
+}
+
+export interface RuntimeStrikeMissionRequest {
+  name: string;
+  assigned_unit_ids: string[];
+  assigned_target_ids: string[];
+}
+
+export type RuntimeWeaponCarrierType = "aircraft" | "ship" | "facility";
+
+export interface RuntimeAddWeaponRequest {
+  unit_type: RuntimeWeaponCarrierType;
+  unit_id: string;
+  class_name: string;
+  speed: number;
+  max_fuel: number;
+  fuel_rate: number;
+  range: number;
+  lethality: number;
+  quantity?: number;
+}
+
+export interface RuntimeDeleteWeaponRequest {
+  unit_type: RuntimeWeaponCarrierType;
+  unit_id: string;
+  weapon_id: string;
+}
+
+export interface RuntimeUpdateWeaponQuantityRequest
+  extends RuntimeDeleteWeaponRequest {
+  increment: number;
 }
 
 export interface ScenarioCreatePayload {

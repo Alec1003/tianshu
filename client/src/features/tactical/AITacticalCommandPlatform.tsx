@@ -356,6 +356,7 @@ export default function AITacticalCommandPlatform({
     () => game.currentScenario.id
   );
   const chatScenarioId = scenarioMeta?.id ?? scenarioId;
+  const autoOpenedAiScenarioRef = useRef<string>("");
 
   const refreshSnapshot = useCallback(
     (runState: SimulationRunState = runStateRef.current) => {
@@ -1140,6 +1141,14 @@ export default function AITacticalCommandPlatform({
     if (!timelinePanelOpen) setAiSidebarOpen(false);
     setTimelinePanelOpen((value) => !value);
   }, [timelinePanelOpen]);
+
+  useEffect(() => {
+    const projectId = scenarioMeta?.id;
+    if (!projectId || autoOpenedAiScenarioRef.current === projectId) return;
+    autoOpenedAiScenarioRef.current = projectId;
+    setTimelinePanelOpen(false);
+    setAiSidebarOpen(true);
+  }, [scenarioMeta?.id]);
 
   const toggleAiSidebar = useCallback(() => {
     if (!aiSidebarOpen) setTimelinePanelOpen(false);

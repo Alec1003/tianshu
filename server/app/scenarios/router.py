@@ -43,7 +43,9 @@ from app.scenarios.schemas import (
     ScenarioDetail,
     ScenarioListItem,
     ScenarioUpdate,
+    TrainingScoreResponse,
 )
+from app.scenarios.training_score import build_training_score
 
 router = APIRouter(prefix="/api/scenarios", tags=["scenarios"])
 
@@ -241,6 +243,35 @@ async def list_scenario_timeline(
         limit=limit,
     )
     return RuntimeTimelineResponse(events=list(events))
+
+
+@router.get("/{scenario_id}/training-score", response_model=TrainingScoreResponse)
+async def get_scenario_training_score(
+    scenario_id: str,
+    user: User = Depends(current_active_user),
+    session: AsyncSession = Depends(get_async_session),
+) -> TrainingScoreResponse:
+    try:
+        sc = await scenario_service.get_scenario(session, user, scenario_id)
+    except ScenarioServiceError as exc:
+        _raise_scenario_http(exc)
+    inner_id = runtime_scenario_id(sc.data)
+    scenario_ids = [scenario_id]
+    if inner_id and inner_id != scenario_id:
+        scenario_ids.append(inner_id)
+    events = await list_runtime_events(
+        session,
+        user,
+        scenario_id=scenario_ids,
+        limit=500,
+    )
+    aar_records = await scenario_service.list_aar_records(
+        session,
+        user,
+        scenario_id,
+        limit=50,
+    )
+    return build_training_score(sc, events, aar_records)
 
 
 # ---------- runtime activation ----------

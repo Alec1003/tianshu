@@ -73,3 +73,26 @@ class AarRecordRead(BaseModel):
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+# ---------- Training score ----------
+class TrainingScoreDimension(BaseModel):
+    key: str
+    label: str
+    score: int = Field(..., ge=0, le=100)
+    weight: float = Field(..., ge=0, le=1)
+    summary: str
+    evidence: list[str] = Field(default_factory=list)
+
+
+class TrainingScoreResponse(BaseModel):
+    scenario_id: str
+    runtime_scenario_id: str | None = None
+    generated_at: datetime
+    overall_score: int = Field(..., ge=0, le=100)
+    grade: str
+    confidence: str
+    dimensions: list[TrainingScoreDimension]
+    metrics: dict[str, Any] = Field(default_factory=dict)
+    strengths: list[str] = Field(default_factory=list)
+    improvements: list[str] = Field(default_factory=list)

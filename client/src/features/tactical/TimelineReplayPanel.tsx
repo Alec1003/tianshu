@@ -1,6 +1,8 @@
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Activity,
+  Award,
+  BarChart3,
   CheckCircle2,
   Clock3,
   FileText,
@@ -24,11 +26,15 @@ import {
   type ReactNode,
 } from "react";
 import { listRuntimeTimeline } from "@/api/ai";
-import { listScenarioTimeline } from "@/api/scenarios";
+import {
+  getScenarioTrainingScore,
+  listScenarioTimeline,
+} from "@/api/scenarios";
 import type {
   RuntimeTimelineEvent,
   RuntimeTimelineResponse,
   RuntimeUnitChange,
+  TrainingScoreResponse,
 } from "@/api/types";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -50,7 +56,7 @@ const categoryOptions: Array<{
 }> = [
   { id: "all", label: "全部" },
   { id: "command", label: "命令" },
-  { id: "runtime", label: "仿真" },
+  { id: "runtime", label: "推演" },
   { id: "scenario", label: "场景" },
   { id: "aar", label: "AAR" },
 ];
@@ -86,7 +92,7 @@ const fieldLabels: Record<string, string> = {
 
 function categoryLabel(category: string) {
   if (category === "command") return "命令";
-  if (category === "runtime") return "仿真";
+  if (category === "runtime") return "推演";
   if (category === "scenario") return "场景";
   if (category === "aar") return "AAR";
   return "事件";
@@ -97,7 +103,8 @@ function eventTitle(event: RuntimeTimelineEvent) {
   if (event.event_type === "command.approved") return "审批通过";
   if (event.event_type === "command.rejected") return "审批驳回";
   if (event.event_type === "command.proposed") return "生成命令提案";
-  if (event.event_type === "runtime.step") return "仿真推进";
+  if (event.event_type === "command.executed") return "命令执行";
+  if (event.event_type === "runtime.step") return "推演推进";
   if (event.event_type === "runtime.reset") return "推演重置";
   if (event.event_type === "aar.created") return "生成 AAR 复盘";
   return event.action || event.event_type;
@@ -174,6 +181,20 @@ function formatValue(value: unknown): string {
   return String(value);
 }
 
+function confidenceLabel(value: string) {
+  if (value === "high") return "高";
+  if (value === "medium") return "中";
+  if (value === "low") return "低";
+  return value || "未知";
+}
+
+function scoreTone(score: number) {
+  if (score >= 85) return "emerald";
+  if (score >= 70) return "cyan";
+  if (score >= 60) return "amber";
+  return "red";
+}
+
 function unitChangeLabel(change: RuntimeUnitChange) {
   if (change.change_type === "added") return "新增";
   if (change.change_type === "removed") return "移除";
@@ -237,6 +258,142 @@ function ChangeBadge({ change }: { change: RuntimeUnitChange }) {
       <span>{unitChangeLabel(change)}</span>
       <span className="truncate">{change.name || change.unit_id}</span>
     </span>
+  );
+}
+
+function ScorePanel({
+  score,
+  loading,
+  error,
+  hasScenario,
+}: {
+  score: TrainingScoreResponse | null;
+  loading: boolean;
+  error: string | null;
+  hasScenario: boolean;
+}) {
+  if (!hasScenario) {
+    return (
+      <div className="rounded-2xl border border-dashed border-cyan-300/12 bg-slate-950/30 px-4 py-3 text-xs text-slate-500">
+        当前运行态尚未绑定项目，保存或进入项目后可生成训练评分。
+      </div>
+    );
+  }
+
+  if (loading && !score) {
+    return (
+      <div className="flex items-center gap-2 rounded-2xl border border-cyan-300/12 bg-slate-950/35 px-4 py-3 text-xs text-cyan-100">
+        <Loader2 className="size-4 animate-spin" />
+        正在计算训练评分
+      </div>
+    );
+  }
+
+  if (error && !score) {
+    return (
+      <div className="rounded-2xl border border-red-300/20 bg-red-500/10 px-4 py-3 text-xs text-red-200">
+        {error}
+      </div>
+    );
+  }
+
+  if (!score) return null;
+
+  const tone = scoreTone(score.overall_score);
+  return (
+    <div className="rounded-2xl border border-cyan-300/12 bg-slate-950/35 p-4">
+      <div className="grid gap-4 lg:grid-cols-[180px_minmax(0,1fr)]">
+        <div>
+          <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.24em] text-cyan-300/70">
+            <Award className="size-3.5" />
+            Training Score
+          </div>
+          <div className="mt-3 flex items-end gap-2">
+            <span
+              className={cn(
+                "font-mono text-5xl font-bold leading-none",
+                tone === "emerald" && "text-emerald-200",
+                tone === "cyan" && "text-cyan-100",
+                tone === "amber" && "text-amber-200",
+                tone === "red" && "text-red-200"
+              )}
+            >
+              {score.overall_score}
+            </span>
+            <span className="pb-1 text-sm text-slate-500">/ 100</span>
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <span className="rounded-full border border-cyan-300/18 bg-cyan-300/8 px-2.5 py-1 text-xs text-cyan-100">
+              {score.grade}
+            </span>
+            <span className="rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-1 text-xs text-slate-400">
+              置信度 {confidenceLabel(score.confidence)}
+            </span>
+          </div>
+        </div>
+
+        <div className="grid gap-3 md:grid-cols-2">
+          {score.dimensions.map((dimension) => {
+            const dimensionTone = scoreTone(dimension.score);
+            return (
+              <div
+                className="rounded-xl border border-cyan-300/10 bg-white/[0.03] p-3"
+                key={dimension.key}
+              >
+                <div className="mb-2 flex items-center justify-between gap-3">
+                  <span className="text-xs font-semibold text-slate-200">
+                    {dimension.label}
+                  </span>
+                  <span className="font-mono text-xs text-cyan-100">
+                    {dimension.score}
+                  </span>
+                </div>
+                <div className="h-1.5 overflow-hidden rounded-full bg-slate-800">
+                  <div
+                    className={cn(
+                      "h-full rounded-full",
+                      dimensionTone === "emerald" && "bg-emerald-300",
+                      dimensionTone === "cyan" && "bg-cyan-300",
+                      dimensionTone === "amber" && "bg-amber-300",
+                      dimensionTone === "red" && "bg-red-300"
+                    )}
+                    style={{ width: `${dimension.score}%` }}
+                  />
+                </div>
+                <p className="mt-2 line-clamp-2 text-[11px] leading-relaxed text-slate-500">
+                  {dimension.summary}
+                </p>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="mt-4 grid gap-3 md:grid-cols-2">
+        <div className="rounded-xl border border-emerald-300/10 bg-emerald-300/[0.04] p-3">
+          <div className="mb-2 flex items-center gap-2 text-xs font-semibold text-emerald-200">
+            <CheckCircle2 className="size-4" />
+            优势
+          </div>
+          <ul className="space-y-1.5 text-[11px] leading-relaxed text-slate-400">
+            {score.strengths.slice(0, 2).map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+        </div>
+        <div className="rounded-xl border border-amber-300/10 bg-amber-300/[0.04] p-3">
+          <div className="mb-2 flex items-center gap-2 text-xs font-semibold text-amber-200">
+            <BarChart3 className="size-4" />
+            改进
+          </div>
+          <ul className="space-y-1.5 text-[11px] leading-relaxed text-slate-400">
+            {score.improvements.slice(0, 2).map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -423,6 +580,10 @@ export default function TimelineReplayPanel({
   const [category, setCategory] = useState<TimelineCategory>("all");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [trainingScore, setTrainingScore] =
+    useState<TrainingScoreResponse | null>(null);
+  const [scoreLoading, setScoreLoading] = useState(false);
+  const [scoreError, setScoreError] = useState<string | null>(null);
 
   const fetchTimeline = useCallback(async () => {
     setLoading(true);
@@ -448,12 +609,42 @@ export default function TimelineReplayPanel({
     }
   }, [runtimeScenarioId, scenarioId]);
 
+  const fetchTrainingScore = useCallback(async () => {
+    if (!scenarioId) {
+      setTrainingScore(null);
+      setScoreError(null);
+      setScoreLoading(false);
+      return;
+    }
+    setScoreLoading(true);
+    setScoreError(null);
+    try {
+      setTrainingScore(await getScenarioTrainingScore(scenarioId));
+    } catch (err) {
+      setScoreError(err instanceof Error ? err.message : "训练评分加载失败");
+    } finally {
+      setScoreLoading(false);
+    }
+  }, [scenarioId]);
+
+  const refreshAll = useCallback(() => {
+    void fetchTimeline();
+    void fetchTrainingScore();
+  }, [fetchTimeline, fetchTrainingScore]);
+
   useEffect(() => {
     if (!open) return;
-    void fetchTimeline();
-    const id = window.setInterval(() => void fetchTimeline(), 5000);
-    return () => window.clearInterval(id);
-  }, [fetchTimeline, open]);
+    refreshAll();
+    const timelineTimer = window.setInterval(() => void fetchTimeline(), 5000);
+    const scoreTimer = window.setInterval(
+      () => void fetchTrainingScore(),
+      10000
+    );
+    return () => {
+      window.clearInterval(timelineTimer);
+      window.clearInterval(scoreTimer);
+    };
+  }, [fetchTimeline, fetchTrainingScore, open, refreshAll]);
 
   const filteredEvents = useMemo(() => {
     if (category === "all") return events;
@@ -483,7 +674,7 @@ export default function TimelineReplayPanel({
       {open && (
         <motion.aside
           animate={{ opacity: 1, x: 0 }}
-          className="fixed bottom-3 right-3 top-14 z-[70] flex w-[min(880px,calc(100vw-1.5rem))] flex-col overflow-hidden rounded-2xl border border-cyan-300/18 bg-[#050b13]/95 shadow-[0_24px_90px_rgba(0,0,0,0.62)] backdrop-blur-2xl"
+          className="fixed bottom-3 right-3 top-14 z-[70] flex w-[min(1080px,calc(100vw-1.5rem))] flex-col overflow-hidden rounded-2xl border border-cyan-300/18 bg-[#050b13]/95 shadow-[0_24px_90px_rgba(0,0,0,0.62)] backdrop-blur-2xl"
           exit={{ opacity: 0, x: 28 }}
           initial={{ opacity: 0, x: 28 }}
           role="dialog"
@@ -510,13 +701,13 @@ export default function TimelineReplayPanel({
                 <Button
                   aria-label="刷新时间线"
                   className="size-9"
-                  disabled={loading}
-                  onClick={() => void fetchTimeline()}
+                  disabled={loading || scoreLoading}
+                  onClick={refreshAll}
                   size="icon"
                   title="刷新时间线"
                   variant="ghost"
                 >
-                  {loading ? (
+                  {loading || scoreLoading ? (
                     <Loader2 className="size-4 animate-spin" />
                   ) : (
                     <RefreshCcw className="size-4" />
@@ -536,7 +727,7 @@ export default function TimelineReplayPanel({
             </div>
           </div>
 
-          <div className="grid grid-cols-4 gap-3 border-b border-cyan-300/10 px-5 py-4">
+          <div className="grid grid-cols-2 gap-3 border-b border-cyan-300/10 px-5 py-4 sm:grid-cols-4">
             <StatTile
               icon={<GitCommitVertical className="size-4" />}
               label="事件"
@@ -556,6 +747,15 @@ export default function TimelineReplayPanel({
               icon={<Sparkles className="size-4" />}
               label="单位变化"
               value={countUnitChanges(events)}
+            />
+          </div>
+
+          <div className="border-b border-cyan-300/10 px-5 py-4">
+            <ScorePanel
+              error={scoreError}
+              hasScenario={Boolean(scenarioId)}
+              loading={scoreLoading}
+              score={trainingScore}
             />
           </div>
 
@@ -588,7 +788,7 @@ export default function TimelineReplayPanel({
             </div>
           )}
 
-          <div className="grid min-h-0 flex-1 grid-cols-1 grid-rows-[minmax(0,1fr)_minmax(220px,0.7fr)] gap-4 overflow-hidden p-5 xl:grid-cols-[minmax(0,1fr)_minmax(300px,0.78fr)] xl:grid-rows-1">
+          <div className="grid min-h-0 flex-1 grid-cols-1 grid-rows-[minmax(0,1fr)_minmax(220px,0.7fr)] gap-4 overflow-hidden p-5 xl:grid-cols-[minmax(0,1fr)_minmax(330px,0.78fr)] xl:grid-rows-1">
             <div className="min-h-0 overflow-y-auto pr-1">
               <div className="relative space-y-2">
                 <div className="absolute bottom-2 left-[18px] top-2 w-px bg-cyan-300/12" />

@@ -9,6 +9,7 @@ import type {
   ScenarioListItem,
   RuntimeTimelineResponse,
   ScenarioUpdatePayload,
+  TrainingScoreResponse,
 } from "./types";
 
 export async function listScenarios(
@@ -70,6 +71,14 @@ export async function listScenarioTimeline(
   const suffix = query.toString() ? `?${query.toString()}` : "";
   return apiCall<RuntimeTimelineResponse>(
     `/api/scenarios/${encodeURIComponent(scenarioId)}/timeline${suffix}`
+  );
+}
+
+export async function getScenarioTrainingScore(
+  scenarioId: string
+): Promise<TrainingScoreResponse> {
+  return apiCall<TrainingScoreResponse>(
+    `/api/scenarios/${encodeURIComponent(scenarioId)}/training-score`
   );
 }
 

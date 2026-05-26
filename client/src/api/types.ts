@@ -112,6 +112,28 @@ export interface RuntimeTimelineResponse {
   events: RuntimeTimelineEvent[];
 }
 
+export interface TrainingScoreDimension {
+  key: string;
+  label: string;
+  score: number;
+  weight: number;
+  summary: string;
+  evidence: string[];
+}
+
+export interface TrainingScoreResponse {
+  scenario_id: string;
+  runtime_scenario_id?: string | null;
+  generated_at: string;
+  overall_score: number;
+  grade: string;
+  confidence: "low" | "medium" | "high" | string;
+  dimensions: TrainingScoreDimension[];
+  metrics: Record<string, unknown>;
+  strengths: string[];
+  improvements: string[];
+}
+
 export interface SkillExecutionResult {
   skill: string;
   status: "ok" | "error";

@@ -23,8 +23,8 @@ from app.scenarios.errors import (
     ScenarioNotFoundError,
     ScenarioTemplateReadOnlyError,
 )
-from app.scenarios.models import AarRecord, Scenario
-from app.scenarios.schemas import VALID_STATUSES
+from app.scenarios.models import AarRecord, Scenario, TrainingScoreRecord
+from app.scenarios.schemas import VALID_STATUSES, TrainingScoreResponse
 
 
 # ---------- helpers ----------------------------------------------------------
@@ -235,3 +235,55 @@ async def create_aar_record(
     await session.commit()
     await session.refresh(rec)
     return rec
+
+
+# ---------- Training score records ------------------------------------------
+
+
+async def list_training_score_records(
+    session: AsyncSession,
+    user: User,
+    scenario_id: str,
+    *,
+    limit: int = 20,
+) -> Sequence[TrainingScoreRecord]:
+    sc = await _load_or_404(session, scenario_id)
+    _ensure_can_read(sc, user)
+    limit = max(1, min(int(limit), 100))
+    stmt = (
+        select(TrainingScoreRecord)
+        .where(TrainingScoreRecord.scenario_id == scenario_id)
+        .where(TrainingScoreRecord.owner_id == user.id)
+        .order_by(TrainingScoreRecord.created_at.desc())
+        .limit(limit)
+    )
+    rows = await session.execute(stmt)
+    return rows.scalars().all()
+
+
+async def create_training_score_record(
+    session: AsyncSession,
+    user: User,
+    scenario_id: str,
+    *,
+    score: TrainingScoreResponse,
+    aar_record_id: str | None = None,
+) -> TrainingScoreRecord:
+    sc = await _load_or_404(session, scenario_id)
+    _ensure_can_read(sc, user)
+    payload = score.model_dump(mode="json")
+    record = TrainingScoreRecord(
+        scenario_id=sc.id,
+        owner_id=user.id,
+        runtime_scenario_id=score.runtime_scenario_id,
+        aar_record_id=aar_record_id,
+        overall_score=score.overall_score,
+        grade=score.grade,
+        confidence=score.confidence,
+        score=payload,
+        metrics=score.metrics,
+    )
+    session.add(record)
+    await session.commit()
+    await session.refresh(record)
+    return record

@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Activity,
+  Archive,
   Award,
   BarChart3,
   CheckCircle2,
@@ -27,13 +28,16 @@ import {
 } from "react";
 import { listRuntimeTimeline } from "@/api/ai";
 import {
+  createScenarioTrainingScoreRecord,
   getScenarioTrainingScore,
+  listScenarioTrainingScoreRecords,
   listScenarioTimeline,
 } from "@/api/scenarios";
 import type {
   RuntimeTimelineEvent,
   RuntimeTimelineResponse,
   RuntimeUnitChange,
+  TrainingScoreRecord,
   TrainingScoreResponse,
 } from "@/api/types";
 import { Button } from "@/components/ui/button";
@@ -263,14 +267,20 @@ function ChangeBadge({ change }: { change: RuntimeUnitChange }) {
 
 function ScorePanel({
   score,
+  record,
   loading,
   error,
   hasScenario,
+  archiving,
+  onArchive,
 }: {
   score: TrainingScoreResponse | null;
+  record: TrainingScoreRecord | null;
   loading: boolean;
   error: string | null;
   hasScenario: boolean;
+  archiving: boolean;
+  onArchive: () => void;
 }) {
   if (!hasScenario) {
     return (
@@ -329,7 +339,27 @@ function ScorePanel({
             <span className="rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-1 text-xs text-slate-400">
               置信度 {confidenceLabel(score.confidence)}
             </span>
+            <span className="rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-1 text-xs text-slate-400">
+              {record
+                ? `已归档 ${formatWallTime(record.created_at)}`
+                : "实时计算"}
+            </span>
           </div>
+          <Button
+            className="mt-4 h-8 gap-2 border-cyan-300/20 bg-cyan-300/10 px-3 text-xs text-cyan-100 hover:bg-cyan-300/16"
+            disabled={archiving || loading}
+            onClick={onArchive}
+            size="sm"
+            type="button"
+            variant="ghost"
+          >
+            {archiving ? (
+              <Loader2 className="size-3.5 animate-spin" />
+            ) : (
+              <Archive className="size-3.5" />
+            )}
+            归档当前评分
+          </Button>
         </div>
 
         <div className="grid gap-3 md:grid-cols-2">
@@ -582,7 +612,10 @@ export default function TimelineReplayPanel({
   const [error, setError] = useState<string | null>(null);
   const [trainingScore, setTrainingScore] =
     useState<TrainingScoreResponse | null>(null);
+  const [trainingScoreRecord, setTrainingScoreRecord] =
+    useState<TrainingScoreRecord | null>(null);
   const [scoreLoading, setScoreLoading] = useState(false);
+  const [scoreArchiving, setScoreArchiving] = useState(false);
   const [scoreError, setScoreError] = useState<string | null>(null);
 
   const fetchTimeline = useCallback(async () => {
@@ -612,6 +645,7 @@ export default function TimelineReplayPanel({
   const fetchTrainingScore = useCallback(async () => {
     if (!scenarioId) {
       setTrainingScore(null);
+      setTrainingScoreRecord(null);
       setScoreError(null);
       setScoreLoading(false);
       return;
@@ -619,11 +653,35 @@ export default function TimelineReplayPanel({
     setScoreLoading(true);
     setScoreError(null);
     try {
-      setTrainingScore(await getScenarioTrainingScore(scenarioId));
+      const records = await listScenarioTrainingScoreRecords(scenarioId, {
+        limit: 1,
+      });
+      if (records[0]) {
+        setTrainingScoreRecord(records[0]);
+        setTrainingScore(records[0].score);
+      } else {
+        setTrainingScoreRecord(null);
+        setTrainingScore(await getScenarioTrainingScore(scenarioId));
+      }
     } catch (err) {
       setScoreError(err instanceof Error ? err.message : "训练评分加载失败");
     } finally {
       setScoreLoading(false);
+    }
+  }, [scenarioId]);
+
+  const archiveTrainingScore = useCallback(async () => {
+    if (!scenarioId) return;
+    setScoreArchiving(true);
+    setScoreError(null);
+    try {
+      const record = await createScenarioTrainingScoreRecord(scenarioId);
+      setTrainingScoreRecord(record);
+      setTrainingScore(record.score);
+    } catch (err) {
+      setScoreError(err instanceof Error ? err.message : "训练评分归档失败");
+    } finally {
+      setScoreArchiving(false);
     }
   }, [scenarioId]);
 
@@ -701,13 +759,13 @@ export default function TimelineReplayPanel({
                 <Button
                   aria-label="刷新时间线"
                   className="size-9"
-                  disabled={loading || scoreLoading}
+                  disabled={loading || scoreLoading || scoreArchiving}
                   onClick={refreshAll}
                   size="icon"
                   title="刷新时间线"
                   variant="ghost"
                 >
-                  {loading || scoreLoading ? (
+                  {loading || scoreLoading || scoreArchiving ? (
                     <Loader2 className="size-4 animate-spin" />
                   ) : (
                     <RefreshCcw className="size-4" />
@@ -752,9 +810,12 @@ export default function TimelineReplayPanel({
 
           <div className="border-b border-cyan-300/10 px-5 py-4">
             <ScorePanel
+              archiving={scoreArchiving}
               error={scoreError}
               hasScenario={Boolean(scenarioId)}
               loading={scoreLoading}
+              onArchive={archiveTrainingScore}
+              record={trainingScoreRecord}
               score={trainingScore}
             />
           </div>

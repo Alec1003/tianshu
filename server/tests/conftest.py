@@ -46,7 +46,11 @@ async def db_engine() -> AsyncIterator:
         CommandProposalStepRecord,
     )
     from app.aicc_runtime.models import RuntimeEvent, RuntimeState  # noqa: F401
-    from app.scenarios.models import AarRecord, Scenario  # noqa: F401
+    from app.scenarios.models import (  # noqa: F401
+        AarRecord,
+        Scenario,
+        TrainingScoreRecord,
+    )
     from app.unit_assets.models import UnitAsset  # noqa: F401
 
     async with engine.begin() as conn:

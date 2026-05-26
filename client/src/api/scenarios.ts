@@ -9,6 +9,7 @@ import type {
   ScenarioListItem,
   RuntimeTimelineResponse,
   ScenarioUpdatePayload,
+  TrainingScoreRecord,
   TrainingScoreResponse,
 } from "./types";
 
@@ -79,6 +80,27 @@ export async function getScenarioTrainingScore(
 ): Promise<TrainingScoreResponse> {
   return apiCall<TrainingScoreResponse>(
     `/api/scenarios/${encodeURIComponent(scenarioId)}/training-score`
+  );
+}
+
+export async function listScenarioTrainingScoreRecords(
+  scenarioId: string,
+  params?: { limit?: number }
+): Promise<TrainingScoreRecord[]> {
+  const query = new URLSearchParams();
+  if (params?.limit !== undefined) query.set("limit", String(params.limit));
+  const suffix = query.toString() ? `?${query.toString()}` : "";
+  return apiCall<TrainingScoreRecord[]>(
+    `/api/scenarios/${encodeURIComponent(scenarioId)}/training-score/records${suffix}`
+  );
+}
+
+export async function createScenarioTrainingScoreRecord(
+  scenarioId: string
+): Promise<TrainingScoreRecord> {
+  return apiCall<TrainingScoreRecord>(
+    `/api/scenarios/${encodeURIComponent(scenarioId)}/training-score/records`,
+    { method: "POST" }
   );
 }
 

@@ -18,6 +18,7 @@ from app.scenarios.errors import (
     ScenarioTemplateReadOnlyError,
 )
 from app.scenarios.models import Scenario
+from app.scenarios.schemas import TrainingScoreDimension, TrainingScoreResponse
 
 
 pytestmark = pytest.mark.asyncio
@@ -283,3 +284,45 @@ async def test_create_aar_rejects_long_outcome_reason(db_session, user):
             summary={},
             ended_at=datetime.now(tz=timezone.utc),
         )
+
+
+# ---------- Training score records -----------------------------------------
+
+
+async def test_create_and_list_training_score_records(db_session, user):
+    sc = await svc.create_scenario(db_session, user, name="score", data={})
+    score = TrainingScoreResponse(
+        scenario_id=sc.id,
+        runtime_scenario_id="runtime-score",
+        generated_at=datetime.now(tz=timezone.utc),
+        overall_score=86,
+        grade="良好",
+        confidence="high",
+        dimensions=[
+            TrainingScoreDimension(
+                key="task_effectiveness",
+                label="任务达成",
+                score=86,
+                weight=1,
+                summary="ok",
+                evidence=[],
+            )
+        ],
+        metrics={"event_count": 5},
+        strengths=["stable"],
+        improvements=[],
+    )
+
+    record = await svc.create_training_score_record(
+        db_session,
+        user,
+        sc.id,
+        score=score,
+    )
+    records = await svc.list_training_score_records(db_session, user, sc.id)
+
+    assert record.id
+    assert record.overall_score == 86
+    assert record.score["overall_score"] == 86
+    assert record.metrics == {"event_count": 5}
+    assert [item.id for item in records] == [record.id]

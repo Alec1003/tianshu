@@ -8,7 +8,7 @@ from sqlalchemy.schema import CreateIndex, CreateTable
 from app.aicc_runtime.models import RuntimeEvent, RuntimeState
 from app.auth.models import User
 from app.db import session as db_session_mod
-from app.scenarios.models import AarRecord, Scenario
+from app.scenarios.models import AarRecord, Scenario, TrainingScoreRecord
 from app.unit_assets.models import UnitAsset
 
 
@@ -61,6 +61,11 @@ def test_scenario_json_columns_compile_as_jsonb_for_postgres() -> None:
     runtime_event_ddl = str(
         CreateTable(RuntimeEvent.__table__).compile(dialect=postgresql.dialect())
     )
+    training_score_ddl = str(
+        CreateTable(TrainingScoreRecord.__table__).compile(
+            dialect=postgresql.dialect()
+        )
+    )
 
     assert "data JSONB NOT NULL" in ddl
     assert "data JSONB NOT NULL" in unit_ddl
@@ -68,6 +73,8 @@ def test_scenario_json_columns_compile_as_jsonb_for_postgres() -> None:
     assert "runtime_metadata JSONB NOT NULL" in runtime_state_ddl
     assert "payload JSONB NOT NULL" in runtime_event_ddl
     assert "unit_changes JSONB NOT NULL" in runtime_event_ddl
+    assert "score JSONB NOT NULL" in training_score_ddl
+    assert "metrics JSONB NOT NULL" in training_score_ddl
 
 
 def test_user_foreign_keys_compile_as_uuid_for_postgres() -> None:
@@ -87,6 +94,11 @@ def test_user_foreign_keys_compile_as_uuid_for_postgres() -> None:
     runtime_event_ddl = str(
         CreateTable(RuntimeEvent.__table__).compile(dialect=postgresql.dialect())
     )
+    training_score_ddl = str(
+        CreateTable(TrainingScoreRecord.__table__).compile(
+            dialect=postgresql.dialect()
+        )
+    )
 
     assert "id UUID NOT NULL" in user_ddl
     assert "owner_id UUID" in scenario_ddl
@@ -99,6 +111,8 @@ def test_user_foreign_keys_compile_as_uuid_for_postgres() -> None:
     assert 'FOREIGN KEY(owner_id) REFERENCES "user" (id)' in runtime_state_ddl
     assert "owner_id UUID NOT NULL" in runtime_event_ddl
     assert 'FOREIGN KEY(owner_id) REFERENCES "user" (id)' in runtime_event_ddl
+    assert "owner_id UUID" in training_score_ddl
+    assert 'FOREIGN KEY(owner_id) REFERENCES "user" (id)' in training_score_ddl
 
 
 def test_unit_asset_has_scoped_unique_indexes_for_postgres() -> None:

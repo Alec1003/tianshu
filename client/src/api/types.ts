@@ -134,6 +134,20 @@ export interface TrainingScoreResponse {
   improvements: string[];
 }
 
+export interface TrainingScoreRecord {
+  id: string;
+  scenario_id: string | null;
+  owner_id: string | null;
+  runtime_scenario_id?: string | null;
+  aar_record_id?: string | null;
+  overall_score: number;
+  grade: string;
+  confidence: string;
+  score: TrainingScoreResponse;
+  metrics: Record<string, unknown>;
+  created_at: string;
+}
+
 export interface SkillExecutionResult {
   skill: string;
   status: "ok" | "error";

@@ -43,11 +43,37 @@ from app.scenarios.schemas import (
     ScenarioDetail,
     ScenarioListItem,
     ScenarioUpdate,
+    TrainingScoreRecordRead,
     TrainingScoreResponse,
 )
 from app.scenarios.training_score import build_training_score
 
 router = APIRouter(prefix="/api/scenarios", tags=["scenarios"])
+
+
+async def _build_training_score_for_scenario(
+    session: AsyncSession,
+    user: User,
+    sc: Scenario,
+    scenario_id: str,
+) -> TrainingScoreResponse:
+    inner_id = runtime_scenario_id(sc.data)
+    scenario_ids = [scenario_id]
+    if inner_id and inner_id != scenario_id:
+        scenario_ids.append(inner_id)
+    events = await list_runtime_events(
+        session,
+        user,
+        scenario_id=scenario_ids,
+        limit=500,
+    )
+    aar_records = await scenario_service.list_aar_records(
+        session,
+        user,
+        scenario_id,
+        limit=50,
+    )
+    return build_training_score(sc, events, aar_records)
 
 
 def _bridge_for_user(request: Request, user: User) -> Any:
@@ -198,6 +224,7 @@ async def create_aar_record(
     except ScenarioServiceError as exc:
         _raise_scenario_http(exc)
     event_scenario_id = scenario_id
+    sc: Scenario | None = None
     try:
         sc = await scenario_service.get_scenario(session, user, scenario_id)
         event_scenario_id = runtime_scenario_id(sc.data) or scenario_id
@@ -214,6 +241,15 @@ async def create_aar_record(
         scenario_id=event_scenario_id,
         aar_record_id=rec.id,
     )
+    if sc is not None:
+        score = await _build_training_score_for_scenario(session, user, sc, scenario_id)
+        await scenario_service.create_training_score_record(
+            session,
+            user,
+            scenario_id,
+            score=score,
+            aar_record_id=rec.id,
+        )
     return rec
 
 
@@ -255,23 +291,51 @@ async def get_scenario_training_score(
         sc = await scenario_service.get_scenario(session, user, scenario_id)
     except ScenarioServiceError as exc:
         _raise_scenario_http(exc)
-    inner_id = runtime_scenario_id(sc.data)
-    scenario_ids = [scenario_id]
-    if inner_id and inner_id != scenario_id:
-        scenario_ids.append(inner_id)
-    events = await list_runtime_events(
-        session,
-        user,
-        scenario_id=scenario_ids,
-        limit=500,
-    )
-    aar_records = await scenario_service.list_aar_records(
-        session,
-        user,
-        scenario_id,
-        limit=50,
-    )
-    return build_training_score(sc, events, aar_records)
+    return await _build_training_score_for_scenario(session, user, sc, scenario_id)
+
+
+@router.get(
+    "/{scenario_id}/training-score/records",
+    response_model=list[TrainingScoreRecordRead],
+)
+async def list_scenario_training_score_records(
+    scenario_id: str,
+    limit: int = 20,
+    user: User = Depends(current_active_user),
+    session: AsyncSession = Depends(get_async_session),
+) -> Sequence:
+    try:
+        return await scenario_service.list_training_score_records(
+            session,
+            user,
+            scenario_id,
+            limit=limit,
+        )
+    except ScenarioServiceError as exc:
+        _raise_scenario_http(exc)
+
+
+@router.post(
+    "/{scenario_id}/training-score/records",
+    response_model=TrainingScoreRecordRead,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_scenario_training_score_record(
+    scenario_id: str,
+    user: User = Depends(current_active_user),
+    session: AsyncSession = Depends(get_async_session),
+):
+    try:
+        sc = await scenario_service.get_scenario(session, user, scenario_id)
+        score = await _build_training_score_for_scenario(session, user, sc, scenario_id)
+        return await scenario_service.create_training_score_record(
+            session,
+            user,
+            scenario_id,
+            score=score,
+        )
+    except ScenarioServiceError as exc:
+        _raise_scenario_http(exc)
 
 
 # ---------- runtime activation ----------

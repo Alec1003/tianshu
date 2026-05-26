@@ -96,3 +96,19 @@ class TrainingScoreResponse(BaseModel):
     metrics: dict[str, Any] = Field(default_factory=dict)
     strengths: list[str] = Field(default_factory=list)
     improvements: list[str] = Field(default_factory=list)
+
+
+class TrainingScoreRecordRead(BaseModel):
+    id: str
+    scenario_id: str | None
+    owner_id: uuid.UUID | None
+    runtime_scenario_id: str | None = None
+    aar_record_id: str | None = None
+    overall_score: int = Field(..., ge=0, le=100)
+    grade: str
+    confidence: str
+    score: TrainingScoreResponse
+    metrics: dict[str, Any] = Field(default_factory=dict)
+    created_at: datetime
+
+    model_config = {"from_attributes": True}

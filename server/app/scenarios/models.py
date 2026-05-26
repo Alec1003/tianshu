@@ -3,6 +3,7 @@
 v1 schema (flat, single-user-owned):
     Scenario       -- player-saved or system-template scenario JSON
     AarRecord      -- post-game After-Action-Review record per played session
+    TrainingScoreRecord -- immutable score snapshot for a played session
 
 Workspace / WorkspaceMember tables are intentionally deferred to S4 when we
 introduce multi-user collaboration. Adding them now would only inflate the
@@ -100,6 +101,9 @@ class Scenario(Base):
     aar_records: Mapped[list["AarRecord"]] = relationship(
         back_populates="scenario", cascade="all, delete-orphan", lazy="selectin"
     )
+    training_score_records: Mapped[list["TrainingScoreRecord"]] = relationship(
+        back_populates="scenario", cascade="all, delete-orphan", lazy="selectin"
+    )
 
 
 class AarRecord(Base):
@@ -141,3 +145,49 @@ class AarRecord(Base):
     )
 
     scenario: Mapped["Scenario | None"] = relationship(back_populates="aar_records")
+
+
+class TrainingScoreRecord(Base):
+    """Immutable training score snapshot for score history and comparison."""
+
+    __tablename__ = "training_score_record"
+
+    id: Mapped[str] = _uuid_pk()
+
+    scenario_id: Mapped[str | None] = mapped_column(
+        String(36),
+        ForeignKey("scenario.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    owner_id: Mapped[uuid.UUID | None] = mapped_column(
+        GUID(),
+        ForeignKey("user.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
+    runtime_scenario_id: Mapped[str | None] = mapped_column(
+        String(120),
+        nullable=True,
+        index=True,
+    )
+    aar_record_id: Mapped[str | None] = mapped_column(
+        String(36),
+        ForeignKey("aar_record.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+
+    overall_score: Mapped[int] = mapped_column(Integer, nullable=False)
+    grade: Mapped[str] = mapped_column(String(16), nullable=False)
+    confidence: Mapped[str] = mapped_column(String(16), nullable=False)
+    score: Mapped[dict] = mapped_column(SCENARIO_JSON, nullable=False)
+    metrics: Mapped[dict] = mapped_column(SCENARIO_JSON, default=dict, nullable=False)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    scenario: Mapped["Scenario | None"] = relationship(
+        back_populates="training_score_records"
+    )

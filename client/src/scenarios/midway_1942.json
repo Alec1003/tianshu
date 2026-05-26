@@ -1,0 +1,442 @@
+{
+  "currentScenario": {
+    "id": "hist-midway-1942",
+    "name": "中途岛海战（1942）",
+    "startTime": -870291000,
+    "currentTime": -870291000,
+    "duration": 21600,
+    "timeCompression": 8,
+    "historicalCase": {
+      "date": "1942-06-04",
+      "location": "Midway Atoll, Central Pacific",
+      "basis": "Battle of Midway carrier engagement; positions and forces are intentionally abstracted for training simulation."
+    },
+    "sides": [
+      {
+        "id": "side-usn",
+        "name": "美国海军特遣舰队",
+        "totalScore": 0,
+        "color": "blue"
+      },
+      {
+        "id": "side-ijn",
+        "name": "日本联合舰队机动部队",
+        "totalScore": 0,
+        "color": "red"
+      }
+    ],
+    "aircraft": [
+      {
+        "id": "midway-air-sbd-1",
+        "name": "企业号 SBD 俯冲轰炸机编队",
+        "sideId": "side-usn",
+        "className": "SBD Dauntless",
+        "latitude": 30.2,
+        "longitude": -177.8,
+        "altitude": 12000,
+        "heading": 300,
+        "speed": 220,
+        "currentFuel": 9500,
+        "maxFuel": 9500,
+        "fuelRate": 850,
+        "range": 85,
+        "route": [[30.55, -178.65]],
+        "selected": false,
+        "sideColor": "blue",
+        "weapons": [
+          {
+            "id": "midway-wpn-sbd-1",
+            "name": "1000 lb bomb",
+            "sideId": "side-usn",
+            "className": "1000 lb bomb",
+            "latitude": 30.2,
+            "longitude": -177.8,
+            "altitude": 12000,
+            "heading": 300,
+            "speed": 420,
+            "currentFuel": 120,
+            "maxFuel": 120,
+            "fuelRate": 60,
+            "range": 2,
+            "route": [],
+            "sideColor": "blue",
+            "targetId": "",
+            "lethality": 0.72,
+            "maxQuantity": 12,
+            "currentQuantity": 12
+          }
+        ],
+        "homeBaseId": "midway-ship-enterprise",
+        "rtb": false,
+        "targetId": "midway-ship-akagi",
+        "desiredRoute": []
+      },
+      {
+        "id": "midway-air-tbd-1",
+        "name": "约克城 TBD 鱼雷机编队",
+        "sideId": "side-usn",
+        "className": "TBD Devastator",
+        "latitude": 29.5,
+        "longitude": -176.9,
+        "altitude": 3000,
+        "heading": 310,
+        "speed": 160,
+        "currentFuel": 7600,
+        "maxFuel": 7600,
+        "fuelRate": 780,
+        "range": 45,
+        "route": [[30.4, -178.45]],
+        "selected": false,
+        "sideColor": "blue",
+        "weapons": [
+          {
+            "id": "midway-wpn-tbd-1",
+            "name": "Mark 13 torpedo",
+            "sideId": "side-usn",
+            "className": "Mark 13 torpedo",
+            "latitude": 29.5,
+            "longitude": -176.9,
+            "altitude": 3000,
+            "heading": 310,
+            "speed": 190,
+            "currentFuel": 80,
+            "maxFuel": 80,
+            "fuelRate": 40,
+            "range": 3,
+            "route": [],
+            "sideColor": "blue",
+            "targetId": "",
+            "lethality": 0.58,
+            "maxQuantity": 8,
+            "currentQuantity": 8
+          }
+        ],
+        "homeBaseId": "midway-ship-yorktown",
+        "rtb": false,
+        "targetId": "midway-ship-kaga",
+        "desiredRoute": []
+      },
+      {
+        "id": "midway-air-zero-cap",
+        "name": "零式舰战防空巡逻",
+        "sideId": "side-ijn",
+        "className": "A6M Zero",
+        "latitude": 30.4,
+        "longitude": -178.35,
+        "altitude": 15000,
+        "heading": 95,
+        "speed": 285,
+        "currentFuel": 8200,
+        "maxFuel": 8200,
+        "fuelRate": 760,
+        "range": 70,
+        "route": [[30.05, -178.0], [30.72, -178.8]],
+        "selected": false,
+        "sideColor": "red",
+        "weapons": [
+          {
+            "id": "midway-wpn-zero-1",
+            "name": "20 mm cannon",
+            "sideId": "side-ijn",
+            "className": "20 mm cannon",
+            "latitude": 30.4,
+            "longitude": -178.35,
+            "altitude": 15000,
+            "heading": 95,
+            "speed": 1200,
+            "currentFuel": 60,
+            "maxFuel": 60,
+            "fuelRate": 30,
+            "range": 1,
+            "route": [],
+            "sideColor": "red",
+            "targetId": "",
+            "lethality": 0.35,
+            "maxQuantity": 20,
+            "currentQuantity": 20
+          }
+        ],
+        "homeBaseId": "midway-ship-akagi",
+        "rtb": false,
+        "targetId": "midway-air-sbd-1",
+        "desiredRoute": []
+      },
+      {
+        "id": "midway-air-b5n-1",
+        "name": "赤城 B5N 攻击编队",
+        "sideId": "side-ijn",
+        "className": "B5N Kate",
+        "latitude": 29.7,
+        "longitude": -178.65,
+        "altitude": 9000,
+        "heading": 115,
+        "speed": 210,
+        "currentFuel": 9000,
+        "maxFuel": 9000,
+        "fuelRate": 820,
+        "range": 65,
+        "route": [[28.21, -177.37]],
+        "selected": false,
+        "sideColor": "red",
+        "weapons": [
+          {
+            "id": "midway-wpn-b5n-1",
+            "name": "Type 91 torpedo",
+            "sideId": "side-ijn",
+            "className": "Type 91 torpedo",
+            "latitude": 29.7,
+            "longitude": -178.65,
+            "altitude": 9000,
+            "heading": 115,
+            "speed": 210,
+            "currentFuel": 80,
+            "maxFuel": 80,
+            "fuelRate": 40,
+            "range": 3,
+            "route": [],
+            "sideColor": "red",
+            "targetId": "",
+            "lethality": 0.6,
+            "maxQuantity": 10,
+            "currentQuantity": 10
+          }
+        ],
+        "homeBaseId": "midway-ship-akagi",
+        "rtb": false,
+        "targetId": "midway-airbase-midway",
+        "desiredRoute": []
+      }
+    ],
+    "ships": [
+      {
+        "id": "midway-ship-enterprise",
+        "name": "USS Enterprise (CV-6)",
+        "sideId": "side-usn",
+        "className": "Yorktown-class carrier",
+        "latitude": 31.0,
+        "longitude": -176.5,
+        "altitude": 0,
+        "heading": 285,
+        "speed": 28,
+        "currentFuel": 120000,
+        "maxFuel": 120000,
+        "fuelRate": 1400,
+        "range": 45,
+        "route": [[31.2, -177.1]],
+        "sideColor": "blue",
+        "weapons": [],
+        "aircraft": [],
+        "isObjective": true
+      },
+      {
+        "id": "midway-ship-yorktown",
+        "name": "USS Yorktown (CV-5)",
+        "sideId": "side-usn",
+        "className": "Yorktown-class carrier",
+        "latitude": 30.4,
+        "longitude": -176.1,
+        "altitude": 0,
+        "heading": 282,
+        "speed": 27,
+        "currentFuel": 110000,
+        "maxFuel": 110000,
+        "fuelRate": 1350,
+        "range": 45,
+        "route": [[30.7, -176.7]],
+        "sideColor": "blue",
+        "weapons": [],
+        "aircraft": [],
+        "isObjective": true
+      },
+      {
+        "id": "midway-ship-akagi",
+        "name": "IJN Akagi",
+        "sideId": "side-ijn",
+        "className": "Akagi-class carrier",
+        "latitude": 30.55,
+        "longitude": -178.65,
+        "altitude": 0,
+        "heading": 90,
+        "speed": 30,
+        "currentFuel": 120000,
+        "maxFuel": 120000,
+        "fuelRate": 1400,
+        "range": 45,
+        "route": [[30.35, -178.05]],
+        "sideColor": "red",
+        "weapons": [],
+        "aircraft": [],
+        "isObjective": true
+      },
+      {
+        "id": "midway-ship-kaga",
+        "name": "IJN Kaga",
+        "sideId": "side-ijn",
+        "className": "Kaga-class carrier",
+        "latitude": 30.25,
+        "longitude": -178.95,
+        "altitude": 0,
+        "heading": 92,
+        "speed": 28,
+        "currentFuel": 115000,
+        "maxFuel": 115000,
+        "fuelRate": 1380,
+        "range": 45,
+        "route": [[30.1, -178.2]],
+        "sideColor": "red",
+        "weapons": [],
+        "aircraft": [],
+        "isObjective": true
+      }
+    ],
+    "facilities": [
+      {
+        "id": "midway-fac-radar",
+        "name": "中途岛预警雷达站",
+        "sideId": "side-usn",
+        "className": "Early warning radar",
+        "latitude": 28.21,
+        "longitude": -177.37,
+        "altitude": 0,
+        "range": 120,
+        "sideColor": "blue",
+        "weapons": [],
+        "isObjective": true
+      }
+    ],
+    "airbases": [
+      {
+        "id": "midway-airbase-midway",
+        "name": "中途岛机场",
+        "sideId": "side-usn",
+        "className": "Island airfield",
+        "latitude": 28.21,
+        "longitude": -177.37,
+        "altitude": 0,
+        "sideColor": "blue",
+        "aircraft": [],
+        "isObjective": true
+      }
+    ],
+    "weapons": [],
+    "referencePoints": [
+      {
+        "id": "midway-rp-atoll",
+        "name": "中途岛环礁",
+        "sideId": "side-usn",
+        "latitude": 28.21,
+        "longitude": -177.37,
+        "altitude": 0,
+        "sideColor": "blue"
+      },
+      {
+        "id": "midway-rp-carrier-box",
+        "name": "日本航母机动区",
+        "sideId": "side-ijn",
+        "latitude": 30.45,
+        "longitude": -178.55,
+        "altitude": 0,
+        "sideColor": "red"
+      }
+    ],
+    "missions": [
+      {
+        "id": "midway-mission-us-strike",
+        "name": "美军俯冲轰炸机搜索并攻击日方航母",
+        "sideId": "side-usn",
+        "assignedUnitIds": ["midway-air-sbd-1", "midway-air-tbd-1"],
+        "assignedTargetIds": ["midway-ship-akagi", "midway-ship-kaga"],
+        "active": true
+      },
+      {
+        "id": "midway-mission-ijn-strike",
+        "name": "日军攻击中途岛机场",
+        "sideId": "side-ijn",
+        "assignedUnitIds": ["midway-air-b5n-1"],
+        "assignedTargetIds": ["midway-airbase-midway"],
+        "active": true
+      },
+      {
+        "id": "midway-mission-zero-cap",
+        "name": "日方航母上空防空巡逻",
+        "sideId": "side-ijn",
+        "assignedUnitIds": ["midway-air-zero-cap"],
+        "assignedArea": [
+          {
+            "id": "midway-cap-1",
+            "name": "CAP 北西点",
+            "sideId": "side-ijn",
+            "latitude": 30.85,
+            "longitude": -179.05,
+            "altitude": 15000,
+            "sideColor": "red"
+          },
+          {
+            "id": "midway-cap-2",
+            "name": "CAP 北东点",
+            "sideId": "side-ijn",
+            "latitude": 30.85,
+            "longitude": -178.05,
+            "altitude": 15000,
+            "sideColor": "red"
+          },
+          {
+            "id": "midway-cap-3",
+            "name": "CAP 南东点",
+            "sideId": "side-ijn",
+            "latitude": 30.0,
+            "longitude": -178.05,
+            "altitude": 15000,
+            "sideColor": "red"
+          },
+          {
+            "id": "midway-cap-4",
+            "name": "CAP 南西点",
+            "sideId": "side-ijn",
+            "latitude": 30.0,
+            "longitude": -179.05,
+            "altitude": 15000,
+            "sideColor": "red"
+          }
+        ],
+        "active": true
+      }
+    ],
+    "relationships": {
+      "hostiles": {
+        "side-usn": ["side-ijn"],
+        "side-ijn": ["side-usn"]
+      },
+      "allies": {
+        "side-usn": [],
+        "side-ijn": []
+      }
+    },
+    "doctrine": {
+      "side-usn": {
+        "Aircraft attack hostile aircraft": true,
+        "Aircraft chase hostile aircraft": true,
+        "Aircraft RTB when out of range of homebase": false,
+        "Aircraft RTB when strike mission complete": true,
+        "SAMs attack hostile aircraft": true,
+        "Ships attack hostile aircraft": true
+      },
+      "side-ijn": {
+        "Aircraft attack hostile aircraft": true,
+        "Aircraft chase hostile aircraft": true,
+        "Aircraft RTB when out of range of homebase": false,
+        "Aircraft RTB when strike mission complete": true,
+        "SAMs attack hostile aircraft": true,
+        "Ships attack hostile aircraft": true
+      }
+    }
+  },
+  "currentSideId": "side-usn",
+  "selectedUnitId": "",
+  "mapView": {
+    "defaultCenter": [28.21, -177.37],
+    "currentCameraCenter": [28.21, -177.37],
+    "defaultZoom": 5,
+    "currentCameraZoom": 5
+  }
+}

@@ -1,0 +1,430 @@
+{
+  "currentScenario": {
+    "id": "hist-overlord-1944",
+    "name": "诺曼底登陆（1944）",
+    "startTime": -806952600,
+    "currentTime": -806952600,
+    "duration": 28800,
+    "timeCompression": 8,
+    "historicalCase": {
+      "date": "1944-06-06",
+      "location": "Normandy, France",
+      "basis": "Operation Overlord D-Day landings; units and positions are abstracted for training simulation."
+    },
+    "sides": [
+      {
+        "id": "side-allied",
+        "name": "盟军远征部队",
+        "totalScore": 0,
+        "color": "blue"
+      },
+      {
+        "id": "side-german",
+        "name": "德军海岸防御部队",
+        "totalScore": 0,
+        "color": "red"
+      }
+    ],
+    "aircraft": [
+      {
+        "id": "overlord-air-c47",
+        "name": "第 82 空降师 C-47 运输机群",
+        "sideId": "side-allied",
+        "className": "C-47 Skytrain",
+        "latitude": 50.55,
+        "longitude": -1.2,
+        "altitude": 6000,
+        "heading": 165,
+        "speed": 170,
+        "currentFuel": 16000,
+        "maxFuel": 16000,
+        "fuelRate": 950,
+        "range": 35,
+        "route": [[49.41, -1.32], [49.32, -1.22]],
+        "selected": false,
+        "sideColor": "blue",
+        "weapons": [],
+        "homeBaseId": "overlord-airbase-stoney-cross",
+        "rtb": false,
+        "targetId": "",
+        "desiredRoute": [],
+        "isObjective": true
+      },
+      {
+        "id": "overlord-air-b26",
+        "name": "B-26 Marauder 轰炸机编队",
+        "sideId": "side-allied",
+        "className": "B-26 Marauder",
+        "latitude": 50.0,
+        "longitude": -1.1,
+        "altitude": 11000,
+        "heading": 175,
+        "speed": 230,
+        "currentFuel": 18000,
+        "maxFuel": 18000,
+        "fuelRate": 1150,
+        "range": 70,
+        "route": [[49.34, -0.69]],
+        "selected": false,
+        "sideColor": "blue",
+        "weapons": [
+          {
+            "id": "overlord-wpn-b26-1",
+            "name": "500 lb general purpose bomb",
+            "sideId": "side-allied",
+            "className": "500 lb general purpose bomb",
+            "latitude": 50.0,
+            "longitude": -1.1,
+            "altitude": 11000,
+            "heading": 175,
+            "speed": 450,
+            "currentFuel": 100,
+            "maxFuel": 100,
+            "fuelRate": 40,
+            "range": 2,
+            "route": [],
+            "sideColor": "blue",
+            "targetId": "",
+            "lethality": 0.5,
+            "maxQuantity": 24,
+            "currentQuantity": 24
+          }
+        ],
+        "homeBaseId": "overlord-airbase-stoney-cross",
+        "rtb": false,
+        "targetId": "overlord-fac-longues",
+        "desiredRoute": []
+      },
+      {
+        "id": "overlord-air-p51",
+        "name": "P-51 Mustang 护航巡逻",
+        "sideId": "side-allied",
+        "className": "P-51 Mustang",
+        "latitude": 49.78,
+        "longitude": -0.9,
+        "altitude": 13000,
+        "heading": 90,
+        "speed": 320,
+        "currentFuel": 14000,
+        "maxFuel": 14000,
+        "fuelRate": 900,
+        "range": 80,
+        "route": [[49.55, -1.25], [49.55, -0.45]],
+        "selected": false,
+        "sideColor": "blue",
+        "weapons": [
+          {
+            "id": "overlord-wpn-p51-1",
+            "name": "0.50 cal machine guns",
+            "sideId": "side-allied",
+            "className": "0.50 cal machine guns",
+            "latitude": 49.78,
+            "longitude": -0.9,
+            "altitude": 13000,
+            "heading": 90,
+            "speed": 1400,
+            "currentFuel": 80,
+            "maxFuel": 80,
+            "fuelRate": 20,
+            "range": 1,
+            "route": [],
+            "sideColor": "blue",
+            "targetId": "",
+            "lethality": 0.3,
+            "maxQuantity": 24,
+            "currentQuantity": 24
+          }
+        ],
+        "homeBaseId": "overlord-airbase-stoney-cross",
+        "rtb": false,
+        "targetId": "overlord-air-fw190",
+        "desiredRoute": []
+      },
+      {
+        "id": "overlord-air-fw190",
+        "name": "Fw 190 拦截小队",
+        "sideId": "side-german",
+        "className": "Fw 190",
+        "latitude": 49.25,
+        "longitude": 0.25,
+        "altitude": 12000,
+        "heading": 285,
+        "speed": 330,
+        "currentFuel": 9000,
+        "maxFuel": 9000,
+        "fuelRate": 850,
+        "range": 60,
+        "route": [[49.65, -0.75]],
+        "selected": false,
+        "sideColor": "red",
+        "weapons": [
+          {
+            "id": "overlord-wpn-fw190-1",
+            "name": "20 mm MG 151 cannon",
+            "sideId": "side-german",
+            "className": "20 mm MG 151 cannon",
+            "latitude": 49.25,
+            "longitude": 0.25,
+            "altitude": 12000,
+            "heading": 285,
+            "speed": 1300,
+            "currentFuel": 80,
+            "maxFuel": 80,
+            "fuelRate": 20,
+            "range": 1,
+            "route": [],
+            "sideColor": "red",
+            "targetId": "",
+            "lethality": 0.35,
+            "maxQuantity": 18,
+            "currentQuantity": 18
+          }
+        ],
+        "homeBaseId": "overlord-airbase-caen",
+        "rtb": false,
+        "targetId": "overlord-air-c47",
+        "desiredRoute": []
+      }
+    ],
+    "ships": [
+      {
+        "id": "overlord-ship-nevada",
+        "name": "USS Nevada 火力支援舰",
+        "sideId": "side-allied",
+        "className": "Battleship shore bombardment group",
+        "latitude": 49.38,
+        "longitude": -0.95,
+        "altitude": 0,
+        "heading": 95,
+        "speed": 15,
+        "currentFuel": 160000,
+        "maxFuel": 160000,
+        "fuelRate": 1200,
+        "range": 35,
+        "route": [[49.4, -0.82]],
+        "sideColor": "blue",
+        "weapons": [
+          {
+            "id": "overlord-wpn-naval-1",
+            "name": "14 in naval gunfire",
+            "sideId": "side-allied",
+            "className": "14 in naval gunfire",
+            "latitude": 49.38,
+            "longitude": -0.95,
+            "altitude": 0,
+            "heading": 95,
+            "speed": 2600,
+            "currentFuel": 220,
+            "maxFuel": 220,
+            "fuelRate": 80,
+            "range": 16,
+            "route": [],
+            "sideColor": "blue",
+            "targetId": "",
+            "lethality": 0.55,
+            "maxQuantity": 40,
+            "currentQuantity": 40
+          }
+        ],
+        "aircraft": [],
+        "isObjective": false
+      }
+    ],
+    "facilities": [
+      {
+        "id": "overlord-fac-longues",
+        "name": "Longues-sur-Mer 海岸炮台",
+        "sideId": "side-german",
+        "className": "Coastal artillery battery",
+        "latitude": 49.34,
+        "longitude": -0.69,
+        "altitude": 0,
+        "range": 75,
+        "sideColor": "red",
+        "weapons": [
+          {
+            "id": "overlord-wpn-aa-1",
+            "name": "88 mm flak battery",
+            "sideId": "side-german",
+            "className": "88 mm flak battery",
+            "latitude": 49.34,
+            "longitude": -0.69,
+            "altitude": 0,
+            "heading": 270,
+            "speed": 2600,
+            "currentFuel": 180,
+            "maxFuel": 180,
+            "fuelRate": 70,
+            "range": 8,
+            "route": [],
+            "sideColor": "red",
+            "targetId": "",
+            "lethality": 0.38,
+            "maxQuantity": 24,
+            "currentQuantity": 24
+          }
+        ],
+        "isObjective": true
+      },
+      {
+        "id": "overlord-fac-omaha",
+        "name": "奥马哈海滩 WN-62 强点",
+        "sideId": "side-german",
+        "className": "Coastal strongpoint",
+        "latitude": 49.37,
+        "longitude": -0.86,
+        "altitude": 0,
+        "range": 45,
+        "sideColor": "red",
+        "weapons": [],
+        "isObjective": true
+      }
+    ],
+    "airbases": [
+      {
+        "id": "overlord-airbase-stoney-cross",
+        "name": "RAF Stoney Cross",
+        "sideId": "side-allied",
+        "className": "Forward airfield",
+        "latitude": 50.86,
+        "longitude": -1.63,
+        "altitude": 0,
+        "sideColor": "blue",
+        "aircraft": [],
+        "isObjective": false
+      },
+      {
+        "id": "overlord-airbase-caen",
+        "name": "Caen-Carpiquet 机场",
+        "sideId": "side-german",
+        "className": "Occupied airfield",
+        "latitude": 49.17,
+        "longitude": -0.45,
+        "altitude": 0,
+        "sideColor": "red",
+        "aircraft": [],
+        "isObjective": true
+      }
+    ],
+    "weapons": [],
+    "referencePoints": [
+      {
+        "id": "overlord-rp-omaha",
+        "name": "奥马哈海滩",
+        "sideId": "side-allied",
+        "latitude": 49.37,
+        "longitude": -0.88,
+        "altitude": 0,
+        "sideColor": "blue"
+      },
+      {
+        "id": "overlord-rp-utah",
+        "name": "犹他海滩",
+        "sideId": "side-allied",
+        "latitude": 49.42,
+        "longitude": -1.18,
+        "altitude": 0,
+        "sideColor": "blue"
+      }
+    ],
+    "missions": [
+      {
+        "id": "overlord-mission-bomber",
+        "name": "压制 Longues-sur-Mer 海岸炮台",
+        "sideId": "side-allied",
+        "assignedUnitIds": ["overlord-air-b26"],
+        "assignedTargetIds": ["overlord-fac-longues"],
+        "active": true
+      },
+      {
+        "id": "overlord-mission-escort",
+        "name": "登陆空域护航巡逻",
+        "sideId": "side-allied",
+        "assignedUnitIds": ["overlord-air-p51"],
+        "assignedArea": [
+          {
+            "id": "overlord-cap-1",
+            "name": "护航区西北",
+            "sideId": "side-allied",
+            "latitude": 49.85,
+            "longitude": -1.25,
+            "altitude": 13000,
+            "sideColor": "blue"
+          },
+          {
+            "id": "overlord-cap-2",
+            "name": "护航区东北",
+            "sideId": "side-allied",
+            "latitude": 49.85,
+            "longitude": -0.35,
+            "altitude": 13000,
+            "sideColor": "blue"
+          },
+          {
+            "id": "overlord-cap-3",
+            "name": "护航区东南",
+            "sideId": "side-allied",
+            "latitude": 49.3,
+            "longitude": -0.35,
+            "altitude": 13000,
+            "sideColor": "blue"
+          },
+          {
+            "id": "overlord-cap-4",
+            "name": "护航区西南",
+            "sideId": "side-allied",
+            "latitude": 49.3,
+            "longitude": -1.25,
+            "altitude": 13000,
+            "sideColor": "blue"
+          }
+        ],
+        "active": true
+      },
+      {
+        "id": "overlord-mission-intercept",
+        "name": "德军小规模截击",
+        "sideId": "side-german",
+        "assignedUnitIds": ["overlord-air-fw190"],
+        "assignedTargetIds": ["overlord-air-c47"],
+        "active": true
+      }
+    ],
+    "relationships": {
+      "hostiles": {
+        "side-allied": ["side-german"],
+        "side-german": ["side-allied"]
+      },
+      "allies": {
+        "side-allied": [],
+        "side-german": []
+      }
+    },
+    "doctrine": {
+      "side-allied": {
+        "Aircraft attack hostile aircraft": true,
+        "Aircraft chase hostile aircraft": true,
+        "Aircraft RTB when out of range of homebase": false,
+        "Aircraft RTB when strike mission complete": true,
+        "SAMs attack hostile aircraft": true,
+        "Ships attack hostile aircraft": true
+      },
+      "side-german": {
+        "Aircraft attack hostile aircraft": true,
+        "Aircraft chase hostile aircraft": true,
+        "Aircraft RTB when out of range of homebase": false,
+        "Aircraft RTB when strike mission complete": false,
+        "SAMs attack hostile aircraft": true,
+        "Ships attack hostile aircraft": true
+      }
+    }
+  },
+  "currentSideId": "side-allied",
+  "selectedUnitId": "",
+  "mapView": {
+    "defaultCenter": [49.36, -0.85],
+    "currentCameraCenter": [49.36, -0.85],
+    "defaultZoom": 7,
+    "currentCameraZoom": 7
+  }
+}

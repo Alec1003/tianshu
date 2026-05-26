@@ -1,0 +1,522 @@
+{
+  "currentScenario": {
+    "id": "hist-desert-storm-1991",
+    "name": "沙漠风暴：诺曼底特遣队（1991）",
+    "startTime": 664072200,
+    "currentTime": 664072200,
+    "duration": 14400,
+    "timeCompression": 4,
+    "historicalCase": {
+      "date": "1991-01-17",
+      "location": "Western Iraq air-defense corridor",
+      "basis": "Opening-night Task Force Normandy action in Operation Desert Storm; geometry and force counts are abstracted for training simulation."
+    },
+    "sides": [
+      {
+        "id": "side-coalition",
+        "name": "多国部队空中联队",
+        "totalScore": 0,
+        "color": "blue"
+      },
+      {
+        "id": "side-iraq-iads",
+        "name": "伊拉克综合防空体系",
+        "totalScore": 0,
+        "color": "red"
+      }
+    ],
+    "aircraft": [
+      {
+        "id": "storm-air-ah64-1",
+        "name": "AH-64A Apache 低空突击编队",
+        "sideId": "side-coalition",
+        "className": "AH-64A Apache",
+        "latitude": 31.35,
+        "longitude": 42.1,
+        "altitude": 300,
+        "heading": 35,
+        "speed": 145,
+        "currentFuel": 5200,
+        "maxFuel": 5200,
+        "fuelRate": 520,
+        "range": 35,
+        "route": [[32.05, 42.75], [32.55, 43.35]],
+        "selected": false,
+        "sideColor": "blue",
+        "weapons": [
+          {
+            "id": "storm-wpn-hellfire-1",
+            "name": "AGM-114 Hellfire",
+            "sideId": "side-coalition",
+            "className": "AGM-114 Hellfire",
+            "latitude": 31.35,
+            "longitude": 42.1,
+            "altitude": 300,
+            "heading": 35,
+            "speed": 820,
+            "currentFuel": 160,
+            "maxFuel": 160,
+            "fuelRate": 70,
+            "range": 5,
+            "route": [],
+            "sideColor": "blue",
+            "targetId": "",
+            "lethality": 0.72,
+            "maxQuantity": 16,
+            "currentQuantity": 16
+          },
+          {
+            "id": "storm-wpn-rocket-1",
+            "name": "Hydra 70 rocket pod",
+            "sideId": "side-coalition",
+            "className": "Hydra 70 rocket pod",
+            "latitude": 31.35,
+            "longitude": 42.1,
+            "altitude": 300,
+            "heading": 35,
+            "speed": 760,
+            "currentFuel": 120,
+            "maxFuel": 120,
+            "fuelRate": 50,
+            "range": 4,
+            "route": [],
+            "sideColor": "blue",
+            "targetId": "",
+            "lethality": 0.45,
+            "maxQuantity": 38,
+            "currentQuantity": 38
+          }
+        ],
+        "homeBaseId": "storm-airbase-al-jouf",
+        "rtb": false,
+        "targetId": "storm-fac-radar-west",
+        "desiredRoute": [],
+        "isObjective": true
+      },
+      {
+        "id": "storm-air-mh53-1",
+        "name": "MH-53J Pave Low 导航引导机",
+        "sideId": "side-coalition",
+        "className": "MH-53J Pave Low",
+        "latitude": 31.25,
+        "longitude": 41.95,
+        "altitude": 250,
+        "heading": 40,
+        "speed": 120,
+        "currentFuel": 8000,
+        "maxFuel": 8000,
+        "fuelRate": 640,
+        "range": 45,
+        "route": [[32.0, 42.55], [32.45, 43.1]],
+        "selected": false,
+        "sideColor": "blue",
+        "weapons": [],
+        "homeBaseId": "storm-airbase-al-jouf",
+        "rtb": false,
+        "targetId": "",
+        "desiredRoute": [],
+        "isObjective": true
+      },
+      {
+        "id": "storm-air-ef111",
+        "name": "EF-111A Raven 电子支援机",
+        "sideId": "side-coalition",
+        "className": "EF-111A Raven",
+        "latitude": 31.7,
+        "longitude": 41.2,
+        "altitude": 24000,
+        "heading": 55,
+        "speed": 480,
+        "currentFuel": 34000,
+        "maxFuel": 34000,
+        "fuelRate": 2400,
+        "range": 150,
+        "route": [[32.8, 42.0], [33.2, 43.0]],
+        "selected": false,
+        "sideColor": "blue",
+        "weapons": [],
+        "homeBaseId": "storm-airbase-king-khalid",
+        "rtb": false,
+        "targetId": "",
+        "desiredRoute": []
+      },
+      {
+        "id": "storm-air-f117",
+        "name": "F-117A 后续突防打击编队",
+        "sideId": "side-coalition",
+        "className": "F-117A Nighthawk",
+        "latitude": 31.0,
+        "longitude": 40.8,
+        "altitude": 26000,
+        "heading": 50,
+        "speed": 430,
+        "currentFuel": 22000,
+        "maxFuel": 22000,
+        "fuelRate": 2100,
+        "range": 120,
+        "route": [[33.2, 44.4]],
+        "selected": false,
+        "sideColor": "blue",
+        "weapons": [
+          {
+            "id": "storm-wpn-gbu-27-1",
+            "name": "GBU-27 guided bomb",
+            "sideId": "side-coalition",
+            "className": "GBU-27 guided bomb",
+            "latitude": 31.0,
+            "longitude": 40.8,
+            "altitude": 26000,
+            "heading": 50,
+            "speed": 500,
+            "currentFuel": 140,
+            "maxFuel": 140,
+            "fuelRate": 60,
+            "range": 6,
+            "route": [],
+            "sideColor": "blue",
+            "targetId": "",
+            "lethality": 0.78,
+            "maxQuantity": 4,
+            "currentQuantity": 4
+          }
+        ],
+        "homeBaseId": "storm-airbase-king-khalid",
+        "rtb": false,
+        "targetId": "storm-fac-command",
+        "desiredRoute": []
+      },
+      {
+        "id": "storm-air-mig29",
+        "name": "MiG-29 截击待命小队",
+        "sideId": "side-iraq-iads",
+        "className": "MiG-29",
+        "latitude": 33.26,
+        "longitude": 44.23,
+        "altitude": 18000,
+        "heading": 250,
+        "speed": 520,
+        "currentFuel": 18000,
+        "maxFuel": 18000,
+        "fuelRate": 1800,
+        "range": 100,
+        "route": [[32.7, 43.4]],
+        "selected": false,
+        "sideColor": "red",
+        "weapons": [
+          {
+            "id": "storm-wpn-aa10-1",
+            "name": "R-27 air-to-air missile",
+            "sideId": "side-iraq-iads",
+            "className": "R-27 air-to-air missile",
+            "latitude": 33.26,
+            "longitude": 44.23,
+            "altitude": 18000,
+            "heading": 250,
+            "speed": 2200,
+            "currentFuel": 400,
+            "maxFuel": 400,
+            "fuelRate": 160,
+            "range": 35,
+            "route": [],
+            "sideColor": "red",
+            "targetId": "",
+            "lethality": 0.62,
+            "maxQuantity": 4,
+            "currentQuantity": 4
+          }
+        ],
+        "homeBaseId": "storm-airbase-h3",
+        "rtb": false,
+        "targetId": "storm-air-f117",
+        "desiredRoute": []
+      }
+    ],
+    "ships": [],
+    "facilities": [
+      {
+        "id": "storm-fac-radar-west",
+        "name": "西侧早期预警雷达站",
+        "sideId": "side-iraq-iads",
+        "className": "Early warning radar site",
+        "latitude": 32.55,
+        "longitude": 43.35,
+        "altitude": 0,
+        "range": 160,
+        "sideColor": "red",
+        "weapons": [
+          {
+            "id": "storm-wpn-aaa-west",
+            "name": "23 mm AAA battery",
+            "sideId": "side-iraq-iads",
+            "className": "23 mm AAA battery",
+            "latitude": 32.55,
+            "longitude": 43.35,
+            "altitude": 0,
+            "heading": 240,
+            "speed": 1800,
+            "currentFuel": 120,
+            "maxFuel": 120,
+            "fuelRate": 50,
+            "range": 3,
+            "route": [],
+            "sideColor": "red",
+            "targetId": "",
+            "lethality": 0.28,
+            "maxQuantity": 60,
+            "currentQuantity": 60
+          }
+        ],
+        "isObjective": true
+      },
+      {
+        "id": "storm-fac-radar-east",
+        "name": "东侧早期预警雷达站",
+        "sideId": "side-iraq-iads",
+        "className": "Early warning radar site",
+        "latitude": 32.76,
+        "longitude": 43.75,
+        "altitude": 0,
+        "range": 160,
+        "sideColor": "red",
+        "weapons": [
+          {
+            "id": "storm-wpn-aaa-east",
+            "name": "23 mm AAA battery",
+            "sideId": "side-iraq-iads",
+            "className": "23 mm AAA battery",
+            "latitude": 32.76,
+            "longitude": 43.75,
+            "altitude": 0,
+            "heading": 240,
+            "speed": 1800,
+            "currentFuel": 120,
+            "maxFuel": 120,
+            "fuelRate": 50,
+            "range": 3,
+            "route": [],
+            "sideColor": "red",
+            "targetId": "",
+            "lethality": 0.28,
+            "maxQuantity": 60,
+            "currentQuantity": 60
+          }
+        ],
+        "isObjective": true
+      },
+      {
+        "id": "storm-fac-sa2",
+        "name": "SA-2 防空阵地",
+        "sideId": "side-iraq-iads",
+        "className": "SA-2 SAM site",
+        "latitude": 33.05,
+        "longitude": 44.1,
+        "altitude": 0,
+        "range": 95,
+        "sideColor": "red",
+        "weapons": [
+          {
+            "id": "storm-wpn-sa2-1",
+            "name": "V-750 surface-to-air missile",
+            "sideId": "side-iraq-iads",
+            "className": "V-750 surface-to-air missile",
+            "latitude": 33.05,
+            "longitude": 44.1,
+            "altitude": 0,
+            "heading": 240,
+            "speed": 3000,
+            "currentFuel": 900,
+            "maxFuel": 900,
+            "fuelRate": 220,
+            "range": 28,
+            "route": [],
+            "sideColor": "red",
+            "targetId": "",
+            "lethality": 0.65,
+            "maxQuantity": 8,
+            "currentQuantity": 8
+          }
+        ],
+        "isObjective": false
+      },
+      {
+        "id": "storm-fac-command",
+        "name": "区域防空指挥节点",
+        "sideId": "side-iraq-iads",
+        "className": "Air defense command node",
+        "latitude": 33.2,
+        "longitude": 44.4,
+        "altitude": 0,
+        "range": 80,
+        "sideColor": "red",
+        "weapons": [],
+        "isObjective": true
+      }
+    ],
+    "airbases": [
+      {
+        "id": "storm-airbase-al-jouf",
+        "name": "Al Jouf 前进集结点",
+        "sideId": "side-coalition",
+        "className": "Forward staging base",
+        "latitude": 29.79,
+        "longitude": 40.1,
+        "altitude": 0,
+        "sideColor": "blue",
+        "aircraft": [],
+        "isObjective": false
+      },
+      {
+        "id": "storm-airbase-king-khalid",
+        "name": "King Khalid 空军基地",
+        "sideId": "side-coalition",
+        "className": "Coalition airbase",
+        "latitude": 24.96,
+        "longitude": 46.7,
+        "altitude": 0,
+        "sideColor": "blue",
+        "aircraft": [],
+        "isObjective": false
+      },
+      {
+        "id": "storm-airbase-h3",
+        "name": "H-3 空军基地",
+        "sideId": "side-iraq-iads",
+        "className": "Iraqi airbase",
+        "latitude": 32.93,
+        "longitude": 40.58,
+        "altitude": 0,
+        "sideColor": "red",
+        "aircraft": [],
+        "isObjective": true
+      }
+    ],
+    "weapons": [],
+    "referencePoints": [
+      {
+        "id": "storm-rp-corridor",
+        "name": "防空走廊开辟区",
+        "sideId": "side-coalition",
+        "latitude": 32.6,
+        "longitude": 43.55,
+        "altitude": 0,
+        "sideColor": "blue"
+      },
+      {
+        "id": "storm-rp-baghdad-axis",
+        "name": "后续突防航线",
+        "sideId": "side-coalition",
+        "latitude": 33.1,
+        "longitude": 44.3,
+        "altitude": 0,
+        "sideColor": "blue"
+      }
+    ],
+    "missions": [
+      {
+        "id": "storm-mission-apache-radar",
+        "name": "Apache 编队摧毁预警雷达",
+        "sideId": "side-coalition",
+        "assignedUnitIds": ["storm-air-ah64-1"],
+        "assignedTargetIds": ["storm-fac-radar-west", "storm-fac-radar-east"],
+        "active": true
+      },
+      {
+        "id": "storm-mission-ew-support",
+        "name": "电子支援机走廊压制巡逻",
+        "sideId": "side-coalition",
+        "assignedUnitIds": ["storm-air-ef111"],
+        "assignedArea": [
+          {
+            "id": "storm-ew-1",
+            "name": "电子支援区西北",
+            "sideId": "side-coalition",
+            "latitude": 33.4,
+            "longitude": 41.6,
+            "altitude": 24000,
+            "sideColor": "blue"
+          },
+          {
+            "id": "storm-ew-2",
+            "name": "电子支援区东北",
+            "sideId": "side-coalition",
+            "latitude": 33.4,
+            "longitude": 43.3,
+            "altitude": 24000,
+            "sideColor": "blue"
+          },
+          {
+            "id": "storm-ew-3",
+            "name": "电子支援区东南",
+            "sideId": "side-coalition",
+            "latitude": 32.1,
+            "longitude": 43.3,
+            "altitude": 24000,
+            "sideColor": "blue"
+          },
+          {
+            "id": "storm-ew-4",
+            "name": "电子支援区西南",
+            "sideId": "side-coalition",
+            "latitude": 32.1,
+            "longitude": 41.6,
+            "altitude": 24000,
+            "sideColor": "blue"
+          }
+        ],
+        "active": true
+      },
+      {
+        "id": "storm-mission-f117-follow",
+        "name": "F-117 后续突防打击防空指挥节点",
+        "sideId": "side-coalition",
+        "assignedUnitIds": ["storm-air-f117"],
+        "assignedTargetIds": ["storm-fac-command"],
+        "active": true
+      },
+      {
+        "id": "storm-mission-iraq-intercept",
+        "name": "伊拉克战斗机截击",
+        "sideId": "side-iraq-iads",
+        "assignedUnitIds": ["storm-air-mig29"],
+        "assignedTargetIds": ["storm-air-f117"],
+        "active": true
+      }
+    ],
+    "relationships": {
+      "hostiles": {
+        "side-coalition": ["side-iraq-iads"],
+        "side-iraq-iads": ["side-coalition"]
+      },
+      "allies": {
+        "side-coalition": [],
+        "side-iraq-iads": []
+      }
+    },
+    "doctrine": {
+      "side-coalition": {
+        "Aircraft attack hostile aircraft": true,
+        "Aircraft chase hostile aircraft": true,
+        "Aircraft RTB when out of range of homebase": false,
+        "Aircraft RTB when strike mission complete": true,
+        "SAMs attack hostile aircraft": true,
+        "Ships attack hostile aircraft": true
+      },
+      "side-iraq-iads": {
+        "Aircraft attack hostile aircraft": true,
+        "Aircraft chase hostile aircraft": true,
+        "Aircraft RTB when out of range of homebase": false,
+        "Aircraft RTB when strike mission complete": false,
+        "SAMs attack hostile aircraft": true,
+        "Ships attack hostile aircraft": true
+      }
+    }
+  },
+  "currentSideId": "side-coalition",
+  "selectedUnitId": "",
+  "mapView": {
+    "defaultCenter": [32.6, 43.4],
+    "currentCameraCenter": [32.6, 43.4],
+    "defaultZoom": 6,
+    "currentCameraZoom": 6
+  }
+}

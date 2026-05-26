@@ -58,6 +58,7 @@ import { cn } from "@/lib/utils";
 import { randomUUID } from "@/utils/generateUUID";
 import AISidebar from "./AISidebar";
 import SimulationInspectorPanel from "./SimulationInspectorPanel";
+import TimelineReplayPanel from "./TimelineReplayPanel";
 import TopTacticalBar from "./TopTacticalBar";
 import SimulationSidebar, {
   type SimulationPanelId,
@@ -323,6 +324,7 @@ export default function AITacticalCommandPlatform({
   // AI 侧栏：默认 collapsed；sidebar 顶部 Sparkles 动作与底部 Settings
   // 动作分别打开 chat / settings tab。
   const [aiSidebarOpen, setAiSidebarOpen] = useState(false);
+  const [timelinePanelOpen, setTimelinePanelOpen] = useState(false);
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
   const [showRoutes, setShowRoutes] = useState(false);
   const [showRanges, setShowRanges] = useState(false);
@@ -1134,6 +1136,16 @@ export default function AITacticalCommandPlatform({
     onRequestSaveAs(captureCurrentScenarioData());
   }, [onRequestSaveAs, captureCurrentScenarioData]);
 
+  const toggleTimelinePanel = useCallback(() => {
+    if (!timelinePanelOpen) setAiSidebarOpen(false);
+    setTimelinePanelOpen((value) => !value);
+  }, [timelinePanelOpen]);
+
+  const toggleAiSidebar = useCallback(() => {
+    if (!aiSidebarOpen) setTimelinePanelOpen(false);
+    setAiSidebarOpen((value) => !value);
+  }, [aiSidebarOpen]);
+
   // 是否需要渲染顶部 mini bar（路由模式才显示；standalone 兼容老入口）。
   const showRouterChrome = Boolean(
     scenarioMeta && (onSave || onRequestSaveAs || onExit)
@@ -1191,7 +1203,7 @@ export default function AITacticalCommandPlatform({
               "size-10",
               aiSidebarOpen ? "text-cyan-100 shadow-hud-cyan" : "text-slate-400"
             )}
-            onClick={() => setAiSidebarOpen((value) => !value)}
+            onClick={toggleAiSidebar}
             size="icon"
             title="AI 助手"
             variant={aiSidebarOpen ? "tactical" : "ghost"}
@@ -1282,7 +1294,7 @@ export default function AITacticalCommandPlatform({
         <TopTacticalBar
           snapshot={snapshot}
           aiSidebarOpen={aiSidebarOpen}
-          onToggleAiSidebar={() => setAiSidebarOpen((value) => !value)}
+          onToggleAiSidebar={toggleAiSidebar}
           settingsOpen={settingsModalOpen}
           onToggleSettings={() => setSettingsModalOpen((value) => !value)}
           scenarioMeta={scenarioMeta}
@@ -1292,6 +1304,8 @@ export default function AITacticalCommandPlatform({
             onRequestSaveAs ? () => handleSaveAsClick() : undefined
           }
           savingState={savingState}
+          timelineOpen={timelinePanelOpen}
+          onToggleTimeline={toggleTimelinePanel}
           mapSceneMode={mapSceneMode}
           onToggleMapSceneMode={() =>
             setMapSceneMode((value) => (value === "3d" ? "2d" : "3d"))
@@ -1365,6 +1379,14 @@ export default function AITacticalCommandPlatform({
         onMapBaseLayerChange={setMapBaseLayer}
         scenarioId={chatScenarioId}
         settingsOpen={settingsModalOpen}
+      />
+
+      <TimelineReplayPanel
+        onClose={() => setTimelinePanelOpen(false)}
+        open={timelinePanelOpen}
+        runtimeScenarioId={scenarioId}
+        scenarioId={scenarioMeta?.id}
+        snapshot={snapshot}
       />
 
       <AARDialog

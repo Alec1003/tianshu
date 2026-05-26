@@ -5,6 +5,7 @@ import {
   BrainCircuit,
   Copy,
   Cpu,
+  History,
   Save,
   Settings,
   Shield,
@@ -30,6 +31,8 @@ interface TopTacticalBarProps {
   onSave?: () => void;
   onRequestSaveAs?: () => void;
   savingState?: "idle" | "saving" | "saved" | "error";
+  timelineOpen?: boolean;
+  onToggleTimeline?: () => void;
   mapSceneMode?: "2d" | "3d";
   onToggleMapSceneMode?: () => void;
 }
@@ -45,6 +48,8 @@ export default function TopTacticalBar({
   onSave,
   onRequestSaveAs,
   savingState,
+  timelineOpen,
+  onToggleTimeline,
   mapSceneMode = "2d",
   onToggleMapSceneMode,
 }: TopTacticalBarProps) {
@@ -282,6 +287,25 @@ export default function TopTacticalBar({
         </div>
 
         <div className="hidden h-6 w-px bg-cyan-400/20 md:block" />
+
+        <button
+          aria-label={timelineOpen ? "关闭推演回放" : "打开推演回放"}
+          disabled={!onToggleTimeline}
+          onClick={() => onToggleTimeline && onToggleTimeline()}
+          className={cn(
+            "flex h-8 items-center gap-2 rounded border px-3 transition-all",
+            timelineOpen
+              ? "border-cyan-400/50 bg-cyan-400/10 text-cyan-300 shadow-[0_0_12px_rgba(34,211,238,0.2)]"
+              : "border-white/5 bg-white/5 text-slate-300 hover:border-cyan-400/30 hover:bg-cyan-400/5 hover:text-cyan-300"
+          )}
+          title={timelineOpen ? "关闭推演回放" : "打开推演回放"}
+          type="button"
+        >
+          <History className="size-4" />
+          <span className="hidden font-mono text-[10px] font-bold uppercase tracking-wider sm:inline">
+            回放
+          </span>
+        </button>
 
         <button
           aria-label={aiSidebarOpen ? "关闭 AI 助手" : "打开 AI 助手"}

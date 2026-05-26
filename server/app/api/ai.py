@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import StreamingResponse
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai.model_checker import check_model_connectivity
 from app.ai.models import (
@@ -32,9 +34,26 @@ from app.ai.models import (
     RuntimeUpdateUnitRequest,
     RuntimeUpdateWeaponQuantityRequest,
 )
+from app.ai.command_service import (
+    CommandProposalNotFoundError,
+    get_command_proposal,
+    list_command_proposals as list_persisted_command_proposals,
+    save_command_proposal,
+)
+from app.aicc_runtime.persistence import (
+    ensure_runtime_state_loaded,
+    save_runtime_state,
+)
+from app.aicc_runtime.schemas import RuntimeTimelineResponse
+from app.aicc_runtime.timeline import (
+    list_runtime_events,
+    record_runtime_event,
+    runtime_scenario_id,
+)
 from app.aicc_runtime.visibility import compute_runtime_visibility
 from app.auth.models import User
 from app.auth.users import current_active_user
+from app.db.session import async_session_maker, get_async_session
 
 logger = logging.getLogger(__name__)
 
@@ -52,12 +71,123 @@ def _bridge_for_user(request: Request, user: User) -> Any:
     return request.app.state.bridge
 
 
-def _runtime_for_user(request: Request, user: User) -> Any:
+async def _bridge_for_user_loaded(
+    request: Request,
+    user: User,
+    session: AsyncSession,
+) -> Any:
     bridge = _bridge_for_user(request, user)
+    runtime = getattr(bridge, "runtime", None)
+    if runtime is not None:
+        await ensure_runtime_state_loaded(session, user, runtime)
+    return bridge
+
+
+async def _runtime_for_user_loaded(
+    request: Request,
+    user: User,
+    session: AsyncSession,
+) -> Any:
+    bridge = await _bridge_for_user_loaded(request, user, session)
     runtime = getattr(bridge, "runtime", None)
     if runtime is None:
         raise RuntimeError("AI bridge does not expose a runtime")
     return runtime
+
+
+async def _persisted_runtime_snapshot(
+    request: Request,
+    user: User,
+    session: AsyncSession,
+    runtime: Any,
+    *,
+    action: str,
+    state: dict[str, Any] | None = None,
+    event_type: str | None = None,
+    actor: str = "operator",
+    before_scenario: dict[str, Any] | None = None,
+    event_payload: dict[str, Any] | None = None,
+) -> RuntimeSnapshotResponse:
+    await save_runtime_state(session, user, runtime)
+    snapshot = _runtime_snapshot(request, user, action=action, state=state)
+    if event_type:
+        await record_runtime_event(
+            session,
+            user,
+            event_type=event_type,
+            action=action,
+            actor=actor,
+            summary=_runtime_event_summary(action, state or {}),
+            payload={"state": state or {}, **(event_payload or {})},
+            runtime=runtime,
+            before_scenario=before_scenario,
+            after_scenario=snapshot.scenario,
+        )
+    return snapshot
+
+
+def _runtime_event_baseline(runtime: Any) -> dict[str, Any] | None:
+    try:
+        return runtime.get_exported_scenario()
+    except AttributeError:
+        return None
+
+
+def _runtime_event_type(action: str) -> str:
+    if action == "step":
+        return "runtime.step"
+    if action in {"start", "pause", "reset"}:
+        return f"runtime.{action}"
+    if action == "load_scenario":
+        return "scenario.loaded"
+    return f"runtime.{action}"
+
+
+def _runtime_event_summary(action: str, state: dict[str, Any]) -> str:
+    if action == "step":
+        return f"仿真推进 {state.get('steps', state.get('requestedSteps', 0))} 秒"
+    if action == "start":
+        return "推演开始"
+    if action == "pause":
+        return "推演暂停"
+    if action == "reset":
+        return "推演重置"
+    if action == "load_scenario":
+        return "加载运行想定"
+    if action == "deploy_unit":
+        return f"部署单位 {state.get('name') or state.get('unitId') or ''}".strip()
+    if action == "delete_unit":
+        return f"删除单位 {state.get('unitId') or ''}".strip()
+    if action == "move_unit":
+        return f"单位机动 {state.get('unitId') or ''}".strip()
+    if action == "attack":
+        return f"攻击目标 {state.get('targetId') or ''}".strip()
+    return action.replace("_", " ")
+
+
+def _proposal_execution_event_type(proposal: Any) -> str:
+    if not getattr(proposal, "steps", None):
+        return "runtime.command_execution"
+    skills = [step.skill for step in proposal.steps]
+    if len(skills) == 1:
+        skill = skills[0]
+        mapping = {
+            "simulation_start": "runtime.start",
+            "simulation_pause": "runtime.pause",
+            "simulation_reset": "runtime.reset",
+            "simulation_stop": "runtime.stop",
+            "simulation_step": "runtime.step",
+            "load_scenario_snapshot": "scenario.loaded",
+            "move_unit": "runtime.move_unit",
+            "delete_unit": "runtime.delete_unit",
+            "update_unit_state": "runtime.update_unit",
+            "trigger_tactical_event": "runtime.tactical_event",
+            "update_situation_layer": "runtime.situation_layer",
+        }
+        if skill.startswith("deploy_"):
+            return "runtime.deploy_unit"
+        return mapping.get(skill, "runtime.command_execution")
+    return "runtime.command_execution"
 
 
 def _runtime_outcome_payload(runtime: Any) -> dict[str, Any]:
@@ -123,9 +253,12 @@ def _runtime_value_error(exc: ValueError) -> HTTPException:
 async def command(
     request: Request,
     payload: AICommandRequest,
+    session: AsyncSession = Depends(get_async_session),
     user: User = Depends(current_active_user),
 ) -> AICommandResponse:
-    bridge = _bridge_for_user(request, user)
+    bridge = await _bridge_for_user_loaded(request, user, session)
+    runtime = getattr(bridge, "runtime", None)
+    before_scenario = _runtime_event_baseline(runtime) if runtime is not None else None
     if hasattr(bridge, "propose_command_async"):
         execution, proposals = await bridge.propose_command_async(
             payload.command,
@@ -134,6 +267,37 @@ async def command(
     else:
         execution = await bridge.process_command_async(payload.command, payload.context)
         proposals = []
+    if proposals:
+        saved_proposals = []
+        for proposal in proposals:
+            saved = await save_command_proposal(session, user, proposal)
+            saved_proposals.append(saved)
+            await record_runtime_event(
+                session,
+                user,
+                event_type="command.proposed",
+                action="proposal_created",
+                actor=saved.source,
+                summary=f"命令提案：{saved.command}",
+                payload=saved.model_dump(mode="json"),
+                runtime=runtime,
+                proposal_id=saved.id,
+            )
+        proposals = saved_proposals
+    elif execution.status == "ok":
+        if runtime is not None:
+            await save_runtime_state(session, user, runtime)
+            await record_runtime_event(
+                session,
+                user,
+                event_type="command.executed",
+                action="command",
+                actor="ai",
+                summary=f"命令执行：{payload.command}",
+                payload=execution.model_dump(mode="json"),
+                runtime=runtime,
+                before_scenario=before_scenario,
+            )
     scenario = bridge.exported_scenario()
 
     if execution.status == "ok":
@@ -165,15 +329,22 @@ def _approval_queue_for_user(request: Request, user: User) -> Any:
 
 
 @router.get("/command/proposals", response_model=CommandProposalListResponse)
-def list_command_proposals(
+async def list_command_proposals(
     request: Request,
     status_filter: str | None = None,
     limit: int = 50,
+    session: AsyncSession = Depends(get_async_session),
     user: User = Depends(current_active_user),
 ) -> CommandProposalListResponse:
-    queue = _approval_queue_for_user(request, user)
+    await _bridge_for_user_loaded(request, user, session)
+    _approval_queue_for_user(request, user)
     return CommandProposalListResponse(
-        proposals=queue.list_proposals(status=status_filter, limit=limit)
+        proposals=await list_persisted_command_proposals(
+            session,
+            user,
+            status=status_filter,
+            limit=limit,
+        )
     )
 
 
@@ -181,14 +352,25 @@ def list_command_proposals(
     "/command/proposals/{proposal_id}/approve",
     response_model=CommandApprovalResponse,
 )
-def approve_command_proposal(
+async def approve_command_proposal(
     request: Request,
     proposal_id: str,
+    session: AsyncSession = Depends(get_async_session),
     user: User = Depends(current_active_user),
 ) -> CommandApprovalResponse:
+    runtime = await _runtime_for_user_loaded(request, user, session)
     queue = _approval_queue_for_user(request, user)
+    before_scenario = _runtime_event_baseline(runtime)
     try:
-        proposal = queue.approve_and_execute(proposal_id)
+        persisted = await get_command_proposal(session, user, proposal_id)
+        proposal = queue.approve_and_execute_loaded(persisted)
+        proposal = await save_command_proposal(session, user, proposal)
+        await save_runtime_state(session, user, runtime)
+    except CommandProposalNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Command proposal not found.",
+        ) from exc
     except ValueError as exc:
         raise _runtime_value_error(exc) from exc
     snapshot = _runtime_snapshot(
@@ -197,6 +379,30 @@ def approve_command_proposal(
         action="approve_command_proposal",
         state={"proposalId": proposal.id, "proposalStatus": proposal.status},
     )
+    await record_runtime_event(
+        session,
+        user,
+        event_type="command.approved",
+        action="approve_command_proposal",
+        actor="operator",
+        summary=f"审批通过：{proposal.command}",
+        payload=proposal.model_dump(mode="json"),
+        runtime=runtime,
+        proposal_id=proposal.id,
+    )
+    await record_runtime_event(
+        session,
+        user,
+        event_type=_proposal_execution_event_type(proposal),
+        action="approved_execution",
+        actor=proposal.source,
+        summary=f"执行审批命令：{proposal.command}",
+        payload=proposal.model_dump(mode="json"),
+        runtime=runtime,
+        before_scenario=before_scenario,
+        after_scenario=snapshot.scenario,
+        proposal_id=proposal.id,
+    )
     return CommandApprovalResponse(proposal=proposal, snapshot=snapshot)
 
 
@@ -204,22 +410,43 @@ def approve_command_proposal(
     "/command/proposals/{proposal_id}/reject",
     response_model=CommandApprovalResponse,
 )
-def reject_command_proposal(
+async def reject_command_proposal(
     request: Request,
     proposal_id: str,
+    session: AsyncSession = Depends(get_async_session),
     user: User = Depends(current_active_user),
 ) -> CommandApprovalResponse:
+    await _bridge_for_user_loaded(request, user, session)
     queue = _approval_queue_for_user(request, user)
     try:
-        proposal = queue.reject(proposal_id)
+        persisted = await get_command_proposal(session, user, proposal_id)
+        proposal = queue.reject_loaded(persisted)
+        proposal = await save_command_proposal(session, user, proposal)
+    except CommandProposalNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Command proposal not found.",
+        ) from exc
     except ValueError as exc:
         raise _runtime_value_error(exc) from exc
+    await record_runtime_event(
+        session,
+        user,
+        event_type="command.rejected",
+        action="reject_command_proposal",
+        actor="operator",
+        summary=f"审批驳回：{proposal.command}",
+        payload=proposal.model_dump(mode="json"),
+        runtime=getattr(_bridge_for_user(request, user), "runtime", None),
+        proposal_id=proposal.id,
+    )
     return CommandApprovalResponse(proposal=proposal, snapshot=None)
 
 
 @router.get("/runtime/scenario")
-def runtime_scenario(
+async def runtime_scenario(
     request: Request,
+    session: AsyncSession = Depends(get_async_session),
     user: User = Depends(current_active_user),
 ) -> dict:
     """Export the current in-memory runtime scenario as JSON.
@@ -234,79 +461,163 @@ def runtime_scenario(
     Authentication is enforced at the router level because this shared
     runtime can contain user-loaded scenario state and AI/MCP mutations.
     """
-    bridge = _bridge_for_user(request, user)
+    bridge = await _bridge_for_user_loaded(request, user, session)
     return bridge.exported_scenario()
 
 
 @router.get("/runtime", response_model=RuntimeSnapshotResponse)
-def runtime_snapshot(
+async def runtime_snapshot(
     request: Request,
+    session: AsyncSession = Depends(get_async_session),
     user: User = Depends(current_active_user),
 ) -> RuntimeSnapshotResponse:
     """Return the authoritative backend runtime snapshot."""
+    await _bridge_for_user_loaded(request, user, session)
     return _runtime_snapshot(request, user, action="snapshot")
 
 
+@router.get("/runtime/timeline", response_model=RuntimeTimelineResponse)
+async def runtime_timeline(
+    request: Request,
+    scenario_id: str | None = None,
+    event_type: str | None = None,
+    category: str | None = None,
+    limit: int = 200,
+    session: AsyncSession = Depends(get_async_session),
+    user: User = Depends(current_active_user),
+) -> RuntimeTimelineResponse:
+    bridge = await _bridge_for_user_loaded(request, user, session)
+    effective_scenario_id = scenario_id
+    if effective_scenario_id is None:
+        effective_scenario_id = runtime_scenario_id(bridge.exported_scenario())
+    events = await list_runtime_events(
+        session,
+        user,
+        scenario_id=effective_scenario_id,
+        event_type=event_type,
+        category=category,
+        limit=limit,
+    )
+    return RuntimeTimelineResponse(events=list(events))
+
+
 @router.put("/runtime/scenario", response_model=RuntimeSnapshotResponse)
-def runtime_load_scenario(
+async def runtime_load_scenario(
     request: Request,
     payload: RuntimeLoadScenarioRequest,
+    session: AsyncSession = Depends(get_async_session),
     user: User = Depends(current_active_user),
 ) -> RuntimeSnapshotResponse:
     """Load a frontend-shaped scenario JSON into the user's backend runtime."""
-    runtime = _runtime_for_user(request, user)
+    runtime = await _runtime_for_user_loaded(request, user, session)
+    before_scenario = _runtime_event_baseline(runtime)
     state = runtime.load_scenario_from_json(json.dumps(payload.scenario))
-    return _runtime_snapshot(request, user, action="load_scenario", state=state)
+    return await _persisted_runtime_snapshot(
+        request,
+        user,
+        session,
+        runtime,
+        action="load_scenario",
+        state=state,
+        event_type=_runtime_event_type("load_scenario"),
+        before_scenario=before_scenario,
+    )
 
 
 @router.post("/runtime/start", response_model=RuntimeSnapshotResponse)
-def runtime_start(
+async def runtime_start(
     request: Request,
+    session: AsyncSession = Depends(get_async_session),
     user: User = Depends(current_active_user),
 ) -> RuntimeSnapshotResponse:
-    runtime = _runtime_for_user(request, user)
+    runtime = await _runtime_for_user_loaded(request, user, session)
+    before_scenario = _runtime_event_baseline(runtime)
     state = runtime.start_simulation()
-    return _runtime_snapshot(request, user, action="start", state=state)
+    return await _persisted_runtime_snapshot(
+        request,
+        user,
+        session,
+        runtime,
+        action="start",
+        state=state,
+        event_type=_runtime_event_type("start"),
+        before_scenario=before_scenario,
+    )
 
 
 @router.post("/runtime/pause", response_model=RuntimeSnapshotResponse)
-def runtime_pause(
+async def runtime_pause(
     request: Request,
+    session: AsyncSession = Depends(get_async_session),
     user: User = Depends(current_active_user),
 ) -> RuntimeSnapshotResponse:
-    runtime = _runtime_for_user(request, user)
+    runtime = await _runtime_for_user_loaded(request, user, session)
+    before_scenario = _runtime_event_baseline(runtime)
     state = runtime.pause_simulation()
-    return _runtime_snapshot(request, user, action="pause", state=state)
+    return await _persisted_runtime_snapshot(
+        request,
+        user,
+        session,
+        runtime,
+        action="pause",
+        state=state,
+        event_type=_runtime_event_type("pause"),
+        before_scenario=before_scenario,
+    )
 
 
 @router.post("/runtime/reset", response_model=RuntimeSnapshotResponse)
-def runtime_reset(
+async def runtime_reset(
     request: Request,
+    session: AsyncSession = Depends(get_async_session),
     user: User = Depends(current_active_user),
 ) -> RuntimeSnapshotResponse:
-    runtime = _runtime_for_user(request, user)
+    runtime = await _runtime_for_user_loaded(request, user, session)
+    before_scenario = _runtime_event_baseline(runtime)
     state = runtime.reset_simulation()
-    return _runtime_snapshot(request, user, action="reset", state=state)
+    return await _persisted_runtime_snapshot(
+        request,
+        user,
+        session,
+        runtime,
+        action="reset",
+        state=state,
+        event_type=_runtime_event_type("reset"),
+        before_scenario=before_scenario,
+    )
 
 
 @router.post("/runtime/step", response_model=RuntimeSnapshotResponse)
-def runtime_step(
+async def runtime_step(
     request: Request,
     payload: RuntimeStepRequest,
+    session: AsyncSession = Depends(get_async_session),
     user: User = Depends(current_active_user),
 ) -> RuntimeSnapshotResponse:
-    runtime = _runtime_for_user(request, user)
+    runtime = await _runtime_for_user_loaded(request, user, session)
+    before_scenario = _runtime_event_baseline(runtime)
     state = runtime.step_simulation(payload.steps)
-    return _runtime_snapshot(request, user, action="step", state=state)
+    return await _persisted_runtime_snapshot(
+        request,
+        user,
+        session,
+        runtime,
+        action="step",
+        state=state,
+        event_type=_runtime_event_type("step"),
+        before_scenario=before_scenario,
+    )
 
 
 @router.post("/runtime/attack", response_model=RuntimeSnapshotResponse)
-def runtime_attack(
+async def runtime_attack(
     request: Request,
     payload: RuntimeAttackRequest,
+    session: AsyncSession = Depends(get_async_session),
     user: User = Depends(current_active_user),
 ) -> RuntimeSnapshotResponse:
-    runtime = _runtime_for_user(request, user)
+    runtime = await _runtime_for_user_loaded(request, user, session)
+    before_scenario = _runtime_event_baseline(runtime)
     try:
         state = runtime.attack_unit(
             attacker_type=payload.attacker_type,
@@ -321,16 +632,27 @@ def runtime_attack(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(exc),
         ) from exc
-    return _runtime_snapshot(request, user, action="attack", state=state)
+    return await _persisted_runtime_snapshot(
+        request,
+        user,
+        session,
+        runtime,
+        action="attack",
+        state=state,
+        event_type=_runtime_event_type("attack"),
+        before_scenario=before_scenario,
+    )
 
 
 @router.post("/runtime/units", response_model=RuntimeSnapshotResponse)
-def runtime_deploy_unit(
+async def runtime_deploy_unit(
     request: Request,
     payload: RuntimeDeployUnitRequest,
+    session: AsyncSession = Depends(get_async_session),
     user: User = Depends(current_active_user),
 ) -> RuntimeSnapshotResponse:
-    runtime = _runtime_for_user(request, user)
+    runtime = await _runtime_for_user_loaded(request, user, session)
+    before_scenario = _runtime_event_baseline(runtime)
     try:
         if payload.unit_type == "aircraft":
             state = runtime.deploy_aircraft(
@@ -374,34 +696,56 @@ def runtime_deploy_unit(
             )
     except ValueError as exc:
         raise _runtime_value_error(exc) from exc
-    return _runtime_snapshot(request, user, action="deploy_unit", state=state)
+    return await _persisted_runtime_snapshot(
+        request,
+        user,
+        session,
+        runtime,
+        action="deploy_unit",
+        state=state,
+        event_type=_runtime_event_type("deploy_unit"),
+        before_scenario=before_scenario,
+    )
 
 
 @router.delete(
     "/runtime/units/{unit_type}/{unit_id}",
     response_model=RuntimeSnapshotResponse,
 )
-def runtime_delete_unit(
+async def runtime_delete_unit(
     request: Request,
     unit_type: str,
     unit_id: str,
+    session: AsyncSession = Depends(get_async_session),
     user: User = Depends(current_active_user),
 ) -> RuntimeSnapshotResponse:
-    runtime = _runtime_for_user(request, user)
+    runtime = await _runtime_for_user_loaded(request, user, session)
+    before_scenario = _runtime_event_baseline(runtime)
     try:
         state = runtime.delete_unit(unit_type, unit_id)
     except ValueError as exc:
         raise _runtime_value_error(exc) from exc
-    return _runtime_snapshot(request, user, action="delete_unit", state=state)
+    return await _persisted_runtime_snapshot(
+        request,
+        user,
+        session,
+        runtime,
+        action="delete_unit",
+        state=state,
+        event_type=_runtime_event_type("delete_unit"),
+        before_scenario=before_scenario,
+    )
 
 
 @router.patch("/runtime/units/route", response_model=RuntimeSnapshotResponse)
-def runtime_move_unit(
+async def runtime_move_unit(
     request: Request,
     payload: RuntimeMoveUnitRequest,
+    session: AsyncSession = Depends(get_async_session),
     user: User = Depends(current_active_user),
 ) -> RuntimeSnapshotResponse:
-    runtime = _runtime_for_user(request, user)
+    runtime = await _runtime_for_user_loaded(request, user, session)
+    before_scenario = _runtime_event_baseline(runtime)
     try:
         state = runtime.move_unit(
             payload.unit_type,
@@ -410,16 +754,27 @@ def runtime_move_unit(
         )
     except ValueError as exc:
         raise _runtime_value_error(exc) from exc
-    return _runtime_snapshot(request, user, action="move_unit", state=state)
+    return await _persisted_runtime_snapshot(
+        request,
+        user,
+        session,
+        runtime,
+        action="move_unit",
+        state=state,
+        event_type=_runtime_event_type("move_unit"),
+        before_scenario=before_scenario,
+    )
 
 
 @router.patch("/runtime/units/position", response_model=RuntimeSnapshotResponse)
-def runtime_set_unit_position(
+async def runtime_set_unit_position(
     request: Request,
     payload: RuntimeSetUnitPositionRequest,
+    session: AsyncSession = Depends(get_async_session),
     user: User = Depends(current_active_user),
 ) -> RuntimeSnapshotResponse:
-    runtime = _runtime_for_user(request, user)
+    runtime = await _runtime_for_user_loaded(request, user, session)
+    before_scenario = _runtime_event_baseline(runtime)
     try:
         state = runtime.set_unit_position(
             payload.unit_type,
@@ -429,16 +784,27 @@ def runtime_set_unit_position(
         )
     except ValueError as exc:
         raise _runtime_value_error(exc) from exc
-    return _runtime_snapshot(request, user, action="set_unit_position", state=state)
+    return await _persisted_runtime_snapshot(
+        request,
+        user,
+        session,
+        runtime,
+        action="set_unit_position",
+        state=state,
+        event_type=_runtime_event_type("set_unit_position"),
+        before_scenario=before_scenario,
+    )
 
 
 @router.patch("/runtime/units", response_model=RuntimeSnapshotResponse)
-def runtime_update_unit(
+async def runtime_update_unit(
     request: Request,
     payload: RuntimeUpdateUnitRequest,
+    session: AsyncSession = Depends(get_async_session),
     user: User = Depends(current_active_user),
 ) -> RuntimeSnapshotResponse:
-    runtime = _runtime_for_user(request, user)
+    runtime = await _runtime_for_user_loaded(request, user, session)
+    before_scenario = _runtime_event_baseline(runtime)
     try:
         state = runtime.update_unit_state(
             payload.unit_type,
@@ -447,30 +813,52 @@ def runtime_update_unit(
         )
     except ValueError as exc:
         raise _runtime_value_error(exc) from exc
-    return _runtime_snapshot(request, user, action="update_unit", state=state)
+    return await _persisted_runtime_snapshot(
+        request,
+        user,
+        session,
+        runtime,
+        action="update_unit",
+        state=state,
+        event_type=_runtime_event_type("update_unit"),
+        before_scenario=before_scenario,
+    )
 
 
 @router.patch("/runtime/side/current", response_model=RuntimeSnapshotResponse)
-def runtime_set_current_side(
+async def runtime_set_current_side(
     request: Request,
     payload: RuntimeSetCurrentSideRequest,
+    session: AsyncSession = Depends(get_async_session),
     user: User = Depends(current_active_user),
 ) -> RuntimeSnapshotResponse:
-    runtime = _runtime_for_user(request, user)
+    runtime = await _runtime_for_user_loaded(request, user, session)
+    before_scenario = _runtime_event_baseline(runtime)
     try:
         state = runtime.set_current_side(payload.side)
     except ValueError as exc:
         raise _runtime_value_error(exc) from exc
-    return _runtime_snapshot(request, user, action="set_current_side", state=state)
+    return await _persisted_runtime_snapshot(
+        request,
+        user,
+        session,
+        runtime,
+        action="set_current_side",
+        state=state,
+        event_type=_runtime_event_type("set_current_side"),
+        before_scenario=before_scenario,
+    )
 
 
 @router.post("/runtime/sides", response_model=RuntimeSnapshotResponse)
-def runtime_create_side(
+async def runtime_create_side(
     request: Request,
     payload: RuntimeCreateSideRequest,
+    session: AsyncSession = Depends(get_async_session),
     user: User = Depends(current_active_user),
 ) -> RuntimeSnapshotResponse:
-    runtime = _runtime_for_user(request, user)
+    runtime = await _runtime_for_user_loaded(request, user, session)
+    before_scenario = _runtime_event_baseline(runtime)
     state = runtime.add_side(
         payload.name,
         payload.color,
@@ -478,17 +866,28 @@ def runtime_create_side(
         payload.allies,
         payload.doctrine,
     )
-    return _runtime_snapshot(request, user, action="create_side", state=state)
+    return await _persisted_runtime_snapshot(
+        request,
+        user,
+        session,
+        runtime,
+        action="create_side",
+        state=state,
+        event_type=_runtime_event_type("create_side"),
+        before_scenario=before_scenario,
+    )
 
 
 @router.patch("/runtime/sides/{side_id}", response_model=RuntimeSnapshotResponse)
-def runtime_update_side(
+async def runtime_update_side(
     request: Request,
     side_id: str,
     payload: RuntimeUpdateSideRequest,
+    session: AsyncSession = Depends(get_async_session),
     user: User = Depends(current_active_user),
 ) -> RuntimeSnapshotResponse:
-    runtime = _runtime_for_user(request, user)
+    runtime = await _runtime_for_user_loaded(request, user, session)
+    before_scenario = _runtime_event_baseline(runtime)
     try:
         state = runtime.update_side(
             side_id,
@@ -500,60 +899,104 @@ def runtime_update_side(
         )
     except ValueError as exc:
         raise _runtime_value_error(exc) from exc
-    return _runtime_snapshot(request, user, action="update_side", state=state)
+    return await _persisted_runtime_snapshot(
+        request,
+        user,
+        session,
+        runtime,
+        action="update_side",
+        state=state,
+        event_type=_runtime_event_type("update_side"),
+        before_scenario=before_scenario,
+    )
 
 
 @router.delete("/runtime/sides/{side_id}", response_model=RuntimeSnapshotResponse)
-def runtime_delete_side(
+async def runtime_delete_side(
     request: Request,
     side_id: str,
+    session: AsyncSession = Depends(get_async_session),
     user: User = Depends(current_active_user),
 ) -> RuntimeSnapshotResponse:
-    runtime = _runtime_for_user(request, user)
+    runtime = await _runtime_for_user_loaded(request, user, session)
+    before_scenario = _runtime_event_baseline(runtime)
     try:
         state = runtime.delete_side(side_id)
     except ValueError as exc:
         raise _runtime_value_error(exc) from exc
-    return _runtime_snapshot(request, user, action="delete_side", state=state)
+    return await _persisted_runtime_snapshot(
+        request,
+        user,
+        session,
+        runtime,
+        action="delete_side",
+        state=state,
+        event_type=_runtime_event_type("delete_side"),
+        before_scenario=before_scenario,
+    )
 
 
 @router.delete("/runtime/missions/{mission_id}", response_model=RuntimeSnapshotResponse)
-def runtime_delete_mission(
+async def runtime_delete_mission(
     request: Request,
     mission_id: str,
+    session: AsyncSession = Depends(get_async_session),
     user: User = Depends(current_active_user),
 ) -> RuntimeSnapshotResponse:
-    runtime = _runtime_for_user(request, user)
+    runtime = await _runtime_for_user_loaded(request, user, session)
+    before_scenario = _runtime_event_baseline(runtime)
     state = runtime.delete_mission(mission_id)
-    return _runtime_snapshot(request, user, action="delete_mission", state=state)
+    return await _persisted_runtime_snapshot(
+        request,
+        user,
+        session,
+        runtime,
+        action="delete_mission",
+        state=state,
+        event_type=_runtime_event_type("delete_mission"),
+        before_scenario=before_scenario,
+    )
 
 
 @router.post("/runtime/missions/patrol", response_model=RuntimeSnapshotResponse)
-def runtime_create_patrol_mission(
+async def runtime_create_patrol_mission(
     request: Request,
     payload: RuntimePatrolMissionRequest,
+    session: AsyncSession = Depends(get_async_session),
     user: User = Depends(current_active_user),
 ) -> RuntimeSnapshotResponse:
-    runtime = _runtime_for_user(request, user)
+    runtime = await _runtime_for_user_loaded(request, user, session)
+    before_scenario = _runtime_event_baseline(runtime)
     state = runtime.create_patrol_mission(
         payload.name,
         payload.assigned_unit_ids,
         payload.reference_point_ids,
     )
-    return _runtime_snapshot(request, user, action="create_patrol_mission", state=state)
+    return await _persisted_runtime_snapshot(
+        request,
+        user,
+        session,
+        runtime,
+        action="create_patrol_mission",
+        state=state,
+        event_type=_runtime_event_type("create_patrol_mission"),
+        before_scenario=before_scenario,
+    )
 
 
 @router.patch(
     "/runtime/missions/patrol/{mission_id}",
     response_model=RuntimeSnapshotResponse,
 )
-def runtime_update_patrol_mission(
+async def runtime_update_patrol_mission(
     request: Request,
     mission_id: str,
     payload: RuntimePatrolMissionRequest,
+    session: AsyncSession = Depends(get_async_session),
     user: User = Depends(current_active_user),
 ) -> RuntimeSnapshotResponse:
-    runtime = _runtime_for_user(request, user)
+    runtime = await _runtime_for_user_loaded(request, user, session)
+    before_scenario = _runtime_event_baseline(runtime)
     try:
         state = runtime.update_patrol_mission(
             mission_id,
@@ -563,35 +1006,57 @@ def runtime_update_patrol_mission(
         )
     except ValueError as exc:
         raise _runtime_value_error(exc) from exc
-    return _runtime_snapshot(request, user, action="update_patrol_mission", state=state)
+    return await _persisted_runtime_snapshot(
+        request,
+        user,
+        session,
+        runtime,
+        action="update_patrol_mission",
+        state=state,
+        event_type=_runtime_event_type("update_patrol_mission"),
+        before_scenario=before_scenario,
+    )
 
 
 @router.post("/runtime/missions/strike", response_model=RuntimeSnapshotResponse)
-def runtime_create_strike_mission(
+async def runtime_create_strike_mission(
     request: Request,
     payload: RuntimeStrikeMissionRequest,
+    session: AsyncSession = Depends(get_async_session),
     user: User = Depends(current_active_user),
 ) -> RuntimeSnapshotResponse:
-    runtime = _runtime_for_user(request, user)
+    runtime = await _runtime_for_user_loaded(request, user, session)
+    before_scenario = _runtime_event_baseline(runtime)
     state = runtime.create_strike_mission(
         payload.name,
         payload.assigned_unit_ids,
         payload.assigned_target_ids,
     )
-    return _runtime_snapshot(request, user, action="create_strike_mission", state=state)
+    return await _persisted_runtime_snapshot(
+        request,
+        user,
+        session,
+        runtime,
+        action="create_strike_mission",
+        state=state,
+        event_type=_runtime_event_type("create_strike_mission"),
+        before_scenario=before_scenario,
+    )
 
 
 @router.patch(
     "/runtime/missions/strike/{mission_id}",
     response_model=RuntimeSnapshotResponse,
 )
-def runtime_update_strike_mission(
+async def runtime_update_strike_mission(
     request: Request,
     mission_id: str,
     payload: RuntimeStrikeMissionRequest,
+    session: AsyncSession = Depends(get_async_session),
     user: User = Depends(current_active_user),
 ) -> RuntimeSnapshotResponse:
-    runtime = _runtime_for_user(request, user)
+    runtime = await _runtime_for_user_loaded(request, user, session)
+    before_scenario = _runtime_event_baseline(runtime)
     try:
         state = runtime.update_strike_mission(
             mission_id,
@@ -601,16 +1066,27 @@ def runtime_update_strike_mission(
         )
     except ValueError as exc:
         raise _runtime_value_error(exc) from exc
-    return _runtime_snapshot(request, user, action="update_strike_mission", state=state)
+    return await _persisted_runtime_snapshot(
+        request,
+        user,
+        session,
+        runtime,
+        action="update_strike_mission",
+        state=state,
+        event_type=_runtime_event_type("update_strike_mission"),
+        before_scenario=before_scenario,
+    )
 
 
 @router.post("/runtime/weapons", response_model=RuntimeSnapshotResponse)
-def runtime_add_weapon(
+async def runtime_add_weapon(
     request: Request,
     payload: RuntimeAddWeaponRequest,
+    session: AsyncSession = Depends(get_async_session),
     user: User = Depends(current_active_user),
 ) -> RuntimeSnapshotResponse:
-    runtime = _runtime_for_user(request, user)
+    runtime = await _runtime_for_user_loaded(request, user, session)
+    before_scenario = _runtime_event_baseline(runtime)
     try:
         state = runtime.add_weapon_to_unit(
             payload.unit_type,
@@ -625,16 +1101,27 @@ def runtime_add_weapon(
         )
     except ValueError as exc:
         raise _runtime_value_error(exc) from exc
-    return _runtime_snapshot(request, user, action="add_weapon", state=state)
+    return await _persisted_runtime_snapshot(
+        request,
+        user,
+        session,
+        runtime,
+        action="add_weapon",
+        state=state,
+        event_type=_runtime_event_type("add_weapon"),
+        before_scenario=before_scenario,
+    )
 
 
 @router.delete("/runtime/weapons", response_model=RuntimeSnapshotResponse)
-def runtime_delete_weapon(
+async def runtime_delete_weapon(
     request: Request,
     payload: RuntimeDeleteWeaponRequest,
+    session: AsyncSession = Depends(get_async_session),
     user: User = Depends(current_active_user),
 ) -> RuntimeSnapshotResponse:
-    runtime = _runtime_for_user(request, user)
+    runtime = await _runtime_for_user_loaded(request, user, session)
+    before_scenario = _runtime_event_baseline(runtime)
     try:
         state = runtime.delete_weapon_from_unit(
             payload.unit_type,
@@ -643,16 +1130,27 @@ def runtime_delete_weapon(
         )
     except ValueError as exc:
         raise _runtime_value_error(exc) from exc
-    return _runtime_snapshot(request, user, action="delete_weapon", state=state)
+    return await _persisted_runtime_snapshot(
+        request,
+        user,
+        session,
+        runtime,
+        action="delete_weapon",
+        state=state,
+        event_type=_runtime_event_type("delete_weapon"),
+        before_scenario=before_scenario,
+    )
 
 
 @router.patch("/runtime/weapons/quantity", response_model=RuntimeSnapshotResponse)
-def runtime_update_weapon_quantity(
+async def runtime_update_weapon_quantity(
     request: Request,
     payload: RuntimeUpdateWeaponQuantityRequest,
+    session: AsyncSession = Depends(get_async_session),
     user: User = Depends(current_active_user),
 ) -> RuntimeSnapshotResponse:
-    runtime = _runtime_for_user(request, user)
+    runtime = await _runtime_for_user_loaded(request, user, session)
+    before_scenario = _runtime_event_baseline(runtime)
     try:
         state = runtime.update_weapon_quantity(
             payload.unit_type,
@@ -662,7 +1160,16 @@ def runtime_update_weapon_quantity(
         )
     except ValueError as exc:
         raise _runtime_value_error(exc) from exc
-    return _runtime_snapshot(request, user, action="update_weapon_quantity", state=state)
+    return await _persisted_runtime_snapshot(
+        request,
+        user,
+        session,
+        runtime,
+        action="update_weapon_quantity",
+        state=state,
+        event_type=_runtime_event_type("update_weapon_quantity"),
+        before_scenario=before_scenario,
+    )
 
 
 @router.get("/skills")
@@ -708,6 +1215,7 @@ def _read_chat_mode_from_headers(request: Request) -> str:
 @router.post("/chat")
 async def chat(
     request: Request,
+    session: AsyncSession = Depends(get_async_session),
     user: User = Depends(current_active_user),
 ) -> StreamingResponse:
     """Streaming chat endpoint powered by pydantic-ai.
@@ -733,7 +1241,7 @@ async def chat(
         can_build_model_override,
     )
 
-    bridge = _bridge_for_user(request, user)
+    bridge = await _bridge_for_user_loaded(request, user, session)
     chat_mode = _read_chat_mode_from_headers(request)
 
     # Per-request model override via headers (set by AI sidebar useChat).
@@ -778,14 +1286,38 @@ async def chat(
             media_type="application/json",
         )
 
+    approval_queue = (
+        getattr(bridge, "command_approvals", None)
+        if chat_mode == "command"
+        else None
+    )
+    event_loop = asyncio.get_running_loop()
+
+    def _record_proposal(proposal):
+        async def _persist() -> None:
+            async with async_session_maker() as session:
+                saved = await save_command_proposal(session, user, proposal)
+                await record_runtime_event(
+                    session,
+                    user,
+                    event_type="command.proposed",
+                    action="proposal_created",
+                    actor=saved.source,
+                    summary=f"命令提案：{saved.command}",
+                    payload=saved.model_dump(mode="json"),
+                    runtime=getattr(bridge, "runtime", None),
+                    proposal_id=saved.id,
+                )
+            if approval_queue is not None:
+                approval_queue.hydrate(saved)
+
+        event_loop.call_soon_threadsafe(lambda: event_loop.create_task(_persist()))
+
     deps = AgentDeps(
         registry=bridge.skill_registry,
         chat_mode=chat_mode,
-        approval_queue=(
-            getattr(bridge, "command_approvals", None)
-            if chat_mode == "command"
-            else None
-        ),
+        approval_queue=approval_queue,
+        proposal_recorder=_record_proposal if approval_queue is not None else None,
     )
     return await VercelAIAdapter.dispatch_request(
         request,

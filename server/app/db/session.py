@@ -65,9 +65,15 @@ async def create_db_and_tables() -> None:
     """
     # Imported here to avoid circular imports when this module is reused by
     # the migration env.py. v1 keeps the schema flat: User + Scenario +
-    # AarRecord + UnitAsset. Workspace/Member tables are deferred to S4
+    # AarRecord + UnitAsset + command approval proposals.
+    # Workspace/Member tables are deferred to S4
     # (multi-user collaboration) -- adding them now would only inflate code
     # surface.
+    from app.ai.command_models import (  # noqa: F401
+        CommandProposalRecord,
+        CommandProposalStepRecord,
+    )
+    from app.aicc_runtime.models import RuntimeEvent, RuntimeState  # noqa: F401
     from app.auth.models import User  # noqa: F401
     from app.scenarios.models import (  # noqa: F401
         AarRecord,

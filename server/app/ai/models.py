@@ -63,7 +63,7 @@ class CommandAdjudicationResult(BaseModel):
 class CommandProposal(BaseModel):
     id: str
     command: str
-    source: Literal["regex", "llm_tool", "api"] = "api"
+    source: Literal["regex", "llm_tool", "api", "mcp"] = "api"
     status: Literal[
         "pending",
         "blocked",

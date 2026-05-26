@@ -497,6 +497,57 @@ class AICCRuntime:
             self.game.load_scenario(self._normalize_scenario_payload(scenario_json))
             return {"loaded": True}
 
+    def export_runtime_state(self) -> dict[str, Any]:
+        """Return the DB-persistable authoritative runtime snapshot."""
+        with self._lock:
+            return {
+                "scenario": self.game.export_scenario(),
+                "runtime_metadata": {
+                    "paused": bool(getattr(self.game, "scenario_paused", True)),
+                    "currentSideId": getattr(self.game, "current_side_id", ""),
+                    "gameOutcome": getattr(self.game, "game_outcome", {}) or {},
+                    "script": {
+                        "steps": list(self._script_steps),
+                        "cursor": self._script_cursor,
+                        "paused": self._script_paused,
+                    },
+                },
+            }
+
+    def load_runtime_state(
+        self,
+        scenario: dict[str, Any],
+        runtime_metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Restore a snapshot previously produced by ``export_runtime_state``."""
+        with self._lock:
+            self.game.load_scenario(
+                self._normalize_scenario_payload(
+                    json.dumps(scenario, ensure_ascii=False)
+                )
+            )
+            metadata = runtime_metadata or {}
+            self.game.scenario_paused = bool(metadata.get("paused", True))
+            current_side_id = metadata.get("currentSideId") or scenario.get(
+                "currentSideId"
+            )
+            if current_side_id:
+                self.game.current_side_id = str(current_side_id)
+            game_outcome = metadata.get("gameOutcome")
+            if isinstance(game_outcome, dict):
+                self.game.game_outcome = game_outcome
+            script = metadata.get("script") if isinstance(metadata, dict) else None
+            if isinstance(script, dict):
+                steps = script.get("steps")
+                self._script_steps = [str(item) for item in steps or []]
+                self._script_cursor = max(0, self._to_int(script.get("cursor"), 0))
+                self._script_paused = bool(script.get("paused", True))
+            else:
+                self._script_steps = []
+                self._script_cursor = 0
+                self._script_paused = True
+            return {"loaded": True}
+
     def load_script(self, script: list[str] | str) -> dict[str, Any]:
         with self._lock:
             if isinstance(script, str):

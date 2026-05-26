@@ -7,6 +7,7 @@ gymnasium==0.29.1
 # --- S1+S2: auth + scenario persistence ---
 # fastapi-users 14 兼容 fastapi 0.115 / pydantic 2.11，含 SQLAlchemy 适配器
 fastapi-users[sqlalchemy]==14.0.1
+fastapi-users[sqlalchemy]==14.0.1
 sqlalchemy[asyncio]==2.0.36
 alembic==1.14.0
 aiosqlite==0.20.0

@@ -12,7 +12,12 @@ from app.auth.router import router as auth_router
 from app.config import get_settings, validate_production_settings
 from app.db.session import create_db_and_tables
 from app.mcp.http_auth import BearerAuthASGI
-from app.mcp.server import mcp, set_shared_runtime, set_shared_runtime_provider
+from app.mcp.server import (
+    mcp,
+    set_shared_bridge_provider,
+    set_shared_runtime,
+    set_shared_runtime_provider,
+)
 from app.scenarios.router import router as scenarios_router
 from app.scenarios.seed import seed_system_templates
 from app.unit_assets.router import router as unit_assets_router
@@ -54,6 +59,7 @@ async def lifespan(app: FastAPI):
         logger.exception("seed_system_unit_assets failed; continuing without units")
 
     app.state.bridge_registry = AICCBridgeRegistry.from_env()
+    set_shared_bridge_provider(app.state.bridge_registry.get_bridge_for_user)
     set_shared_runtime_provider(app.state.bridge_registry.get_runtime_for_user)
 
     # First call lazily creates ``mcp._session_manager``; we must trigger it
@@ -65,6 +71,7 @@ async def lifespan(app: FastAPI):
         )
         yield
     set_shared_runtime_provider(None)
+    set_shared_bridge_provider(None)
     set_shared_runtime(None)
     app.state.bridge_registry.clear()
 

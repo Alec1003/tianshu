@@ -234,6 +234,18 @@ class AICCSkillRegistry:
         )
         self._register(
             RegisteredSkill(
+                name="load_scenario_snapshot",
+                description="Load an already authorized scenario JSON snapshot.",
+                parameters={
+                    "scenario_json": {"type": "string"},
+                    "scenario_id": {"type": "string", "required": False},
+                    "name": {"type": "string", "required": False},
+                },
+                func=self._load_scenario_snapshot,
+            )
+        )
+        self._register(
+            RegisteredSkill(
                 name="load_scenario_file",
                 description="加载场景文件",
                 parameters={"scenario_path": {"type": "string"}},
@@ -254,6 +266,19 @@ class AICCSkillRegistry:
 
     def has_skill(self, skill_name: str) -> bool:
         return skill_name in self._skills
+
+    def _load_scenario_snapshot(
+        self,
+        scenario_json: str,
+        scenario_id: str = "",
+        name: str = "",
+    ) -> dict[str, Any]:
+        state = self.runtime.load_scenario_from_json(scenario_json)
+        return {
+            **state,
+            "scenarioId": scenario_id,
+            "name": name,
+        }
 
     def execute(self, skill_name: str, parameters: dict[str, Any]) -> dict[str, Any]:
         if skill_name not in self._skills:

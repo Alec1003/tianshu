@@ -17,6 +17,13 @@ from typing import Any, NoReturn, Sequence
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.aicc_runtime.persistence import save_runtime_state
+from app.aicc_runtime.schemas import RuntimeTimelineResponse
+from app.aicc_runtime.timeline import (
+    list_runtime_events,
+    record_runtime_event,
+    runtime_scenario_id,
+)
 from app.auth.models import User
 from app.auth.users import current_active_user
 from app.db.session import get_async_session
@@ -177,7 +184,7 @@ async def create_aar_record(
     # imported scenarios that were never persisted to DB. ``scenario_id`` then
     # acts as a free-form correlation tag.
     try:
-        return await scenario_service.create_aar_record(
+        rec = await scenario_service.create_aar_record(
             session,
             user,
             scenario_id,
@@ -188,6 +195,52 @@ async def create_aar_record(
         )
     except ScenarioServiceError as exc:
         _raise_scenario_http(exc)
+    event_scenario_id = scenario_id
+    try:
+        sc = await scenario_service.get_scenario(session, user, scenario_id)
+        event_scenario_id = runtime_scenario_id(sc.data) or scenario_id
+    except ScenarioServiceError:
+        event_scenario_id = scenario_id
+    await record_runtime_event(
+        session,
+        user,
+        event_type="aar.created",
+        action="create_aar_record",
+        actor="operator",
+        summary="生成 AAR 复盘记录",
+        payload=AarRecordRead.model_validate(rec).model_dump(mode="json"),
+        scenario_id=event_scenario_id,
+        aar_record_id=rec.id,
+    )
+    return rec
+
+
+@router.get("/{scenario_id}/timeline", response_model=RuntimeTimelineResponse)
+async def list_scenario_timeline(
+    scenario_id: str,
+    event_type: str | None = None,
+    category: str | None = None,
+    limit: int = 200,
+    user: User = Depends(current_active_user),
+    session: AsyncSession = Depends(get_async_session),
+) -> RuntimeTimelineResponse:
+    try:
+        sc = await scenario_service.get_scenario(session, user, scenario_id)
+    except ScenarioServiceError as exc:
+        _raise_scenario_http(exc)
+    inner_id = runtime_scenario_id(sc.data)
+    scenario_ids = [scenario_id]
+    if inner_id and inner_id != scenario_id:
+        scenario_ids.append(inner_id)
+    events = await list_runtime_events(
+        session,
+        user,
+        scenario_id=scenario_ids,
+        event_type=event_type,
+        category=category,
+        limit=limit,
+    )
+    return RuntimeTimelineResponse(events=list(events))
 
 
 # ---------- runtime activation ----------
@@ -221,6 +274,19 @@ async def activate_scenario(
         return {"ok": True, "scenario_id": sc.id, "scenario_name": sc.name, "loaded": False}
 
     scenario_json = json.dumps(sc.data, ensure_ascii=False)
+    before_scenario = bridge.runtime.get_exported_scenario()
     await asyncio.to_thread(bridge.runtime.load_scenario_from_json, scenario_json)
+    await save_runtime_state(session, user, bridge.runtime)
+    await record_runtime_event(
+        session,
+        user,
+        event_type="scenario.activated",
+        action="activate_scenario",
+        actor="operator",
+        summary=f"激活场景：{sc.name}",
+        payload={"scenarioId": sc.id, "scenarioName": sc.name},
+        runtime=bridge.runtime,
+        before_scenario=before_scenario,
+    )
 
     return {"ok": True, "scenario_id": sc.id, "scenario_name": sc.name, "loaded": True}

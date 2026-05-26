@@ -41,6 +41,11 @@ async def db_engine() -> AsyncIterator:
         future=True,
     )
     # Make sure tables are imported and registered on Base before create_all.
+    from app.ai.command_models import (  # noqa: F401
+        CommandProposalRecord,
+        CommandProposalStepRecord,
+    )
+    from app.aicc_runtime.models import RuntimeEvent, RuntimeState  # noqa: F401
     from app.scenarios.models import AarRecord, Scenario  # noqa: F401
     from app.unit_assets.models import UnitAsset  # noqa: F401
 

@@ -200,6 +200,7 @@ def test_ai_routes_reject_unauthenticated_requests() -> None:
 
     cases = [
         ("get", "/api/ai/runtime", None),
+        ("get", "/api/ai/runtime/timeline", None),
         ("get", "/api/ai/runtime/scenario", None),
         ("put", "/api/ai/runtime/scenario", {"scenario": {"currentScenario": {"id": "x"}}}),
         ("post", "/api/ai/runtime/start", None),

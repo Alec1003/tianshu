@@ -133,3 +133,21 @@ def test_rule_engine_blocks_missing_unit_target() -> None:
     assert any(
         issue.code == "unit_not_found" for issue in proposal.adjudication.issues
     )
+
+
+def test_pydantic_tool_proposal_recorder_receives_created_proposal() -> None:
+    from app.ai.pydantic_agent import AgentDeps, _exec
+
+    queue = CommandApprovalQueue(FakeRuntime(), FakeRegistry())  # type: ignore[arg-type]
+    recorded = []
+    deps = AgentDeps(
+        registry=FakeRegistry(),  # type: ignore[arg-type]
+        approval_queue=queue,
+        source_command="advance one second",
+        proposal_recorder=recorded.append,
+    )
+
+    output = _exec(deps, "simulation_step", {"steps": 1})
+
+    assert output["proposalId"] == recorded[0].id
+    assert recorded[0].source == "llm_tool"

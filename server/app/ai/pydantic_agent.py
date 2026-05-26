@@ -9,6 +9,7 @@ AgentExecutionSummary without parsing raw message history.
 from __future__ import annotations
 
 import os
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
@@ -54,6 +55,7 @@ class AgentDeps:
     chat_mode: Literal["ask", "command"] = "command"
     call_log: list[SkillExecutionResult] = field(default_factory=list)
     approval_queue: Any | None = None
+    proposal_recorder: Callable[[Any], None] | None = None
     source_command: str = ""
 
 
@@ -77,6 +79,8 @@ def _exec(deps: AgentDeps, skill: str, params: dict[str, Any]) -> dict[str, Any]
             parameters=params,
             source="llm_tool",
         )
+        if deps.proposal_recorder is not None:
+            deps.proposal_recorder(proposal)
         output = {
             "proposalId": proposal.id,
             "proposalStatus": proposal.status,

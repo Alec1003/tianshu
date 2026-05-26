@@ -7,6 +7,7 @@ import type {
   ScenarioCreatePayload,
   ScenarioDetail,
   ScenarioListItem,
+  RuntimeTimelineResponse,
   ScenarioUpdatePayload,
 } from "./types";
 
@@ -51,6 +52,24 @@ export async function deleteScenario(id: string): Promise<void> {
 export async function listAarRecords(scenarioId: string): Promise<AarRecord[]> {
   return apiCall<AarRecord[]>(
     `/api/scenarios/${encodeURIComponent(scenarioId)}/aar`
+  );
+}
+
+export async function listScenarioTimeline(
+  scenarioId: string,
+  params?: {
+    eventType?: string;
+    category?: string;
+    limit?: number;
+  }
+): Promise<RuntimeTimelineResponse> {
+  const query = new URLSearchParams();
+  if (params?.eventType) query.set("event_type", params.eventType);
+  if (params?.category) query.set("category", params.category);
+  if (params?.limit !== undefined) query.set("limit", String(params.limit));
+  const suffix = query.toString() ? `?${query.toString()}` : "";
+  return apiCall<RuntimeTimelineResponse>(
+    `/api/scenarios/${encodeURIComponent(scenarioId)}/timeline${suffix}`
   );
 }
 

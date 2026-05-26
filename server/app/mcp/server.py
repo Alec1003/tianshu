@@ -26,8 +26,12 @@ from datetime import datetime
 from typing import Any, Callable
 
 from mcp.server.fastmcp import Context, FastMCP
-from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.ai.command_governance import CommandApprovalQueue
+from app.ai.command_service import save_command_proposal
+from app.ai.skill_registry import AICCSkillRegistry
+from app.aicc_runtime.persistence import ensure_runtime_state_loaded
+from app.aicc_runtime.timeline import record_runtime_event
 from app.auth.models import User
 from app.db.session import async_session_maker, create_db_and_tables
 from app.mcp.auth import McpAuthError, resolve_user_from_env
@@ -36,13 +40,10 @@ from app.mcp.schemas import (
     AarRecordOut,
     ListUnitsResult,
     QueryThreatsResult,
-    RuntimeDeployResult,
     RuntimeOutcome,
     RuntimeSavedScenario,
     RuntimeSideStat,
-    RuntimeSimpleResult,
     RuntimeStatus,
-    RuntimeStepResult,
     ScenarioFull,
     ScenarioStatistics,
     ScenarioSummary,
@@ -88,6 +89,7 @@ logger = logging.getLogger(__name__)
 
 _shared_runtime: AICCRuntime | None = None
 _shared_runtime_provider: Callable[[User], AICCRuntime] | None = None
+_shared_bridge_provider: Callable[[User], Any] | None = None
 _request_user_var: contextvars.ContextVar[User | None] = contextvars.ContextVar(
     "_aicc_mcp_request_user", default=None
 )
@@ -120,6 +122,16 @@ def get_shared_runtime_provider() -> Callable[[User], AICCRuntime] | None:
     return _shared_runtime_provider
 
 
+def set_shared_bridge_provider(provider: Callable[[User], Any] | None) -> None:
+    """Bind a per-user bridge provider so MCP writes can enter approvals."""
+    global _shared_bridge_provider
+    _shared_bridge_provider = provider
+
+
+def get_shared_bridge_provider() -> Callable[[User], Any] | None:
+    return _shared_bridge_provider
+
+
 def set_request_user(user: User | None) -> contextvars.Token[User | None]:
     """HTTP middleware hook: per-request Bearer-resolved user goes here.
 
@@ -148,6 +160,7 @@ class McpAppContext:
 
     user: User | None
     runtime: AICCRuntime | None
+    command_approvals: CommandApprovalQueue | None = None
 
 
 @asynccontextmanager
@@ -158,6 +171,7 @@ async def mcp_lifespan(server: FastMCP) -> AsyncIterator[McpAppContext]:  # noqa
 
     shared_provider = get_shared_runtime_provider()
     shared = get_shared_runtime()
+    command_approvals: CommandApprovalQueue | None = None
     if shared_provider is not None:
         runtime = None
         user = None
@@ -184,8 +198,17 @@ async def mcp_lifespan(server: FastMCP) -> AsyncIterator[McpAppContext]:  # noqa
             runtime.game.current_scenario.name,
             len(runtime.game.current_scenario.sides),
         )
+    if runtime is not None:
+        command_approvals = CommandApprovalQueue(
+            runtime=runtime,
+            registry=AICCSkillRegistry(runtime),
+        )
     try:
-        yield McpAppContext(user=user, runtime=runtime)
+        yield McpAppContext(
+            user=user,
+            runtime=runtime,
+            command_approvals=command_approvals,
+        )
     finally:
         # No explicit shutdown hook on AICCRuntime; in stdio mode GC
         # reclaims it when the process exits, in HTTP mode the FastAPI host
@@ -249,6 +272,98 @@ def _get_runtime(ctx: Context) -> AICCRuntime:
             "no runtime bound; HTTP transport requires a valid Bearer token"
         )
     return app_ctx.runtime
+
+
+async def _get_runtime_loaded(ctx: Context) -> AICCRuntime:
+    user = _get_user(ctx)
+    provider = get_shared_runtime_provider()
+    if provider is not None:
+        runtime = provider(user)
+    else:
+        app_ctx: McpAppContext = ctx.request_context.lifespan_context
+        if app_ctx.runtime is None:
+            raise _UnauthenticatedError(
+                "no runtime bound; HTTP transport requires a valid Bearer token"
+            )
+        runtime = app_ctx.runtime
+    async with async_session_maker() as session:
+        await ensure_runtime_state_loaded(session, user, runtime)
+    return runtime
+
+
+def _get_bridge(ctx: Context) -> Any | None:
+    provider = get_shared_bridge_provider()
+    if provider is None:
+        return None
+    return provider(_get_user(ctx))
+
+
+def _get_approval_queue(ctx: Context) -> CommandApprovalQueue:
+    bridge = _get_bridge(ctx)
+    if bridge is not None:
+        queue = getattr(bridge, "command_approvals", None)
+        if queue is not None:
+            return queue
+    app_ctx: McpAppContext = ctx.request_context.lifespan_context
+    if app_ctx.command_approvals is not None:
+        return app_ctx.command_approvals
+    raise _UnauthenticatedError(
+        "no command approval queue bound for this MCP transport"
+    )
+
+
+async def _create_runtime_proposal(
+    ctx: Context,
+    *,
+    command: str,
+    skill: str,
+    parameters: dict[str, Any],
+    source_text: str = "",
+) -> dict[str, Any]:
+    try:
+        user = _get_user(ctx)
+        queue = _get_approval_queue(ctx)
+    except _UnauthenticatedError as exc:
+        return ToolError(
+            code="unauthenticated",
+            message=str(exc),
+        ).model_dump()
+
+    runtime = getattr(queue, "runtime", None)
+    if runtime is not None:
+        async with async_session_maker() as session:
+            await ensure_runtime_state_loaded(session, user, runtime)
+    proposal = queue.create_single_step_proposal(
+        command=command,
+        skill=skill,
+        parameters=parameters,
+        source="mcp",
+        source_text=source_text or command,
+    )
+    async with async_session_maker() as session:
+        proposal = await save_command_proposal(session, user, proposal)
+        await record_runtime_event(
+            session,
+            user,
+            event_type="command.proposed",
+            action="proposal_created",
+            actor="mcp",
+            summary=f"命令提案：{proposal.command}",
+            payload=proposal.model_dump(mode="json"),
+            runtime=runtime,
+            proposal_id=proposal.id,
+        )
+    queue.hydrate(proposal)
+    return {
+        "ok": True,
+        "action": "command_proposal_created",
+        "state": {
+            "proposalId": proposal.id,
+            "proposalStatus": proposal.status,
+            "requiresApproval": True,
+        },
+        "proposal": proposal.model_dump(mode="json"),
+    }
 
 
 def _err(exc: ScenarioServiceError) -> dict[str, Any]:
@@ -729,7 +844,9 @@ def _nearest_distance_km(
 
 
 # ===========================================================================
-# Runtime tools: in-memory live scenario driven by AICCRuntime.
+# Runtime tools: live scenario driven by authoritative AICCRuntime.
+# Note: the per-user live runtime now restores from/saves to ``runtime_state``;
+# ``runtime_save_to_db`` still creates a separate static Scenario row.
 #
 # 边界（重要，给 LLM 看也给运维看）：
 # - "Runtime" 是 stdio 进程内一个 AICCRuntime 实例，跑的是活想定；
@@ -805,7 +922,7 @@ async def resource_runtime_status() -> str:
     DB 静态行，这个读 runtime 内存态。AI 在做推演决策时应该读这个。
     """
     ctx: Context = mcp.get_context()
-    runtime = _get_runtime(ctx)
+    runtime = await _get_runtime_loaded(ctx)
     payload = _runtime_status_payload(runtime)
     return json.dumps(payload, ensure_ascii=False, indent=2)
 
@@ -820,34 +937,41 @@ async def runtime_status(ctx: Context) -> dict[str, Any]:
     与 DB 中静态的 ``get_scenario`` 不同源；要读 AI 当前正在操控的想定，
     必须用这个工具。
     """
-    runtime = _get_runtime(ctx)
+    runtime = await _get_runtime_loaded(ctx)
     return _runtime_status_payload(runtime)
 
 
 @mcp.tool()
 async def runtime_start(ctx: Context) -> dict[str, Any]:
     """启动/继续推演（取消暂停）。"""
-    runtime = _get_runtime(ctx)
-    state = await run_in_runtime(runtime.start_simulation)
-    await ctx.info("runtime: started")
-    return RuntimeSimpleResult(action="start", state=state).model_dump(mode="json")
+    return await _create_runtime_proposal(
+        ctx,
+        command="MCP runtime_start",
+        skill="simulation_start",
+        parameters={},
+    )
 
 
 @mcp.tool()
 async def runtime_pause(ctx: Context) -> dict[str, Any]:
     """暂停推演（仿真时间停滞，单位指令仍可下达）。"""
-    runtime = _get_runtime(ctx)
-    state = await run_in_runtime(runtime.pause_simulation)
-    return RuntimeSimpleResult(action="pause", state=state).model_dump(mode="json")
+    return await _create_runtime_proposal(
+        ctx,
+        command="MCP runtime_pause",
+        skill="simulation_pause",
+        parameters={},
+    )
 
 
 @mcp.tool()
 async def runtime_reset(ctx: Context) -> dict[str, Any]:
     """重置推演状态（回到当前 scenario 的初始时刻）。"""
-    runtime = _get_runtime(ctx)
-    state = await run_in_runtime(runtime.reset_simulation)
-    await ctx.info("runtime: reset")
-    return RuntimeSimpleResult(action="reset", state=state).model_dump(mode="json")
+    return await _create_runtime_proposal(
+        ctx,
+        command="MCP runtime_reset",
+        skill="simulation_reset",
+        parameters={},
+    )
 
 
 @mcp.tool()
@@ -871,18 +995,12 @@ async def runtime_step(ctx: Context, steps: int = 1) -> dict[str, Any]:
             message="steps too large; split into multiple calls (max 7200 per call)",
             details={"steps": steps, "max": 7200},
         ).model_dump()
-    runtime = _get_runtime(ctx)
-    state = await run_in_runtime(runtime.step_simulation, steps=steps)
-    scenario = runtime.game.current_scenario
-    start = int(scenario.start_time or 0)
-    current = int(scenario.current_time or start)
-    duration = int(scenario.duration or 0)
-    return RuntimeStepResult(
-        steps_executed=int(state.get("steps", 0)),
-        current_time=current,
-        elapsed=max(0, current - start),
-        duration_left=max(0, start + duration - current),
-    ).model_dump(mode="json")
+    return await _create_runtime_proposal(
+        ctx,
+        command=f"MCP runtime_step steps={steps}",
+        skill="simulation_step",
+        parameters={"steps": steps},
+    )
 
 
 # ---------- runtime: scenario load / save bridging --------------------------
@@ -903,16 +1021,22 @@ async def runtime_load_scenario_from_db(
         scenario_id: DB scenario 的 ID（模板形如 ``tpl-SCS``，用户行 UUID）。
     """
     user = _get_user(ctx)
-    runtime = _get_runtime(ctx)
     async with async_session_maker() as session:
         try:
             sc = await scenario_service.get_scenario(session, user, scenario_id)
         except ScenarioServiceError as exc:
             return _err(exc)
     scenario_json = json.dumps(sc.data, ensure_ascii=False)
-    await run_in_runtime(runtime.load_scenario_from_json, scenario_json)
-    await ctx.info(f"runtime: loaded scenario {sc.id} ({sc.name!r})")
-    return _runtime_status_payload(runtime)
+    return await _create_runtime_proposal(
+        ctx,
+        command=f"MCP runtime_load_scenario_from_db scenario_id={sc.id}",
+        skill="load_scenario_snapshot",
+        parameters={
+            "scenario_json": scenario_json,
+            "scenario_id": sc.id,
+            "name": sc.name,
+        },
+    )
 
 
 @mcp.tool()
@@ -922,7 +1046,7 @@ async def runtime_export_scenario(ctx: Context) -> dict[str, Any]:
     返回的 ``data`` 字段结构跟 ``Scenario.data`` 一致；如需持久化，紧接
     着用 ``runtime_save_to_db`` 把它当新 scenario 行写入。
     """
-    runtime = _get_runtime(ctx)
+    runtime = await _get_runtime_loaded(ctx)
     exported = await run_in_runtime(runtime.get_exported_scenario)
     return {"ok": True, "data": exported}
 
@@ -945,7 +1069,7 @@ async def runtime_save_to_db(
         status: ``draft`` / ``running`` / ``completed`` 之一，默认 running。
     """
     user = _get_user(ctx)
-    runtime = _get_runtime(ctx)
+    runtime = await _get_runtime_loaded(ctx)
     exported = await run_in_runtime(runtime.get_exported_scenario)
     async with async_session_maker() as session:
         try:
@@ -971,15 +1095,6 @@ async def runtime_save_to_db(
 # ---------- runtime: deploy units -------------------------------------------
 
 
-def _deploy_result(payload: dict[str, Any], side_id: str) -> dict[str, Any]:
-    return RuntimeDeployResult(
-        unit_type=payload.get("unitType", ""),
-        unit_id=payload.get("unitId", ""),
-        name=payload.get("name", ""),
-        side_id=side_id,
-    ).model_dump(mode="json")
-
-
 @mcp.tool()
 async def runtime_deploy_aircraft(
     ctx: Context,
@@ -995,24 +1110,19 @@ async def runtime_deploy_aircraft(
     ``class_name`` 必须命中后端 AircraftDb（默认未命中会回落到首行）；建
     议先用 DB 工具读 SCS 模板看可选机型，再传入这里。
     """
-    runtime = _get_runtime(ctx)
-    try:
-        payload = await run_in_runtime(
-            runtime.deploy_aircraft,
-            class_name=class_name,
-            latitude=latitude,
-            longitude=longitude,
-            side=side,
-            name=name,
-            altitude=altitude,
-        )
-    except ValueError as exc:
-        return ToolError(
-            code="runtime_deploy_failed",
-            message=str(exc),
-            details={"class_name": class_name, "side": side},
-        ).model_dump()
-    return _deploy_result(payload, side or "")
+    return await _create_runtime_proposal(
+        ctx,
+        command=f"MCP runtime_deploy_aircraft class_name={class_name}",
+        skill="deploy_aircraft",
+        parameters={
+            "class_name": class_name,
+            "latitude": latitude,
+            "longitude": longitude,
+            "side": side,
+            "name": name,
+            "altitude": altitude,
+        },
+    )
 
 
 @mcp.tool()
@@ -1025,23 +1135,18 @@ async def runtime_deploy_ship(
     name: str | None = None,
 ) -> dict[str, Any]:
     """在活想定中部署一艘舰艇。"""
-    runtime = _get_runtime(ctx)
-    try:
-        payload = await run_in_runtime(
-            runtime.deploy_ship,
-            class_name=class_name,
-            latitude=latitude,
-            longitude=longitude,
-            side=side,
-            name=name,
-        )
-    except ValueError as exc:
-        return ToolError(
-            code="runtime_deploy_failed",
-            message=str(exc),
-            details={"class_name": class_name, "side": side},
-        ).model_dump()
-    return _deploy_result(payload, side or "")
+    return await _create_runtime_proposal(
+        ctx,
+        command=f"MCP runtime_deploy_ship class_name={class_name}",
+        skill="deploy_ship",
+        parameters={
+            "class_name": class_name,
+            "latitude": latitude,
+            "longitude": longitude,
+            "side": side,
+            "name": name,
+        },
+    )
 
 
 @mcp.tool()
@@ -1054,23 +1159,18 @@ async def runtime_deploy_facility(
     name: str | None = None,
 ) -> dict[str, Any]:
     """在活想定中部署一处地面设施（防空 / 雷达 / 指挥所等）。"""
-    runtime = _get_runtime(ctx)
-    try:
-        payload = await run_in_runtime(
-            runtime.deploy_facility,
-            class_name=class_name,
-            latitude=latitude,
-            longitude=longitude,
-            side=side,
-            name=name,
-        )
-    except ValueError as exc:
-        return ToolError(
-            code="runtime_deploy_failed",
-            message=str(exc),
-            details={"class_name": class_name, "side": side},
-        ).model_dump()
-    return _deploy_result(payload, side or "")
+    return await _create_runtime_proposal(
+        ctx,
+        command=f"MCP runtime_deploy_facility class_name={class_name}",
+        skill="deploy_facility",
+        parameters={
+            "class_name": class_name,
+            "latitude": latitude,
+            "longitude": longitude,
+            "side": side,
+            "name": name,
+        },
+    )
 
 
 @mcp.tool()
@@ -1083,23 +1183,18 @@ async def runtime_deploy_airbase(
     name: str | None = None,
 ) -> dict[str, Any]:
     """在活想定中部署一座机场（aircraft 的 homeBase）。"""
-    runtime = _get_runtime(ctx)
-    try:
-        payload = await run_in_runtime(
-            runtime.deploy_airbase,
-            class_name=class_name,
-            latitude=latitude,
-            longitude=longitude,
-            side=side,
-            name=name,
-        )
-    except ValueError as exc:
-        return ToolError(
-            code="runtime_deploy_failed",
-            message=str(exc),
-            details={"class_name": class_name, "side": side},
-        ).model_dump()
-    return _deploy_result(payload, side or "")
+    return await _create_runtime_proposal(
+        ctx,
+        command=f"MCP runtime_deploy_airbase class_name={class_name}",
+        skill="deploy_airbase",
+        parameters={
+            "class_name": class_name,
+            "latitude": latitude,
+            "longitude": longitude,
+            "side": side,
+            "name": name,
+        },
+    )
 
 
 # ---------- runtime: unit control -------------------------------------------
@@ -1133,21 +1228,12 @@ async def runtime_move_unit(
             message="route must be a non-empty list of [lat, lon] pairs",
             details={},
         ).model_dump()
-    runtime = _get_runtime(ctx)
-    try:
-        await run_in_runtime(
-            runtime.move_unit, unit_type=unit_type, unit_id=unit_id, route=route
-        )
-    except ValueError as exc:
-        return ToolError(
-            code="runtime_move_failed",
-            message=str(exc),
-            details={"unit_type": unit_type, "unit_id": unit_id},
-        ).model_dump()
-    return RuntimeSimpleResult(
-        action="move_unit",
-        state={"unit_type": unit_type, "unit_id": unit_id, "route_points": len(route)},
-    ).model_dump(mode="json")
+    return await _create_runtime_proposal(
+        ctx,
+        command=f"MCP runtime_move_unit unit_type={unit_type} unit_id={unit_id}",
+        skill="move_unit",
+        parameters={"unit_type": unit_type, "unit_id": unit_id, "route": route},
+    )
 
 
 @mcp.tool()
@@ -1156,19 +1242,12 @@ async def runtime_delete_unit(
 ) -> dict[str, Any]:
     """从活想定中移除一个单位（aircraft / ship / facility / airbase /
     reference_point）。"""
-    runtime = _get_runtime(ctx)
-    try:
-        await run_in_runtime(runtime.delete_unit, unit_type=unit_type, unit_id=unit_id)
-    except ValueError as exc:
-        return ToolError(
-            code="runtime_delete_failed",
-            message=str(exc),
-            details={"unit_type": unit_type, "unit_id": unit_id},
-        ).model_dump()
-    return RuntimeSimpleResult(
-        action="delete_unit",
-        state={"unit_type": unit_type, "unit_id": unit_id},
-    ).model_dump(mode="json")
+    return await _create_runtime_proposal(
+        ctx,
+        command=f"MCP runtime_delete_unit unit_type={unit_type} unit_id={unit_id}",
+        skill="delete_unit",
+        parameters={"unit_type": unit_type, "unit_id": unit_id},
+    )
 
 
 # ---------- runtime: tactical events ----------------------------------------
@@ -1188,25 +1267,17 @@ async def runtime_set_relationship(
         hostiles: 敌对方 side_id 列表。
         allies: 友方 side_id 列表，可省略（默认空）。
     """
-    runtime = _get_runtime(ctx)
     payload = {
         "side": side,
         "hostiles": hostiles,
         "allies": allies or [],
     }
-    try:
-        result = await run_in_runtime(
-            runtime.trigger_tactical_event,
-            event_name="set_relationship",
-            payload=payload,
-        )
-    except ValueError as exc:
-        return ToolError(
-            code="runtime_event_failed",
-            message=str(exc),
-            details=payload,
-        ).model_dump()
-    return RuntimeSimpleResult(action="set_relationship", state=result).model_dump(mode="json")
+    return await _create_runtime_proposal(
+        ctx,
+        command=f"MCP runtime_set_relationship side={side}",
+        skill="trigger_tactical_event",
+        parameters={"event_name": "set_relationship", "payload": payload},
+    )
 
 
 @mcp.tool()
@@ -1216,20 +1287,12 @@ async def runtime_set_current_side(ctx: Context, side: str) -> dict[str, Any]:
     很多 deploy_* / move_* 内部会用 ``current_side_id`` 作为兜底，AI 在
     扮演双方时必须显式切换，避免单位落到错的阵营。
     """
-    runtime = _get_runtime(ctx)
-    try:
-        result = await run_in_runtime(
-            runtime.trigger_tactical_event,
-            event_name="set_current_side",
-            payload={"side": side},
-        )
-    except ValueError as exc:
-        return ToolError(
-            code="runtime_event_failed",
-            message=str(exc),
-            details={"side": side},
-        ).model_dump()
-    return RuntimeSimpleResult(action="set_current_side", state=result).model_dump(mode="json")
+    return await _create_runtime_proposal(
+        ctx,
+        command=f"MCP runtime_set_current_side side={side}",
+        skill="trigger_tactical_event",
+        parameters={"event_name": "set_current_side", "payload": {"side": side}},
+    )
 
 
 # ---------- runtime: outcome ------------------------------------------------
@@ -1288,7 +1351,7 @@ async def runtime_get_outcome(ctx: Context) -> dict[str, Any]:
     返回后端仿真引擎的权威 ``ended`` / ``winner_side_id`` / ``reason``，
     同时保留 ``time_up``、各方存活和全灭状态作为辅助态势信号。
     """
-    runtime = _get_runtime(ctx)
+    runtime = await _get_runtime_loaded(ctx)
     return _runtime_outcome_payload(runtime)
 
 

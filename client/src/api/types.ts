@@ -80,6 +80,38 @@ export interface RuntimeSnapshot {
   visibility: RuntimeVisibility;
 }
 
+export interface RuntimeUnitChange {
+  change_type: "added" | "removed" | "updated";
+  unit_type: string;
+  unit_id: string;
+  name: string;
+  side_id: string;
+  fields: Record<string, { before: unknown; after: unknown }>;
+  before?: Record<string, unknown> | null;
+  after?: Record<string, unknown> | null;
+}
+
+export interface RuntimeTimelineEvent {
+  id: string;
+  owner_id: string;
+  scenario_id?: string | null;
+  event_type: string;
+  category: string;
+  action: string;
+  actor: string;
+  summary: string;
+  payload: Record<string, unknown>;
+  unit_changes: RuntimeUnitChange[];
+  current_time?: number | null;
+  proposal_id?: string | null;
+  aar_record_id?: string | null;
+  created_at: string;
+}
+
+export interface RuntimeTimelineResponse {
+  events: RuntimeTimelineEvent[];
+}
+
 export interface SkillExecutionResult {
   skill: string;
   status: "ok" | "error";
@@ -116,7 +148,7 @@ export interface CommandAdjudicationResult {
 export interface CommandProposal {
   id: string;
   command: string;
-  source: "regex" | "llm_tool" | "api";
+  source: "regex" | "llm_tool" | "api" | "mcp";
   status:
     | "pending"
     | "blocked"

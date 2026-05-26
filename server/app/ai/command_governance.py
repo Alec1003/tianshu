@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import math
 from datetime import UTC, datetime
 from threading import RLock
@@ -35,6 +36,7 @@ ALLOWED_SKILLS = {
     "load_script",
     "execute_script_step",
     "control_script_flow",
+    "load_scenario_snapshot",
 }
 
 BLOCKED_SKILLS = {
@@ -49,6 +51,7 @@ HIGH_RISK_SKILLS = {
     "update_unit_state",
     "load_script",
     "control_script_flow",
+    "load_scenario_snapshot",
 }
 
 LOW_RISK_SKILLS = {
@@ -199,6 +202,9 @@ class CommandRuleEngine:
                     )
                 )
 
+        if skill == "load_scenario_snapshot":
+            issues.extend(self._validate_scenario_snapshot(step))
+
         if skill in HIGH_RISK_SKILLS:
             issues.append(
                 self._issue(
@@ -211,6 +217,44 @@ class CommandRuleEngine:
             )
 
         return issues
+
+    def _validate_scenario_snapshot(
+        self, step: StructuredCommandStep
+    ) -> list[CommandAdjudicationIssue]:
+        scenario_json = step.parameters.get("scenario_json")
+        if not isinstance(scenario_json, str) or not scenario_json.strip():
+            return [
+                self._issue(
+                    "blocking",
+                    "missing_scenario_json",
+                    "想定加载提案必须包含已授权的 scenario_json 快照。",
+                    step.id,
+                    "scenario_json",
+                )
+            ]
+        try:
+            parsed = json.loads(scenario_json)
+        except json.JSONDecodeError:
+            return [
+                self._issue(
+                    "blocking",
+                    "invalid_scenario_json",
+                    "scenario_json 必须是合法 JSON。",
+                    step.id,
+                    "scenario_json",
+                )
+            ]
+        if not isinstance(parsed, dict):
+            return [
+                self._issue(
+                    "blocking",
+                    "invalid_scenario_shape",
+                    "scenario_json 必须表示一个想定 JSON 对象。",
+                    step.id,
+                    "scenario_json",
+                )
+            ]
+        return []
 
     def _validate_deploy(
         self, step: StructuredCommandStep
@@ -499,6 +543,12 @@ class CommandApprovalQueue:
         with self._lock:
             return self._proposals.get(proposal_id)
 
+    def hydrate(self, proposal: CommandProposal) -> CommandProposal:
+        """Put a persisted proposal back into the runtime-local queue."""
+        with self._lock:
+            self._proposals[proposal.id] = proposal
+            return proposal
+
     def reject(self, proposal_id: str, reason: str = "") -> CommandProposal:
         with self._lock:
             proposal = self._require(proposal_id)
@@ -509,6 +559,12 @@ class CommandApprovalQueue:
             proposal.updated_at = _utc_now()
             self._proposals[proposal_id] = proposal
             return proposal
+
+    def reject_loaded(
+        self, proposal: CommandProposal, reason: str = ""
+    ) -> CommandProposal:
+        self.hydrate(proposal)
+        return self.reject(proposal.id, reason=reason)
 
     def approve_and_execute(self, proposal_id: str) -> CommandProposal:
         with self._lock:
@@ -561,6 +617,12 @@ class CommandApprovalQueue:
             self._proposals[proposal_id] = proposal
             return proposal
 
+    def approve_and_execute_loaded(
+        self, proposal: CommandProposal
+    ) -> CommandProposal:
+        self.hydrate(proposal)
+        return self.approve_and_execute(proposal.id)
+
     def _require(self, proposal_id: str) -> CommandProposal:
         proposal = self._proposals.get(proposal_id)
         if proposal is None:
@@ -585,4 +647,6 @@ class CommandApprovalQueue:
             return f"删除 {parameters.get('unit_type')} {parameters.get('unit_id')}"
         if skill == "simulation_step":
             return f"推进仿真 {parameters.get('steps', 1)} 秒"
+        if skill == "load_scenario_snapshot":
+            return f"Load scenario {parameters.get('name') or parameters.get('scenario_id') or ''}".strip()
         return skill.replace("_", " ")

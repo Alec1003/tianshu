@@ -17,6 +17,7 @@ from types import SimpleNamespace
 import pytest
 
 from app.mcp.server import (
+    _create_runtime_proposal,
     _get_runtime,
     _runtime_outcome_payload,
     _runtime_side_stats,
@@ -24,6 +25,7 @@ from app.mcp.server import (
     _runtime_unit_counts,
     reset_request_user,
     set_request_user,
+    set_shared_bridge_provider,
     set_shared_runtime_provider,
 )
 from app.mcp.schemas import RuntimeOutcome, RuntimeStatus
@@ -274,3 +276,50 @@ def test_get_runtime_uses_per_request_user_provider():
     finally:
         reset_request_user(token)
         set_shared_runtime_provider(None)
+
+
+@pytest.mark.asyncio
+async def test_mcp_runtime_write_creates_persisted_proposal(
+    session_maker, user, monkeypatch
+):
+    from app.ai.command_governance import CommandApprovalQueue
+    from app.ai.command_service import list_command_proposals
+    from app.mcp import server as mcp_server_mod
+
+    monkeypatch.setattr(mcp_server_mod, "async_session_maker", session_maker)
+
+    class _Registry:
+        def has_skill(self, skill: str) -> bool:
+            return skill == "simulation_step"
+
+        def execute(self, skill: str, parameters: dict) -> dict:
+            return {"skill": skill, "parameters": parameters}
+
+    runtime = _make_runtime(sides=[_make_side("blue", "BLUE")])
+    bridge = SimpleNamespace(
+        command_approvals=CommandApprovalQueue(runtime, _Registry())  # type: ignore[arg-type]
+    )
+    ctx = SimpleNamespace(
+        request_context=SimpleNamespace(
+            lifespan_context=SimpleNamespace(user=None, runtime=None)
+        )
+    )
+
+    token = set_request_user(user)
+    set_shared_bridge_provider(lambda current_user: bridge)
+    try:
+        payload = await _create_runtime_proposal(
+            ctx,  # type: ignore[arg-type]
+            command="MCP runtime_step steps=3",
+            skill="simulation_step",
+            parameters={"steps": 3},
+        )
+        async with session_maker() as session:
+            proposals = await list_command_proposals(session, user)
+    finally:
+        reset_request_user(token)
+        set_shared_bridge_provider(None)
+
+    assert payload["action"] == "command_proposal_created"
+    assert payload["proposal"]["source"] == "mcp"
+    assert proposals[0].id == payload["proposal"]["id"]

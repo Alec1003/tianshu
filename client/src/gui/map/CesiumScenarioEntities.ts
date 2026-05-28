@@ -18,6 +18,7 @@ import Aircraft from "@/game/units/Aircraft";
 import Airbase from "@/game/units/Airbase";
 import Facility from "@/game/units/Facility";
 import ReferencePoint from "@/game/units/ReferencePoint";
+import Obstacle from "@/game/units/Obstacle";
 import Scenario from "@/game/Scenario";
 import Ship from "@/game/units/Ship";
 import { NAUTICAL_MILES_TO_METERS } from "@/utils/constants";
@@ -105,7 +106,8 @@ export type ScenarioUnit =
   | { type: "ship"; unit: Ship }
   | { type: "facility"; unit: Facility }
   | { type: "airbase"; unit: Airbase }
-  | { type: "referencePoint"; unit: ReferencePoint };
+  | { type: "referencePoint"; unit: ReferencePoint }
+  | { type: "obstacle"; unit: Obstacle };
 
 type ScenarioMapUnit = Aircraft | Ship | Facility | Airbase | ReferencePoint;
 
@@ -178,6 +180,7 @@ export class CesiumScenarioEntities {
   // both an icon entity and a route polyline simultaneously.
   private readonly routes = new Map<string, Entity>();
   private readonly ranges = new Map<string, Entity>();
+  private readonly obstacleEntities = new Map<string, Entity>();
   // Flying / in-flight weapons (scenario.weapons), keyed by weapon.id.
   private readonly weaponEntities = new Map<string, Entity>();
   // Latest typed snapshot of units, indexed by id. Refreshed each sync().
@@ -275,6 +278,11 @@ export class CesiumScenarioEntities {
       isObjectVisible(unit, visibility)
     )) {
       this.unitIndex.set(rp.id, { type: "referencePoint", unit: rp });
+    }
+    for (const obstacle of scenario.obstacles.filter((unit) =>
+      isObjectVisible(unit, visibility)
+    )) {
+      this.unitIndex.set(obstacle.id, { type: "obstacle", unit: obstacle });
     }
 
     // Pre-warm icon cache for every (svg, color) combo seen this frame without
@@ -374,10 +382,6 @@ export class CesiumScenarioEntities {
         this.entities.delete(id);
       }
     }
-    if (this.selectedId && !wantIds.has(this.selectedId)) {
-      this.selectedId = null;
-    }
-
     if (showRoutes) {
       this.syncRoutes(scenario, visibility);
     } else {
@@ -388,7 +392,15 @@ export class CesiumScenarioEntities {
     } else {
       this.clearRanges();
     }
+    this.syncObstacles(scenario, visibility);
     this.syncWeapons(scenario, visibility);
+    if (
+      this.selectedId &&
+      !wantIds.has(this.selectedId) &&
+      !this.obstacleEntities.has(this.selectedId)
+    ) {
+      this.selectedId = null;
+    }
   }
 
   private clearRoutes(): void {
@@ -561,6 +573,72 @@ export class CesiumScenarioEntities {
     }
   }
 
+  private syncObstacles(
+    scenario: Scenario,
+    visibility: AuthoritativeScenarioVisibility
+  ): void {
+    const want = new Set<string>();
+    for (const obstacle of scenario.obstacles.filter((unit) =>
+      isObjectVisible(unit, visibility)
+    )) {
+      want.add(obstacle.id);
+      const radius = Math.max(0, obstacle.radiusNm) * NAUTICAL_MILES_TO_METERS;
+      if (radius <= 0) continue;
+      const position = Cartesian3.fromDegrees(
+        obstacle.longitude,
+        obstacle.latitude
+      );
+      const baseColor = Color.fromCssColorString(obstacle.sideColor);
+      const selected = this.selectedId === obstacle.id;
+      const fill = new ColorMaterialProperty(
+        baseColor.withAlpha(selected ? 0.26 : 0.14)
+      );
+      const outline = baseColor.withAlpha(obstacle.active ? 0.95 : 0.45);
+      const existing = this.obstacleEntities.get(obstacle.id);
+      if (existing && existing.ellipse && existing.label) {
+        (existing.position as unknown) = position;
+        (existing.ellipse.semiMajorAxis as unknown) = radius;
+        (existing.ellipse.semiMinorAxis as unknown) = radius;
+        (existing.ellipse.material as unknown) = fill;
+        (existing.ellipse.outlineColor as unknown) = outline;
+        (existing.label.text as unknown) = localizeUnitName(obstacle.name);
+        (existing.label.fillColor as unknown) = outline;
+      } else {
+        const entity = this.viewer.entities.add({
+          id: obstacle.id,
+          position,
+          ellipse: {
+            semiMajorAxis: radius,
+            semiMinorAxis: radius,
+            material: fill,
+            outline: true,
+            outlineColor: outline,
+            outlineWidth: selected ? 3 : 1,
+            height: 0,
+          },
+          label: {
+            text: localizeUnitName(obstacle.name),
+            font: "12px Roboto, Helvetica, Arial, sans-serif",
+            fillColor: outline,
+            outlineColor: Color.BLACK,
+            outlineWidth: 1,
+            style: LabelStyle.FILL_AND_OUTLINE,
+            verticalOrigin: VerticalOrigin.CENTER,
+            horizontalOrigin: HorizontalOrigin.CENTER,
+            showBackground: false,
+          },
+        });
+        this.obstacleEntities.set(obstacle.id, entity);
+      }
+    }
+    for (const [id, entity] of this.obstacleEntities) {
+      if (!want.has(id)) {
+        this.viewer.entities.remove(entity);
+        this.obstacleEntities.delete(id);
+      }
+    }
+  }
+
   destroy(): void {
     for (const entity of this.entities.values()) {
       this.viewer.entities.remove(entity);
@@ -574,10 +652,14 @@ export class CesiumScenarioEntities {
     for (const entity of this.weaponEntities.values()) {
       this.viewer.entities.remove(entity);
     }
+    for (const entity of this.obstacleEntities.values()) {
+      this.viewer.entities.remove(entity);
+    }
     this.entities.clear();
     this.routes.clear();
     this.ranges.clear();
     this.weaponEntities.clear();
+    this.obstacleEntities.clear();
     this.unitIndex.clear();
     this.selectedId = null;
   }

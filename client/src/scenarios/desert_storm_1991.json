@@ -174,7 +174,12 @@
         "homeBaseId": "storm-airbase-king-khalid",
         "rtb": false,
         "targetId": "",
-        "desiredRoute": []
+        "desiredRoute": [],
+        "isElectronicWarfare": true,
+        "jammingRange": 140,
+        "jammingStrength": 0.5,
+        "jammingModes": ["radar", "communications"],
+        "communicationDisruption": 0.3
       },
       {
         "id": "storm-air-f117",

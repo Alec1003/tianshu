@@ -28,6 +28,11 @@ interface IAircraft {
   fuelOffloadCapacity?: number;
   fuelTransferRate?: number;
   refuelRange?: number;
+  isElectronicWarfare?: boolean;
+  jammingRange?: number;
+  jammingStrength?: number;
+  jammingModes?: string[];
+  communicationDisruption?: number;
 }
 
 export default class Aircraft {
@@ -57,6 +62,11 @@ export default class Aircraft {
   fuelOffloadCapacity: number;
   fuelTransferRate: number;
   refuelRange: number;
+  isElectronicWarfare: boolean;
+  jammingRange: number;
+  jammingStrength: number;
+  jammingModes: string[];
+  communicationDisruption: number;
 
   constructor(parameters: IAircraft) {
     this.id = parameters.id;
@@ -104,6 +114,32 @@ export default class Aircraft {
         : this.isTanker
           ? 2
           : 0;
+    const ewTokens = [
+      "electronic",
+      "ewar",
+      "jammer",
+      "growler",
+      "prowler",
+      "raven",
+      "电子战",
+      "干扰",
+    ];
+    this.isElectronicWarfare =
+      parameters.isElectronicWarfare ??
+      ewTokens.some((token) => classNameLower.includes(token));
+    this.jammingRange =
+      parameters.jammingRange && parameters.jammingRange > 0
+        ? parameters.jammingRange
+        : 0;
+    this.jammingStrength = Math.max(
+      0,
+      Math.min(0.85, parameters.jammingStrength ?? 0)
+    );
+    this.jammingModes = parameters.jammingModes ?? [];
+    this.communicationDisruption = Math.max(
+      0,
+      Math.min(0.85, parameters.communicationDisruption ?? 0)
+    );
   }
 
   getTotalWeaponQuantity(): number {

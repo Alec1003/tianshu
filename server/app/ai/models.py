@@ -127,6 +127,7 @@ RuntimeUnitType = Literal[
     "facility",
     "airbase",
     "reference_point",
+    "obstacle",
 ]
 
 
@@ -138,6 +139,12 @@ class RuntimeDeployUnitRequest(BaseModel):
     side: str | None = None
     name: str | None = None
     altitude: float | None = None
+    radius_nm: float | None = Field(default=None, ge=0)
+    obstacle_type: str | None = None
+    movement_penalty: float | None = Field(default=None, ge=0, le=1)
+    detection_penalty: float | None = Field(default=None, ge=0, le=1)
+    communication_penalty: float | None = Field(default=None, ge=0, le=1)
+    affected_domains: list[str] | None = None
 
 
 class RuntimeMoveUnitRequest(BaseModel):

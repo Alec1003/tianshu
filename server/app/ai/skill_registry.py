@@ -137,6 +137,26 @@ class AICCSkillRegistry:
         )
         self._register(
             RegisteredSkill(
+                name="deploy_obstacle",
+                description="部署仿真环境障碍/约束区",
+                parameters={
+                    "class_name": {"type": "string"},
+                    "latitude": {"type": "number"},
+                    "longitude": {"type": "number"},
+                    "side": {"type": "string", "required": False},
+                    "name": {"type": "string", "required": False},
+                    "radius_nm": {"type": "number", "required": False},
+                    "obstacle_type": {"type": "string", "required": False},
+                    "movement_penalty": {"type": "number", "required": False},
+                    "detection_penalty": {"type": "number", "required": False},
+                    "communication_penalty": {"type": "number", "required": False},
+                    "affected_domains": {"type": "array", "required": False},
+                },
+                func=self.runtime.deploy_obstacle,
+            )
+        )
+        self._register(
+            RegisteredSkill(
                 name="deploy_reference_point",
                 description="新增参考点",
                 parameters={

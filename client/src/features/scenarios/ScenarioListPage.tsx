@@ -1520,6 +1520,11 @@ type AddUnitForm = {
   fuelOffloadCapacity: string;
   fuelTransferRate: string;
   refuelRange: string;
+  isElectronicWarfare: boolean;
+  jammingRange: string;
+  jammingStrength: string;
+  jammingModes: string;
+  communicationDisruption: string;
 };
 
 const DEFAULT_UNIT_FORM: AddUnitForm = {
@@ -1537,6 +1542,11 @@ const DEFAULT_UNIT_FORM: AddUnitForm = {
   fuelOffloadCapacity: "",
   fuelTransferRate: "",
   refuelRange: "",
+  isElectronicWarfare: false,
+  jammingRange: "",
+  jammingStrength: "",
+  jammingModes: "radar,communications",
+  communicationDisruption: "",
 };
 
 function AddUnitAssetDialog({
@@ -1836,6 +1846,50 @@ function AddUnitAssetDialog({
                   />
                 </div>
               )}
+              <label className="mt-4 flex items-center gap-3 text-sm text-slate-300">
+                <input
+                  type="checkbox"
+                  checked={form.isElectronicWarfare}
+                  onChange={(event) =>
+                    update({ isElectronicWarfare: event.target.checked })
+                  }
+                  className="size-4 accent-cyan-400"
+                />
+                电子战 / 雷达干扰能力
+              </label>
+              {form.isElectronicWarfare && (
+                <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-4">
+                  <AssetFormInput
+                    label="干扰半径"
+                    value={form.jammingRange}
+                    onChange={(value) => update({ jammingRange: value })}
+                    placeholder="150"
+                    type="number"
+                  />
+                  <AssetFormInput
+                    label="干扰强度"
+                    value={form.jammingStrength}
+                    onChange={(value) => update({ jammingStrength: value })}
+                    placeholder="0.55"
+                    type="number"
+                  />
+                  <AssetFormInput
+                    label="通信扰动"
+                    value={form.communicationDisruption}
+                    onChange={(value) =>
+                      update({ communicationDisruption: value })
+                    }
+                    placeholder="0.35"
+                    type="number"
+                  />
+                  <AssetFormInput
+                    label="干扰模式"
+                    value={form.jammingModes}
+                    onChange={(value) => update({ jammingModes: value })}
+                    placeholder="radar,communications"
+                  />
+                </div>
+              )}
             </div>
           )}
 
@@ -1981,6 +2035,22 @@ function createUnitAssetPayloadFromForm(form: AddUnitForm): {
         ? readOptionalNumber(form.fuelTransferRate)
         : 0,
       refuelRange: form.isTanker ? readOptionalNumber(form.refuelRange) : 0,
+      isElectronicWarfare: form.isElectronicWarfare,
+      jammingRange: form.isElectronicWarfare
+        ? readOptionalNumber(form.jammingRange)
+        : 0,
+      jammingStrength: form.isElectronicWarfare
+        ? readOptionalNumber(form.jammingStrength)
+        : 0,
+      jammingModes: form.isElectronicWarfare
+        ? form.jammingModes
+            .split(",")
+            .map((mode) => mode.trim())
+            .filter(Boolean)
+        : [],
+      communicationDisruption: form.isElectronicWarfare
+        ? readOptionalNumber(form.communicationDisruption)
+        : 0,
       dataSource: {
         speedSrc: "Manual",
         maxFuelSrc: "Manual",
@@ -1992,6 +2062,7 @@ function createUnitAssetPayloadFromForm(form: AddUnitForm): {
         maxFuelUnit: "kg",
         fuelRateUnit: "kg/h",
         rangeUnit: "nm",
+        jammingRangeUnit: "nm",
       },
     };
   } else if (form.type === "ship") {
@@ -2078,11 +2149,21 @@ function unitAssetFormFromData(
     fuelOffloadCapacity: toFormValue(data.fuelOffloadCapacity),
     fuelTransferRate: toFormValue(data.fuelTransferRate),
     refuelRange: toFormValue(data.refuelRange),
+    isElectronicWarfare: Boolean(data.isElectronicWarfare),
+    jammingRange: toFormValue(data.jammingRange),
+    jammingStrength: toFormValue(data.jammingStrength),
+    jammingModes: Array.isArray(data.jammingModes)
+      ? data.jammingModes.join(",")
+      : typeof data.jammingModes === "string"
+        ? data.jammingModes
+        : "radar,communications",
+    communicationDisruption: toFormValue(data.communicationDisruption),
   };
 }
 
 const UNIT_ASSET_STATUS_LABELS: Record<string, string> = {
   "TANKER READY": "加油机就绪",
+  "EW READY": "电子战就绪",
   "AIR ASSET": "空中单位",
   "SURFACE ASSET": "水面舰艇",
   "GROUND ASSET": "地面设施",
@@ -2107,6 +2188,11 @@ const UNIT_ASSET_FIELD_LABELS: Record<string, string> = {
   fuelOffloadCapacity: "可卸载燃油",
   fuelTransferRate: "输油速率",
   refuelRange: "加油半径",
+  isElectronicWarfare: "电子战能力",
+  jammingRange: "干扰半径",
+  jammingStrength: "干扰强度",
+  jammingModes: "干扰模式",
+  communicationDisruption: "通信扰动",
 };
 
 const UNIT_ASSET_SOURCE_LABELS: Record<string, string> = {
@@ -2202,9 +2288,11 @@ function buildUnitAssetRecords(apiAssets: ApiUnitAsset[]): UnitAssetRecord[] {
     if (asset.type === "aircraft") {
       const unit = asset.data as unknown as IAircraftModel;
       const canonicalName = unit.className;
-      const role = unit.isTanker
-        ? "空中加油机"
-        : classifyAircraft(canonicalName);
+      const role = unit.isElectronicWarfare
+        ? "电子战机"
+        : unit.isTanker
+          ? "空中加油机"
+          : classifyAircraft(canonicalName);
       return makeAssetRecord({
         id: asset.id,
         assetId: asset.id,
@@ -2219,7 +2307,11 @@ function buildUnitAssetRecords(apiAssets: ApiUnitAsset[]): UnitAssetRecord[] {
           unit.range,
           unit.units?.rangeUnit
         ),
-        status: unit.isTanker ? "TANKER READY" : "AIR ASSET",
+        status: unit.isElectronicWarfare
+          ? "EW READY"
+          : unit.isTanker
+            ? "TANKER READY"
+            : "AIR ASSET",
         raw: unit,
         isSystem: asset.is_system,
         version: asset.version,
@@ -2228,6 +2320,9 @@ function buildUnitAssetRecords(apiAssets: ApiUnitAsset[]): UnitAssetRecord[] {
           unit.maxFuel,
           unit.fuelRate,
           unit.isTanker ? "tanker refuel fuelOffload" : "",
+          unit.isElectronicWarfare
+            ? `electronic warfare ewar jammer jamming ${unit.jammingRange ?? ""} ${unit.jammingStrength ?? ""}`
+            : "",
         ].join(" "),
       });
     }
@@ -2327,7 +2422,11 @@ function buildUnitAssetRecords(apiAssets: ApiUnitAsset[]): UnitAssetRecord[] {
 function buildUnitAssets(unitDb: Dba): UnitAssetRecord[] {
   const aircraft = unitDb.getAircraftDb().map((unit) => {
     const canonicalName = unit.className;
-    const role = unit.isTanker ? "空中加油机" : classifyAircraft(canonicalName);
+    const role = unit.isElectronicWarfare
+      ? "电子战机"
+      : unit.isTanker
+        ? "空中加油机"
+        : classifyAircraft(canonicalName);
     return makeAssetRecord({
       type: "aircraft",
       typeLabel: "飞机",
@@ -2340,12 +2439,19 @@ function buildUnitAssets(unitDb: Dba): UnitAssetRecord[] {
         unit.range,
         unit.units?.rangeUnit
       ),
-      status: unit.isTanker ? "TANKER READY" : "AIR ASSET",
+      status: unit.isElectronicWarfare
+        ? "EW READY"
+        : unit.isTanker
+          ? "TANKER READY"
+          : "AIR ASSET",
       raw: unit,
       extra: [
         unit.maxFuel,
         unit.fuelRate,
         unit.isTanker ? "tanker refuel fuelOffload" : "",
+        unit.isElectronicWarfare
+          ? `electronic warfare ewar jammer jamming ${unit.jammingRange ?? ""} ${unit.jammingStrength ?? ""}`
+          : "",
       ].join(" "),
     });
   });
@@ -2488,6 +2594,19 @@ function countUnitAssets(assets: UnitAssetRecord[]) {
 
 function classifyAircraft(className: string) {
   const lower = className.toLowerCase();
+  if (
+    lower.includes("ea-") ||
+    lower.includes("ef-111") ||
+    lower.includes("growler") ||
+    lower.includes("prowler") ||
+    lower.includes("raven") ||
+    lower.includes("electronic") ||
+    lower.includes("jammer") ||
+    lower.includes("电子战") ||
+    lower.includes("干扰")
+  ) {
+    return "电子战机";
+  }
   if (lower.includes("kc-") || lower.includes("tanker")) return "空中加油机";
   if (lower.includes("b-")) return "轰炸机";
   if (lower.includes("c-")) return "运输机";

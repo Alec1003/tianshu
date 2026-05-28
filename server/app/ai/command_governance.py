@@ -27,6 +27,7 @@ ALLOWED_SKILLS = {
     "deploy_ship",
     "deploy_facility",
     "deploy_airbase",
+    "deploy_obstacle",
     "deploy_reference_point",
     "delete_unit",
     "move_unit",
@@ -67,6 +68,7 @@ UNIT_LOOKUP = {
     "facility": "get_facility",
     "airbase": "get_airbase",
     "reference_point": "get_reference_point",
+    "obstacle": "get_obstacle",
 }
 
 
@@ -279,11 +281,16 @@ class CommandRuleEngine:
         if side:
             issues.extend(self._validate_side(step.id, str(side)))
         else:
+            message = (
+                "未指定阵营，将创建中立环境约束区。"
+                if step.skill == "deploy_obstacle"
+                else "未指定阵营，将使用当前后端 runtime 激活阵营。"
+            )
             issues.append(
                 self._issue(
                     "info",
                     "default_side",
-                    "未指定阵营，将使用当前后端 runtime 激活阵营。",
+                    message,
                     step.id,
                     "side",
                 )
@@ -301,7 +308,7 @@ class CommandRuleEngine:
                 self._issue(
                     "blocking",
                     "invalid_unit_type",
-                    "单位类型必须是 aircraft、ship、facility、airbase 或 reference_point。",
+                    "单位类型必须是 aircraft、ship、facility、airbase、reference_point 或 obstacle。",
                     step.id,
                     "unit_type",
                 )

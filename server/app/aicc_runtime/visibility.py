@@ -12,6 +12,7 @@ if str(GYM_DIR) not in sys.path:
     sys.path.insert(0, str(GYM_DIR))
 
 from blade.utils.constants import NAUTICAL_MILES_TO_METERS  # type: ignore  # noqa: E402
+from blade.engine.electronicWarfare import get_effective_detection_range  # type: ignore  # noqa: E402
 from blade.utils.utils import get_distance_between_two_points  # type: ignore  # noqa: E402
 
 
@@ -21,6 +22,7 @@ VISIBLE_COLLECTIONS: tuple[tuple[str, str], ...] = (
     ("facilities", "facilities"),
     ("airbases", "airbases"),
     ("referencePoints", "reference_points"),
+    ("obstacles", "obstacles"),
     ("weapons", "weapons"),
 )
 SENSOR_COLLECTIONS = ("aircraft", "ships", "facilities")
@@ -68,7 +70,9 @@ def _detected_by_viewer_sensors(
         return True
 
     for sensor in sensors:
-        detection_range_nm = _as_float(sensor.get_detection_range())
+        detection_range_nm = _as_float(
+            get_effective_detection_range(scenario, sensor)
+        )
         if detection_range_nm <= 0:
             continue
 

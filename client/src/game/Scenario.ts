@@ -4,6 +4,7 @@ import Facility from "@/game/units/Facility";
 import Side from "@/game/Side";
 import Weapon from "@/game/units/Weapon";
 import Ship from "@/game/units/Ship";
+import Obstacle from "@/game/units/Obstacle";
 import { getDistanceBetweenTwoPoints } from "@/utils/mapFunctions";
 import ReferencePoint from "@/game/units/ReferencePoint";
 import PatrolMission from "@/game/mission/PatrolMission";
@@ -42,6 +43,7 @@ interface IScenario {
   airbases?: Airbase[];
   weapons?: Weapon[];
   referencePoints?: ReferencePoint[];
+  obstacles?: Obstacle[];
   missions?: PatrolMission[];
   relationships?: Relationships;
   doctrine?: Doctrine;
@@ -61,6 +63,7 @@ export default class Scenario {
   airbases: Airbase[];
   weapons: Weapon[];
   referencePoints: ReferencePoint[];
+  obstacles: Obstacle[];
   missions: Mission[];
   relationships: Relationships;
   doctrine: Doctrine;
@@ -83,6 +86,7 @@ export default class Scenario {
     this.weapons = parameters.weapons ?? [];
     this.ships = parameters.ships ?? [];
     this.referencePoints = parameters.referencePoints ?? [];
+    this.obstacles = parameters.obstacles ?? [];
     this.missions = parameters.missions ?? [];
     this.relationships = parameters.relationships ?? new Relationships({});
     // 防御性兜底：servers / 历史快照可能把 doctrine 序列化成 {} 或缺失某些
@@ -198,6 +202,10 @@ export default class Scenario {
     return this.referencePoints.find(
       (referencePoint) => referencePoint.id === referencePointId
     );
+  }
+
+  getObstacle(obstacleId: string | null): Obstacle | undefined {
+    return this.obstacles.find((obstacle) => obstacle.id === obstacleId);
   }
 
   getPatrolMission(missionId: string | null): PatrolMission | undefined {

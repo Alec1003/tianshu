@@ -220,6 +220,8 @@ def _collect_metrics(
     fuel_before = 0.0
     ammo_drop = 0.0
     ammo_before = 0.0
+    refueling_event_count = 0
+    refueled_amount = 0.0
     for change in changes:
         if not _side_matches(change.get("side_id"), trainee_side_id):
             continue
@@ -234,6 +236,19 @@ def _collect_metrics(
         if isinstance(ammo, dict) and (drop := _positive_drop(ammo)):
             ammo_drop += drop[0]
             ammo_before += drop[1]
+    for event in events:
+        payload = event.payload if isinstance(event.payload, dict) else {}
+        state = payload.get("state") if isinstance(payload, dict) else {}
+        refueling_events = (
+            state.get("refuelingEvents") if isinstance(state, dict) else None
+        )
+        if not isinstance(refueling_events, list):
+            continue
+        for refueling_event in refueling_events:
+            if not isinstance(refueling_event, dict):
+                continue
+            refueling_event_count += 1
+            refueled_amount += float(refueling_event.get("fuelTransferred") or 0)
 
     warnings, blockers = _collect_adjudication_counts(events)
     elapsed_seconds = _aar_elapsed(latest_aar)
@@ -256,6 +271,10 @@ def _collect_metrics(
         "fuel_before": round(fuel_before, 3),
         "ammo_drop": round(ammo_drop, 3),
         "ammo_before": round(ammo_before, 3),
+        "refueling_event_count": refueling_event_count,
+        "refueled_amount": round(refueled_amount, 3),
+        "tanker_count": sum(1 for unit in initial_units if unit.get("isTanker")),
+        "obstacle_count": len(inner.get("obstacles") or []),
         "warning_count": warnings,
         "blocking_count": blockers,
         "proposal_count": event_types.get("command.proposed", 0),
@@ -361,6 +380,8 @@ def _resource_efficiency(metrics: dict[str, Any]) -> TrainingScoreDimension:
     ammo_before = float(metrics["ammo_before"] or 0)
     fuel_ratio = float(metrics["fuel_drop"] or 0) / fuel_before if fuel_before else 0
     ammo_ratio = float(metrics["ammo_drop"] or 0) / ammo_before if ammo_before else 0
+    refueling_events = int(metrics["refueling_event_count"] or 0)
+    obstacle_count = int(metrics["obstacle_count"] or 0)
 
     if fuel_before == 0 and ammo_before == 0:
         score = 70 if metrics["event_count"] else 55
@@ -370,6 +391,11 @@ def _resource_efficiency(metrics: dict[str, Any]) -> TrainingScoreDimension:
         summary = "油弹消耗处于可解释区间。"
         if fuel_ratio > 0.45 or ammo_ratio > 0.45:
             summary = "资源消耗偏高，需要优化任务路径和火力分配。"
+    if refueling_events:
+        score += min(6, refueling_events * 2)
+        summary = "已记录空中加油补给，资源调度具备可追踪证据。"
+    if obstacle_count and not refueling_events and fuel_ratio > 0.35:
+        summary = "存在障碍/约束区且油料消耗偏高，需要复盘航路与补给计划。"
 
     return _dimension(
         "resource_efficiency",
@@ -378,6 +404,8 @@ def _resource_efficiency(metrics: dict[str, Any]) -> TrainingScoreDimension:
         [
             f"油料消耗={metrics['fuel_drop']}",
             f"弹药消耗={metrics['ammo_drop']}",
+            f"空中加油事件={refueling_events}",
+            f"障碍/约束区={obstacle_count}",
         ],
     )
 

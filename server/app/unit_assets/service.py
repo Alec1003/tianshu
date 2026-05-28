@@ -60,6 +60,9 @@ NUMERIC_FIELDS: dict[str, tuple[str, ...]] = {
         "fuelOffloadCapacity",
         "fuelTransferRate",
         "refuelRange",
+        "jammingRange",
+        "jammingStrength",
+        "communicationDisruption",
     ),
     "ship": ("speed", "maxFuel", "fuelRate", "range"),
     "facility": ("range",),
@@ -169,6 +172,26 @@ async def _find_scope_conflict(
     if existing is not None and existing.id != exclude_id:
         return existing
     return None
+
+
+async def find_accessible_unit_asset_by_name(
+    session: AsyncSession,
+    user: User,
+    *,
+    asset_type: str,
+    name: str,
+) -> UnitAsset | None:
+    if asset_type not in VALID_UNIT_ASSET_TYPES:
+        raise UnitAssetInvalidError("type", "unknown unit asset type")
+    normalized_name = name.strip()
+    if not normalized_name:
+        return None
+    user_asset = await _find_user_by_type_name(
+        session, user, asset_type, normalized_name
+    )
+    if user_asset is not None:
+        return user_asset
+    return await _find_system_by_type_name(session, asset_type, normalized_name)
 
 
 async def list_unit_assets(

@@ -105,6 +105,11 @@ class Aircraft:
         fuel_offload_capacity: float = 0.0,
         fuel_transfer_rate: float = 0.0,
         refuel_range: float = 0.0,
+        is_electronic_warfare: bool = False,
+        jamming_range: float = 0.0,
+        jamming_strength: float = 0.0,
+        jamming_modes: Optional[List[str]] = None,
+        communication_disruption: float = 0.0,
     ):
         self.id = id
         self.name = name
@@ -150,6 +155,25 @@ class Aircraft:
             refuel_range
             if refuel_range > 0
             else (2.0 if self.is_tanker else 0.0)
+        )
+        ew_name_tokens = (
+            "electronic",
+            "ewar",
+            "jammer",
+            "growler",
+            "prowler",
+            "raven",
+            "电子战",
+            "干扰",
+        )
+        self.is_electronic_warfare = is_electronic_warfare or any(
+            token in class_name_lower for token in ew_name_tokens
+        )
+        self.jamming_range = jamming_range if jamming_range > 0 else 0.0
+        self.jamming_strength = max(0.0, min(0.85, jamming_strength))
+        self.jamming_modes = jamming_modes if jamming_modes is not None else []
+        self.communication_disruption = max(
+            0.0, min(0.85, communication_disruption)
         )
 
     def get_total_weapon_quantity(self) -> int:
@@ -200,4 +224,9 @@ class Aircraft:
             "fuel_offload_capacity": self.fuel_offload_capacity,
             "fuel_transfer_rate": self.fuel_transfer_rate,
             "refuel_range": self.refuel_range,
+            "is_electronic_warfare": self.is_electronic_warfare,
+            "jamming_range": self.jamming_range,
+            "jamming_strength": self.jamming_strength,
+            "jamming_modes": self.jamming_modes,
+            "communication_disruption": self.communication_disruption,
         }

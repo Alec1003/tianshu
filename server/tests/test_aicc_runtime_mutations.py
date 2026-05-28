@@ -55,6 +55,37 @@ def test_deploy_aircraft_uses_backend_weapon_loadout() -> None:
     assert [weapon.current_quantity for weapon in aircraft.weapons] == [4, 2, 2]
 
 
+def test_deploy_aircraft_uses_unit_asset_electronic_warfare_template() -> None:
+    runtime = _runtime()
+
+    state = runtime.deploy_aircraft(
+        "Custom EW",
+        latitude=10.0,
+        longitude=20.0,
+        side="blue",
+        template={
+            "className": "Custom EW",
+            "speed": 820,
+            "maxFuel": 14000,
+            "fuelRate": 4200,
+            "range": 800,
+            "isElectronicWarfare": True,
+            "jammingRange": 125,
+            "jammingStrength": 0.5,
+            "jammingModes": ["radar"],
+            "communicationDisruption": 0.2,
+        },
+    )
+
+    aircraft = runtime.game.current_scenario.get_aircraft(state["unitId"])
+    assert aircraft is not None
+    assert aircraft.is_electronic_warfare is True
+    assert aircraft.jamming_range == 125
+    assert aircraft.jamming_strength == 0.5
+    assert aircraft.jamming_modes == ["radar"]
+    assert aircraft.weapons == []
+
+
 def test_runtime_unit_mutations_are_applied_in_backend_scenario() -> None:
     runtime = _runtime()
     runtime.deploy_ship("Destroyer", 11.0, 21.0, side="blue")
@@ -68,6 +99,55 @@ def test_runtime_unit_mutations_are_applied_in_backend_scenario() -> None:
     assert ship.latitude == 14.0
     assert ship.longitude == 24.0
     assert ship.is_objective is True
+
+
+def test_runtime_obstacle_mutations_are_applied_in_backend_scenario() -> None:
+    runtime = _runtime()
+
+    state = runtime.deploy_obstacle(
+        "禁行区",
+        latitude=11.0,
+        longitude=21.0,
+        radius_nm=12.0,
+        obstacle_type="no_go",
+        movement_penalty=1.0,
+        detection_penalty=0.0,
+        affected_domains=["aircraft"],
+    )
+    obstacle = runtime.game.current_scenario.get_obstacle(state["unitId"])
+
+    assert obstacle is not None
+    assert obstacle.class_name == "禁行区"
+    assert obstacle.radius_nm == 12.0
+    assert obstacle.affected_domains == ["aircraft"]
+
+    runtime.set_unit_position("obstacle", obstacle.id, 12.0, 22.0)
+    runtime.update_unit_state(
+        "obstacle",
+        obstacle.id,
+        {
+            "name": "天气约束区",
+            "obstacleType": "weather",
+            "radiusNm": 20.0,
+            "movementPenalty": 0.25,
+            "detectionPenalty": 0.35,
+            "communicationPenalty": 0.15,
+            "affectedDomains": ["aircraft", "ship"],
+        },
+    )
+
+    assert obstacle.latitude == 12.0
+    assert obstacle.longitude == 22.0
+    assert obstacle.name == "天气约束区"
+    assert obstacle.obstacle_type == "weather"
+    assert obstacle.radius_nm == 20.0
+    assert obstacle.movement_penalty == 0.25
+    assert obstacle.detection_penalty == 0.35
+    assert obstacle.communication_penalty == 0.15
+    assert obstacle.affected_domains == ["aircraft", "ship"]
+
+    runtime.delete_unit("obstacle", obstacle.id)
+    assert runtime.game.current_scenario.get_obstacle(obstacle.id) is None
 
 
 def test_runtime_weapon_mutations_use_backend_weapon_templates() -> None:
@@ -228,7 +308,17 @@ def test_step_simulation_reports_actual_steps_when_time_limit_stops_early() -> N
 
     state = runtime.step_simulation(5)
 
-    assert state == {"steps": 1, "requestedSteps": 5, "currentTime": 1}
+    assert state == {
+        "steps": 1,
+        "requestedSteps": 5,
+        "currentTime": 1,
+        "refuelingEvents": [],
+    }
 
     already_done = runtime.step_simulation(5)
-    assert already_done == {"steps": 0, "requestedSteps": 5, "currentTime": 1}
+    assert already_done == {
+        "steps": 0,
+        "requestedSteps": 5,
+        "currentTime": 1,
+        "refuelingEvents": [],
+    }

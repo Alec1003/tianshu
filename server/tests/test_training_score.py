@@ -202,3 +202,52 @@ def test_training_score_marks_sparse_data_as_low_confidence() -> None:
     assert score.metrics["event_count"] == 0
     assert dimensions["task_effectiveness"].score == 40
     assert any("样本" in item for item in score.improvements)
+
+
+def test_training_score_includes_refueling_and_obstacle_evidence() -> None:
+    scenario = _scenario()
+    scenario.data["currentScenario"]["obstacles"] = [
+        {
+            "id": "weather-zone",
+            "name": "天气约束区",
+            "className": "天气约束区",
+            "obstacleType": "weather",
+        }
+    ]
+    scenario.data["currentScenario"]["aircraft"][0]["isTanker"] = True
+    events = [
+        _event(
+            "runtime.step",
+            index=1,
+            payload={
+                "state": {
+                    "refuelingEvents": [
+                        {
+                            "receiverId": "blue-air-1",
+                            "tankerId": "blue-air-0",
+                            "fuelTransferred": 250.0,
+                        }
+                    ]
+                }
+            },
+            unit_changes=[
+                {
+                    "change_type": "updated",
+                    "unit_type": "aircraft",
+                    "unit_id": "blue-air-1",
+                    "side_id": "blue",
+                    "fields": {"currentFuel": {"before": 100.0, "after": 80.0}},
+                }
+            ],
+        )
+    ]
+
+    score = build_training_score(scenario, events, [_aar(winner_side_id="blue")])
+    resource = _dimensions(score)["resource_efficiency"]
+
+    assert score.metrics["refueling_event_count"] == 1
+    assert score.metrics["refueled_amount"] == 250.0
+    assert score.metrics["tanker_count"] == 1
+    assert score.metrics["obstacle_count"] == 1
+    assert any("空中加油事件=1" == item for item in resource.evidence)
+    assert any("障碍/约束区=1" == item for item in resource.evidence)

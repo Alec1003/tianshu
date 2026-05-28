@@ -19,6 +19,7 @@ from blade.Scenario import Scenario  # noqa: E402
 from blade.Side import Side  # noqa: E402
 from blade.units.Aircraft import Aircraft  # noqa: E402
 from blade.units.Facility import Facility  # noqa: E402
+from blade.units.Obstacle import Obstacle  # noqa: E402
 from blade.units.Ship import Ship  # noqa: E402
 from blade.units.Weapon import Weapon  # noqa: E402
 from blade.utils.constants import NAUTICAL_MILES_TO_METERS  # noqa: E402
@@ -92,6 +93,65 @@ def test_threat_detection_includes_exact_sensor_range_boundary() -> None:
     )
 
     assert is_threat_detected(threat, detector) is True
+
+
+def test_threat_detection_uses_electronic_warfare_adjusted_sensor_range() -> None:
+    relationships = Relationships()
+    relationships.add_hostile("blue", "red")
+    threat = Aircraft(
+        id="target",
+        name="Target",
+        side_id="red",
+        class_name="Test Aircraft",
+        latitude=0.5,
+        longitude=0.0,
+        altitude=1000.0,
+        heading=0.0,
+        speed=300.0,
+        current_fuel=1000.0,
+        max_fuel=1000.0,
+        fuel_rate=100.0,
+        range=0.0,
+    )
+    jammer = Aircraft(
+        id="jammer",
+        name="Jammer",
+        side_id="red",
+        class_name="EA-18G Growler",
+        latitude=0.1,
+        longitude=0.0,
+        altitude=1000.0,
+        heading=0.0,
+        speed=300.0,
+        current_fuel=1000.0,
+        max_fuel=1000.0,
+        fuel_rate=100.0,
+        range=0.0,
+        is_electronic_warfare=True,
+        jamming_range=40.0,
+        jamming_strength=0.85,
+        jamming_modes=["radar"],
+    )
+    detector = Facility(
+        id="radar",
+        name="Radar",
+        side_id="blue",
+        class_name="Radar",
+        latitude=0.0,
+        longitude=0.0,
+        range=70.0,
+    )
+    scenario = Scenario(
+        sides=[
+            Side(id="blue", name="Blue", color="blue"),
+            Side(id="red", name="Red", color="red"),
+        ],
+        aircraft=[threat, jammer],
+        facilities=[detector],
+        relationships=relationships,
+    )
+
+    assert is_threat_detected(threat, detector, scenario) is False
 
 
 def test_scenario_defaults_do_not_share_mutable_state() -> None:
@@ -196,6 +256,70 @@ def test_aircraft_surface_engagement_attacks_hostile_surface_target_once() -> No
     assert len(scenario.weapons) == 1
 
 
+def test_aircraft_surface_engagement_respects_sensor_shadow_obstacle() -> None:
+    aircraft = Aircraft(
+        id="blue-aircraft",
+        name="Blue Aircraft",
+        side_id="blue",
+        class_name="Test Aircraft",
+        latitude=0.0,
+        longitude=0.0,
+        altitude=1000.0,
+        heading=0.0,
+        speed=300.0,
+        current_fuel=1000.0,
+        max_fuel=1000.0,
+        fuel_rate=100.0,
+        range=50.0,
+        weapons=[_surface_weapon()],
+    )
+    facility = Facility(
+        id="red-sam",
+        name="Red SAM",
+        side_id="red",
+        class_name="SAM",
+        latitude=0.0,
+        longitude=0.5,
+        range=100.0,
+        weapons=[],
+    )
+    relationships = Relationships()
+    relationships.add_hostile("blue", "red")
+    scenario = Scenario(
+        id="s1",
+        name="Surface engagement through sensor shadow",
+        start_time=0,
+        current_time=0,
+        duration=600,
+        sides=[
+            Side(id="blue", name="BLUE", color="blue"),
+            Side(id="red", name="RED", color="red"),
+        ],
+        aircraft=[aircraft],
+        facilities=[facility],
+        obstacles=[
+            Obstacle(
+                id="shadow",
+                name="Sensor Shadow",
+                class_name="Sensor Shadow",
+                latitude=facility.latitude,
+                longitude=facility.longitude,
+                radius_nm=5.0,
+                obstacle_type="sensor_shadow",
+                detection_penalty=0.6,
+                affected_domains=["aircraft"],
+            )
+        ],
+        relationships=relationships,
+    )
+    game = Game(current_scenario=scenario)
+
+    game.aircraft_surface_engagement()
+
+    assert scenario.weapons == []
+    assert aircraft.weapons[0].current_quantity == 2
+
+
 def test_manual_aircraft_attack_requires_declared_hostile_relationship() -> None:
     aircraft = Aircraft(
         id="blue-aircraft",
@@ -244,6 +368,61 @@ def test_manual_aircraft_attack_requires_declared_hostile_relationship() -> None
     )
 
     assert len(scenario.weapons) == 0
+    assert aircraft.weapons[0].current_quantity == 1
+
+
+def test_manual_aircraft_attack_requires_detected_target() -> None:
+    target_longitude = 0.45
+    target_distance_nm = (
+        get_distance_between_two_points(0.0, 0.0, 0.0, target_longitude) * 1000
+    ) / NAUTICAL_MILES_TO_METERS
+    aircraft = Aircraft(
+        id="blue-aircraft",
+        name="Blue Aircraft",
+        side_id="blue",
+        class_name="Test Aircraft",
+        latitude=0.0,
+        longitude=0.0,
+        altitude=1000.0,
+        heading=0.0,
+        speed=300.0,
+        current_fuel=1000.0,
+        max_fuel=1000.0,
+        fuel_rate=100.0,
+        range=target_distance_nm * 0.95,
+        weapons=[_surface_weapon(quantity=1)],
+    )
+    target = Facility(
+        id="red-site",
+        name="Red Site",
+        side_id="red",
+        class_name="Radar",
+        latitude=0.0,
+        longitude=target_longitude,
+        range=100.0,
+        weapons=[],
+    )
+    relationships = Relationships()
+    relationships.add_hostile("blue", "red")
+    scenario = Scenario(
+        id="s1",
+        name="Manual attack detection guard",
+        start_time=0,
+        current_time=0,
+        duration=600,
+        sides=[
+            Side(id="blue", name="BLUE", color="blue"),
+            Side(id="red", name="RED", color="red"),
+        ],
+        aircraft=[aircraft],
+        facilities=[target],
+        relationships=relationships,
+    )
+    game = Game(current_scenario=scenario)
+
+    game.handle_aircraft_attack("blue-aircraft", "red-site", "surface-weapon", 1)
+
+    assert scenario.weapons == []
     assert aircraft.weapons[0].current_quantity == 1
 
 
@@ -303,6 +482,145 @@ def test_strike_mission_requires_hostile_target() -> None:
     game.update_units_on_strike_mission()
 
     assert len(scenario.weapons) == 0
+    assert aircraft.weapons[0].current_quantity == 1
+
+
+def test_strike_mission_respects_sensor_shadow_obstacle() -> None:
+    aircraft = Aircraft(
+        id="blue-aircraft",
+        name="Blue Aircraft",
+        side_id="blue",
+        class_name="Test Aircraft",
+        latitude=0.0,
+        longitude=0.0,
+        altitude=1000.0,
+        heading=0.0,
+        speed=300.0,
+        current_fuel=1000.0,
+        max_fuel=1000.0,
+        fuel_rate=100.0,
+        range=50.0,
+        weapons=[_surface_weapon(quantity=1)],
+    )
+    target = Facility(
+        id="red-site",
+        name="Red Site",
+        side_id="red",
+        class_name="Radar",
+        latitude=0.0,
+        longitude=0.5,
+        range=100.0,
+        weapons=[],
+    )
+    relationships = Relationships()
+    relationships.add_hostile("blue", "red")
+    scenario = Scenario(
+        id="s1",
+        name="Strike through sensor shadow",
+        start_time=0,
+        current_time=0,
+        duration=600,
+        sides=[
+            Side(id="blue", name="BLUE", color="blue"),
+            Side(id="red", name="RED", color="red"),
+        ],
+        aircraft=[aircraft],
+        facilities=[target],
+        obstacles=[
+            Obstacle(
+                id="shadow",
+                name="Sensor Shadow",
+                class_name="Sensor Shadow",
+                latitude=target.latitude,
+                longitude=target.longitude,
+                radius_nm=5.0,
+                obstacle_type="sensor_shadow",
+                detection_penalty=0.6,
+                affected_domains=["aircraft"],
+            )
+        ],
+        missions=[
+            StrikeMission(
+                id="strike-1",
+                name="Strike",
+                side_id="blue",
+                assigned_unit_ids=[aircraft.id],
+                assigned_target_ids=[target.id],
+                active=True,
+            )
+        ],
+        relationships=relationships,
+    )
+    game = Game(current_scenario=scenario)
+
+    game.update_units_on_strike_mission()
+
+    assert scenario.weapons == []
+    assert aircraft.weapons[0].current_quantity == 1
+
+
+def test_strike_mission_does_not_launch_when_target_is_only_inside_tolerance_margin() -> None:
+    target_longitude = 0.45
+    target_distance_nm = (
+        get_distance_between_two_points(0.0, 0.0, 0.0, target_longitude) * 1000
+    ) / NAUTICAL_MILES_TO_METERS
+    aircraft = Aircraft(
+        id="blue-aircraft",
+        name="Blue Aircraft",
+        side_id="blue",
+        class_name="Test Aircraft",
+        latitude=0.0,
+        longitude=0.0,
+        altitude=1000.0,
+        heading=0.0,
+        speed=300.0,
+        current_fuel=1000.0,
+        max_fuel=1000.0,
+        fuel_rate=100.0,
+        range=target_distance_nm * 0.95,
+        weapons=[_surface_weapon(quantity=1)],
+    )
+    target = Facility(
+        id="red-site",
+        name="Red Site",
+        side_id="red",
+        class_name="Radar",
+        latitude=0.0,
+        longitude=target_longitude,
+        range=100.0,
+        weapons=[],
+    )
+    relationships = Relationships()
+    relationships.add_hostile("blue", "red")
+    scenario = Scenario(
+        id="s1",
+        name="Strike outside exact detection range",
+        start_time=0,
+        current_time=0,
+        duration=600,
+        sides=[
+            Side(id="blue", name="BLUE", color="blue"),
+            Side(id="red", name="RED", color="red"),
+        ],
+        aircraft=[aircraft],
+        facilities=[target],
+        missions=[
+            StrikeMission(
+                id="strike-1",
+                name="Strike",
+                side_id="blue",
+                assigned_unit_ids=[aircraft.id],
+                assigned_target_ids=[target.id],
+                active=True,
+            )
+        ],
+        relationships=relationships,
+    )
+    game = Game(current_scenario=scenario)
+
+    game.update_units_on_strike_mission()
+
+    assert scenario.weapons == []
     assert aircraft.weapons[0].current_quantity == 1
 
 

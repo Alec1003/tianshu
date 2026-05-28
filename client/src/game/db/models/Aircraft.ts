@@ -8,6 +8,11 @@ export interface IAircraftModel {
   fuelOffloadCapacity?: number;
   fuelTransferRate?: number;
   refuelRange?: number;
+  isElectronicWarfare?: boolean;
+  jammingRange?: number;
+  jammingStrength?: number;
+  jammingModes?: string[];
+  communicationDisruption?: number;
   dataSource: {
     speedSrc: string;
     maxFuelSrc: string;
@@ -19,5 +24,6 @@ export interface IAircraftModel {
     maxFuelUnit: string;
     fuelRateUnit: string;
     rangeUnit: string;
+    jammingRangeUnit?: string;
   };
 }

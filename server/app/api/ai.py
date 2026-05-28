@@ -62,6 +62,7 @@ from app.aicc_runtime.visibility import compute_runtime_visibility
 from app.auth.models import User
 from app.auth.users import current_active_user
 from app.db.session import async_session_maker, get_async_session
+from app.unit_assets.service import find_accessible_unit_asset_by_name
 
 logger = logging.getLogger(__name__)
 
@@ -717,6 +718,17 @@ async def runtime_deploy_unit(
     runtime = await _runtime_for_user_loaded(request, user, session)
     before_scenario = _runtime_event_baseline(runtime)
     try:
+        asset = (
+            await find_accessible_unit_asset_by_name(
+                session,
+                user,
+                asset_type=payload.unit_type,
+                name=payload.class_name,
+            )
+            if payload.unit_type in {"aircraft", "ship", "facility", "airbase"}
+            else None
+        )
+        template = asset.data if asset is not None else None
         if payload.unit_type == "aircraft":
             state = runtime.deploy_aircraft(
                 payload.class_name,
@@ -725,6 +737,7 @@ async def runtime_deploy_unit(
                 side=payload.side,
                 name=payload.name,
                 altitude=payload.altitude or 10000.0,
+                template=template,
             )
         elif payload.unit_type == "ship":
             state = runtime.deploy_ship(
@@ -733,6 +746,7 @@ async def runtime_deploy_unit(
                 payload.longitude,
                 side=payload.side,
                 name=payload.name,
+                template=template,
             )
         elif payload.unit_type == "facility":
             state = runtime.deploy_facility(
@@ -741,6 +755,7 @@ async def runtime_deploy_unit(
                 payload.longitude,
                 side=payload.side,
                 name=payload.name,
+                template=template,
             )
         elif payload.unit_type == "airbase":
             state = runtime.deploy_airbase(
@@ -749,6 +764,25 @@ async def runtime_deploy_unit(
                 payload.longitude,
                 side=payload.side,
                 name=payload.name,
+                template=template,
+            )
+        elif payload.unit_type == "obstacle":
+            state = runtime.deploy_obstacle(
+                payload.class_name,
+                payload.latitude,
+                payload.longitude,
+                name=payload.name,
+                side=payload.side,
+                radius_nm=payload.radius_nm or 15.0,
+                obstacle_type=payload.obstacle_type or "no_go",
+                movement_penalty=(
+                    1.0
+                    if payload.movement_penalty is None
+                    else payload.movement_penalty
+                ),
+                detection_penalty=payload.detection_penalty or 0.0,
+                communication_penalty=payload.communication_penalty or 0.0,
+                affected_domains=payload.affected_domains,
             )
         else:
             state = runtime.deploy_reference_point(

@@ -44,9 +44,14 @@ async def test_seed_default_unit_assets_loads_existing_unit_db(db_session):
     rows = await db_session.execute(select(UnitAsset))
     assets = rows.scalars().all()
 
-    assert seeded == 109
-    assert len(assets) == 109
+    assert seeded == 111
+    assert len(assets) == 111
     assert any(a.type == "aircraft" and a.name == "KC-135R Stratotanker" for a in assets)
+    growler = next(
+        a for a in assets if a.type == "aircraft" and a.name == "EA-18G Growler"
+    )
+    assert growler.data["isElectronicWarfare"] is True
+    assert growler.data["jammingRange"] > 0
 
 
 async def test_create_lists_own_custom_asset(db_session, user):
@@ -198,6 +203,36 @@ async def test_estimate_unit_asset_marks_tanker_aircraft():
     assert data["fuelOffloadCapacity"] > 0
     assert 0 < confidence < 1
     assert warnings
+
+
+async def test_estimate_unit_asset_marks_electronic_warfare_aircraft():
+    data, confidence, warnings = estimate_unit_asset("aircraft", "EA-18G Growler")
+
+    assert data["className"] == "EA-18G Growler"
+    assert data["isElectronicWarfare"] is True
+    assert data["jammingRange"] > 0
+    assert data["jammingStrength"] > 0
+    assert "radar" in data["jammingModes"]
+    assert 0 < confidence < 1
+    assert warnings
+
+
+async def test_normalize_aircraft_accepts_electronic_warfare_fields():
+    name, normalized = svc.normalize_asset_data(
+        "aircraft",
+        {
+            **AIRCRAFT,
+            "className": "Custom EW Aircraft",
+            "isElectronicWarfare": True,
+            "jammingRange": 120,
+            "jammingStrength": 0.45,
+            "jammingModes": ["radar"],
+            "communicationDisruption": 0.25,
+        },
+    )
+
+    assert name == "Custom EW Aircraft"
+    assert normalized["jammingStrength"] == 0.45
 
 
 async def test_generate_unit_asset_payload_falls_back_without_model():

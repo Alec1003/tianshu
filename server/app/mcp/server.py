@@ -529,7 +529,7 @@ async def list_units(
     Args:
         scenario_id: 想定 ID。
         side_id: 阵营 ID。可选；不传则返回所有阵营单位。
-        unit_type: 单位类型。可选；取值 ∈ aircraft / ship / facility / airbase / weapon / referencePoint。
+        unit_type: 单位类型。可选；取值 ∈ aircraft / ship / facility / airbase / weapon / referencePoint / obstacle。
 
     Returns:
         ``{"ok": true, "scenario_id": "...", "total": N, "units": [UnitBrief, ...]}``。
@@ -865,6 +865,7 @@ _RUNTIME_UNIT_FIELDS: tuple[tuple[str, str], ...] = (
     ("airbases", "airbase"),
     ("weapons", "weapon"),
     ("reference_points", "referencePoint"),
+    ("obstacles", "obstacle"),
 )
 
 
@@ -1197,6 +1198,46 @@ async def runtime_deploy_airbase(
     )
 
 
+@mcp.tool()
+async def runtime_deploy_obstacle(
+    ctx: Context,
+    class_name: str,
+    latitude: float,
+    longitude: float,
+    side: str | None = None,
+    name: str | None = None,
+    radius_nm: float = 15.0,
+    obstacle_type: str = "no_go",
+    movement_penalty: float = 1.0,
+    detection_penalty: float = 0.0,
+    communication_penalty: float = 0.0,
+    affected_domains: list[str] | None = None,
+) -> dict[str, Any]:
+    """在活想定中部署环境障碍/约束区。
+
+    障碍物不是火力单位，只作为仿真世界约束：禁行区会阻断机动，
+    地形/天气会降低机动速度，雷达遮蔽/天气/地形会降低探测距离。
+    """
+    return await _create_runtime_proposal(
+        ctx,
+        command=f"MCP runtime_deploy_obstacle class_name={class_name}",
+        skill="deploy_obstacle",
+        parameters={
+            "class_name": class_name,
+            "latitude": latitude,
+            "longitude": longitude,
+            "side": side,
+            "name": name,
+            "radius_nm": radius_nm,
+            "obstacle_type": obstacle_type,
+            "movement_penalty": movement_penalty,
+            "detection_penalty": detection_penalty,
+            "communication_penalty": communication_penalty,
+            "affected_domains": affected_domains,
+        },
+    )
+
+
 # ---------- runtime: unit control -------------------------------------------
 
 
@@ -1241,7 +1282,7 @@ async def runtime_delete_unit(
     ctx: Context, unit_type: str, unit_id: str
 ) -> dict[str, Any]:
     """从活想定中移除一个单位（aircraft / ship / facility / airbase /
-    reference_point）。"""
+    reference_point / obstacle）。"""
     return await _create_runtime_proposal(
         ctx,
         command=f"MCP runtime_delete_unit unit_type={unit_type} unit_id={unit_id}",

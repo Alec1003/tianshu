@@ -115,6 +115,7 @@
       "ship": "Add Ship",
       "facility": "Add SAM",
       "airbase": "Add Airbase",
+      "obstacle": "Add Obstacle",
       "referencePoint": "Add Reference Point"
     },
     "recording": {
@@ -209,6 +210,7 @@
       "ship": "Ship",
       "facility": "Facility",
       "airbase": "Airbase",
+      "obstacle": "Obstacle",
       "referencePoint": "Reference Point"
     },
     "field": {

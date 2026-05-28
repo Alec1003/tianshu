@@ -69,7 +69,7 @@ class ScenarioStatistics(BaseModel):
     sides: list[dict[str, Any]] = Field(default_factory=list)
     counts: dict[str, int] = Field(
         default_factory=dict,
-        description="单位类型 → 数量：aircraft / ship / facility / airbase / weapon / referencePoint",
+        description="单位类型 → 数量：aircraft / ship / facility / airbase / weapon / referencePoint / obstacle",
     )
     mission_count: int = 0
 
@@ -80,7 +80,7 @@ class ScenarioStatistics(BaseModel):
 class UnitBrief(BaseModel):
     id: str | None = None
     name: str | None = None
-    type: str | None = Field(default=None, description="aircraft / ship / facility / airbase / weapon / referencePoint")
+    type: str | None = Field(default=None, description="aircraft / ship / facility / airbase / weapon / referencePoint / obstacle")
     side_id: str | None = None
     class_name: str | None = None
     latitude: float | None = None
@@ -173,7 +173,7 @@ class RuntimeStatus(BaseModel):
     duration_left: int = Field(..., description="max(0, start_time + duration - current_time)")
     counts: dict[str, int] = Field(
         ...,
-        description="按单位类型聚合的活单位数：aircraft / ship / facility / airbase / weapon / referencePoint",
+        description="按单位类型聚合的活单位数：aircraft / ship / facility / airbase / weapon / referencePoint / obstacle",
     )
     sides: list[RuntimeSideStat]
 

@@ -85,6 +85,11 @@ export default class Dba {
           fuelOffloadCapacity,
           fuelTransferRate,
           refuelRange,
+          isElectronicWarfare,
+          jammingRange,
+          jammingStrength,
+          jammingModes,
+          communicationDisruption,
           dataSource,
           units,
         } = aircraft;
@@ -109,6 +114,11 @@ export default class Dba {
           fuelOffloadCapacity: fuelOffloadCapacity ?? 0,
           fuelTransferRate: fuelTransferRate ?? 0,
           refuelRange: refuelRange ?? 0,
+          isElectronicWarfare: Boolean(isElectronicWarfare),
+          jammingRange: jammingRange ?? 0,
+          jammingStrength: jammingStrength ?? 0,
+          jammingModes: Array.isArray(jammingModes) ? jammingModes : [],
+          communicationDisruption: communicationDisruption ?? 0,
           dataSource: {
             speedSrc: dataSource?.speedSrc ?? "",
             maxFuelSrc: dataSource?.maxFuelSrc ?? "",
@@ -120,6 +130,7 @@ export default class Dba {
             maxFuelUnit: units?.maxFuelUnit ?? "",
             fuelRateUnit: units?.fuelRateUnit ?? "",
             rangeUnit: units?.rangeUnit ?? "",
+            jammingRangeUnit: units?.jammingRangeUnit,
           },
         });
       });

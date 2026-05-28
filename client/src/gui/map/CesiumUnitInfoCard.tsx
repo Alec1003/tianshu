@@ -15,6 +15,7 @@ import StarIcon from "@mui/icons-material/Star";
 import Aircraft from "@/game/units/Aircraft";
 import Airbase from "@/game/units/Airbase";
 import Facility from "@/game/units/Facility";
+import Obstacle from "@/game/units/Obstacle";
 import Ship from "@/game/units/Ship";
 import Scenario from "@/game/Scenario";
 import type { Mission } from "@/game/Game";
@@ -57,6 +58,16 @@ function Row({ label, value }: { label: string; value: string }) {
 
 const fmt = (n: number, digits = 2) =>
   Number.isFinite(n) ? n.toFixed(digits) : "-";
+
+const obstacleTypeLabels: Record<string, string> = {
+  no_go: "禁行区",
+  restricted_airspace: "受限空域",
+  blocked_area: "阻断区",
+  terrain: "复杂地形区",
+  weather: "恶劣天气区",
+  sensor_shadow: "雷达遮蔽区",
+  communication_shadow: "通信遮蔽区",
+};
 
 function missionTypeLabel(mission: Mission): string {
   return "assignedTargetIds" in mission ? "打击任务" : "巡逻任务";
@@ -107,7 +118,10 @@ export default function CesiumUnitInfoCard({
   );
   const sideName = localizeSideName(rawSideName);
   const position = `${fmt(unit.latitude, 3)}, ${fmt(unit.longitude, 3)}`;
-  const assignedMission = scenario.getMissionByAssignedUnitId(unit.id);
+  const assignedMission =
+    type === "obstacle"
+      ? undefined
+      : scenario.getMissionByAssignedUnitId(unit.id);
 
   const extraRows: { label: string; value: string }[] = [];
   extraRows.push({
@@ -174,6 +188,15 @@ export default function CesiumUnitInfoCard({
           )} ${t("unit.unit.nm")}`,
         });
       }
+      if (a.isElectronicWarfare) {
+        extraRows.push({
+          label: "电子战",
+          value: `${fmt(a.jammingRange, 0)} ${t("unit.unit.nm")} / ${fmt(
+            a.jammingStrength,
+            2
+          )}`,
+        });
+      }
     }
     if (type === "ship") {
       const s = u as Ship;
@@ -200,6 +223,40 @@ export default function CesiumUnitInfoCard({
     extraRows.push({
       label: t("unit.field.altitude"),
       value: t("common.na"),
+    });
+  } else if (type === "obstacle") {
+    const obstacle = unit as Obstacle;
+    extraRows.push({
+      label: t("unit.field.class"),
+      value: obstacle.className
+        ? localizeClassName(obstacle.className)
+        : t("common.na"),
+    });
+    extraRows.push({
+      label: "类型",
+      value:
+        obstacleTypeLabels[String(obstacle.obstacleType)] ??
+        String(obstacle.obstacleType),
+    });
+    extraRows.push({
+      label: "半径",
+      value: `${fmt(obstacle.radiusNm, 1)} ${t("unit.unit.nm")}`,
+    });
+    extraRows.push({
+      label: "机动影响",
+      value: `${fmt(obstacle.movementPenalty * 100, 0)}%`,
+    });
+    extraRows.push({
+      label: "探测影响",
+      value: `${fmt(obstacle.detectionPenalty * 100, 0)}%`,
+    });
+    extraRows.push({
+      label: "通信影响",
+      value: `${fmt(obstacle.communicationPenalty * 100, 0)}%`,
+    });
+    extraRows.push({
+      label: "状态",
+      value: obstacle.active ? "启用" : "停用",
     });
   }
 

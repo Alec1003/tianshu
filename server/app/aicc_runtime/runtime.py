@@ -21,6 +21,7 @@ from blade.Side import Side  # type: ignore  # noqa: E402
 from blade.units.Airbase import Airbase  # type: ignore  # noqa: E402
 from blade.units.Aircraft import Aircraft  # type: ignore  # noqa: E402
 from blade.units.Facility import Facility  # type: ignore  # noqa: E402
+from blade.units.Obstacle import Obstacle  # type: ignore  # noqa: E402
 from blade.units.ReferencePoint import ReferencePoint  # type: ignore  # noqa: E402
 from blade.units.Ship import Ship  # type: ignore  # noqa: E402
 from blade.units.Weapon import Weapon  # type: ignore  # noqa: E402
@@ -210,6 +211,31 @@ class AICCRuntime:
                 return row
         return rows[0] if rows else {}
 
+    @staticmethod
+    def _row_value(row: dict[str, Any], *keys: str, default: Any = None) -> Any:
+        for key in keys:
+            if key in row and row[key] is not None:
+                return row[key]
+        return default
+
+    @classmethod
+    def _row_bool(
+        cls, row: dict[str, Any], *keys: str, default: bool = False
+    ) -> bool:
+        value = cls._row_value(row, *keys, default=default)
+        if isinstance(value, str):
+            return value.strip().lower() in {"1", "true", "yes", "y", "on"}
+        return bool(value)
+
+    @classmethod
+    def _row_list(cls, row: dict[str, Any], *keys: str) -> list[str]:
+        value = cls._row_value(row, *keys, default=[])
+        if isinstance(value, list):
+            return [str(item) for item in value if str(item).strip()]
+        if isinstance(value, str):
+            return [item.strip() for item in value.split(",") if item.strip()]
+        return []
+
     def _make_weapon(
         self,
         class_name: str,
@@ -283,6 +309,8 @@ class AICCRuntime:
             return scenario.get_airbase(unit_id)
         if normalized in {"reference_point", "referencepoint"}:
             return scenario.get_reference_point(unit_id)
+        if normalized == "obstacle":
+            return scenario.get_obstacle(unit_id)
         if normalized == "weapon":
             return scenario.get_weapon(unit_id)
         raise ValueError(f"Unsupported unit type: {unit_type}")
@@ -333,6 +361,9 @@ class AICCRuntime:
         for point in scenario.reference_points:
             if point.side_id == side_id:
                 point.side_color = color
+        for obstacle in scenario.obstacles:
+            if getattr(obstacle, "side_id", "") == side_id:
+                obstacle.side_color = color
         for mission in scenario.missions:
             assigned_area = getattr(mission, "assigned_area", None)
             if assigned_area:
@@ -393,15 +424,18 @@ class AICCRuntime:
         with self._lock:
             requested_steps = max(1, steps)
             executed_steps = 0
+            refueling_events: list[dict[str, Any]] = []
             for _ in range(requested_steps):
                 if self.game.check_game_ended():
                     break
                 self.game.step("")
+                refueling_events.extend(getattr(self.game, "last_refueling_events", []))
                 executed_steps += 1
             return {
                 "steps": executed_steps,
                 "requestedSteps": requested_steps,
                 "currentTime": self.game.current_scenario.current_time,
+                "refuelingEvents": refueling_events,
             }
 
     def attack_unit(
@@ -598,11 +632,28 @@ class AICCRuntime:
         side: str | None = None,
         name: str | None = None,
         altitude: float = 10000.0,
+        template: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         with self._lock:
             side_id = self._resolve_side_id(side)
             side_color = self._side_color(side_id)
-            row = self._find_db_row(AircraftDb, "class_name", class_name)
+            row = template or self._find_db_row(AircraftDb, "class_name", class_name)
+            is_tanker = self._row_bool(row, "is_tanker", "isTanker")
+            is_electronic_warfare = self._row_bool(
+                row, "is_electronic_warfare", "isElectronicWarfare"
+            ) or any(
+                token in class_name.lower()
+                for token in (
+                    "electronic",
+                    "ewar",
+                    "jammer",
+                    "growler",
+                    "prowler",
+                    "raven",
+                    "电子战",
+                    "干扰",
+                )
+            )
             aircraft = Aircraft(
                 id=str(uuid4()),
                 name=name or f"{class_name} #{len(self.game.current_scenario.aircraft) + 1}",
@@ -612,15 +663,21 @@ class AICCRuntime:
                 longitude=longitude,
                 altitude=altitude,
                 heading=90.0,
-                speed=self._to_float(row.get("speed"), 350.0),
-                current_fuel=self._to_float(row.get("max_fuel"), 100000.0),
-                max_fuel=self._to_float(row.get("max_fuel"), 100000.0),
-                fuel_rate=self._to_float(row.get("fuel_rate"), 1000.0),
-                range=self._to_float(row.get("range"), 100.0),
+                speed=self._to_float(self._row_value(row, "speed"), 350.0),
+                current_fuel=self._to_float(
+                    self._row_value(row, "max_fuel", "maxFuel"), 100000.0
+                ),
+                max_fuel=self._to_float(
+                    self._row_value(row, "max_fuel", "maxFuel"), 100000.0
+                ),
+                fuel_rate=self._to_float(
+                    self._row_value(row, "fuel_rate", "fuelRate"), 1000.0
+                ),
+                range=self._to_float(self._row_value(row, "range"), 100.0),
                 side_color=side_color,
                 weapons=(
                     []
-                    if bool(row.get("is_tanker", False))
+                    if is_tanker or is_electronic_warfare
                     else self._default_weapons(
                         DEFAULT_AIRCRAFT_WEAPON_KEYS,
                         side_id,
@@ -630,12 +687,35 @@ class AICCRuntime:
                         altitude=altitude,
                     )
                 ),
-                is_tanker=bool(row.get("is_tanker", False)),
+                is_tanker=is_tanker,
                 fuel_offload_capacity=self._to_float(
-                    row.get("fuel_offload_capacity"), 0.0
+                    self._row_value(
+                        row, "fuel_offload_capacity", "fuelOffloadCapacity"
+                    ),
+                    0.0,
                 ),
-                fuel_transfer_rate=self._to_float(row.get("fuel_transfer_rate"), 0.0),
-                refuel_range=self._to_float(row.get("refuel_range"), 0.0),
+                fuel_transfer_rate=self._to_float(
+                    self._row_value(row, "fuel_transfer_rate", "fuelTransferRate"),
+                    0.0,
+                ),
+                refuel_range=self._to_float(
+                    self._row_value(row, "refuel_range", "refuelRange"), 0.0
+                ),
+                is_electronic_warfare=is_electronic_warfare,
+                jamming_range=self._to_float(
+                    self._row_value(row, "jamming_range", "jammingRange"), 0.0
+                ),
+                jamming_strength=self._to_float(
+                    self._row_value(row, "jamming_strength", "jammingStrength"),
+                    0.0,
+                ),
+                jamming_modes=self._row_list(row, "jamming_modes", "jammingModes"),
+                communication_disruption=self._to_float(
+                    self._row_value(
+                        row, "communication_disruption", "communicationDisruption"
+                    ),
+                    0.0,
+                ),
             )
             self.game.current_scenario.aircraft.append(aircraft)
             return {"unitType": "aircraft", "unitId": aircraft.id, "name": aircraft.name}
@@ -647,11 +727,12 @@ class AICCRuntime:
         longitude: float,
         side: str | None = None,
         name: str | None = None,
+        template: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         with self._lock:
             side_id = self._resolve_side_id(side)
             side_color = self._side_color(side_id)
-            row = self._find_db_row(ShipDb, "class_name", class_name)
+            row = template or self._find_db_row(ShipDb, "class_name", class_name)
             ship = Ship(
                 id=str(uuid4()),
                 name=name or f"{class_name} #{len(self.game.current_scenario.ships) + 1}",
@@ -661,11 +742,17 @@ class AICCRuntime:
                 longitude=longitude,
                 altitude=0.0,
                 heading=90.0,
-                speed=self._to_float(row.get("speed"), 30.0),
-                current_fuel=self._to_float(row.get("max_fuel"), 1000000.0),
-                max_fuel=self._to_float(row.get("max_fuel"), 1000000.0),
-                fuel_rate=self._to_float(row.get("fuel_rate"), 10000.0),
-                range=self._to_float(row.get("range"), 1000.0),
+                speed=self._to_float(self._row_value(row, "speed"), 30.0),
+                current_fuel=self._to_float(
+                    self._row_value(row, "max_fuel", "maxFuel"), 1000000.0
+                ),
+                max_fuel=self._to_float(
+                    self._row_value(row, "max_fuel", "maxFuel"), 1000000.0
+                ),
+                fuel_rate=self._to_float(
+                    self._row_value(row, "fuel_rate", "fuelRate"), 10000.0
+                ),
+                range=self._to_float(self._row_value(row, "range"), 1000.0),
                 side_color=side_color,
                 weapons=self._default_weapons(
                     DEFAULT_SHIP_WEAPON_KEYS,
@@ -687,11 +774,12 @@ class AICCRuntime:
         longitude: float,
         side: str | None = None,
         name: str | None = None,
+        template: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         with self._lock:
             side_id = self._resolve_side_id(side)
             side_color = self._side_color(side_id)
-            row = self._find_db_row(FacilityDb, "class_name", class_name)
+            row = template or self._find_db_row(FacilityDb, "class_name", class_name)
             facility = Facility(
                 id=str(uuid4()),
                 name=name or f"{class_name} #{len(self.game.current_scenario.facilities) + 1}",
@@ -700,7 +788,7 @@ class AICCRuntime:
                 latitude=latitude,
                 longitude=longitude,
                 altitude=0.0,
-                range=self._to_float(row.get("range"), 50.0),
+                range=self._to_float(self._row_value(row, "range"), 50.0),
                 side_color=side_color,
                 weapons=self._default_weapons(
                     DEFAULT_FACILITY_WEAPON_KEYS,
@@ -721,11 +809,12 @@ class AICCRuntime:
         longitude: float,
         side: str | None = None,
         name: str | None = None,
+        template: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         with self._lock:
             side_id = self._resolve_side_id(side)
             side_color = self._side_color(side_id)
-            _row = self._find_db_row(AirbaseDb, "name", class_name)
+            _row = template or self._find_db_row(AirbaseDb, "name", class_name)
             airbase = Airbase(
                 id=str(uuid4()),
                 name=name or class_name,
@@ -751,6 +840,50 @@ class AICCRuntime:
                 raise ValueError("Failed to create reference point")
             return {"unitType": "reference_point", "unitId": point.id, "name": point.name}
 
+    def deploy_obstacle(
+        self,
+        class_name: str,
+        latitude: float,
+        longitude: float,
+        *,
+        name: str | None = None,
+        side: str | None = None,
+        radius_nm: float = 15.0,
+        obstacle_type: str = "no_go",
+        movement_penalty: float = 1.0,
+        detection_penalty: float = 0.0,
+        communication_penalty: float = 0.0,
+        affected_domains: list[str] | None = None,
+        description: str = "",
+    ) -> dict[str, Any]:
+        with self._lock:
+            side_id = self._resolve_side_id(side) if side else ""
+            side_color = self._side_color(side_id) if side_id else "#38bdf8"
+            obstacle = Obstacle(
+                id=str(uuid4()),
+                name=name or class_name,
+                class_name=class_name,
+                side_id=side_id,
+                latitude=latitude,
+                longitude=longitude,
+                altitude=0.0,
+                radius_nm=self._to_float(radius_nm, 15.0),
+                obstacle_type=obstacle_type,
+                side_color=side_color,
+                active=True,
+                movement_penalty=self._to_float(movement_penalty, 1.0),
+                detection_penalty=self._to_float(detection_penalty, 0.0),
+                communication_penalty=self._to_float(communication_penalty, 0.0),
+                affected_domains=affected_domains or ["aircraft", "ship"],
+                description=description,
+            )
+            self.game.current_scenario.obstacles.append(obstacle)
+            return {
+                "unitType": "obstacle",
+                "unitId": obstacle.id,
+                "name": obstacle.name,
+            }
+
     def delete_unit(self, unit_type: str, unit_id: str) -> dict[str, Any]:
         with self._lock:
             unit_type = unit_type.lower().strip()
@@ -775,6 +908,10 @@ class AICCRuntime:
                     item
                     for item in self.game.current_scenario.reference_points
                     if item.id != unit_id
+                ]
+            elif unit_type == "obstacle":
+                self.game.current_scenario.obstacles = [
+                    item for item in self.game.current_scenario.obstacles if item.id != unit_id
                 ]
             else:
                 raise ValueError(f"Unsupported unit type for delete: {unit_type}")
@@ -950,6 +1087,53 @@ class AICCRuntime:
                         self._to_float(patch.get("latitude"), point.latitude),
                         self._to_float(patch.get("longitude"), point.longitude),
                     )
+            elif unit_type == "obstacle":
+                obstacle = self.game.current_scenario.get_obstacle(unit_id)
+                if obstacle is None:
+                    raise ValueError("Obstacle not found")
+                obstacle.name = str(patch.get("name", obstacle.name))
+                obstacle.class_name = str(
+                    patch.get("class_name", patch.get("className", obstacle.class_name))
+                )
+                obstacle.obstacle_type = str(
+                    patch.get(
+                        "obstacle_type",
+                        patch.get("obstacleType", obstacle.obstacle_type),
+                    )
+                )
+                obstacle.radius_nm = self._to_float(
+                    patch.get("radius_nm", patch.get("radiusNm")), obstacle.radius_nm
+                )
+                obstacle.movement_penalty = self._to_float(
+                    patch.get("movement_penalty", patch.get("movementPenalty")),
+                    obstacle.movement_penalty,
+                )
+                obstacle.detection_penalty = self._to_float(
+                    patch.get("detection_penalty", patch.get("detectionPenalty")),
+                    obstacle.detection_penalty,
+                )
+                obstacle.communication_penalty = self._to_float(
+                    patch.get(
+                        "communication_penalty",
+                        patch.get("communicationPenalty"),
+                    ),
+                    obstacle.communication_penalty,
+                )
+                if "active" in patch:
+                    obstacle.active = bool(patch["active"])
+                if "description" in patch:
+                    obstacle.description = str(patch.get("description") or "")
+                if "affected_domains" in patch or "affectedDomains" in patch:
+                    raw_domains = patch.get("affected_domains", patch.get("affectedDomains"))
+                    if isinstance(raw_domains, list):
+                        obstacle.affected_domains = [str(item) for item in raw_domains]
+                if "latitude" in patch or "longitude" in patch:
+                    obstacle.latitude = self._to_float(
+                        patch.get("latitude"), obstacle.latitude
+                    )
+                    obstacle.longitude = self._to_float(
+                        patch.get("longitude"), obstacle.longitude
+                    )
             else:
                 raise ValueError(f"Unsupported unit type for update: {unit_type}")
             return {"updated": True, "unitType": unit_type, "unitId": unit_id}
@@ -1038,6 +1222,11 @@ class AICCRuntime:
             ]
             scenario.reference_points = [
                 point for point in scenario.reference_points if point.side_id != side_id
+            ]
+            scenario.obstacles = [
+                obstacle
+                for obstacle in scenario.obstacles
+                if getattr(obstacle, "side_id", "") != side_id
             ]
             scenario.relationships.delete_side(side_id)
             scenario.remove_side_doctrine(side_id)
@@ -1266,6 +1455,41 @@ class AICCRuntime:
                 if operation == "remove":
                     return self.delete_unit(
                         unit_type="reference_point",
+                        unit_id=str(payload.get("id", "")),
+                    )
+            if layer_name == "obstacles":
+                if operation == "add":
+                    return self.deploy_obstacle(
+                        class_name=str(payload.get("class_name", payload.get("className", "No-go zone"))),
+                        name=str(payload.get("name", payload.get("class_name", "No-go zone"))),
+                        latitude=self._to_float(payload.get("latitude"), 0.0),
+                        longitude=self._to_float(payload.get("longitude"), 0.0),
+                        side=payload.get("side"),
+                        radius_nm=self._to_float(
+                            payload.get("radius_nm", payload.get("radiusNm")), 15.0
+                        ),
+                        obstacle_type=str(
+                            payload.get("obstacle_type", payload.get("obstacleType", "no_go"))
+                        ),
+                        movement_penalty=self._to_float(
+                            payload.get("movement_penalty", payload.get("movementPenalty")),
+                            1.0,
+                        ),
+                        detection_penalty=self._to_float(
+                            payload.get("detection_penalty", payload.get("detectionPenalty")),
+                            0.0,
+                        ),
+                        communication_penalty=self._to_float(
+                            payload.get(
+                                "communication_penalty",
+                                payload.get("communicationPenalty"),
+                            ),
+                            0.0,
+                        ),
+                    )
+                if operation == "remove":
+                    return self.delete_unit(
+                        unit_type="obstacle",
                         unit_id=str(payload.get("id", "")),
                     )
             return {"layer": layer_name, "operation": operation, "payload": payload}

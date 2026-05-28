@@ -18,6 +18,7 @@ UNIT_COLLECTIONS: tuple[tuple[str, str], ...] = (
     ("airbases", "airbase"),
     ("weapons", "weapon"),
     ("referencePoints", "reference_point"),
+    ("obstacles", "obstacle"),
 )
 
 NESTED_UNIT_COLLECTIONS: tuple[tuple[str, str], ...] = (
@@ -52,7 +53,20 @@ TRACKED_UNIT_FIELDS = (
     "fuelOffloadCapacity",
     "fuelTransferRate",
     "refuelRange",
+    "isElectronicWarfare",
+    "jammingRange",
+    "jammingStrength",
+    "jammingModes",
+    "communicationDisruption",
     "homeBaseId",
+    "radiusNm",
+    "obstacleType",
+    "active",
+    "movementPenalty",
+    "detectionPenalty",
+    "communicationPenalty",
+    "affectedDomains",
+    "description",
 )
 
 

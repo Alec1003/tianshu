@@ -16,6 +16,7 @@ import {
   NAUTICAL_MILES_TO_METERS,
 } from "@/utils/constants";
 import Ship from "@/game/units/Ship";
+import Obstacle from "@/game/units/Obstacle";
 import ReferencePoint from "@/game/units/ReferencePoint";
 import PatrolMission from "@/game/mission/PatrolMission";
 import StrikeMission from "@/game/mission/StrikeMission";
@@ -420,7 +421,12 @@ export default class Game {
     isTanker?: boolean,
     fuelOffloadCapacity?: number,
     fuelTransferRate?: number,
-    refuelRange?: number
+    refuelRange?: number,
+    isElectronicWarfare?: boolean,
+    jammingRange?: number,
+    jammingStrength?: number,
+    jammingModes?: string[],
+    communicationDisruption?: number
   ): Aircraft | undefined {
     if (!this.currentSideId) {
       return;
@@ -455,6 +461,11 @@ export default class Game {
       fuelOffloadCapacity: fuelOffloadCapacity ?? 0,
       fuelTransferRate: fuelTransferRate ?? 0,
       refuelRange: refuelRange ?? 0,
+      isElectronicWarfare,
+      jammingRange: jammingRange ?? 0,
+      jammingStrength: jammingStrength ?? 0,
+      jammingModes: jammingModes ?? [],
+      communicationDisruption: communicationDisruption ?? 0,
     });
     this.currentScenario.aircraft.push(aircraft);
     return aircraft;
@@ -470,7 +481,12 @@ export default class Game {
     isTanker?: boolean,
     fuelOffloadCapacity?: number,
     fuelTransferRate?: number,
-    refuelRange?: number
+    refuelRange?: number,
+    isElectronicWarfare?: boolean,
+    jammingRange?: number,
+    jammingStrength?: number,
+    jammingModes?: string[],
+    communicationDisruption?: number
   ) {
     let airbaseAircraft: Aircraft[] = [];
     if (!this.currentSideId) {
@@ -510,6 +526,11 @@ export default class Game {
         fuelOffloadCapacity: fuelOffloadCapacity ?? 0,
         fuelTransferRate: fuelTransferRate ?? 0,
         refuelRange: refuelRange ?? 0,
+        isElectronicWarfare,
+        jammingRange: jammingRange ?? 0,
+        jammingStrength: jammingStrength ?? 0,
+        jammingModes: jammingModes ?? [],
+        communicationDisruption: communicationDisruption ?? 0,
       });
       airbase.aircraft.push(aircraft);
     }
@@ -731,6 +752,11 @@ export default class Game {
           fuelOffloadCapacity: aircraft.fuelOffloadCapacity,
           fuelTransferRate: aircraft.fuelTransferRate,
           refuelRange: aircraft.refuelRange,
+          isElectronicWarfare: aircraft.isElectronicWarfare,
+          jammingRange: aircraft.jammingRange,
+          jammingStrength: aircraft.jammingStrength,
+          jammingModes: aircraft.jammingModes,
+          communicationDisruption: aircraft.communicationDisruption,
         });
         this.currentScenario.aircraft.push(newAircraft);
         return newAircraft;
@@ -748,7 +774,12 @@ export default class Game {
     isTanker?: boolean,
     fuelOffloadCapacity?: number,
     fuelTransferRate?: number,
-    refuelRange?: number
+    refuelRange?: number,
+    isElectronicWarfare?: boolean,
+    jammingRange?: number,
+    jammingStrength?: number,
+    jammingModes?: string[],
+    communicationDisruption?: number
   ) {
     let shipAircraft: Aircraft[] = [];
     if (!this.currentSideId) {
@@ -788,6 +819,11 @@ export default class Game {
         fuelOffloadCapacity: fuelOffloadCapacity ?? 0,
         fuelTransferRate: fuelTransferRate ?? 0,
         refuelRange: refuelRange ?? 0,
+        isElectronicWarfare,
+        jammingRange: jammingRange ?? 0,
+        jammingStrength: jammingStrength ?? 0,
+        jammingModes: jammingModes ?? [],
+        communicationDisruption: communicationDisruption ?? 0,
       });
       ship.aircraft.push(aircraft);
     }
@@ -1203,6 +1239,15 @@ export default class Game {
           targetId: aircraft.targetId,
           sideColor: aircraft.sideColor,
           isObjective: aircraft.isObjective,
+          isTanker: aircraft.isTanker,
+          fuelOffloadCapacity: aircraft.fuelOffloadCapacity,
+          fuelTransferRate: aircraft.fuelTransferRate,
+          refuelRange: aircraft.refuelRange,
+          isElectronicWarfare: aircraft.isElectronicWarfare,
+          jammingRange: aircraft.jammingRange,
+          jammingStrength: aircraft.jammingStrength,
+          jammingModes: aircraft.jammingModes,
+          communicationDisruption: aircraft.communicationDisruption,
         });
         homeBase.aircraft.push(newAircraft);
         this.removeAircraft(aircraft.id);
@@ -1304,6 +1349,11 @@ export default class Game {
         fuelOffloadCapacity: aircraft.fuelOffloadCapacity,
         fuelTransferRate: aircraft.fuelTransferRate,
         refuelRange: aircraft.refuelRange,
+        isElectronicWarfare: aircraft.isElectronicWarfare,
+        jammingRange: aircraft.jammingRange,
+        jammingStrength: aircraft.jammingStrength,
+        jammingModes: aircraft.jammingModes,
+        communicationDisruption: aircraft.communicationDisruption,
       });
       loadedScenario.aircraft.push(newAircraft);
     });
@@ -1343,6 +1393,11 @@ export default class Game {
           fuelOffloadCapacity: aircraft.fuelOffloadCapacity,
           fuelTransferRate: aircraft.fuelTransferRate,
           refuelRange: aircraft.refuelRange,
+          isElectronicWarfare: aircraft.isElectronicWarfare,
+          jammingRange: aircraft.jammingRange,
+          jammingStrength: aircraft.jammingStrength,
+          jammingModes: aircraft.jammingModes,
+          communicationDisruption: aircraft.communicationDisruption,
         });
         airbaseAircraft.push(newAircraft);
       });
@@ -1423,6 +1478,11 @@ export default class Game {
           fuelOffloadCapacity: aircraft.fuelOffloadCapacity,
           fuelTransferRate: aircraft.fuelTransferRate,
           refuelRange: aircraft.refuelRange,
+          isElectronicWarfare: aircraft.isElectronicWarfare,
+          jammingRange: aircraft.jammingRange,
+          jammingStrength: aircraft.jammingStrength,
+          jammingModes: aircraft.jammingModes,
+          communicationDisruption: aircraft.communicationDisruption,
         });
         shipAircraft.push(newAircraft);
       });
@@ -1463,6 +1523,28 @@ export default class Game {
         sideColor: referencePoint.sideColor,
       });
       loadedScenario.referencePoints.push(newReferencePoint);
+    });
+    savedScenario.obstacles?.forEach((obstacle: Obstacle) => {
+      loadedScenario.obstacles.push(
+        new Obstacle({
+          id: obstacle.id,
+          name: obstacle.name,
+          className: obstacle.className,
+          sideId: obstacle.sideId ?? "",
+          latitude: obstacle.latitude,
+          longitude: obstacle.longitude,
+          altitude: obstacle.altitude,
+          radiusNm: obstacle.radiusNm,
+          obstacleType: obstacle.obstacleType,
+          sideColor: obstacle.sideColor,
+          active: obstacle.active,
+          movementPenalty: obstacle.movementPenalty,
+          detectionPenalty: obstacle.detectionPenalty,
+          communicationPenalty: obstacle.communicationPenalty,
+          affectedDomains: obstacle.affectedDomains,
+          description: obstacle.description,
+        })
+      );
     });
     savedScenario.missions?.forEach((mission: Mission) => {
       const baseProps = {

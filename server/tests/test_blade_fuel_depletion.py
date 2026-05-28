@@ -82,3 +82,15 @@ def test_fuel_depletion_removes_adjacent_ships_without_skipping() -> None:
     game.update_all_ship_position()
 
     assert scenario.ships == []
+
+
+def test_fuel_depletion_removes_idle_ship_without_route() -> None:
+    scenario = _scenario()
+    ship = _ship("idle-ship")
+    ship.route = []
+    scenario.ships.append(ship)
+    game = Game(current_scenario=scenario)
+
+    game.update_all_ship_position()
+
+    assert scenario.ships == []

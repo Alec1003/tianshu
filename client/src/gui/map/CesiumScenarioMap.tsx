@@ -130,6 +130,43 @@ interface CesiumScenarioMapProps {
 
 // Reserved legacy rail width when non-embedded callers still offset content.
 const TOOLBAR_WIDTH = 240;
+const OBSTACLE_TEMPLATES = [
+  {
+    className: "禁行区",
+    obstacleType: "no_go",
+    radiusNm: 15,
+    movementPenalty: 1,
+    detectionPenalty: 0,
+    communicationPenalty: 0,
+  },
+  {
+    className: "复杂地形区",
+    obstacleType: "terrain",
+    radiusNm: 20,
+    movementPenalty: 0.45,
+    detectionPenalty: 0.2,
+    communicationPenalty: 0.1,
+  },
+  {
+    className: "恶劣天气区",
+    obstacleType: "weather",
+    radiusNm: 25,
+    movementPenalty: 0.25,
+    detectionPenalty: 0.35,
+    communicationPenalty: 0.15,
+  },
+  {
+    className: "雷达遮蔽区",
+    obstacleType: "sensor_shadow",
+    radiusNm: 18,
+    movementPenalty: 0,
+    detectionPenalty: 0.55,
+    communicationPenalty: 0.1,
+  },
+] as const;
+const obstacleLabels = Object.fromEntries(
+  OBSTACLE_TEMPLATES.map((item) => [item.className, item.className])
+);
 
 // approximate OL zoom <-> Cesium altitude (meters) conversion
 const EARTH_CIRCUMFERENCE_M = 40075016.686;
@@ -600,7 +637,9 @@ export default function CesiumScenarioMap({
               ? scenario.getFacility(current.unit.id)
               : current.type === "airbase"
                 ? scenario.getAirbase(current.unit.id)
-                : scenario.getReferencePoint(current.unit.id);
+                : current.type === "obstacle"
+                  ? scenario.getObstacle(current.unit.id)
+                  : scenario.getReferencePoint(current.unit.id);
       if (!unit) return null;
       return { ...current, unit } as ScenarioUnit;
     },
@@ -1762,6 +1801,48 @@ export default function CesiumScenarioMap({
             }}
           >
             {t("toolbar.addAt.airbase")} ▸
+          </MenuItem>
+        )}
+        {contextMenu?.kind === "add" && (
+          <MenuItem
+            onMouseEnter={(e) => {
+              if (contextMenu.kind !== "add") return;
+              const c = contextMenu;
+              const anchor = e.currentTarget as HTMLElement;
+              setClassChooser({
+                anchorEl: anchor,
+                options: OBSTACLE_TEMPLATES.map((item) => item.className),
+                labelOf: labelFromDict(obstacleLabels),
+                onPick: (cls) => {
+                  const template =
+                    OBSTACLE_TEMPLATES.find((item) => item.className === cls) ??
+                    OBSTACLE_TEMPLATES[0];
+                  if (onDeployUnit) {
+                    void Promise.resolve(
+                      onDeployUnit({
+                        unit_type: "obstacle",
+                        class_name: template.className,
+                        name: template.className,
+                        latitude: c.lat,
+                        longitude: c.lon,
+                        radius_nm: template.radiusNm,
+                        obstacle_type: template.obstacleType,
+                        movement_penalty: template.movementPenalty,
+                        detection_penalty: template.detectionPenalty,
+                        communication_penalty: template.communicationPenalty,
+                        affected_domains: ["aircraft", "ship"],
+                      })
+                    ).catch((err) => {
+                      reportRuntimeFailure("deployUnit", err);
+                    });
+                  } else {
+                    reportRuntimeUnavailable("deployUnit");
+                  }
+                },
+              });
+            }}
+          >
+            {t("toolbar.addAt.obstacle")} ›
           </MenuItem>
         )}
         {contextMenu?.kind === "add" && (

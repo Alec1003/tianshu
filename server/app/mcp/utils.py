@@ -13,7 +13,15 @@ from __future__ import annotations
 
 from typing import Any, Iterable, Literal
 
-UnitType = Literal["aircraft", "ship", "facility", "airbase", "weapon", "referencePoint"]
+UnitType = Literal[
+    "aircraft",
+    "ship",
+    "facility",
+    "airbase",
+    "weapon",
+    "referencePoint",
+    "obstacle",
+]
 UNIT_TYPES: tuple[UnitType, ...] = (
     "aircraft",
     "ship",
@@ -21,6 +29,7 @@ UNIT_TYPES: tuple[UnitType, ...] = (
     "airbase",
     "weapon",
     "referencePoint",
+    "obstacle",
 )
 
 # Frontend ``Scenario.ts`` 使用的 JSON 键名。aircraft 是不可数名词（直接复
@@ -32,6 +41,7 @@ _BUCKET_KEY: dict[UnitType, str] = {
     "airbase": "airbases",
     "weapon": "weapons",
     "referencePoint": "referencePoints",
+    "obstacle": "obstacles",
 }
 
 
@@ -63,7 +73,7 @@ def iter_units(
     *,
     types: Iterable[UnitType] | None = None,
 ) -> list[dict[str, Any]]:
-    """Flatten aircraft/ship/facility/airbase/weapon/referencePoint into one
+    """Flatten aircraft/ship/facility/airbase/weapon/referencePoint/obstacle into one
     list, each item gets an injected ``_unit_type`` for downstream filtering."""
     scenario = get_current_scenario(data)
     wanted = tuple(types) if types else UNIT_TYPES

@@ -131,6 +131,12 @@ export default function MapContextMenu({
                 <Typography variant="body2" sx={{ fontWeight: "bold" }}>
                   Detection Range: {aircraft.range.toFixed(0)} nm
                 </Typography>
+                {aircraft.isElectronicWarfare && (
+                  <Typography variant="body2" sx={{ fontWeight: "bold" }}>
+                    EW: {aircraft.jammingRange?.toFixed(0) ?? 0} nm, strength{" "}
+                    {aircraft.jammingStrength?.toFixed(2) ?? "0.00"}
+                  </Typography>
+                )}
               </Stack>
             }
           >

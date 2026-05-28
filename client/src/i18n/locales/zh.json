@@ -19,7 +19,9 @@
       "F-4 Phantom II": "F-4 鬼怪 II 战斗机",
       "B-1B Lancer": "B-1B 枪骑兵轰炸机",
       "C-12 Huron": "C-12 休伦运输机",
-      "F-14 Tomcat": "F-14 雄猫战斗机"
+      "F-14 Tomcat": "F-14 雄猫战斗机",
+      "EA-18G Growler": "EA-18G 咆哮者电子战机",
+      "EF-111A Raven": "EF-111A 渡鸦电子战机"
     },
     "ship": {
       "Aircraft Carrier": "航空母舰",
@@ -187,6 +189,7 @@
       "ship": "加舰舰",
       "facility": "加防空",
       "airbase": "加机场",
+      "obstacle": "添加障碍物",
       "referencePoint": "加参考点"
     },
     "recording": {
@@ -309,6 +312,8 @@
       "C-17 Globemaster III": "C-17 环球霸王Ⅲ",
       "C-12 Huron": "C-12 休伦",
       "KC-135R Stratotanker": "KC-135R 同温层加油机",
+      "EA-18G Growler": "EA-18G 咆哮者",
+      "EF-111A Raven": "EF-111A 渡鸦",
       "Aircraft Carrier": "航空母舰",
       "Destroyer": "驱逐舰",
       "Frigate": "护卫舰",
@@ -397,6 +402,7 @@
       "ship": "舰艇",
       "facility": "设施",
       "airbase": "机场",
+      "obstacle": "障碍物",
       "referencePoint": "参考点"
     },
     "field": {

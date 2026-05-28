@@ -48,6 +48,7 @@ def _make_runtime(
     airbases: list[SimpleNamespace] | None = None,
     weapons: list[SimpleNamespace] | None = None,
     reference_points: list[SimpleNamespace] | None = None,
+    obstacles: list[SimpleNamespace] | None = None,
     start_time: int = 1000,
     duration: int = 600,
     current_time: int | None = None,
@@ -68,6 +69,7 @@ def _make_runtime(
         airbases=airbases or [],
         weapons=weapons or [],
         reference_points=reference_points or [],
+        obstacles=obstacles or [],
     )
     game = SimpleNamespace(
         current_scenario=scenario,
@@ -87,6 +89,7 @@ def test_unit_counts_aggregate_all_buckets():
         aircraft=[_make_unit("blue"), _make_unit("blue")],
         ships=[_make_unit("blue")],
         weapons=[_make_unit("blue"), _make_unit("blue"), _make_unit("blue")],
+        obstacles=[_make_unit("blue")],
     )
     counts = _runtime_unit_counts(runtime)
     assert counts == {
@@ -96,6 +99,7 @@ def test_unit_counts_aggregate_all_buckets():
         "airbase": 0,
         "weapon": 3,
         "referencePoint": 0,
+        "obstacle": 1,
     }
 
 

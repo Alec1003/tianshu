@@ -41,6 +41,15 @@ _SCENARIO = {
         "airbases": [],
         "weapons": [],
         "referencePoints": [],
+        "obstacles": [
+            {
+                "id": "o1",
+                "name": "No-go",
+                "sideId": "blue",
+                "latitude": 10.5,
+                "longitude": 20.5,
+            }
+        ],
         "missions": [{"id": "m1", "type": "patrol"}],
         "relationships": {
             "hostiles": {"blue": ["red"], "red": ["blue"]},
@@ -70,7 +79,8 @@ def test_iter_units_collects_all_types_and_injects_marker():
     types = {un["_unit_type"] for un in units}
     assert "aircraft" in types
     assert "ship" in types
-    assert len(units) == 3  # a1 + a2 + s1
+    assert "obstacle" in types
+    assert len(units) == 4  # a1 + a2 + s1 + o1
 
 
 def test_iter_units_filters_by_type():

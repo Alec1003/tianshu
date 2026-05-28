@@ -262,6 +262,21 @@ class AICCCommanderAgent:
                         source_text=text_norm,
                     )
                 )
+            elif unit_type == "obstacle":
+                calls.append(
+                    PlannedSkillCall(
+                        "deploy_obstacle",
+                        {
+                            "class_name": class_name,
+                            "latitude": lat,
+                            "longitude": lon,
+                            "side": side,
+                            "radius_nm": self._extract_radius_nm(text_norm),
+                            "obstacle_type": self._detect_obstacle_type(text_l),
+                        },
+                        source_text=text_norm,
+                    )
+                )
             elif unit_type == "reference_point":
                 calls.append(
                     PlannedSkillCall(
@@ -392,10 +407,15 @@ class AICCCommanderAgent:
 
     @staticmethod
     def _detect_unit_type(text: str) -> str | None:
-        if any(keyword in text for keyword in ["飞机", "aircraft", "plane"]):
+        if any(keyword in text for keyword in ["加油机", "飞机", "aircraft", "plane"]):
             return "aircraft"
         if any(keyword in text for keyword in ["舰", "ship"]):
             return "ship"
+        if any(
+            keyword in text
+            for keyword in ["障碍", "禁行", "禁飞", "地形", "天气", "遮蔽", "obstacle"]
+        ):
+            return "obstacle"
         if any(keyword in text for keyword in ["设施", "雷达", "sam", "facility"]):
             return "facility"
         if any(keyword in text for keyword in ["机场", "airbase", "基地"]):
@@ -403,6 +423,27 @@ class AICCCommanderAgent:
         if any(keyword in text for keyword in ["参考点", "reference"]):
             return "reference_point"
         return None
+
+    @staticmethod
+    def _detect_obstacle_type(text: str) -> str:
+        if any(keyword in text for keyword in ["禁飞", "禁行", "no-go", "no_go"]):
+            return "no_go"
+        if any(keyword in text for keyword in ["地形", "terrain"]):
+            return "terrain"
+        if any(keyword in text for keyword in ["天气", "weather"]):
+            return "weather"
+        if any(keyword in text for keyword in ["遮蔽", "雷达盲区", "sensor"]):
+            return "sensor_shadow"
+        return "no_go"
+
+    @staticmethod
+    def _extract_radius_nm(text: str) -> float:
+        match = re.search(
+            r"(?:半径|radius)\D*(\d+(?:\.\d+)?)\s*(?:nm|海里)?",
+            text,
+            flags=re.I,
+        )
+        return float(match.group(1)) if match else 15.0
 
     @staticmethod
     def _extract_quoted(text: str) -> str | None:
@@ -421,7 +462,10 @@ class AICCCommanderAgent:
             "facility": "MIM-104 Patriot",
             "airbase": "Andersen Air Force Base",
             "reference_point": "Reference Point",
+            "obstacle": "No-go zone",
         }
+        if unit_type == "aircraft" and "加油机" in text:
+            return "KC-135R Stratotanker"
         return defaults.get(unit_type or "", "Unknown")
 
     @staticmethod

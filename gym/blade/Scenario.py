@@ -6,6 +6,7 @@ from blade.units.Facility import Facility
 from blade.units.Airbase import Airbase
 from blade.units.Weapon import Weapon
 from blade.units.ReferencePoint import ReferencePoint
+from blade.units.Obstacle import Obstacle
 from blade.Side import Side
 from blade.mission.PatrolMission import PatrolMission
 from blade.mission.StrikeMission import StrikeMission
@@ -35,6 +36,7 @@ class Scenario:
         airbases: list[Airbase] = None,
         weapons: list[Weapon] = None,
         reference_points: list[ReferencePoint] = None,
+        obstacles: list[Obstacle] = None,
         missions: list[PatrolMission | StrikeMission] = None,
         relationships: Relationships | None = None,
         doctrine: Doctrine = None,
@@ -53,6 +55,7 @@ class Scenario:
         self.airbases = airbases if airbases is not None else []
         self.weapons = weapons if weapons is not None else []
         self.reference_points = reference_points if reference_points is not None else []
+        self.obstacles = obstacles if obstacles is not None else []
         self.missions = missions if missions is not None else []
         self.relationships = (
             relationships if relationships is not None else Relationships()
@@ -154,6 +157,12 @@ class Scenario:
         for reference_point in self.reference_points:
             if reference_point.id == reference_point_id:
                 return reference_point
+        return None
+
+    def get_obstacle(self, obstacle_id: str) -> Obstacle | None:
+        for obstacle in self.obstacles:
+            if obstacle.id == obstacle_id:
+                return obstacle
         return None
 
     def get_patrol_mission(self, mission_id: str) -> PatrolMission | None:

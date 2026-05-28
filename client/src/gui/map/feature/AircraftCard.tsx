@@ -326,6 +326,17 @@ export default function AircraftCard(props: Readonly<AircraftCardProps>) {
                 </TableCell>
               </TableRow>
             )}
+            {props.aircraft.isElectronicWarfare && (
+              <TableRow sx={tableRowStyle}>
+                <TableCell component="th" scope="row" sx={tableKeyCellStyle}>
+                  EW:
+                </TableCell>
+                <TableCell align="right" sx={tableValueCellStyle}>
+                  {props.aircraft.jammingRange.toFixed(0)} NM /{" "}
+                  {props.aircraft.jammingStrength.toFixed(2)}
+                </TableCell>
+              </TableRow>
+            )}
             <TableRow sx={tableRowStyle}>
               <TableCell component="th" scope="row" sx={tableKeyCellStyle}>
                 Detection Range:

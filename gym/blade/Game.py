@@ -9,6 +9,7 @@ from blade.units.Facility import Facility
 from blade.units.Ship import Ship
 from blade.units.Weapon import Weapon
 from blade.units.ReferencePoint import ReferencePoint
+from blade.units.Obstacle import Obstacle
 from blade.mission.PatrolMission import PatrolMission
 from blade.mission.StrikeMission import StrikeMission
 from blade.Scenario import Scenario
@@ -24,6 +25,12 @@ from blade.utils.utils import (
     get_next_coordinates,
     get_distance_between_two_points,
     to_camelcase,
+)
+from blade.engine.electronicWarfare import get_effective_detection_range
+from blade.engine.environmentConstraints import (
+    blocking_obstacle_for_point,
+    get_environment_detection_range,
+    get_effective_unit_speed,
 )
 from blade.engine.weaponEngagement import (
     aircraft_pursuit,
@@ -69,6 +76,7 @@ class Game:
         self.scenario_paused = True
         self.current_attacker_id = ""
         self.game_outcome = self._create_initial_game_outcome()
+        self.last_refueling_events: list[dict] = []
         self.map_view = {
             "defaultCenter": [0, 0],
             "currentCameraCenter": [0, 0],
@@ -124,6 +132,15 @@ class Game:
                     ),
                     fuel_transfer_rate=getattr(aircraft, "fuel_transfer_rate", 0.0),
                     refuel_range=getattr(aircraft, "refuel_range", 0.0),
+                    is_electronic_warfare=getattr(
+                        aircraft, "is_electronic_warfare", False
+                    ),
+                    jamming_range=getattr(aircraft, "jamming_range", 0.0),
+                    jamming_strength=getattr(aircraft, "jamming_strength", 0.0),
+                    jamming_modes=getattr(aircraft, "jamming_modes", []),
+                    communication_disruption=getattr(
+                        aircraft, "communication_disruption", 0.0
+                    ),
                 )
                 homebase.aircraft.append(new_aircraft)
                 self.remove_aircraft(aircraft.id)
@@ -522,6 +539,7 @@ class Game:
             result = self.refuel_aircraft(receiver.id)
             if result.get("refueled"):
                 events.append(result)
+        self.last_refueling_events = events
         return events
 
     def can_launch_at(
@@ -536,6 +554,7 @@ class Game:
             and weapon.current_quantity >= weapon_quantity
             and target.id != origin.id
             and self.current_scenario.is_hostile(origin.side_id, target.side_id)
+            and is_threat_detected(target, origin, self.current_scenario)
             and weapon_can_engage_target(target, weapon)
         )
 
@@ -577,7 +596,9 @@ class Game:
                         if facility_weapon is None:
                             continue
                         if (
-                            is_threat_detected(aircraft, facility)
+                            is_threat_detected(
+                                aircraft, facility, self.current_scenario
+                            )
                             and check_target_tracked_by_count(
                                 self.current_scenario, aircraft
                             )
@@ -601,7 +622,9 @@ class Game:
                         continue
                     if (
                         weapon.target_id == facility.id
-                        and is_threat_detected(weapon, facility)
+                        and is_threat_detected(
+                            weapon, facility, self.current_scenario
+                        )
                         and check_target_tracked_by_count(self.current_scenario, weapon)
                         < 5
                     ):
@@ -628,7 +651,9 @@ class Game:
                         if ship_weapon is None:
                             continue
                         if (
-                            is_threat_detected(aircraft, ship)
+                            is_threat_detected(
+                                aircraft, ship, self.current_scenario
+                            )
                             and check_target_tracked_by_count(
                                 self.current_scenario, aircraft
                             )
@@ -652,7 +677,9 @@ class Game:
                         continue
                     if (
                         weapon.target_id == ship.id
-                        and is_threat_detected(weapon, ship)
+                        and is_threat_detected(
+                            weapon, ship, self.current_scenario
+                        )
                         and check_target_tracked_by_count(self.current_scenario, weapon)
                         < 5
                     ):
@@ -682,7 +709,9 @@ class Game:
                         )
                         if (
                             launchable_weapon is not None
-                            and is_threat_detected(enemy_aircraft, aircraft)
+                            and is_threat_detected(
+                                enemy_aircraft, aircraft, self.current_scenario
+                            )
                             and check_target_tracked_by_count(
                                 self.current_scenario, enemy_aircraft
                             )
@@ -706,7 +735,9 @@ class Game:
                     if (
                         launchable_weapon is not None
                         and enemy_weapon.target_id == aircraft.id
-                        and is_threat_detected(enemy_weapon, aircraft)
+                        and is_threat_detected(
+                            enemy_weapon, aircraft, self.current_scenario
+                        )
                         and check_target_tracked_by_count(
                             self.current_scenario, enemy_weapon
                         )
@@ -740,6 +771,8 @@ class Game:
                 + self.current_scenario.ships
                 + self.current_scenario.airbases
             ):
+                if not is_threat_detected(candidate, aircraft, self.current_scenario):
+                    continue
                 distance_nm = (
                     get_distance_between_two_points(
                         aircraft.latitude,
@@ -749,8 +782,6 @@ class Game:
                     )
                     * 1000
                 ) / NAUTICAL_MILES_TO_METERS
-                if distance_nm > aircraft.get_detection_range() * 1.1:
-                    continue
                 launchable_weapon = self.get_best_weapon_against_target(
                     aircraft, candidate, require_in_range=True
                 )
@@ -915,38 +946,32 @@ class Game:
                 )
                 if aircraft_weapon_with_max_range is None:
                     continue
+                detection_range_nm = get_effective_detection_range(
+                    self.current_scenario, attacker
+                )
+                detection_range_nm = get_environment_detection_range(
+                    self.current_scenario, attacker, target, detection_range_nm
+                )
+                launch_position_distance_nm = (
+                    distance_between_weapon_launch_position_and_target_nm
+                    if distance_between_weapon_launch_position_and_target_nm is not None
+                    else distance_between_attacker_and_target_nm
+                )
                 if (
-                    distance_between_weapon_launch_position_and_target_nm is not None
-                    and (
-                        distance_between_weapon_launch_position_and_target_nm
-                        > attacker.get_detection_range() * 1.1
-                        or distance_between_weapon_launch_position_and_target_nm
-                        > aircraft_weapon_with_max_range.get_engagement_range() * 1.1
-                    )
-                ) or (
-                    distance_between_weapon_launch_position_and_target_nm is None
-                    and (
-                        distance_between_attacker_and_target_nm
-                        > attacker.get_detection_range() * 1.1
-                        or distance_between_attacker_and_target_nm
-                        > aircraft_weapon_with_max_range.get_engagement_range() * 1.1
-                    )
+                    launch_position_distance_nm > detection_range_nm
+                    or launch_position_distance_nm
+                    > aircraft_weapon_with_max_range.get_engagement_range()
                 ):
                     route_aircraft_to_strike_position(
                         self.current_scenario,
                         attacker,
                         mission.assigned_target_ids[0],
                         min(
-                            attacker.get_detection_range(),
+                            detection_range_nm,
                             aircraft_weapon_with_max_range.get_engagement_range(),
                         ),
                     )
-                elif (
-                    distance_between_attacker_and_target_nm
-                    <= attacker.get_detection_range() * 1.1
-                    and distance_between_attacker_and_target_nm
-                    <= aircraft_weapon_with_max_range.get_engagement_range() * 1.1
-                ):
+                elif is_threat_detected(target, attacker, self.current_scenario):
                     launched_weapon = self.get_best_weapon_against_target(
                         attacker,
                         target,
@@ -994,30 +1019,50 @@ class Game:
                     )
                     < 0.5
                 ):
-                    aircraft.latitude = next_waypoint_latitude
-                    aircraft.longitude = next_waypoint_longitude
-                    aircraft.route.pop(0)
+                    if blocking_obstacle_for_point(
+                        self.current_scenario,
+                        aircraft,
+                        next_waypoint_latitude,
+                        next_waypoint_longitude,
+                    ):
+                        pass
+                    else:
+                        aircraft.latitude = next_waypoint_latitude
+                        aircraft.longitude = next_waypoint_longitude
+                        aircraft.route.pop(0)
                 else:
-                    next_aircraft_coordinates = get_next_coordinates(
-                        aircraft.latitude,
-                        aircraft.longitude,
-                        next_waypoint_latitude,
-                        next_waypoint_longitude,
-                        aircraft.speed,
+                    effective_speed = get_effective_unit_speed(
+                        self.current_scenario, aircraft, aircraft.speed
                     )
-                    next_aircraft_latitude = next_aircraft_coordinates[0]
-                    next_aircraft_longitude = next_aircraft_coordinates[1]
-                    aircraft.latitude = next_aircraft_latitude
-                    aircraft.longitude = next_aircraft_longitude
-                    aircraft.heading = get_bearing_between_two_points(
-                        aircraft.latitude,
-                        aircraft.longitude,
-                        next_waypoint_latitude,
-                        next_waypoint_longitude,
-                    )
+                    if effective_speed > 0:
+                        next_aircraft_coordinates = get_next_coordinates(
+                            aircraft.latitude,
+                            aircraft.longitude,
+                            next_waypoint_latitude,
+                            next_waypoint_longitude,
+                            effective_speed,
+                        )
+                        next_aircraft_latitude = next_aircraft_coordinates[0]
+                        next_aircraft_longitude = next_aircraft_coordinates[1]
+                        if not blocking_obstacle_for_point(
+                            self.current_scenario,
+                            aircraft,
+                            next_aircraft_latitude,
+                            next_aircraft_longitude,
+                        ):
+                            aircraft.latitude = next_aircraft_latitude
+                            aircraft.longitude = next_aircraft_longitude
+                            aircraft.heading = get_bearing_between_two_points(
+                                aircraft.latitude,
+                                aircraft.longitude,
+                                next_waypoint_latitude,
+                                next_waypoint_longitude,
+                            )
             aircraft.current_fuel -= aircraft.fuel_rate / 3600
             if not getattr(aircraft, "is_tanker", False):
-                self.refuel_aircraft(aircraft.id)
+                refuel_result = self.refuel_aircraft(aircraft.id)
+                if refuel_result.get("refueled"):
+                    self.last_refueling_events.append(refuel_result)
             fuel_needed_to_return_to_base = self.get_fuel_needed_to_return_to_base(
                 aircraft
             )
@@ -1035,41 +1080,58 @@ class Game:
     def update_all_ship_position(self) -> None:
         for ship in list(self.current_scenario.ships):
             route = ship.route
-            if len(route) < 1:
-                continue
-            next_waypoint = route[0]
-            next_waypoint_latitude = next_waypoint[0]
-            next_waypoint_longitude = next_waypoint[1]
-            if (
-                get_distance_between_two_points(
-                    ship.latitude,
-                    ship.longitude,
-                    next_waypoint_latitude,
-                    next_waypoint_longitude,
-                )
-                < 0.5
-            ):
-                ship.latitude = next_waypoint_latitude
-                ship.longitude = next_waypoint_longitude
-                ship.route.pop(0)
-            else:
-                next_ship_coordinates = get_next_coordinates(
-                    ship.latitude,
-                    ship.longitude,
-                    next_waypoint_latitude,
-                    next_waypoint_longitude,
-                    ship.speed,
-                )
-                next_ship_latitude = next_ship_coordinates[0]
-                next_ship_longitude = next_ship_coordinates[1]
-                ship.latitude = next_ship_latitude
-                ship.longitude = next_ship_longitude
-                ship.heading = get_bearing_between_two_points(
-                    ship.latitude,
-                    ship.longitude,
-                    next_waypoint_latitude,
-                    next_waypoint_longitude,
-                )
+            if len(route) > 0:
+                next_waypoint = route[0]
+                next_waypoint_latitude = next_waypoint[0]
+                next_waypoint_longitude = next_waypoint[1]
+                if (
+                    get_distance_between_two_points(
+                        ship.latitude,
+                        ship.longitude,
+                        next_waypoint_latitude,
+                        next_waypoint_longitude,
+                    )
+                    < 0.5
+                ):
+                    if blocking_obstacle_for_point(
+                        self.current_scenario,
+                        ship,
+                        next_waypoint_latitude,
+                        next_waypoint_longitude,
+                    ):
+                        pass
+                    else:
+                        ship.latitude = next_waypoint_latitude
+                        ship.longitude = next_waypoint_longitude
+                        ship.route.pop(0)
+                else:
+                    effective_speed = get_effective_unit_speed(
+                        self.current_scenario, ship, ship.speed
+                    )
+                    if effective_speed > 0:
+                        next_ship_coordinates = get_next_coordinates(
+                            ship.latitude,
+                            ship.longitude,
+                            next_waypoint_latitude,
+                            next_waypoint_longitude,
+                            effective_speed,
+                        )
+                        next_ship_latitude = next_ship_coordinates[0]
+                        next_ship_longitude = next_ship_coordinates[1]
+                        if not blocking_obstacle_for_point(
+                            self.current_scenario,
+                            ship,
+                            next_ship_latitude,
+                            next_ship_longitude,
+                        ):
+                            ship.latitude = next_ship_latitude
+                            ship.longitude = next_ship_longitude
+                            ship.heading = get_bearing_between_two_points(
+                                ship.latitude,
+                                ship.longitude,
+                                next_waypoint_latitude,
+                                next_waypoint_longitude,
+                            )
             ship.current_fuel -= ship.fuel_rate / 3600
             if ship.current_fuel <= 0:
                 self.current_scenario.ships.remove(ship)
@@ -1090,6 +1152,7 @@ class Game:
 
     def update_game_state(self) -> None:
         self.current_scenario.current_time += 1
+        self.last_refueling_events = []
 
         self.facility_auto_defense()
         self.ship_auto_defense()
@@ -1336,6 +1399,15 @@ class Game:
                     fuel_offload_capacity=aircraft.get("fuelOffloadCapacity", 0.0),
                     fuel_transfer_rate=aircraft.get("fuelTransferRate", 0.0),
                     refuel_range=aircraft.get("refuelRange", 0.0),
+                    is_electronic_warfare=aircraft.get(
+                        "isElectronicWarfare", False
+                    ),
+                    jamming_range=aircraft.get("jammingRange", 0.0),
+                    jamming_strength=aircraft.get("jammingStrength", 0.0),
+                    jamming_modes=aircraft.get("jammingModes", []),
+                    communication_disruption=aircraft.get(
+                        "communicationDisruption", 0.0
+                    ),
                 )
             )
         for airbase in saved_scenario["airbases"]:
@@ -1395,6 +1467,15 @@ class Game:
                     fuel_offload_capacity=aircraft.get("fuelOffloadCapacity", 0.0),
                     fuel_transfer_rate=aircraft.get("fuelTransferRate", 0.0),
                     refuel_range=aircraft.get("refuelRange", 0.0),
+                    is_electronic_warfare=aircraft.get(
+                        "isElectronicWarfare", False
+                    ),
+                    jamming_range=aircraft.get("jammingRange", 0.0),
+                    jamming_strength=aircraft.get("jammingStrength", 0.0),
+                    jamming_modes=aircraft.get("jammingModes", []),
+                    communication_disruption=aircraft.get(
+                        "communicationDisruption", 0.0
+                    ),
                 )
                 airbase_aircraft.append(new_aircraft)
             loaded_scenario.airbases.append(
@@ -1532,6 +1613,15 @@ class Game:
                     fuel_offload_capacity=aircraft.get("fuelOffloadCapacity", 0.0),
                     fuel_transfer_rate=aircraft.get("fuelTransferRate", 0.0),
                     refuel_range=aircraft.get("refuelRange", 0.0),
+                    is_electronic_warfare=aircraft.get(
+                        "isElectronicWarfare", False
+                    ),
+                    jamming_range=aircraft.get("jammingRange", 0.0),
+                    jamming_strength=aircraft.get("jammingStrength", 0.0),
+                    jamming_modes=aircraft.get("jammingModes", []),
+                    communication_disruption=aircraft.get(
+                        "communicationDisruption", 0.0
+                    ),
                 )
                 ship_aircraft.append(new_aircraft)
             ship_weapons = []
@@ -1595,6 +1685,29 @@ class Game:
                         side_color=reference_point["sideColor"],
                     )
                 )
+        for obstacle in saved_scenario.get("obstacles", []):
+            loaded_scenario.obstacles.append(
+                Obstacle(
+                    id=obstacle["id"],
+                    name=obstacle.get("name", obstacle.get("className", "Obstacle")),
+                    class_name=obstacle.get("className", obstacle.get("name", "Obstacle")),
+                    side_id=obstacle.get("sideId", ""),
+                    latitude=obstacle["latitude"],
+                    longitude=obstacle["longitude"],
+                    altitude=obstacle.get("altitude", 0.0),
+                    radius_nm=obstacle.get("radiusNm", 10.0),
+                    obstacle_type=obstacle.get("obstacleType", "no_go"),
+                    side_color=obstacle.get("sideColor", "#38bdf8"),
+                    active=obstacle.get("active", True),
+                    movement_penalty=obstacle.get("movementPenalty", 1.0),
+                    detection_penalty=obstacle.get("detectionPenalty", 0.0),
+                    communication_penalty=obstacle.get("communicationPenalty", 0.0),
+                    affected_domains=obstacle.get(
+                        "affectedDomains", ["aircraft", "ship"]
+                    ),
+                    description=obstacle.get("description", ""),
+                )
+            )
         if "missions" in saved_scenario.keys():
             for mission in saved_scenario["missions"]:
                 if "assignedArea" in mission.keys():

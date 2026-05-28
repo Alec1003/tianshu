@@ -63,6 +63,7 @@ def _with_aircraft_units(data: dict[str, Any], source: str) -> dict[str, Any]:
             "maxFuelUnit": "kg",
             "fuelRateUnit": "kg/h",
             "rangeUnit": "nm",
+            "jammingRangeUnit": "nm",
         },
     )
     return data
@@ -88,6 +89,11 @@ def estimate_unit_asset(
             "fuelOffloadCapacity": 0,
             "fuelTransferRate": 0,
             "refuelRange": 0,
+            "isElectronicWarfare": False,
+            "jammingRange": 0,
+            "jammingStrength": 0,
+            "jammingModes": [],
+            "communicationDisruption": 0,
         }
         if any(token in text for token in ["kc-", "tanker", "加油", "mrt", "il-78", "y-20u"]):
             data.update(
@@ -100,6 +106,38 @@ def estimate_unit_asset(
                     "fuelOffloadCapacity": 45000,
                     "fuelTransferRate": 1200,
                     "refuelRange": 1500,
+                }
+            )
+        elif any(
+            token in text
+            for token in [
+                "electronic warfare",
+                "electronic attack",
+                "ewar",
+                "jammer",
+                "jamming",
+                "growler",
+                "prowler",
+                "raven",
+                "ea-18",
+                "ef-111",
+                "电子战",
+                "电子支援",
+                "电子攻击",
+                "干扰",
+            ]
+        ):
+            data.update(
+                {
+                    "speed": 850,
+                    "maxFuel": 16000,
+                    "fuelRate": 5200,
+                    "range": 900,
+                    "isElectronicWarfare": True,
+                    "jammingRange": 150,
+                    "jammingStrength": 0.5,
+                    "jammingModes": ["radar", "communications"],
+                    "communicationDisruption": 0.3,
                 }
             )
         elif any(token in text for token in ["b-2", "b-52", "b-1", "h-6", "轰炸"]):
@@ -280,7 +318,9 @@ Required units:
 - airbase latitude/longitude: decimal degrees
 Required data fields:
 - aircraft: className, speed, maxFuel, fuelRate, range, isTanker,
-  fuelOffloadCapacity, fuelTransferRate, refuelRange, dataSource, units
+  fuelOffloadCapacity, fuelTransferRate, refuelRange, isElectronicWarfare,
+  jammingRange, jammingStrength, jammingModes, communicationDisruption,
+  dataSource, units
 - ship: className, speed, maxFuel, fuelRate, range, dataSource, units
 - facility: className, range
 - airbase: name, country, latitude, longitude

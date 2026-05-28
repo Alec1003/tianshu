@@ -15,6 +15,8 @@ from blade.utils.utils import (
     random_float,
     random_int,
 )
+from blade.engine.electronicWarfare import get_effective_detection_range
+from blade.engine.environmentConstraints import get_environment_detection_range
 
 Target = Aircraft | Facility | Weapon | Airbase | Ship
 
@@ -29,7 +31,9 @@ OBJECTIVE_BONUS_SCORE = 200
 
 
 def is_threat_detected(
-    threat: Aircraft | Weapon, detector: Facility | Ship | Aircraft
+    threat: Target,
+    detector: Facility | Ship | Aircraft,
+    current_scenario: Scenario | None = None,
 ) -> bool:
     distance_to_threat_km = get_distance_between_two_points(
         detector.latitude,
@@ -40,7 +44,16 @@ def is_threat_detected(
     distance_to_threat_nm = (
         distance_to_threat_km * 1000
     ) / NAUTICAL_MILES_TO_METERS
-    return distance_to_threat_nm <= detector.get_detection_range()
+    detection_range_nm = (
+        get_effective_detection_range(current_scenario, detector)
+        if current_scenario is not None
+        else detector.get_detection_range()
+    )
+    if current_scenario is not None:
+        detection_range_nm = get_environment_detection_range(
+            current_scenario, detector, threat, detection_range_nm
+        )
+    return distance_to_threat_nm <= detection_range_nm
 
 
 def _remove_if_present(items: list, item) -> None:

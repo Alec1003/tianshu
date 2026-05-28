@@ -288,6 +288,56 @@
         "fuelRateUnit": "lbs/hr",
         "rangeUnit": "nm"
       }
+    },
+    {
+      "className": "EA-18G Growler",
+      "speed": 1034,
+      "maxFuel": 14552,
+      "fuelRate": 5200,
+      "range": 120,
+      "isElectronicWarfare": true,
+      "jammingRange": 150,
+      "jammingStrength": 0.55,
+      "jammingModes": ["radar", "communications"],
+      "communicationDisruption": 0.35,
+      "dataSource": {
+        "speedSrc": "public approximate simulator value",
+        "maxFuelSrc": "public approximate simulator value",
+        "fuelRateSrc": "AI estimate; verify before use",
+        "rangeSrc": "public approximate simulator value"
+      },
+      "units": {
+        "speedUnit": "knots",
+        "maxFuelUnit": "lbs",
+        "fuelRateUnit": "lbs/hr",
+        "rangeUnit": "nm",
+        "jammingRangeUnit": "nm"
+      }
+    },
+    {
+      "className": "EF-111A Raven",
+      "speed": 1226,
+      "maxFuel": 34000,
+      "fuelRate": 7200,
+      "range": 110,
+      "isElectronicWarfare": true,
+      "jammingRange": 140,
+      "jammingStrength": 0.5,
+      "jammingModes": ["radar", "communications"],
+      "communicationDisruption": 0.3,
+      "dataSource": {
+        "speedSrc": "public approximate simulator value",
+        "maxFuelSrc": "public approximate simulator value",
+        "fuelRateSrc": "AI estimate; verify before use",
+        "rangeSrc": "public approximate simulator value"
+      },
+      "units": {
+        "speedUnit": "knots",
+        "maxFuelUnit": "lbs",
+        "fuelRateUnit": "lbs/hr",
+        "rangeUnit": "nm",
+        "jammingRangeUnit": "nm"
+      }
     }
   ],
   "airbaseDb": [

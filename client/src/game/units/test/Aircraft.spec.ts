@@ -77,6 +77,35 @@ describe("Aircraft", () => {
     expect(testAircraft.refuelRange).toBe(2);
   });
 
+  test("an electronic warfare aircraft preserves jamming settings", () => {
+    const testAircraft = new Aircraft({
+      id: "ew-1",
+      name: "Growler",
+      sideId: "BLUE",
+      className: "EA-18G Growler",
+      latitude: 15,
+      longitude: 20,
+      altitude: 10000,
+      heading: 90,
+      speed: 500,
+      currentFuel: 1000,
+      maxFuel: 1000,
+      fuelRate: 100,
+      range: 120,
+      isElectronicWarfare: true,
+      jammingRange: 150,
+      jammingStrength: 1,
+      jammingModes: ["radar"],
+      communicationDisruption: 0.3,
+    });
+
+    expect(testAircraft.isElectronicWarfare).toBe(true);
+    expect(testAircraft.jammingRange).toBe(150);
+    expect(testAircraft.jammingStrength).toBe(0.85);
+    expect(testAircraft.jammingModes).toStrictEqual(["radar"]);
+    expect(testAircraft.communicationDisruption).toBe(0.3);
+  });
+
   test("getTotalWeaponQuantity returns the correct number of weapons on an Aircraft", () => {
     const testWeapon1 = new Weapon({
       id: "123456",

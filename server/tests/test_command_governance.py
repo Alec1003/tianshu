@@ -23,6 +23,7 @@ class FakeScenario:
         self.facilities = []
         self.airbases = []
         self.reference_points = []
+        self.obstacles = [SimpleNamespace(id="obstacle-1", latitude=0.0, longitude=0.0)]
 
     def get_aircraft(self, unit_id: str):
         return next((item for item in self.aircraft if item.id == unit_id), None)
@@ -39,6 +40,9 @@ class FakeScenario:
     def get_reference_point(self, unit_id: str):
         return next((item for item in self.reference_points if item.id == unit_id), None)
 
+    def get_obstacle(self, unit_id: str):
+        return next((item for item in self.obstacles if item.id == unit_id), None)
+
 
 class FakeRuntime:
     def __init__(self) -> None:
@@ -54,6 +58,8 @@ class FakeRegistry:
             "simulation_step",
             "move_unit",
             "deploy_aircraft",
+            "deploy_obstacle",
+            "update_unit_state",
             "load_scenario_file",
         }
 
@@ -133,6 +139,45 @@ def test_rule_engine_blocks_missing_unit_target() -> None:
     assert any(
         issue.code == "unit_not_found" for issue in proposal.adjudication.issues
     )
+
+
+def test_rule_engine_allows_obstacle_deploy_and_target_lookup() -> None:
+    queue = CommandApprovalQueue(FakeRuntime(), FakeRegistry())  # type: ignore[arg-type]
+
+    deploy = queue.create_proposal(
+        command="deploy obstacle",
+        source="regex",
+        steps=[
+            StructuredCommandStep(
+                id="s1",
+                skill="deploy_obstacle",
+                parameters={
+                    "class_name": "No-go zone",
+                    "latitude": 1.0,
+                    "longitude": 2.0,
+                    "radius_nm": 15.0,
+                },
+            )
+        ],
+    )
+    update = queue.create_proposal(
+        command="update obstacle",
+        source="regex",
+        steps=[
+            StructuredCommandStep(
+                id="s2",
+                skill="update_unit_state",
+                parameters={
+                    "unit_type": "obstacle",
+                    "unit_id": "obstacle-1",
+                    "patch": {"radiusNm": 20},
+                },
+            )
+        ],
+    )
+
+    assert deploy.status == "pending"
+    assert update.status == "pending"
 
 
 def test_pydantic_tool_proposal_recorder_receives_created_proposal() -> None:

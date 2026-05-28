@@ -53,6 +53,7 @@ export type RuntimeVisibleObjectType =
   | "facilities"
   | "airbases"
   | "referencePoints"
+  | "obstacles"
   | "weapons";
 
 export interface RuntimeVisibilitySide {
@@ -227,7 +228,8 @@ export type RuntimeUnitType =
   | "ship"
   | "facility"
   | "airbase"
-  | "reference_point";
+  | "reference_point"
+  | "obstacle";
 
 export interface RuntimeDeployUnitRequest {
   unit_type: RuntimeUnitType;
@@ -237,6 +239,12 @@ export interface RuntimeDeployUnitRequest {
   side?: string | null;
   name?: string | null;
   altitude?: number | null;
+  radius_nm?: number | null;
+  obstacle_type?: string | null;
+  movement_penalty?: number | null;
+  detection_penalty?: number | null;
+  communication_penalty?: number | null;
+  affected_domains?: string[] | null;
 }
 
 export interface RuntimeMoveUnitRequest {

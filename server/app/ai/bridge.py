@@ -7,7 +7,7 @@ from typing import Any
 
 from app.ai.agent import AICCCommanderAgent
 from app.ai.command_governance import CommandApprovalQueue
-from app.ai.mcp_client import MCPClientSkeleton, MCPServerConfig
+from app.ai.mcp_client import MCPClientSkeleton
 from app.ai.models import (
     AgentExecutionSummary,
     CommandProposal,
@@ -25,7 +25,7 @@ DEFAULT_SCENARIO_PATH = ROOT_DIR / "client" / "src" / "scenarios" / "SCS.json"
 
 
 class AICCOpenClawBridge:
-    """Unified bridge for AICC agent, skill registry, and MCP skeleton."""
+    """Unified bridge for AICC agent, skill registry, and external MCP client."""
 
     def __init__(
         self,
@@ -33,6 +33,7 @@ class AICCOpenClawBridge:
         llm_model: str = "",
         llm_api_key: str = "",
         llm_base_url: str = "",
+        external_mcp_servers: str | None = None,
     ) -> None:
         self.runtime = AICCRuntime(scenario_path=scenario_path)
         self.skill_registry = AICCSkillRegistry(runtime=self.runtime)
@@ -40,15 +41,13 @@ class AICCOpenClawBridge:
             runtime=self.runtime,
             registry=self.skill_registry,
         )
-        self.mcp_client = MCPClientSkeleton()
+        self.mcp_client = MCPClientSkeleton.from_env(external_mcp_servers)
         self.sdk_adapter = OpenClawSDKAdapter()
         self.agent = AICCCommanderAgent(
             skill_registry=self.skill_registry,
             mcp_client=self.mcp_client,
             sdk_adapter=self.sdk_adapter,
         )
-        self._register_default_mcp_skeleton()
-
         # ── S4: Pydantic AI agent ─────────────────────────────────────────────
         # Built only when a model is configured; otherwise None and the regex
         # planner in self.agent is used as the fallback.
@@ -80,17 +79,7 @@ class AICCOpenClawBridge:
             llm_model=settings.llm_model,
             llm_api_key=settings.llm_api_key,
             llm_base_url=settings.llm_base_url,
-        )
-
-    def _register_default_mcp_skeleton(self) -> None:
-        self.mcp_client.register_server(
-            MCPServerConfig(
-                name="solver-reserved",
-                transport="stdio",
-                command="",
-                args=[],
-                enabled=False,
-            )
+            external_mcp_servers=settings.external_mcp_servers,
         )
 
     def process_command(
@@ -154,7 +143,12 @@ class AICCOpenClawBridge:
         if agent is not None:
             from app.ai.pydantic_agent import run_agent  # noqa: PLC0415
 
-            return await run_agent(agent, command, self.skill_registry)
+            return await run_agent(
+                agent,
+                command,
+                self.skill_registry,
+                mcp_client=self.mcp_client,
+            )
         return self.agent.process_command(command=command, context=context)
 
     async def propose_command_async(
@@ -170,6 +164,7 @@ class AICCOpenClawBridge:
                 command,
                 self.skill_registry,
                 approval_queue=self.command_approvals,
+                mcp_client=self.mcp_client,
             )
             proposals = [
                 proposal

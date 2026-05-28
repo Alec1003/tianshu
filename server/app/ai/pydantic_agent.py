@@ -19,7 +19,7 @@ from pydantic_ai.models.openai import OpenAIModel, OpenAIResponsesModel
 from pydantic_ai.providers.anthropic import AnthropicProvider
 from pydantic_ai.providers.openai import OpenAIProvider
 
-from app.ai.models import AgentExecutionSummary, SkillExecutionResult
+from app.ai.models import AgentExecutionSummary, MCPCallTrace, SkillExecutionResult
 from app.ai.skill_registry import AICCSkillRegistry
 from app.security.url_guard import normalize_and_validate_base_url
 
@@ -44,6 +44,9 @@ Rules:
 - Only call the registered tools; never invent tool names.
 - For compound commands separated by "then", ";", or "然后", call tools in sequence.
 - When a required parameter is ambiguous, make the most tactically sensible simulation assumption.
+- External MCP tools are advisory integrations. Use them to obtain plans,
+  allocations, or analysis from operator-configured external servers; they are
+  not the authoritative AICC simulation engine.
 - Tool calls create command proposals for human approval; they do not directly mutate the simulation.
 - After all tools have been called, respond with a concise single-sentence summary of what was proposed.
 - If a tool fails, note the failure in your summary but continue with remaining operations.
@@ -55,9 +58,11 @@ class AgentDeps:
     registry: AICCSkillRegistry
     chat_mode: Literal["ask", "command"] = "command"
     call_log: list[SkillExecutionResult] = field(default_factory=list)
+    mcp_traces: list[MCPCallTrace] = field(default_factory=list)
     approval_queue: Any | None = None
     proposal_recorder: Callable[[Any], None] | None = None
     source_command: str = ""
+    mcp_client: Any | None = None
 
 
 def _exec(deps: AgentDeps, skill: str, params: dict[str, Any]) -> dict[str, Any]:
@@ -108,6 +113,91 @@ def _exec(deps: AgentDeps, skill: str, params: dict[str, Any]) -> dict[str, Any]
             SkillExecutionResult(skill=skill, status="error", parameters=params, error=str(exc))
         )
         raise
+
+
+async def _external_mcp_list_tools(
+    deps: AgentDeps,
+    server: str = "",
+) -> dict[str, Any]:
+    """List operator-configured external MCP tools for the LLM."""
+    params = {"server": server}
+    if deps.mcp_client is None:
+        error = "No external MCP client configured."
+        deps.call_log.append(
+            SkillExecutionResult(
+                skill="external_mcp_list_tools",
+                status="error",
+                parameters=params,
+                error=error,
+            )
+        )
+        return {"ok": False, "error": error, "tools": []}
+
+    traces, tools = await deps.mcp_client.list_tools(server or None)
+    deps.mcp_traces.extend(traces)
+    config_errors = deps.mcp_client.configuration_errors()
+    has_error = any(trace.status == "error" for trace in traces)
+    should_mark_error = (has_error or bool(config_errors)) and not tools
+    output = {
+        "ok": not has_error and not config_errors,
+        "servers": deps.mcp_client.list_server_summaries(),
+        "tools": tools,
+        "configurationErrors": config_errors,
+        "traces": [trace.model_dump(mode="json") for trace in traces],
+    }
+    deps.call_log.append(
+        SkillExecutionResult(
+            skill="external_mcp_list_tools",
+            status="error" if should_mark_error else "ok",
+            parameters=params,
+            output=output,
+            error="Failed to list external MCP tools" if should_mark_error else None,
+        )
+    )
+    return output
+
+
+async def _external_mcp_call(
+    deps: AgentDeps,
+    server: str,
+    tool_name: str,
+    arguments: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Call an external MCP tool and log the trace."""
+    params = {
+        "server": server,
+        "tool_name": tool_name,
+        "arguments": arguments or {},
+    }
+    if deps.mcp_client is None:
+        error = "No external MCP client configured."
+        deps.call_log.append(
+            SkillExecutionResult(
+                skill="external_mcp_call",
+                status="error",
+                parameters=params,
+                error=error,
+            )
+        )
+        return {"ok": False, "error": error}
+
+    trace, result = await deps.mcp_client.call_tool(server, tool_name, arguments or {})
+    deps.mcp_traces.append(trace)
+    output = {
+        "ok": trace.status == "ok",
+        "trace": trace.model_dump(mode="json"),
+        "result": result,
+    }
+    deps.call_log.append(
+        SkillExecutionResult(
+            skill="external_mcp_call",
+            status="ok" if trace.status == "ok" else "error",
+            parameters=params,
+            output=output,
+            error=None if trace.status == "ok" else trace.message,
+        )
+    )
+    return output
 
 
 # Default base URLs for OpenAI-compatible providers. Front-end can still
@@ -432,6 +522,26 @@ def build_agent(
         """Load a scenario from an absolute or repo-relative file path on the server."""
         return _exec(ctx.deps, "load_scenario_file", {"scenario_path": scenario_path})
 
+    # ── External MCP advisory integrations ────────────────────────────────────
+
+    @agent.tool
+    async def external_mcp_list_tools(
+        ctx: RunContext[AgentDeps],
+        server: str = "",
+    ) -> dict[str, Any]:
+        """List tools exposed by configured external MCP servers."""
+        return await _external_mcp_list_tools(ctx.deps, server)
+
+    @agent.tool
+    async def external_mcp_call(
+        ctx: RunContext[AgentDeps],
+        server: str,
+        tool_name: str,
+        arguments: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Call a configured external MCP tool with JSON arguments."""
+        return await _external_mcp_call(ctx.deps, server, tool_name, arguments)
+
     return agent
 
 
@@ -441,6 +551,7 @@ async def run_agent(
     registry: AICCSkillRegistry,
     approval_queue: Any | None = None,
     chat_mode: Literal["ask", "command"] = "command",
+    mcp_client: Any | None = None,
 ) -> AgentExecutionSummary:
     """Run the pydantic-ai agent and wrap the result in AgentExecutionSummary."""
     deps = AgentDeps(
@@ -448,6 +559,7 @@ async def run_agent(
         chat_mode=chat_mode,
         approval_queue=approval_queue,
         source_command=command,
+        mcp_client=mcp_client,
     )
     summary = AgentExecutionSummary(command=command, decomposition=[command])
 
@@ -457,9 +569,11 @@ async def run_agent(
         summary.status = "error"
         summary.error = str(exc)
         summary.skill_calls = deps.call_log
+        summary.mcp_traces = deps.mcp_traces
         return summary
 
     summary.skill_calls = deps.call_log
+    summary.mcp_traces = deps.mcp_traces
     has_error = any(c.status == "error" for c in deps.call_log)
     if has_error and deps.call_log:
         summary.status = "partial"

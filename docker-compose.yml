@@ -37,6 +37,7 @@ services:
       AICC_LLM_MODEL: "${AICC_LLM_MODEL:-}"
       AICC_LLM_API_KEY: "${AICC_LLM_API_KEY:-}"
       AICC_LLM_BASE_URL: "${AICC_LLM_BASE_URL:-}"
+      AICC_EXTERNAL_MCP_SERVERS: "${AICC_EXTERNAL_MCP_SERVERS:-}"
     volumes:
       - aicc_server_data:/app/server/data
     restart: unless-stopped

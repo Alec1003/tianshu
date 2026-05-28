@@ -89,6 +89,13 @@ class Settings(BaseSettings):
     llm_model: str = Field(default="", description="Pydantic-AI model ID.")
     llm_api_key: str = Field(default="", description="API key for the LLM provider.")
     llm_base_url: str = Field(default="", description="Optional custom base URL (proxy / local LLM).")
+    external_mcp_servers: str = Field(
+        default="",
+        description=(
+            "JSON array of operator-configured external MCP servers that the "
+            "LLM agent may list and call."
+        ),
+    )
     model_config_secret: str = Field(
         default="",
         description=(

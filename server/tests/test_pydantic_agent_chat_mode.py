@@ -3,7 +3,14 @@ from __future__ import annotations
 import pytest
 
 from app.ai import pydantic_agent as pa_mod
-from app.ai.pydantic_agent import AgentDeps, _exec
+from app.ai.models import MCPCallTrace
+from app.ai.pydantic_agent import (
+    AgentDeps,
+    _exec,
+    _external_mcp_call,
+    _external_mcp_list_tools,
+    run_agent,
+)
 
 
 class RecordingRegistry:
@@ -113,3 +120,92 @@ def test_build_agent_registers_tools_by_default(monkeypatch: pytest.MonkeyPatch)
 
     assert "simulation_start" in agent.tools
     assert "deploy_aircraft" in agent.tools
+    assert "external_mcp_list_tools" in agent.tools
+    assert "external_mcp_call" in agent.tools
+
+
+class FakeMCPClient:
+    def list_server_summaries(self) -> list[dict]:
+        return [{"name": "planner", "enabled": True}]
+
+    def configuration_errors(self) -> list[str]:
+        return []
+
+    async def list_tools(self, server: str | None = None):
+        return (
+            [
+                MCPCallTrace(
+                    action="list_tools",
+                    target=server or "planner",
+                    status="ok",
+                    message="1 tools available",
+                )
+            ],
+            [
+                {
+                    "server": server or "planner",
+                    "name": "plan_route",
+                    "description": "Plan route",
+                    "inputSchema": {},
+                }
+            ],
+        )
+
+    async def call_tool(self, server: str, tool_name: str, arguments: dict):
+        return (
+            MCPCallTrace(
+                action=f"call:{tool_name}",
+                target=server,
+                status="ok",
+                message="MCP tool call succeeded",
+            ),
+            {"content": [{"type": "text", "text": "planned"}]},
+        )
+
+
+@pytest.mark.asyncio
+async def test_external_mcp_list_tools_records_trace():
+    deps = AgentDeps(registry=RecordingRegistry(), mcp_client=FakeMCPClient())
+
+    result = await _external_mcp_list_tools(deps, "planner")
+
+    assert result["tools"][0]["name"] == "plan_route"
+    assert deps.mcp_traces[0].action == "list_tools"
+    assert deps.call_log[0].skill == "external_mcp_list_tools"
+    assert deps.call_log[0].status == "ok"
+
+
+@pytest.mark.asyncio
+async def test_external_mcp_call_records_result_and_trace():
+    deps = AgentDeps(registry=RecordingRegistry(), mcp_client=FakeMCPClient())
+
+    result = await _external_mcp_call(
+        deps,
+        "planner",
+        "plan_route",
+        {"unitId": "u-1"},
+    )
+
+    assert result["ok"] is True
+    assert result["result"]["content"][0]["text"] == "planned"
+    assert deps.mcp_traces[0].action == "call:plan_route"
+    assert deps.call_log[0].skill == "external_mcp_call"
+    assert deps.call_log[0].status == "ok"
+
+
+class ExternalMCPAgent:
+    async def run(self, command: str, *, deps: AgentDeps) -> None:
+        await _external_mcp_call(deps, "planner", "plan_route", {"command": command})
+
+
+@pytest.mark.asyncio
+async def test_run_agent_includes_external_mcp_traces():
+    summary = await run_agent(
+        ExternalMCPAgent(),
+        "plan route",
+        RecordingRegistry(),
+        mcp_client=FakeMCPClient(),
+    )
+
+    assert summary.status == "ok"
+    assert summary.mcp_traces[0].action == "call:plan_route"

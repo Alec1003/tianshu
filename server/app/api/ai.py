@@ -1456,6 +1456,7 @@ async def chat(
         chat_mode=chat_mode,
         approval_queue=approval_queue,
         proposal_recorder=_record_proposal if approval_queue is not None else None,
+        mcp_client=bridge.mcp_client,
     )
     return await VercelAIAdapter.dispatch_request(
         request,

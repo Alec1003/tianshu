@@ -7,6 +7,7 @@ from typing import Sequence
 from fastapi import APIRouter, Depends, Header, HTTPException, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.ai.model_config_service import resolve_stored_model_credentials
 from app.auth.models import User
 from app.auth.users import current_active_user
 from app.db.session import get_async_session
@@ -104,21 +105,34 @@ async def create_asset(
 async def generate_asset(
     payload: UnitAssetGenerateRequest,
     user: User = Depends(current_active_user),
+    session: AsyncSession = Depends(get_async_session),
+    x_aicc_model_provider_id: str = Header(default=""),
     x_aicc_model_provider: str = Header(default=""),
     x_aicc_model_name: str = Header(default=""),
     x_aicc_model_api_key: str = Header(default=""),
     x_aicc_model_base_url: str = Header(default=""),
 ) -> UnitAssetGenerateResponse:
     _ = user
+    provider = x_aicc_model_provider.strip()
+    api_key = x_aicc_model_api_key.strip()
+    base_url = x_aicc_model_base_url.strip()
+    if provider and not api_key:
+        api_key, base_url = await resolve_stored_model_credentials(
+            session,
+            user,
+            provider_id=x_aicc_model_provider_id.strip(),
+            provider=provider,
+            base_url=base_url,
+        )
     try:
         data, source, confidence, warnings = await generate_unit_asset_payload(
             asset_type=payload.type,
             query=payload.query,
             context=payload.context,
-            provider=x_aicc_model_provider.strip(),
+            provider=provider,
             model=x_aicc_model_name.strip(),
-            api_key=x_aicc_model_api_key.strip(),
-            base_url=x_aicc_model_base_url.strip(),
+            api_key=api_key,
+            base_url=base_url,
         )
     except UnitAssetServiceError as exc:
         raise _http_error(exc) from exc

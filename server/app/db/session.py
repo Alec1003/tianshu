@@ -73,6 +73,7 @@ async def create_db_and_tables() -> None:
         CommandProposalRecord,
         CommandProposalStepRecord,
     )
+    from app.ai.model_config_models import AIModelProviderConfig  # noqa: F401
     from app.aicc_runtime.models import RuntimeEvent, RuntimeState  # noqa: F401
     from app.auth.models import User  # noqa: F401
     from app.scenarios.models import (  # noqa: F401
@@ -99,12 +100,14 @@ async def _bootstrap_schema_migrations(conn) -> None:
       - default to a non-NULL value so existing rows pass NOT NULL;
       - mirror the corresponding ``mapped_column`` declaration in models.py.
 
-    Once we ship Alembic this whole helper goes away and the migration moves
-    to a versioned revision file.
+    Alembic is now the production path; this helper remains only as a
+    backwards-compatible dev bootstrap for existing local SQLite files.
     """
     backend = conn.engine.dialect.name
     if backend == "postgresql":
+        await _migrate_command_proposal_scope_postgres(conn)
         await _migrate_unit_asset_scope_postgres(conn)
+        await _migrate_runtime_state_scope_postgres(conn)
         return
 
     from sqlalchemy import text
@@ -131,6 +134,8 @@ async def _bootstrap_schema_migrations(conn) -> None:
         await conn.execute(text(ddl))
 
     await _migrate_unit_asset_scope_sqlite(conn)
+    await _migrate_runtime_state_scope_sqlite(conn)
+    await _migrate_command_proposal_scope_sqlite(conn)
 
 
 async def _migrate_unit_asset_scope_postgres(conn) -> None:
@@ -150,6 +155,47 @@ async def _migrate_unit_asset_scope_postgres(conn) -> None:
         text(
             "CREATE UNIQUE INDEX IF NOT EXISTS uq_unit_asset_owner_type_name "
             "ON unit_asset (owner_id, type, name) WHERE owner_id IS NOT NULL"
+        )
+    )
+
+
+async def _migrate_command_proposal_scope_postgres(conn) -> None:
+    """Add scenario scoping to AI command approval proposals."""
+    from sqlalchemy import text
+
+    await conn.execute(
+        text(
+            "ALTER TABLE command_proposal "
+            "ADD COLUMN IF NOT EXISTS scenario_id VARCHAR(120) "
+            "NOT NULL DEFAULT '__default__'"
+        )
+    )
+    await conn.execute(
+        text(
+            "CREATE INDEX IF NOT EXISTS ix_command_proposal_owner_scenario_status "
+            "ON command_proposal (owner_id, scenario_id, status)"
+        )
+    )
+
+
+async def _migrate_runtime_state_scope_postgres(conn) -> None:
+    """Move runtime_state from per-user to per-user/per-scenario snapshots."""
+    from sqlalchemy import text
+
+    await conn.execute(
+        text(
+            "ALTER TABLE runtime_state "
+            "ADD COLUMN IF NOT EXISTS scenario_id VARCHAR(120) "
+            "NOT NULL DEFAULT '__default__'"
+        )
+    )
+    await conn.execute(
+        text("ALTER TABLE runtime_state DROP CONSTRAINT IF EXISTS runtime_state_owner_id_key")
+    )
+    await conn.execute(
+        text(
+            "CREATE UNIQUE INDEX IF NOT EXISTS ix_runtime_state_owner_scenario "
+            "ON runtime_state (owner_id, scenario_id)"
         )
     )
 
@@ -182,3 +228,63 @@ async def _migrate_unit_asset_scope_sqlite(conn) -> None:
         )
     )
     await conn.execute(text("DROP TABLE unit_asset_legacy"))
+
+
+async def _migrate_runtime_state_scope_sqlite(conn) -> None:
+    """Rebuild SQLite runtime_state when it still stores one snapshot per user."""
+    from sqlalchemy import text
+
+    result = await conn.execute(
+        text("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'runtime_state'")
+    )
+    create_sql = result.scalar_one_or_none() or ""
+    if not create_sql:
+        return
+    result = await conn.execute(text("PRAGMA table_info(runtime_state)"))
+    existing_cols = {row[1] for row in result.fetchall()}
+    has_scenario_id = "scenario_id" in existing_cols
+    has_old_unique_owner = "UNIQUE (owner_id)" in create_sql
+    if has_scenario_id and not has_old_unique_owner:
+        return
+
+    from app.aicc_runtime.models import RuntimeState
+
+    scenario_expr = "scenario_id" if has_scenario_id else "'__default__'"
+    await conn.execute(text("ALTER TABLE runtime_state RENAME TO runtime_state_legacy"))
+    await conn.run_sync(lambda sync_conn: RuntimeState.__table__.create(sync_conn))
+    await conn.execute(
+        text(
+            f"""
+            INSERT INTO runtime_state (
+                id, owner_id, scenario_id, scenario, runtime_metadata,
+                version, created_at, updated_at
+            )
+            SELECT
+                id, owner_id, {scenario_expr}, scenario, runtime_metadata,
+                version, created_at, updated_at
+            FROM runtime_state_legacy
+            """
+        )
+    )
+    await conn.execute(text("DROP TABLE runtime_state_legacy"))
+
+
+async def _migrate_command_proposal_scope_sqlite(conn) -> None:
+    """Add scenario scope to SQLite command proposals for existing dev DBs."""
+    from sqlalchemy import text
+
+    result = await conn.execute(text("PRAGMA table_info(command_proposal)"))
+    existing_cols = {row[1] for row in result.fetchall()}
+    if "scenario_id" not in existing_cols:
+        await conn.execute(
+            text(
+                "ALTER TABLE command_proposal ADD COLUMN scenario_id VARCHAR(120) "
+                "NOT NULL DEFAULT '__default__'"
+            )
+        )
+    await conn.execute(
+        text(
+            "CREATE INDEX IF NOT EXISTS ix_command_proposal_owner_scenario_status "
+            "ON command_proposal (owner_id, scenario_id, status)"
+        )
+    )

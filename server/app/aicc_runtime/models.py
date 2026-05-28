@@ -34,12 +34,25 @@ class RuntimeState(Base):
     """Latest authoritative backend Runtime snapshot for one user."""
 
     __tablename__ = "runtime_state"
+    __table_args__ = (
+        Index(
+            "ix_runtime_state_owner_scenario",
+            "owner_id",
+            "scenario_id",
+            unique=True,
+        ),
+    )
 
     id: Mapped[str] = _uuid_pk()
     owner_id: Mapped[uuid.UUID] = mapped_column(
         GUID(),
         ForeignKey("user.id", ondelete="CASCADE"),
-        unique=True,
+        nullable=False,
+        index=True,
+    )
+    scenario_id: Mapped[str] = mapped_column(
+        String(120),
+        default="__default__",
         nullable=False,
         index=True,
     )

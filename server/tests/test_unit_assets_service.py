@@ -361,3 +361,18 @@ async def test_generate_unit_asset_payload_uses_keyless_ollama(monkeypatch):
     assert confidence == 0.7
     assert warnings == []
     assert data["className"] == "Local Test Jet"
+
+
+async def test_generate_unit_asset_payload_blocks_custom_private_base_url():
+    data, source, _confidence, warnings = await generate_unit_asset_payload(
+        asset_type="aircraft",
+        query="Private Test Jet",
+        provider="custom",
+        model="test-model",
+        api_key="sk-test",
+        base_url="http://127.0.0.1:8000/v1",
+    )
+
+    assert source == "estimate"
+    assert any("Base URL blocked" in warning for warning in warnings)
+    assert data["className"] == "Private Test Jet"

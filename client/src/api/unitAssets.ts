@@ -14,8 +14,30 @@ import type {
 interface StoredModelConfig {
   provider?: string;
   baseUrl?: string;
-  apiKey?: string;
   model?: string;
+}
+
+interface StoredModelProfile {
+  id?: string;
+  providerId?: string;
+}
+
+function readActiveModelProviderId(fallbackProvider?: string): string {
+  try {
+    const activeId = window.localStorage.getItem(
+      "aicc.ai.activeModelProfileId"
+    );
+    const rawProfiles = window.localStorage.getItem("aicc.ai.modelProfiles");
+    const profiles = rawProfiles
+      ? (JSON.parse(rawProfiles) as StoredModelProfile[])
+      : [];
+    const activeProfile = Array.isArray(profiles)
+      ? profiles.find((profile) => profile.id === activeId)
+      : undefined;
+    return activeProfile?.providerId || fallbackProvider || "";
+  } catch {
+    return fallbackProvider || "";
+  }
 }
 
 function readModelHeaders(): HeadersInit {
@@ -25,9 +47,10 @@ function readModelHeaders(): HeadersInit {
     if (!raw) return {};
     const config = JSON.parse(raw) as StoredModelConfig;
     const headers: Record<string, string> = {};
+    const providerId = readActiveModelProviderId(config.provider);
+    if (providerId) headers["X-AICC-Model-Provider-Id"] = providerId;
     if (config.provider) headers["X-AICC-Model-Provider"] = config.provider;
     if (config.model) headers["X-AICC-Model-Name"] = config.model;
-    if (config.apiKey) headers["X-AICC-Model-Api-Key"] = config.apiKey;
     if (config.baseUrl) headers["X-AICC-Model-Base-Url"] = config.baseUrl;
     return headers;
   } catch {

@@ -25,6 +25,9 @@ export interface ScenarioListItem {
   owner_id: string | null;
   version: number;
   status: ScenarioStatus;
+  mission_count: number;
+  unit_count: number;
+  side_count: number;
   created_at: string;
   updated_at: string;
 }

@@ -4,6 +4,7 @@ import pytest
 
 from app.ai.command_governance import CommandApprovalQueue
 from app.ai.command_service import (
+    CommandProposalNotFoundError,
     get_command_proposal,
     list_command_proposals,
     save_command_proposal,
@@ -64,3 +65,56 @@ async def test_persisted_proposal_can_be_hydrated_and_executed(db_session, user)
     assert persisted.status == "executed"
     assert persisted.execution[0].skill == "simulation_step"
     assert registry.calls == [("simulation_step", {"steps": 1})]
+
+
+@pytest.mark.asyncio
+async def test_command_proposals_are_scoped_by_scenario(db_session, user):
+    queue = CommandApprovalQueue(FakeRuntime(), FakeRegistry())  # type: ignore[arg-type]
+    proposal = queue.create_proposal(
+        command="advance one second",
+        source="mcp",
+        steps=[
+            StructuredCommandStep(
+                id="s1",
+                skill="simulation_step",
+                parameters={"steps": 1},
+            )
+        ],
+    )
+
+    saved = await save_command_proposal(
+        db_session,
+        user,
+        proposal,
+        scenario_id="scenario-alpha",
+    )
+    assert await get_command_proposal(
+        db_session,
+        user,
+        saved.id,
+        scenario_id="scenario-alpha",
+    )
+    assert [
+        item.id
+        for item in await list_command_proposals(
+            db_session,
+            user,
+            scenario_id="scenario-alpha",
+        )
+    ] == [saved.id]
+    assert (
+        await list_command_proposals(
+            db_session,
+            user,
+            scenario_id="scenario-bravo",
+        )
+        == []
+    )
+
+    with pytest.raises(CommandProposalNotFoundError):
+        await get_command_proposal(
+            db_session,
+            user,
+            saved.id,
+            scenario_id="scenario-bravo",
+        )

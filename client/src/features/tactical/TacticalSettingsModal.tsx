@@ -17,7 +17,7 @@ import {
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import type { CesiumBaseLayerKey } from "@/gui/map/CesiumToolbar";
+import type { CesiumBaseLayerKey } from "@/gui/map/CesiumMapTypes";
 import type { TacticalSettingsProps } from "./AISidebar";
 
 const SETTINGS_TABS = [

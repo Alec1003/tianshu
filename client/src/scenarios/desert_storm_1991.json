@@ -1,7 +1,7 @@
 {
   "currentScenario": {
     "id": "hist-desert-storm-1991",
-    "name": "沙漠风暴：诺曼底特遣队（1991）",
+    "name": "沙漠风暴：开幕空袭与防空压制（1991）",
     "startTime": 664072200,
     "currentTime": 664072200,
     "duration": 14400,
@@ -9,7 +9,16 @@
     "historicalCase": {
       "date": "1991-01-17",
       "location": "Western Iraq air-defense corridor",
-      "basis": "Opening-night Task Force Normandy action in Operation Desert Storm; geometry and force counts are abstracted for training simulation."
+      "basis": "Opening-night Task Force Normandy action in Operation Desert Storm; geometry and force counts are abstracted for training simulation.",
+      "complexity": [
+        "radar-site neutralization",
+        "low-altitude helicopter ingress",
+        "electronic support",
+        "SEAD escort",
+        "air superiority patrol",
+        "tanker support track",
+        "follow-on stealth strike"
+      ]
     },
     "sides": [
       {
@@ -40,7 +49,16 @@
         "maxFuel": 5200,
         "fuelRate": 520,
         "range": 35,
-        "route": [[32.05, 42.75], [32.55, 43.35]],
+        "route": [
+          [
+            32.05,
+            42.75
+          ],
+          [
+            32.55,
+            43.35
+          ]
+        ],
         "selected": false,
         "sideColor": "blue",
         "weapons": [
@@ -107,7 +125,16 @@
         "maxFuel": 8000,
         "fuelRate": 640,
         "range": 45,
-        "route": [[32.0, 42.55], [32.45, 43.1]],
+        "route": [
+          [
+            32,
+            42.55
+          ],
+          [
+            32.45,
+            43.1
+          ]
+        ],
         "selected": false,
         "sideColor": "blue",
         "weapons": [],
@@ -131,7 +158,16 @@
         "maxFuel": 34000,
         "fuelRate": 2400,
         "range": 150,
-        "route": [[32.8, 42.0], [33.2, 43.0]],
+        "route": [
+          [
+            32.8,
+            42
+          ],
+          [
+            33.2,
+            43
+          ]
+        ],
         "selected": false,
         "sideColor": "blue",
         "weapons": [],
@@ -145,7 +181,7 @@
         "name": "F-117A 后续突防打击编队",
         "sideId": "side-coalition",
         "className": "F-117A Nighthawk",
-        "latitude": 31.0,
+        "latitude": 31,
         "longitude": 40.8,
         "altitude": 26000,
         "heading": 50,
@@ -154,7 +190,12 @@
         "maxFuel": 22000,
         "fuelRate": 2100,
         "range": 120,
-        "route": [[33.2, 44.4]],
+        "route": [
+          [
+            33.2,
+            44.4
+          ]
+        ],
         "selected": false,
         "sideColor": "blue",
         "weapons": [
@@ -163,7 +204,7 @@
             "name": "GBU-27 guided bomb",
             "sideId": "side-coalition",
             "className": "GBU-27 guided bomb",
-            "latitude": 31.0,
+            "latitude": 31,
             "longitude": 40.8,
             "altitude": 26000,
             "heading": 50,
@@ -199,7 +240,12 @@
         "maxFuel": 18000,
         "fuelRate": 1800,
         "range": 100,
-        "route": [[32.7, 43.4]],
+        "route": [
+          [
+            32.7,
+            43.4
+          ]
+        ],
         "selected": false,
         "sideColor": "red",
         "weapons": [
@@ -228,6 +274,377 @@
         "homeBaseId": "storm-airbase-h3",
         "rtb": false,
         "targetId": "storm-air-f117",
+        "desiredRoute": []
+      },
+      {
+        "id": "storm-extra-air-ah64-2",
+        "name": "AH-64A Apache 第二突击编队",
+        "sideId": "side-coalition",
+        "className": "AH-64A Apache",
+        "latitude": 31.42,
+        "longitude": 42.18,
+        "altitude": 300,
+        "heading": 38,
+        "speed": 145,
+        "currentFuel": 5200,
+        "maxFuel": 5200,
+        "fuelRate": 520,
+        "range": 35,
+        "route": [
+          [
+            32.12,
+            42.9
+          ],
+          [
+            32.76,
+            43.75
+          ]
+        ],
+        "selected": false,
+        "sideColor": "blue",
+        "weapons": [
+          {
+            "id": "storm-extra-wpn-hellfire-2",
+            "name": "AGM-114 Hellfire",
+            "sideId": "side-coalition",
+            "className": "AGM-114 Hellfire",
+            "latitude": 31.42,
+            "longitude": 42.18,
+            "altitude": 300,
+            "heading": 38,
+            "speed": 820,
+            "currentFuel": 150,
+            "maxFuel": 150,
+            "fuelRate": 40,
+            "range": 5,
+            "route": [],
+            "sideColor": "blue",
+            "targetId": "",
+            "lethality": 0.72,
+            "maxQuantity": 16,
+            "currentQuantity": 16
+          },
+          {
+            "id": "storm-extra-wpn-rocket-2",
+            "name": "Hydra 70 rocket pod",
+            "sideId": "side-coalition",
+            "className": "Hydra 70 rocket pod",
+            "latitude": 31.42,
+            "longitude": 42.18,
+            "altitude": 300,
+            "heading": 38,
+            "speed": 760,
+            "currentFuel": 120,
+            "maxFuel": 120,
+            "fuelRate": 32,
+            "range": 4,
+            "route": [],
+            "sideColor": "blue",
+            "targetId": "",
+            "lethality": 0.45,
+            "maxQuantity": 38,
+            "currentQuantity": 38
+          }
+        ],
+        "homeBaseId": "storm-airbase-al-jouf",
+        "rtb": false,
+        "targetId": "storm-fac-radar-east",
+        "desiredRoute": [],
+        "isObjective": true
+      },
+      {
+        "id": "storm-extra-air-f4g",
+        "name": "F-4G Wild Weasel 防空压制编队",
+        "sideId": "side-coalition",
+        "className": "F-4G Wild Weasel",
+        "latitude": 30.85,
+        "longitude": 41.15,
+        "altitude": 22000,
+        "heading": 48,
+        "speed": 480,
+        "currentFuel": 30000,
+        "maxFuel": 30000,
+        "fuelRate": 2300,
+        "range": 140,
+        "route": [
+          [
+            32.9,
+            43.95
+          ]
+        ],
+        "selected": false,
+        "sideColor": "blue",
+        "weapons": [
+          {
+            "id": "storm-extra-wpn-harm",
+            "name": "AGM-88 HARM",
+            "sideId": "side-coalition",
+            "className": "AGM-88 HARM",
+            "latitude": 30.85,
+            "longitude": 41.15,
+            "altitude": 22000,
+            "heading": 48,
+            "speed": 1800,
+            "currentFuel": 1350,
+            "maxFuel": 1350,
+            "fuelRate": 360,
+            "range": 45,
+            "route": [],
+            "sideColor": "blue",
+            "targetId": "",
+            "lethality": 0.66,
+            "maxQuantity": 6,
+            "currentQuantity": 6
+          }
+        ],
+        "homeBaseId": "storm-extra-airbase-riyadh",
+        "rtb": false,
+        "targetId": "storm-extra-fac-sa3",
+        "desiredRoute": []
+      },
+      {
+        "id": "storm-extra-air-f15c",
+        "name": "F-15C 空优巡逻编队",
+        "sideId": "side-coalition",
+        "className": "F-15C Eagle",
+        "latitude": 31.2,
+        "longitude": 41.4,
+        "altitude": 28000,
+        "heading": 60,
+        "speed": 520,
+        "currentFuel": 28000,
+        "maxFuel": 28000,
+        "fuelRate": 2200,
+        "range": 160,
+        "route": [
+          [
+            32.7,
+            42.8
+          ],
+          [
+            33.4,
+            43.5
+          ]
+        ],
+        "selected": false,
+        "sideColor": "blue",
+        "weapons": [
+          {
+            "id": "storm-extra-wpn-amraam",
+            "name": "AIM-120 AMRAAM",
+            "sideId": "side-coalition",
+            "className": "AIM-120 AMRAAM",
+            "latitude": 31.2,
+            "longitude": 41.4,
+            "altitude": 28000,
+            "heading": 60,
+            "speed": 2600,
+            "currentFuel": 1650,
+            "maxFuel": 1650,
+            "fuelRate": 440,
+            "range": 55,
+            "route": [],
+            "sideColor": "blue",
+            "targetId": "",
+            "lethality": 0.65,
+            "maxQuantity": 8,
+            "currentQuantity": 8
+          },
+          {
+            "id": "storm-extra-wpn-sidewinder",
+            "name": "AIM-9 Sidewinder",
+            "sideId": "side-coalition",
+            "className": "AIM-9 Sidewinder",
+            "latitude": 31.2,
+            "longitude": 41.4,
+            "altitude": 28000,
+            "heading": 60,
+            "speed": 1500,
+            "currentFuel": 360,
+            "maxFuel": 360,
+            "fuelRate": 96,
+            "range": 12,
+            "route": [],
+            "sideColor": "blue",
+            "targetId": "",
+            "lethality": 0.6,
+            "maxQuantity": 4,
+            "currentQuantity": 4
+          }
+        ],
+        "homeBaseId": "storm-extra-airbase-riyadh",
+        "rtb": false,
+        "targetId": "storm-air-mig29",
+        "desiredRoute": []
+      },
+      {
+        "id": "storm-extra-air-f15e",
+        "name": "F-15E 后续纵深打击编队",
+        "sideId": "side-coalition",
+        "className": "F-15E Strike Eagle",
+        "latitude": 30.65,
+        "longitude": 41.05,
+        "altitude": 24000,
+        "heading": 50,
+        "speed": 500,
+        "currentFuel": 32000,
+        "maxFuel": 32000,
+        "fuelRate": 2500,
+        "range": 150,
+        "route": [
+          [
+            33.2,
+            44.4
+          ]
+        ],
+        "selected": false,
+        "sideColor": "blue",
+        "weapons": [
+          {
+            "id": "storm-extra-wpn-gbu-10",
+            "name": "GBU-10 guided bomb",
+            "sideId": "side-coalition",
+            "className": "GBU-10 guided bomb",
+            "latitude": 30.65,
+            "longitude": 41.05,
+            "altitude": 24000,
+            "heading": 50,
+            "speed": 520,
+            "currentFuel": 180,
+            "maxFuel": 180,
+            "fuelRate": 48,
+            "range": 6,
+            "route": [],
+            "sideColor": "blue",
+            "targetId": "",
+            "lethality": 0.74,
+            "maxQuantity": 6,
+            "currentQuantity": 6
+          }
+        ],
+        "homeBaseId": "storm-extra-airbase-riyadh",
+        "rtb": false,
+        "targetId": "storm-fac-command",
+        "desiredRoute": []
+      },
+      {
+        "id": "storm-extra-air-e3",
+        "name": "E-3 Sentry 空中预警指挥机",
+        "sideId": "side-coalition",
+        "className": "E-3 Sentry",
+        "latitude": 31.6,
+        "longitude": 40.7,
+        "altitude": 30000,
+        "heading": 75,
+        "speed": 420,
+        "currentFuel": 52000,
+        "maxFuel": 52000,
+        "fuelRate": 3000,
+        "range": 220,
+        "route": [
+          [
+            32.2,
+            41.2
+          ],
+          [
+            31.4,
+            42
+          ]
+        ],
+        "selected": false,
+        "sideColor": "blue",
+        "weapons": [],
+        "homeBaseId": "storm-extra-airbase-riyadh",
+        "rtb": false,
+        "targetId": "",
+        "desiredRoute": [],
+        "isObjective": true
+      },
+      {
+        "id": "storm-extra-air-kc135",
+        "name": "KC-135 空中加油机",
+        "sideId": "side-coalition",
+        "className": "KC-135 Stratotanker",
+        "latitude": 31.25,
+        "longitude": 40.8,
+        "altitude": 26000,
+        "heading": 70,
+        "speed": 410,
+        "currentFuel": 62000,
+        "maxFuel": 62000,
+        "fuelRate": 3200,
+        "range": 120,
+        "route": [
+          [
+            31.6,
+            41.4
+          ],
+          [
+            31.1,
+            41.8
+          ]
+        ],
+        "selected": false,
+        "sideColor": "blue",
+        "weapons": [],
+        "homeBaseId": "storm-extra-airbase-riyadh",
+        "rtb": false,
+        "targetId": "",
+        "desiredRoute": [],
+        "isObjective": true,
+        "isTanker": true,
+        "fuelOffloadCapacity": 46000,
+        "fuelTransferRate": 180,
+        "refuelRange": 4
+      },
+      {
+        "id": "storm-extra-air-mig23",
+        "name": "MiG-23 拦截编队",
+        "sideId": "side-iraq-iads",
+        "className": "MiG-23",
+        "latitude": 33.12,
+        "longitude": 44.15,
+        "altitude": 17000,
+        "heading": 245,
+        "speed": 500,
+        "currentFuel": 17000,
+        "maxFuel": 17000,
+        "fuelRate": 1700,
+        "range": 90,
+        "route": [
+          [
+            32.45,
+            43.1
+          ]
+        ],
+        "selected": false,
+        "sideColor": "red",
+        "weapons": [
+          {
+            "id": "storm-extra-wpn-aa7",
+            "name": "R-23 air-to-air missile",
+            "sideId": "side-iraq-iads",
+            "className": "R-23 air-to-air missile",
+            "latitude": 33.12,
+            "longitude": 44.15,
+            "altitude": 17000,
+            "heading": 245,
+            "speed": 2100,
+            "currentFuel": 750,
+            "maxFuel": 750,
+            "fuelRate": 200,
+            "range": 25,
+            "route": [],
+            "sideColor": "red",
+            "targetId": "",
+            "lethality": 0.58,
+            "maxQuantity": 4,
+            "currentQuantity": 4
+          }
+        ],
+        "homeBaseId": "storm-extra-airbase-baghdad",
+        "rtb": false,
+        "targetId": "storm-air-ef111",
         "desiredRoute": []
       }
     ],
@@ -350,6 +767,112 @@
         "sideColor": "red",
         "weapons": [],
         "isObjective": true
+      },
+      {
+        "id": "storm-extra-fac-sa3",
+        "name": "SA-3 防空阵地",
+        "sideId": "side-iraq-iads",
+        "className": "SA-3 SAM site",
+        "latitude": 32.92,
+        "longitude": 43.95,
+        "altitude": 0,
+        "range": 85,
+        "sideColor": "red",
+        "weapons": [
+          {
+            "id": "storm-extra-wpn-sa3-1",
+            "name": "S-125 surface-to-air missile",
+            "sideId": "side-iraq-iads",
+            "className": "S-125 surface-to-air missile",
+            "latitude": 32.92,
+            "longitude": 43.95,
+            "altitude": 0,
+            "heading": 240,
+            "speed": 2600,
+            "currentFuel": 540,
+            "maxFuel": 540,
+            "fuelRate": 144,
+            "range": 18,
+            "route": [],
+            "sideColor": "red",
+            "targetId": "",
+            "lethality": 0.58,
+            "maxQuantity": 10,
+            "currentQuantity": 10
+          }
+        ]
+      },
+      {
+        "id": "storm-extra-fac-sa6",
+        "name": "SA-6 机动防空阵地",
+        "sideId": "side-iraq-iads",
+        "className": "SA-6 SAM battery",
+        "latitude": 32.7,
+        "longitude": 44.25,
+        "altitude": 0,
+        "range": 90,
+        "sideColor": "red",
+        "weapons": [
+          {
+            "id": "storm-extra-wpn-sa6-1",
+            "name": "3M9 surface-to-air missile",
+            "sideId": "side-iraq-iads",
+            "className": "3M9 surface-to-air missile",
+            "latitude": 32.7,
+            "longitude": 44.25,
+            "altitude": 0,
+            "heading": 240,
+            "speed": 2600,
+            "currentFuel": 420,
+            "maxFuel": 420,
+            "fuelRate": 112,
+            "range": 14,
+            "route": [],
+            "sideColor": "red",
+            "targetId": "",
+            "lethality": 0.55,
+            "maxQuantity": 12,
+            "currentQuantity": 12
+          }
+        ]
+      },
+      {
+        "id": "storm-extra-fac-relay",
+        "name": "西部防空通信中继站",
+        "sideId": "side-iraq-iads",
+        "className": "Air defense communications relay",
+        "latitude": 32.88,
+        "longitude": 43.6,
+        "altitude": 0,
+        "range": 100,
+        "sideColor": "red",
+        "weapons": [],
+        "isObjective": true
+      },
+      {
+        "id": "storm-extra-fac-ew-decoy",
+        "name": "雷达诱饵与假目标阵地",
+        "sideId": "side-iraq-iads",
+        "className": "Radar decoy site",
+        "latitude": 32.35,
+        "longitude": 43.05,
+        "altitude": 0,
+        "range": 70,
+        "sideColor": "red",
+        "weapons": []
+      },
+      {
+        "id": "storm-extra-fac-tanker-track",
+        "name": "多国部队空中加油航线锚点",
+        "sideId": "side-coalition",
+        "className": "Tanker track control point",
+        "latitude": 31.4,
+        "longitude": 41,
+        "altitude": 0,
+        "range": 20,
+        "sideColor": "blue",
+        "weapons": [],
+        "isObjective": true
       }
     ],
     "airbases": [
@@ -388,6 +911,29 @@
         "sideColor": "red",
         "aircraft": [],
         "isObjective": true
+      },
+      {
+        "id": "storm-extra-airbase-riyadh",
+        "name": "Riyadh 空中作战支援基地",
+        "sideId": "side-coalition",
+        "className": "Coalition support airbase",
+        "latitude": 24.71,
+        "longitude": 46.72,
+        "altitude": 0,
+        "sideColor": "blue",
+        "aircraft": []
+      },
+      {
+        "id": "storm-extra-airbase-baghdad",
+        "name": "巴格达周边拦截机场",
+        "sideId": "side-iraq-iads",
+        "className": "Interceptor base",
+        "latitude": 33.31,
+        "longitude": 44.36,
+        "altitude": 0,
+        "sideColor": "red",
+        "aircraft": [],
+        "isObjective": true
       }
     ],
     "weapons": [],
@@ -409,6 +955,51 @@
         "longitude": 44.3,
         "altitude": 0,
         "sideColor": "blue"
+      },
+      {
+        "id": "storm-extra-rp-west-radar",
+        "name": "西侧雷达目标区",
+        "sideId": "side-iraq-iads",
+        "latitude": 32.55,
+        "longitude": 43.35,
+        "altitude": 0,
+        "sideColor": "red"
+      },
+      {
+        "id": "storm-extra-rp-east-radar",
+        "name": "东侧雷达目标区",
+        "sideId": "side-iraq-iads",
+        "latitude": 32.76,
+        "longitude": 43.75,
+        "altitude": 0,
+        "sideColor": "red"
+      },
+      {
+        "id": "storm-extra-rp-sead-box",
+        "name": "防空压制巡逻区",
+        "sideId": "side-coalition",
+        "latitude": 32.85,
+        "longitude": 44,
+        "altitude": 0,
+        "sideColor": "blue"
+      },
+      {
+        "id": "storm-extra-rp-tanker-track",
+        "name": "空中加油航线",
+        "sideId": "side-coalition",
+        "latitude": 31.4,
+        "longitude": 41.4,
+        "altitude": 0,
+        "sideColor": "blue"
+      },
+      {
+        "id": "storm-extra-rp-awacs-orbit",
+        "name": "空中预警机盘旋区",
+        "sideId": "side-coalition",
+        "latitude": 31.8,
+        "longitude": 41.3,
+        "altitude": 0,
+        "sideColor": "blue"
       }
     ],
     "missions": [
@@ -416,15 +1007,22 @@
         "id": "storm-mission-apache-radar",
         "name": "Apache 编队摧毁预警雷达",
         "sideId": "side-coalition",
-        "assignedUnitIds": ["storm-air-ah64-1"],
-        "assignedTargetIds": ["storm-fac-radar-west", "storm-fac-radar-east"],
+        "assignedUnitIds": [
+          "storm-air-ah64-1"
+        ],
+        "assignedTargetIds": [
+          "storm-fac-radar-west",
+          "storm-fac-radar-east"
+        ],
         "active": true
       },
       {
         "id": "storm-mission-ew-support",
         "name": "电子支援机走廊压制巡逻",
         "sideId": "side-coalition",
-        "assignedUnitIds": ["storm-air-ef111"],
+        "assignedUnitIds": [
+          "storm-air-ef111"
+        ],
         "assignedArea": [
           {
             "id": "storm-ew-1",
@@ -469,23 +1067,227 @@
         "id": "storm-mission-f117-follow",
         "name": "F-117 后续突防打击防空指挥节点",
         "sideId": "side-coalition",
-        "assignedUnitIds": ["storm-air-f117"],
-        "assignedTargetIds": ["storm-fac-command"],
+        "assignedUnitIds": [
+          "storm-air-f117"
+        ],
+        "assignedTargetIds": [
+          "storm-fac-command"
+        ],
         "active": true
       },
       {
         "id": "storm-mission-iraq-intercept",
         "name": "伊拉克战斗机截击",
         "sideId": "side-iraq-iads",
-        "assignedUnitIds": ["storm-air-mig29"],
-        "assignedTargetIds": ["storm-air-f117"],
+        "assignedUnitIds": [
+          "storm-air-mig29"
+        ],
+        "assignedTargetIds": [
+          "storm-air-f117"
+        ],
+        "active": true
+      },
+      {
+        "id": "storm-extra-mission-apache-east",
+        "name": "Apache 第二编队摧毁东侧雷达",
+        "sideId": "side-coalition",
+        "assignedUnitIds": [
+          "storm-extra-air-ah64-2"
+        ],
+        "assignedTargetIds": [
+          "storm-fac-radar-east"
+        ],
+        "active": true
+      },
+      {
+        "id": "storm-extra-mission-weasel-sead",
+        "name": "Wild Weasel 压制中程防空阵地",
+        "sideId": "side-coalition",
+        "assignedUnitIds": [
+          "storm-extra-air-f4g"
+        ],
+        "assignedTargetIds": [
+          "storm-extra-fac-sa3",
+          "storm-extra-fac-sa6"
+        ],
+        "active": true
+      },
+      {
+        "id": "storm-extra-mission-f15e-command",
+        "name": "F-15E 后续打击区域防空指挥节点",
+        "sideId": "side-coalition",
+        "assignedUnitIds": [
+          "storm-extra-air-f15e"
+        ],
+        "assignedTargetIds": [
+          "storm-fac-command",
+          "storm-extra-fac-relay"
+        ],
+        "active": true
+      },
+      {
+        "id": "storm-extra-mission-f15-cap",
+        "name": "F-15C 空优护航巡逻",
+        "sideId": "side-coalition",
+        "assignedUnitIds": [
+          "storm-extra-air-f15c"
+        ],
+        "assignedArea": [
+          {
+            "id": "storm-extra-mission-f15-cap-nw",
+            "name": "F-15C 空优护航巡逻 西北",
+            "sideId": "side-coalition",
+            "latitude": 33.5,
+            "longitude": 42.5,
+            "altitude": 28000,
+            "sideColor": "blue"
+          },
+          {
+            "id": "storm-extra-mission-f15-cap-ne",
+            "name": "F-15C 空优护航巡逻 东北",
+            "sideId": "side-coalition",
+            "latitude": 33.5,
+            "longitude": 44.2,
+            "altitude": 28000,
+            "sideColor": "blue"
+          },
+          {
+            "id": "storm-extra-mission-f15-cap-se",
+            "name": "F-15C 空优护航巡逻 东南",
+            "sideId": "side-coalition",
+            "latitude": 32.2,
+            "longitude": 44.2,
+            "altitude": 28000,
+            "sideColor": "blue"
+          },
+          {
+            "id": "storm-extra-mission-f15-cap-sw",
+            "name": "F-15C 空优护航巡逻 西南",
+            "sideId": "side-coalition",
+            "latitude": 32.2,
+            "longitude": 42.5,
+            "altitude": 28000,
+            "sideColor": "blue"
+          }
+        ],
+        "active": true
+      },
+      {
+        "id": "storm-extra-mission-awacs",
+        "name": "E-3 态势监视盘旋",
+        "sideId": "side-coalition",
+        "assignedUnitIds": [
+          "storm-extra-air-e3"
+        ],
+        "assignedArea": [
+          {
+            "id": "storm-extra-mission-awacs-nw",
+            "name": "E-3 态势监视盘旋 西北",
+            "sideId": "side-coalition",
+            "latitude": 32.3,
+            "longitude": 40.8,
+            "altitude": 30000,
+            "sideColor": "blue"
+          },
+          {
+            "id": "storm-extra-mission-awacs-ne",
+            "name": "E-3 态势监视盘旋 东北",
+            "sideId": "side-coalition",
+            "latitude": 32.3,
+            "longitude": 42.2,
+            "altitude": 30000,
+            "sideColor": "blue"
+          },
+          {
+            "id": "storm-extra-mission-awacs-se",
+            "name": "E-3 态势监视盘旋 东南",
+            "sideId": "side-coalition",
+            "latitude": 31.1,
+            "longitude": 42.2,
+            "altitude": 30000,
+            "sideColor": "blue"
+          },
+          {
+            "id": "storm-extra-mission-awacs-sw",
+            "name": "E-3 态势监视盘旋 西南",
+            "sideId": "side-coalition",
+            "latitude": 31.1,
+            "longitude": 40.8,
+            "altitude": 30000,
+            "sideColor": "blue"
+          }
+        ],
+        "active": true
+      },
+      {
+        "id": "storm-extra-mission-tanker",
+        "name": "KC-135 加油航线保持",
+        "sideId": "side-coalition",
+        "assignedUnitIds": [
+          "storm-extra-air-kc135"
+        ],
+        "assignedArea": [
+          {
+            "id": "storm-extra-mission-tanker-nw",
+            "name": "KC-135 加油航线保持 西北",
+            "sideId": "side-coalition",
+            "latitude": 31.8,
+            "longitude": 40.7,
+            "altitude": 26000,
+            "sideColor": "blue"
+          },
+          {
+            "id": "storm-extra-mission-tanker-ne",
+            "name": "KC-135 加油航线保持 东北",
+            "sideId": "side-coalition",
+            "latitude": 31.8,
+            "longitude": 42,
+            "altitude": 26000,
+            "sideColor": "blue"
+          },
+          {
+            "id": "storm-extra-mission-tanker-se",
+            "name": "KC-135 加油航线保持 东南",
+            "sideId": "side-coalition",
+            "latitude": 30.9,
+            "longitude": 42,
+            "altitude": 26000,
+            "sideColor": "blue"
+          },
+          {
+            "id": "storm-extra-mission-tanker-sw",
+            "name": "KC-135 加油航线保持 西南",
+            "sideId": "side-coalition",
+            "latitude": 30.9,
+            "longitude": 40.7,
+            "altitude": 26000,
+            "sideColor": "blue"
+          }
+        ],
+        "active": true
+      },
+      {
+        "id": "storm-extra-mission-iraq-second-intercept",
+        "name": "伊拉克第二截击波",
+        "sideId": "side-iraq-iads",
+        "assignedUnitIds": [
+          "storm-extra-air-mig23"
+        ],
+        "assignedTargetIds": [
+          "storm-air-ef111",
+          "storm-extra-air-e3"
+        ],
         "active": true
       }
     ],
     "relationships": {
       "hostiles": {
-        "side-coalition": ["side-iraq-iads"],
-        "side-iraq-iads": ["side-coalition"]
+        "side-coalition": [
+          "side-iraq-iads"
+        ],
+        "side-iraq-iads": [
+          "side-coalition"
+        ]
       },
       "allies": {
         "side-coalition": [],
@@ -514,8 +1316,14 @@
   "currentSideId": "side-coalition",
   "selectedUnitId": "",
   "mapView": {
-    "defaultCenter": [32.6, 43.4],
-    "currentCameraCenter": [32.6, 43.4],
+    "defaultCenter": [
+      32.6,
+      43.4
+    ],
+    "currentCameraCenter": [
+      32.6,
+      43.4
+    ],
     "defaultZoom": 6,
     "currentCameraZoom": 6
   }

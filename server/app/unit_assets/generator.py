@@ -14,6 +14,7 @@ import urllib.error
 import urllib.request
 from typing import Any, Literal
 
+from app.security.url_guard import UnsafeBaseUrlError, normalize_and_validate_base_url
 from app.unit_assets.schemas import UnitAssetType
 from app.unit_assets.service import normalize_asset_data
 
@@ -184,7 +185,10 @@ def estimate_unit_asset(
 def _effective_base_url(provider: str, base_url: str) -> str:
     normalized = base_url.strip().rstrip("/")
     if normalized:
-        return normalized
+        return normalize_and_validate_base_url(
+            normalized,
+            allow_private_network=provider.strip().lower() == "ollama",
+        )
     return _OPENAI_COMPAT_BASE_URLS.get(provider.strip().lower(), "")
 
 
@@ -466,6 +470,8 @@ async def generate_unit_asset_payload(
             if isinstance(raw_warnings, list):
                 warnings.extend(str(item) for item in raw_warnings[:4])
             return normalized, "llm", min(1.0, max(0.0, confidence)), warnings
+        except UnsafeBaseUrlError as exc:
+            warnings.append(f"AI Base URL blocked: {exc}")
         except Exception:
             warnings.append("AI 模型暂不可用或返回格式不完整，已改用本地估算。")
 

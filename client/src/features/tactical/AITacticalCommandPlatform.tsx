@@ -50,7 +50,7 @@ import CesiumScenarioMap, {
 import type {
   CesiumBaseLayerKey,
   CesiumPlacement,
-} from "@/gui/map/CesiumToolbar";
+} from "@/gui/map/CesiumMapTypes";
 import SCSScenarioJson from "@/scenarios/SCS.json";
 import blankScenarioJson from "@/scenarios/blank_scenario.json";
 import defaultScenarioJson from "@/scenarios/default_scenario.json";
@@ -311,7 +311,10 @@ export default function AITacticalCommandPlatform({
   );
   const runtimeControllerRef = useRef<RuntimeController | null>(null);
   if (runtimeControllerRef.current === null) {
-    runtimeControllerRef.current = new RuntimeController();
+    runtimeControllerRef.current = new RuntimeController(
+      undefined,
+      scenarioMeta?.id
+    );
   }
   const setScenarioTime = useContext(SetScenarioTimeContext);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -1274,7 +1277,6 @@ export default function AITacticalCommandPlatform({
             onOpenMissionEditor={setMissionEditorMissionId}
             onDeleteMission={deleteMission}
             onBeginPlacement={setPlacement}
-            onScenarioMutation={handleLocalScenarioMutation}
             onSwitchSide={switchRuntimeSide}
             onCreateSide={createRuntimeSide}
             onUpdateSide={updateRuntimeSide}

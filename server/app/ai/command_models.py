@@ -43,12 +43,24 @@ class CommandProposalRecord(Base):
     __tablename__ = "command_proposal"
     __table_args__ = (
         Index("ix_command_proposal_owner_status", "owner_id", "status"),
+        Index(
+            "ix_command_proposal_owner_scenario_status",
+            "owner_id",
+            "scenario_id",
+            "status",
+        ),
     )
 
     id: Mapped[str] = _uuid_pk()
     owner_id: Mapped[uuid.UUID] = mapped_column(
         GUID(),
         ForeignKey("user.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    scenario_id: Mapped[str] = mapped_column(
+        String(120),
+        default="__default__",
         nullable=False,
         index=True,
     )

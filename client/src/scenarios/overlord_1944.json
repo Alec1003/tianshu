@@ -9,7 +9,15 @@
     "historicalCase": {
       "date": "1944-06-06",
       "location": "Normandy, France",
-      "basis": "Operation Overlord D-Day landings; units and positions are abstracted for training simulation."
+      "basis": "Operation Overlord D-Day landings; units and positions are abstracted for training simulation.",
+      "complexity": [
+        "airborne flank security",
+        "beach-exit seizure",
+        "naval gunfire support",
+        "close air support",
+        "German strongpoint and artillery suppression",
+        "beachhead logistics protection"
+      ]
     },
     "sides": [
       {
@@ -40,7 +48,16 @@
         "maxFuel": 16000,
         "fuelRate": 950,
         "range": 35,
-        "route": [[49.41, -1.32], [49.32, -1.22]],
+        "route": [
+          [
+            49.41,
+            -1.32
+          ],
+          [
+            49.32,
+            -1.22
+          ]
+        ],
         "selected": false,
         "sideColor": "blue",
         "weapons": [],
@@ -55,7 +72,7 @@
         "name": "B-26 Marauder 轰炸机编队",
         "sideId": "side-allied",
         "className": "B-26 Marauder",
-        "latitude": 50.0,
+        "latitude": 50,
         "longitude": -1.1,
         "altitude": 11000,
         "heading": 175,
@@ -64,7 +81,12 @@
         "maxFuel": 18000,
         "fuelRate": 1150,
         "range": 70,
-        "route": [[49.34, -0.69]],
+        "route": [
+          [
+            49.34,
+            -0.69
+          ]
+        ],
         "selected": false,
         "sideColor": "blue",
         "weapons": [
@@ -73,7 +95,7 @@
             "name": "500 lb general purpose bomb",
             "sideId": "side-allied",
             "className": "500 lb general purpose bomb",
-            "latitude": 50.0,
+            "latitude": 50,
             "longitude": -1.1,
             "altitude": 11000,
             "heading": 175,
@@ -109,7 +131,16 @@
         "maxFuel": 14000,
         "fuelRate": 900,
         "range": 80,
-        "route": [[49.55, -1.25], [49.55, -0.45]],
+        "route": [
+          [
+            49.55,
+            -1.25
+          ],
+          [
+            49.55,
+            -0.45
+          ]
+        ],
         "selected": false,
         "sideColor": "blue",
         "weapons": [
@@ -154,7 +185,12 @@
         "maxFuel": 9000,
         "fuelRate": 850,
         "range": 60,
-        "route": [[49.65, -0.75]],
+        "route": [
+          [
+            49.65,
+            -0.75
+          ]
+        ],
         "selected": false,
         "sideColor": "red",
         "weapons": [
@@ -184,6 +220,272 @@
         "rtb": false,
         "targetId": "overlord-air-c47",
         "desiredRoute": []
+      },
+      {
+        "id": "overlord-extra-air-c47-101",
+        "name": "第 101 空降师 C-47 运输机群",
+        "sideId": "side-allied",
+        "className": "C-47 Skytrain",
+        "latitude": 50.62,
+        "longitude": -1.35,
+        "altitude": 5500,
+        "heading": 170,
+        "speed": 170,
+        "currentFuel": 16000,
+        "maxFuel": 16000,
+        "fuelRate": 950,
+        "range": 35,
+        "route": [
+          [
+            49.43,
+            -1.25
+          ],
+          [
+            49.37,
+            -1.28
+          ]
+        ],
+        "selected": false,
+        "sideColor": "blue",
+        "weapons": [],
+        "homeBaseId": "overlord-airbase-stoney-cross",
+        "rtb": false,
+        "targetId": "",
+        "desiredRoute": [],
+        "isObjective": true
+      },
+      {
+        "id": "overlord-extra-air-glider",
+        "name": "CG-4A Waco 滑翔机补给队",
+        "sideId": "side-allied",
+        "className": "CG-4A Waco glider",
+        "latitude": 50.45,
+        "longitude": -1.05,
+        "altitude": 2500,
+        "heading": 170,
+        "speed": 95,
+        "currentFuel": 5000,
+        "maxFuel": 5000,
+        "fuelRate": 240,
+        "range": 22,
+        "route": [
+          [
+            49.41,
+            -1.2
+          ]
+        ],
+        "selected": false,
+        "sideColor": "blue",
+        "weapons": [],
+        "homeBaseId": "overlord-airbase-stoney-cross",
+        "rtb": false,
+        "targetId": "",
+        "desiredRoute": [],
+        "isObjective": true
+      },
+      {
+        "id": "overlord-extra-air-p47",
+        "name": "P-47 Thunderbolt 近距支援编队",
+        "sideId": "side-allied",
+        "className": "P-47 Thunderbolt",
+        "latitude": 50.18,
+        "longitude": -1.45,
+        "altitude": 9000,
+        "heading": 135,
+        "speed": 300,
+        "currentFuel": 12000,
+        "maxFuel": 12000,
+        "fuelRate": 900,
+        "range": 70,
+        "route": [
+          [
+            49.37,
+            -0.86
+          ]
+        ],
+        "selected": false,
+        "sideColor": "blue",
+        "weapons": [
+          {
+            "id": "overlord-extra-wpn-p47-rocket",
+            "name": "HVAR rocket salvo",
+            "sideId": "side-allied",
+            "className": "HVAR rocket salvo",
+            "latitude": 50.18,
+            "longitude": -1.45,
+            "altitude": 9000,
+            "heading": 135,
+            "speed": 900,
+            "currentFuel": 120,
+            "maxFuel": 120,
+            "fuelRate": 32,
+            "range": 4,
+            "route": [],
+            "sideColor": "blue",
+            "targetId": "",
+            "lethality": 0.46,
+            "maxQuantity": 18,
+            "currentQuantity": 18
+          }
+        ],
+        "homeBaseId": "overlord-extra-airbase-exeter",
+        "rtb": false,
+        "targetId": "overlord-fac-omaha",
+        "desiredRoute": []
+      },
+      {
+        "id": "overlord-extra-air-typhoon",
+        "name": "RAF Typhoon 火箭攻击编队",
+        "sideId": "side-allied",
+        "className": "Hawker Typhoon",
+        "latitude": 50.25,
+        "longitude": -0.5,
+        "altitude": 8000,
+        "heading": 205,
+        "speed": 320,
+        "currentFuel": 12000,
+        "maxFuel": 12000,
+        "fuelRate": 900,
+        "range": 75,
+        "route": [
+          [
+            49.39,
+            -0.99
+          ]
+        ],
+        "selected": false,
+        "sideColor": "blue",
+        "weapons": [
+          {
+            "id": "overlord-extra-wpn-typhoon-rocket",
+            "name": "RP-3 rocket salvo",
+            "sideId": "side-allied",
+            "className": "RP-3 rocket salvo",
+            "latitude": 50.25,
+            "longitude": -0.5,
+            "altitude": 8000,
+            "heading": 205,
+            "speed": 900,
+            "currentFuel": 120,
+            "maxFuel": 120,
+            "fuelRate": 32,
+            "range": 4,
+            "route": [],
+            "sideColor": "blue",
+            "targetId": "",
+            "lethality": 0.48,
+            "maxQuantity": 16,
+            "currentQuantity": 16
+          }
+        ],
+        "homeBaseId": "overlord-extra-airbase-exeter",
+        "rtb": false,
+        "targetId": "overlord-extra-fac-pointe-du-hoc",
+        "desiredRoute": []
+      },
+      {
+        "id": "overlord-extra-air-spitfire",
+        "name": "Spitfire 海峡上空巡逻",
+        "sideId": "side-allied",
+        "className": "Supermarine Spitfire",
+        "latitude": 49.85,
+        "longitude": -0.65,
+        "altitude": 15000,
+        "heading": 100,
+        "speed": 330,
+        "currentFuel": 12000,
+        "maxFuel": 12000,
+        "fuelRate": 900,
+        "range": 65,
+        "route": [
+          [
+            49.65,
+            -1.25
+          ],
+          [
+            49.65,
+            -0.25
+          ]
+        ],
+        "selected": false,
+        "sideColor": "blue",
+        "weapons": [
+          {
+            "id": "overlord-extra-wpn-spitfire-gun",
+            "name": "20 mm Hispano cannon",
+            "sideId": "side-allied",
+            "className": "20 mm Hispano cannon",
+            "latitude": 49.85,
+            "longitude": -0.65,
+            "altitude": 15000,
+            "heading": 100,
+            "speed": 1300,
+            "currentFuel": 80,
+            "maxFuel": 80,
+            "fuelRate": 30,
+            "range": 1,
+            "route": [],
+            "sideColor": "blue",
+            "targetId": "",
+            "lethality": 0.32,
+            "maxQuantity": 24,
+            "currentQuantity": 24
+          }
+        ],
+        "homeBaseId": "overlord-extra-airbase-exeter",
+        "rtb": false,
+        "targetId": "overlord-extra-air-bf109",
+        "desiredRoute": []
+      },
+      {
+        "id": "overlord-extra-air-bf109",
+        "name": "Bf 109G 拦截小队",
+        "sideId": "side-german",
+        "className": "Bf 109G",
+        "latitude": 49.18,
+        "longitude": 0.25,
+        "altitude": 13000,
+        "heading": 285,
+        "speed": 330,
+        "currentFuel": 12000,
+        "maxFuel": 12000,
+        "fuelRate": 900,
+        "range": 60,
+        "route": [
+          [
+            49.55,
+            -0.75
+          ]
+        ],
+        "selected": false,
+        "sideColor": "red",
+        "weapons": [
+          {
+            "id": "overlord-extra-wpn-bf109-gun",
+            "name": "20 mm MG 151 cannon",
+            "sideId": "side-german",
+            "className": "20 mm MG 151 cannon",
+            "latitude": 49.18,
+            "longitude": 0.25,
+            "altitude": 13000,
+            "heading": 285,
+            "speed": 1300,
+            "currentFuel": 80,
+            "maxFuel": 80,
+            "fuelRate": 30,
+            "range": 1,
+            "route": [],
+            "sideColor": "red",
+            "targetId": "",
+            "lethality": 0.34,
+            "maxQuantity": 20,
+            "currentQuantity": 20
+          }
+        ],
+        "homeBaseId": "overlord-extra-airbase-luftwaffe-field",
+        "rtb": false,
+        "targetId": "overlord-extra-air-c47-101",
+        "desiredRoute": []
       }
     ],
     "ships": [
@@ -201,7 +503,12 @@
         "maxFuel": 160000,
         "fuelRate": 1200,
         "range": 35,
-        "route": [[49.4, -0.82]],
+        "route": [
+          [
+            49.4,
+            -0.82
+          ]
+        ],
         "sideColor": "blue",
         "weapons": [
           {
@@ -228,6 +535,148 @@
         ],
         "aircraft": [],
         "isObjective": false
+      },
+      {
+        "id": "overlord-extra-ship-augusta",
+        "name": "USS Augusta (CA-31) 指挥巡洋舰",
+        "sideId": "side-allied",
+        "className": "Heavy cruiser command ship",
+        "latitude": 49.42,
+        "longitude": -0.78,
+        "altitude": 0,
+        "heading": 100,
+        "speed": 18,
+        "currentFuel": 120000,
+        "maxFuel": 120000,
+        "fuelRate": 1200,
+        "range": 38,
+        "route": [
+          [
+            49.42,
+            -0.65
+          ]
+        ],
+        "sideColor": "blue",
+        "weapons": [
+          {
+            "id": "overlord-extra-wpn-augusta-gun",
+            "name": "8 in naval gunfire",
+            "sideId": "side-allied",
+            "className": "8 in naval gunfire",
+            "latitude": 49.42,
+            "longitude": -0.78,
+            "altitude": 0,
+            "heading": 100,
+            "speed": 2600,
+            "currentFuel": 540,
+            "maxFuel": 540,
+            "fuelRate": 144,
+            "range": 18,
+            "route": [],
+            "sideColor": "blue",
+            "targetId": "",
+            "lethality": 0.58,
+            "maxQuantity": 48,
+            "currentQuantity": 48
+          }
+        ],
+        "aircraft": []
+      },
+      {
+        "id": "overlord-extra-ship-texas",
+        "name": "USS Texas 火力支援舰",
+        "sideId": "side-allied",
+        "className": "Battleship shore bombardment group",
+        "latitude": 49.43,
+        "longitude": -1.05,
+        "altitude": 0,
+        "heading": 92,
+        "speed": 15,
+        "currentFuel": 120000,
+        "maxFuel": 120000,
+        "fuelRate": 1200,
+        "range": 36,
+        "route": [
+          [
+            49.44,
+            -0.92
+          ]
+        ],
+        "sideColor": "blue",
+        "weapons": [
+          {
+            "id": "overlord-extra-wpn-texas-gun",
+            "name": "14 in naval gunfire",
+            "sideId": "side-allied",
+            "className": "14 in naval gunfire",
+            "latitude": 49.43,
+            "longitude": -1.05,
+            "altitude": 0,
+            "heading": 92,
+            "speed": 2600,
+            "currentFuel": 480,
+            "maxFuel": 480,
+            "fuelRate": 128,
+            "range": 16,
+            "route": [],
+            "sideColor": "blue",
+            "targetId": "",
+            "lethality": 0.55,
+            "maxQuantity": 40,
+            "currentQuantity": 40
+          }
+        ],
+        "aircraft": []
+      },
+      {
+        "id": "overlord-extra-ship-lst-utah",
+        "name": "犹他海滩 LST 登陆船队",
+        "sideId": "side-allied",
+        "className": "Landing ship tank convoy",
+        "latitude": 49.43,
+        "longitude": -1.28,
+        "altitude": 0,
+        "heading": 260,
+        "speed": 10,
+        "currentFuel": 120000,
+        "maxFuel": 120000,
+        "fuelRate": 1200,
+        "range": 20,
+        "route": [
+          [
+            49.42,
+            -1.18
+          ]
+        ],
+        "sideColor": "blue",
+        "weapons": [],
+        "aircraft": [],
+        "isObjective": true
+      },
+      {
+        "id": "overlord-extra-ship-lcvp-omaha",
+        "name": "奥马哈第一波 LCVP 登陆艇群",
+        "sideId": "side-allied",
+        "className": "Landing craft wave",
+        "latitude": 49.34,
+        "longitude": -0.98,
+        "altitude": 0,
+        "heading": 95,
+        "speed": 12,
+        "currentFuel": 120000,
+        "maxFuel": 120000,
+        "fuelRate": 1200,
+        "range": 12,
+        "route": [
+          [
+            49.37,
+            -0.88
+          ]
+        ],
+        "sideColor": "blue",
+        "weapons": [],
+        "aircraft": [],
+        "isObjective": true
       }
     ],
     "facilities": [
@@ -278,6 +727,115 @@
         "sideColor": "red",
         "weapons": [],
         "isObjective": true
+      },
+      {
+        "id": "overlord-extra-fac-pointe-du-hoc",
+        "name": "Pointe du Hoc 炮台阵地",
+        "sideId": "side-german",
+        "className": "Cliff battery strongpoint",
+        "latitude": 49.39,
+        "longitude": -0.99,
+        "altitude": 0,
+        "range": 65,
+        "sideColor": "red",
+        "weapons": [
+          {
+            "id": "overlord-extra-wpn-pointe-aa",
+            "name": "20 mm flak position",
+            "sideId": "side-german",
+            "className": "20 mm flak position",
+            "latitude": 49.39,
+            "longitude": -0.99,
+            "altitude": 0,
+            "heading": 270,
+            "speed": 1600,
+            "currentFuel": 90,
+            "maxFuel": 90,
+            "fuelRate": 30,
+            "range": 3,
+            "route": [],
+            "sideColor": "red",
+            "targetId": "",
+            "lethality": 0.25,
+            "maxQuantity": 45,
+            "currentQuantity": 45
+          }
+        ],
+        "isObjective": true
+      },
+      {
+        "id": "overlord-extra-fac-utah-exit",
+        "name": "犹他海滩 2 号出口防御点",
+        "sideId": "side-german",
+        "className": "Beach exit strongpoint",
+        "latitude": 49.42,
+        "longitude": -1.18,
+        "altitude": 0,
+        "range": 40,
+        "sideColor": "red",
+        "weapons": [],
+        "isObjective": true
+      },
+      {
+        "id": "overlord-extra-fac-vierville",
+        "name": "Vierville 火炮观察与迫击炮阵地",
+        "sideId": "side-german",
+        "className": "Artillery observation post",
+        "latitude": 49.36,
+        "longitude": -0.91,
+        "altitude": 0,
+        "range": 55,
+        "sideColor": "red",
+        "weapons": [
+          {
+            "id": "overlord-extra-wpn-mortar",
+            "name": "81 mm mortar battery",
+            "sideId": "side-german",
+            "className": "81 mm mortar battery",
+            "latitude": 49.36,
+            "longitude": -0.91,
+            "altitude": 0,
+            "heading": 260,
+            "speed": 900,
+            "currentFuel": 120,
+            "maxFuel": 120,
+            "fuelRate": 32,
+            "range": 4,
+            "route": [],
+            "sideColor": "red",
+            "targetId": "",
+            "lethality": 0.32,
+            "maxQuantity": 30,
+            "currentQuantity": 30
+          }
+        ],
+        "isObjective": true
+      },
+      {
+        "id": "overlord-extra-fac-omaha-logistics",
+        "name": "奥马哈滩头弹药与医疗集结点",
+        "sideId": "side-allied",
+        "className": "Beachhead logistics node",
+        "latitude": 49.36,
+        "longitude": -0.84,
+        "altitude": 0,
+        "range": 15,
+        "sideColor": "blue",
+        "weapons": [],
+        "isObjective": true
+      },
+      {
+        "id": "overlord-extra-fac-utah-logistics",
+        "name": "犹他滩头补给集结点",
+        "sideId": "side-allied",
+        "className": "Beachhead logistics node",
+        "latitude": 49.42,
+        "longitude": -1.14,
+        "altitude": 0,
+        "range": 15,
+        "sideColor": "blue",
+        "weapons": [],
+        "isObjective": true
       }
     ],
     "airbases": [
@@ -304,6 +862,29 @@
         "sideColor": "red",
         "aircraft": [],
         "isObjective": true
+      },
+      {
+        "id": "overlord-extra-airbase-exeter",
+        "name": "RAF Exeter",
+        "sideId": "side-allied",
+        "className": "Fighter base",
+        "latitude": 50.73,
+        "longitude": -3.42,
+        "altitude": 0,
+        "sideColor": "blue",
+        "aircraft": []
+      },
+      {
+        "id": "overlord-extra-airbase-luftwaffe-field",
+        "name": "诺曼底内陆德军野战机场",
+        "sideId": "side-german",
+        "className": "Forward fighter strip",
+        "latitude": 49.1,
+        "longitude": 0.35,
+        "altitude": 0,
+        "sideColor": "red",
+        "aircraft": [],
+        "isObjective": true
       }
     ],
     "weapons": [],
@@ -325,6 +906,42 @@
         "longitude": -1.18,
         "altitude": 0,
         "sideColor": "blue"
+      },
+      {
+        "id": "overlord-extra-rp-sainte-mere-eglise",
+        "name": "Sainte-Mere-Eglise 空降区",
+        "sideId": "side-allied",
+        "latitude": 49.41,
+        "longitude": -1.32,
+        "altitude": 0,
+        "sideColor": "blue"
+      },
+      {
+        "id": "overlord-extra-rp-pointe-du-hoc",
+        "name": "Pointe du Hoc 悬崖阵地",
+        "sideId": "side-german",
+        "latitude": 49.39,
+        "longitude": -0.99,
+        "altitude": 0,
+        "sideColor": "red"
+      },
+      {
+        "id": "overlord-extra-rp-omaha-exit",
+        "name": "奥马哈海滩出口线",
+        "sideId": "side-allied",
+        "latitude": 49.36,
+        "longitude": -0.86,
+        "altitude": 0,
+        "sideColor": "blue"
+      },
+      {
+        "id": "overlord-extra-rp-utah-exit",
+        "name": "犹他海滩出口线",
+        "sideId": "side-allied",
+        "latitude": 49.42,
+        "longitude": -1.16,
+        "altitude": 0,
+        "sideColor": "blue"
       }
     ],
     "missions": [
@@ -332,15 +949,21 @@
         "id": "overlord-mission-bomber",
         "name": "压制 Longues-sur-Mer 海岸炮台",
         "sideId": "side-allied",
-        "assignedUnitIds": ["overlord-air-b26"],
-        "assignedTargetIds": ["overlord-fac-longues"],
+        "assignedUnitIds": [
+          "overlord-air-b26"
+        ],
+        "assignedTargetIds": [
+          "overlord-fac-longues"
+        ],
         "active": true
       },
       {
         "id": "overlord-mission-escort",
         "name": "登陆空域护航巡逻",
         "sideId": "side-allied",
-        "assignedUnitIds": ["overlord-air-p51"],
+        "assignedUnitIds": [
+          "overlord-air-p51"
+        ],
         "assignedArea": [
           {
             "id": "overlord-cap-1",
@@ -385,15 +1008,169 @@
         "id": "overlord-mission-intercept",
         "name": "德军小规模截击",
         "sideId": "side-german",
-        "assignedUnitIds": ["overlord-air-fw190"],
-        "assignedTargetIds": ["overlord-air-c47"],
+        "assignedUnitIds": [
+          "overlord-air-fw190"
+        ],
+        "assignedTargetIds": [
+          "overlord-air-c47"
+        ],
+        "active": true
+      },
+      {
+        "id": "overlord-extra-mission-airborne-west",
+        "name": "空降部队控制犹他海滩西侧出口",
+        "sideId": "side-allied",
+        "assignedUnitIds": [
+          "overlord-extra-air-c47-101",
+          "overlord-extra-air-glider"
+        ],
+        "assignedArea": [
+          {
+            "id": "overlord-extra-mission-airborne-west-nw",
+            "name": "空降部队控制犹他海滩西侧出口 西北",
+            "sideId": "side-allied",
+            "latitude": 49.55,
+            "longitude": -1.45,
+            "altitude": 4000,
+            "sideColor": "blue"
+          },
+          {
+            "id": "overlord-extra-mission-airborne-west-ne",
+            "name": "空降部队控制犹他海滩西侧出口 东北",
+            "sideId": "side-allied",
+            "latitude": 49.55,
+            "longitude": -1.05,
+            "altitude": 4000,
+            "sideColor": "blue"
+          },
+          {
+            "id": "overlord-extra-mission-airborne-west-se",
+            "name": "空降部队控制犹他海滩西侧出口 东南",
+            "sideId": "side-allied",
+            "latitude": 49.25,
+            "longitude": -1.05,
+            "altitude": 4000,
+            "sideColor": "blue"
+          },
+          {
+            "id": "overlord-extra-mission-airborne-west-sw",
+            "name": "空降部队控制犹他海滩西侧出口 西南",
+            "sideId": "side-allied",
+            "latitude": 49.25,
+            "longitude": -1.45,
+            "altitude": 4000,
+            "sideColor": "blue"
+          }
+        ],
+        "active": true
+      },
+      {
+        "id": "overlord-extra-mission-cas-omaha",
+        "name": "近距空中支援压制奥马哈强点",
+        "sideId": "side-allied",
+        "assignedUnitIds": [
+          "overlord-extra-air-p47"
+        ],
+        "assignedTargetIds": [
+          "overlord-fac-omaha",
+          "overlord-extra-fac-vierville"
+        ],
+        "active": true
+      },
+      {
+        "id": "overlord-extra-mission-typhoon-pointe",
+        "name": "火箭攻击 Pointe du Hoc 炮台",
+        "sideId": "side-allied",
+        "assignedUnitIds": [
+          "overlord-extra-air-typhoon"
+        ],
+        "assignedTargetIds": [
+          "overlord-extra-fac-pointe-du-hoc"
+        ],
+        "active": true
+      },
+      {
+        "id": "overlord-extra-mission-naval-gunfire",
+        "name": "舰炮火力支援滩头突破",
+        "sideId": "side-allied",
+        "assignedUnitIds": [
+          "overlord-air-b26"
+        ],
+        "assignedTargetIds": [
+          "overlord-extra-fac-pointe-du-hoc",
+          "overlord-extra-fac-vierville"
+        ],
+        "active": true
+      },
+      {
+        "id": "overlord-extra-mission-channel-cap",
+        "name": "英吉利海峡登陆空域巡逻",
+        "sideId": "side-allied",
+        "assignedUnitIds": [
+          "overlord-extra-air-spitfire"
+        ],
+        "assignedArea": [
+          {
+            "id": "overlord-extra-mission-channel-cap-nw",
+            "name": "英吉利海峡登陆空域巡逻 西北",
+            "sideId": "side-allied",
+            "latitude": 49.9,
+            "longitude": -1.35,
+            "altitude": 15000,
+            "sideColor": "blue"
+          },
+          {
+            "id": "overlord-extra-mission-channel-cap-ne",
+            "name": "英吉利海峡登陆空域巡逻 东北",
+            "sideId": "side-allied",
+            "latitude": 49.9,
+            "longitude": -0.2,
+            "altitude": 15000,
+            "sideColor": "blue"
+          },
+          {
+            "id": "overlord-extra-mission-channel-cap-se",
+            "name": "英吉利海峡登陆空域巡逻 东南",
+            "sideId": "side-allied",
+            "latitude": 49.35,
+            "longitude": -0.2,
+            "altitude": 15000,
+            "sideColor": "blue"
+          },
+          {
+            "id": "overlord-extra-mission-channel-cap-sw",
+            "name": "英吉利海峡登陆空域巡逻 西南",
+            "sideId": "side-allied",
+            "latitude": 49.35,
+            "longitude": -1.35,
+            "altitude": 15000,
+            "sideColor": "blue"
+          }
+        ],
+        "active": true
+      },
+      {
+        "id": "overlord-extra-mission-german-intercept",
+        "name": "德军拦截运输机与滩头补给",
+        "sideId": "side-german",
+        "assignedUnitIds": [
+          "overlord-extra-air-bf109"
+        ],
+        "assignedTargetIds": [
+          "overlord-extra-air-c47-101",
+          "overlord-extra-fac-omaha-logistics"
+        ],
         "active": true
       }
     ],
     "relationships": {
       "hostiles": {
-        "side-allied": ["side-german"],
-        "side-german": ["side-allied"]
+        "side-allied": [
+          "side-german"
+        ],
+        "side-german": [
+          "side-allied"
+        ]
       },
       "allies": {
         "side-allied": [],
@@ -422,8 +1199,14 @@
   "currentSideId": "side-allied",
   "selectedUnitId": "",
   "mapView": {
-    "defaultCenter": [49.36, -0.85],
-    "currentCameraCenter": [49.36, -0.85],
+    "defaultCenter": [
+      49.36,
+      -0.85
+    ],
+    "currentCameraCenter": [
+      49.36,
+      -0.85
+    ],
     "defaultZoom": 7,
     "currentCameraZoom": 7
   }

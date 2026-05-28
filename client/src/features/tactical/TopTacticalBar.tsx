@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import {
   Activity,
@@ -6,6 +7,7 @@ import {
   Copy,
   Cpu,
   History,
+  LogOut,
   Save,
   Settings,
   Shield,
@@ -13,6 +15,7 @@ import {
   UserCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/features/auth/useAuth";
 import type { SimulationSnapshot } from "./SimulationSidebar";
 
 interface TopTacticalBarProps {
@@ -53,7 +56,33 @@ export default function TopTacticalBar({
   mapSceneMode = "2d",
   onToggleMapSceneMode,
 }: TopTacticalBarProps) {
+  const { user, logout } = useAuth();
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement | null>(null);
   const isRunning = snapshot.runState === "running";
+  const operatorName =
+    user?.display_name?.trim() || user?.email?.split("@")[0] || "操作员";
+  const operatorInitial = operatorName.trim().slice(0, 1).toUpperCase();
+
+  useEffect(() => {
+    if (!userMenuOpen) return;
+
+    const closeOnPointerDown = (event: PointerEvent) => {
+      const target = event.target as Node | null;
+      if (target && userMenuRef.current?.contains(target)) return;
+      setUserMenuOpen(false);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setUserMenuOpen(false);
+    };
+
+    document.addEventListener("pointerdown", closeOnPointerDown);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOnPointerDown);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [userMenuOpen]);
 
   // Calculate generic tactical balance (Active Units)
   const totalUnits = snapshot.aircraft + snapshot.ships + snapshot.facilities;
@@ -341,14 +370,85 @@ export default function TopTacticalBar({
           <Settings className="size-4" />
         </button>
 
-        <button
-          aria-label="当前操作员"
-          className="ml-1 grid size-8 place-items-center rounded-full border border-cyan-400/20 bg-[#01040a]"
-          title="当前操作员"
-          type="button"
-        >
-          <UserCircle className="size-6 text-slate-400" />
-        </button>
+        <div className="relative ml-1" ref={userMenuRef}>
+          <button
+            aria-expanded={userMenuOpen}
+            aria-haspopup="menu"
+            aria-label="当前操作员"
+            className={cn(
+              "grid size-8 place-items-center rounded-full border bg-[#01040a] transition-all",
+              userMenuOpen
+                ? "border-cyan-400/60 text-cyan-200 shadow-[0_0_16px_rgba(34,211,238,0.22)]"
+                : "border-cyan-400/20 text-slate-400 hover:border-cyan-400/45 hover:text-cyan-300"
+            )}
+            onClick={() => setUserMenuOpen((value) => !value)}
+            title="当前操作员"
+            type="button"
+          >
+            <UserCircle className="size-6" />
+          </button>
+
+          {userMenuOpen && (
+            <div
+              className="absolute right-0 top-11 z-50 w-72 overflow-hidden rounded-xl border border-cyan-400/20 bg-[#050914]/98 shadow-[0_18px_44px_rgba(0,0,0,0.45),0_0_24px_rgba(34,211,238,0.1)] backdrop-blur-2xl"
+              role="menu"
+            >
+              <div className="border-b border-white/10 px-4 py-3">
+                <div className="flex items-center gap-3">
+                  <div className="grid size-10 place-items-center rounded-full border border-cyan-400/30 bg-cyan-400/10 font-mono text-sm font-bold text-cyan-200">
+                    {operatorInitial}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-semibold text-slate-100">
+                      {operatorName}
+                    </div>
+                    <div className="truncate font-mono text-[11px] text-slate-500">
+                      {user?.email ?? "未登录"}
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-3 flex items-center gap-2">
+                  <span className="rounded border border-cyan-400/20 bg-cyan-400/10 px-2 py-0.5 font-mono text-[10px] uppercase tracking-widest text-cyan-300">
+                    {user?.is_superuser ? "管理员" : "操作员"}
+                  </span>
+                  {user?.is_verified && (
+                    <span className="rounded border border-emerald-400/20 bg-emerald-400/10 px-2 py-0.5 font-mono text-[10px] uppercase tracking-widest text-emerald-300">
+                      已验证
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {onToggleSettings && (
+                <button
+                  className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-slate-300 transition-colors hover:bg-cyan-400/10 hover:text-cyan-200"
+                  onClick={() => {
+                    setUserMenuOpen(false);
+                    onToggleSettings();
+                  }}
+                  role="menuitem"
+                  type="button"
+                >
+                  <Settings className="size-4" />
+                  打开配置中心
+                </button>
+              )}
+
+              <button
+                className="flex w-full items-center gap-3 border-t border-white/10 px-4 py-3 text-left text-sm text-red-200 transition-colors hover:bg-red-500/10 hover:text-red-100"
+                onClick={() => {
+                  setUserMenuOpen(false);
+                  logout();
+                }}
+                role="menuitem"
+                type="button"
+              >
+                <LogOut className="size-4" />
+                退出登录
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </header>
   );

@@ -40,6 +40,14 @@ from app.ai.command_service import (
     list_command_proposals as list_persisted_command_proposals,
     save_command_proposal,
 )
+from app.ai.model_config_service import (
+    AIModelProviderConfigList,
+    AIModelProviderConfigRead,
+    AIModelProviderConfigUpdate,
+    list_model_provider_configs,
+    resolve_stored_model_credentials,
+    upsert_model_provider_config,
+)
 from app.aicc_runtime.persistence import (
     ensure_runtime_state_loaded,
     save_runtime_state,
@@ -63,11 +71,20 @@ router = APIRouter(
     dependencies=[Depends(current_active_user)],
 )
 
+RUNTIME_SCENARIO_HEADER = "x-aicc-scenario-id"
+
+
+def _runtime_context_from_request(request: Request) -> str | None:
+    return (request.headers.get(RUNTIME_SCENARIO_HEADER) or "").strip() or None
+
 
 def _bridge_for_user(request: Request, user: User) -> Any:
     registry = getattr(request.app.state, "bridge_registry", None)
     if registry is not None:
-        return registry.get_bridge_for_user(user)
+        return registry.get_bridge_for_user(
+            user,
+            scenario_id=_runtime_context_from_request(request),
+        )
     return request.app.state.bridge
 
 
@@ -79,7 +96,12 @@ async def _bridge_for_user_loaded(
     bridge = _bridge_for_user(request, user)
     runtime = getattr(bridge, "runtime", None)
     if runtime is not None:
-        await ensure_runtime_state_loaded(session, user, runtime)
+        await ensure_runtime_state_loaded(
+            session,
+            user,
+            runtime,
+            scenario_id=_runtime_context_from_request(request),
+        )
     return bridge
 
 
@@ -108,7 +130,12 @@ async def _persisted_runtime_snapshot(
     before_scenario: dict[str, Any] | None = None,
     event_payload: dict[str, Any] | None = None,
 ) -> RuntimeSnapshotResponse:
-    await save_runtime_state(session, user, runtime)
+    await save_runtime_state(
+        session,
+        user,
+        runtime,
+        scenario_id=_runtime_context_from_request(request),
+    )
     snapshot = _runtime_snapshot(request, user, action=action, state=state)
     if event_type:
         await record_runtime_event(
@@ -270,7 +297,12 @@ async def command(
     if proposals:
         saved_proposals = []
         for proposal in proposals:
-            saved = await save_command_proposal(session, user, proposal)
+            saved = await save_command_proposal(
+                session,
+                user,
+                proposal,
+                scenario_id=_runtime_context_from_request(request),
+            )
             saved_proposals.append(saved)
             await record_runtime_event(
                 session,
@@ -286,7 +318,12 @@ async def command(
         proposals = saved_proposals
     elif execution.status == "ok":
         if runtime is not None:
-            await save_runtime_state(session, user, runtime)
+            await save_runtime_state(
+                session,
+                user,
+                runtime,
+                scenario_id=_runtime_context_from_request(request),
+            )
             await record_runtime_event(
                 session,
                 user,
@@ -342,6 +379,7 @@ async def list_command_proposals(
         proposals=await list_persisted_command_proposals(
             session,
             user,
+            scenario_id=_runtime_context_from_request(request),
             status=status_filter,
             limit=limit,
         )
@@ -362,10 +400,25 @@ async def approve_command_proposal(
     queue = _approval_queue_for_user(request, user)
     before_scenario = _runtime_event_baseline(runtime)
     try:
-        persisted = await get_command_proposal(session, user, proposal_id)
+        persisted = await get_command_proposal(
+            session,
+            user,
+            proposal_id,
+            scenario_id=_runtime_context_from_request(request),
+        )
         proposal = queue.approve_and_execute_loaded(persisted)
-        proposal = await save_command_proposal(session, user, proposal)
-        await save_runtime_state(session, user, runtime)
+        proposal = await save_command_proposal(
+            session,
+            user,
+            proposal,
+            scenario_id=_runtime_context_from_request(request),
+        )
+        await save_runtime_state(
+            session,
+            user,
+            runtime,
+            scenario_id=_runtime_context_from_request(request),
+        )
     except CommandProposalNotFoundError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -419,9 +472,19 @@ async def reject_command_proposal(
     await _bridge_for_user_loaded(request, user, session)
     queue = _approval_queue_for_user(request, user)
     try:
-        persisted = await get_command_proposal(session, user, proposal_id)
+        persisted = await get_command_proposal(
+            session,
+            user,
+            proposal_id,
+            scenario_id=_runtime_context_from_request(request),
+        )
         proposal = queue.reject_loaded(persisted)
-        proposal = await save_command_proposal(session, user, proposal)
+        proposal = await save_command_proposal(
+            session,
+            user,
+            proposal,
+            scenario_id=_runtime_context_from_request(request),
+        )
     except CommandProposalNotFoundError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -1186,12 +1249,35 @@ def check_model(payload: ModelCheckRequest) -> ModelCheckResponse:
     return check_model_connectivity(payload)
 
 
+@router.get("/model/providers", response_model=AIModelProviderConfigList)
+async def list_model_providers(
+    session: AsyncSession = Depends(get_async_session),
+    user: User = Depends(current_active_user),
+) -> AIModelProviderConfigList:
+    return AIModelProviderConfigList(
+        providers=await list_model_provider_configs(session, user)
+    )
+
+
+@router.put(
+    "/model/providers/{provider_id}",
+    response_model=AIModelProviderConfigRead,
+)
+async def save_model_provider(
+    provider_id: str,
+    payload: AIModelProviderConfigUpdate,
+    session: AsyncSession = Depends(get_async_session),
+    user: User = Depends(current_active_user),
+) -> AIModelProviderConfigRead:
+    return await upsert_model_provider_config(session, user, provider_id, payload)
+
+
 # ─── S4: Streaming Chat (Pydantic AI) ─────────────────────────────────────────
 
 
 def _read_model_override_from_headers(
     request: Request,
-) -> tuple[str, str, str, str]:
+) -> tuple[str, str, str, str, str]:
     """Pull per-request model override fields from custom headers.
 
     The AI sidebar sends ``X-AICC-Model-{Provider,Name,Api-Key,Base-Url}``
@@ -1200,6 +1286,7 @@ def _read_model_override_from_headers(
     the env-configured global agent.
     """
     return (
+        (request.headers.get("x-aicc-model-provider-id") or "").strip(),
         (request.headers.get("x-aicc-model-provider") or "").strip(),
         (request.headers.get("x-aicc-model-name") or "").strip(),
         (request.headers.get("x-aicc-model-api-key") or "").strip(),
@@ -1245,7 +1332,19 @@ async def chat(
     chat_mode = _read_chat_mode_from_headers(request)
 
     # Per-request model override via headers (set by AI sidebar useChat).
-    provider, model_name, api_key, base_url = _read_model_override_from_headers(request)
+    provider_id, provider, model_name, api_key, base_url = (
+        _read_model_override_from_headers(request)
+    )
+    if provider and not api_key:
+        stored_api_key, stored_base_url = await resolve_stored_model_credentials(
+            session,
+            user,
+            provider_id=provider_id,
+            provider=provider,
+            base_url=base_url,
+        )
+        api_key = stored_api_key
+        base_url = stored_base_url
     per_request_agent = None
     if can_build_model_override(provider, model_name, api_key, base_url):
         model_id = f"{provider}:{model_name}"
@@ -1296,7 +1395,12 @@ async def chat(
     def _record_proposal(proposal):
         async def _persist() -> None:
             async with async_session_maker() as session:
-                saved = await save_command_proposal(session, user, proposal)
+                saved = await save_command_proposal(
+                    session,
+                    user,
+                    proposal,
+                    scenario_id=_runtime_context_from_request(request),
+                )
                 await record_runtime_event(
                     session,
                     user,

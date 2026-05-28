@@ -85,6 +85,7 @@ import {
 import { localizeUnitAssetName } from "@/i18n/entityNames";
 import { cn } from "@/lib/utils";
 import blankScenarioJson from "@/scenarios/blank_scenario.json";
+import { projectMetrics } from "./scenarioMetrics";
 
 const EMPTY_SCENARIO_DATA = blankScenarioJson as Record<string, unknown>;
 
@@ -318,15 +319,6 @@ function hashString(input: string): number {
     h = (h * 31 + input.charCodeAt(i)) >>> 0;
   }
   return h;
-}
-
-function projectMetrics(item: ScenarioListItem) {
-  const h = hashString(item.id);
-  return {
-    tasks: 8 + (h % 20),
-    units: 24 + ((h >> 4) % 48),
-    members: 3 + ((h >> 8) % 6),
-  };
 }
 
 function relativeTime(iso: string): string {
@@ -902,7 +894,7 @@ function ProjectCard({
           </span>
           <span className="inline-flex items-center gap-1">
             <Users className="size-3.5" />
-            {metrics.members} 成员
+            {metrics.sides} 阵营
           </span>
         </div>
 

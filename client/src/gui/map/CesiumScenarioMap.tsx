@@ -1,6 +1,6 @@
 import { useCallback, useContext, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Dialog, ListSubheader, Menu, MenuItem } from "@mui/material";
+import { Box, Dialog, ListSubheader, Menu, MenuItem } from "@mui/material";
 import {
   AircraftDb,
   AirbaseDb,
@@ -8,6 +8,9 @@ import {
   ShipDb,
   WeaponDb,
 } from "@/game/db/UnitDb";
+import type Aircraft from "@/game/units/Aircraft";
+import type Facility from "@/game/units/Facility";
+import type Ship from "@/game/units/Ship";
 import MissionCreatorCard from "@/gui/map/mission/MissionCreatorCard";
 import MissionEditorCard from "@/gui/map/mission/MissionEditorCard";
 import type { Target } from "@/game/Target";
@@ -49,11 +52,12 @@ import {
   type ScenarioUnit,
 } from "@/gui/map/CesiumScenarioEntities";
 import CesiumUnitInfoCard from "@/gui/map/CesiumUnitInfoCard";
-import CesiumToolbar, {
-  type CesiumBaseLayerKey,
-  type CesiumPlacement,
-} from "@/gui/map/CesiumToolbar";
-import { localizeAirbaseName } from "@/i18n/entityNames";
+import type {
+  CesiumBaseLayerKey,
+  CesiumPlacement,
+} from "@/gui/map/CesiumMapTypes";
+import WeaponTable from "@/gui/map/feature/shared/WeaponTable";
+import { localizeAirbaseName, localizeUnitName } from "@/i18n/entityNames";
 
 export type CesiumSceneModeKey = "2d" | "3d";
 
@@ -124,7 +128,7 @@ interface CesiumScenarioMapProps {
   ) => void | Promise<void>;
 }
 
-// CesiumToolbar rail width. Keep in sync with CesiumToolbar.tsx Paper width.
+// Reserved legacy rail width when non-embedded callers still offset content.
 const TOOLBAR_WIDTH = 240;
 
 // approximate OL zoom <-> Cesium altitude (meters) conversion
@@ -136,6 +140,29 @@ const altitudeToOlZoom = (altitude: number) =>
 
 function toRuntimeUnitType(unitType: ScenarioUnit["type"]): RuntimeUnitType {
   return unitType === "referencePoint" ? "reference_point" : unitType;
+}
+
+function canPlotUnitRoute(
+  unitType: ScenarioUnit["type"]
+): unitType is "aircraft" | "ship" {
+  return unitType === "aircraft" || unitType === "ship";
+}
+
+function canCarryWeapons(
+  unitType: ScenarioUnit["type"]
+): unitType is "aircraft" | "ship" | "facility" {
+  return (
+    unitType === "aircraft" || unitType === "ship" || unitType === "facility"
+  );
+}
+
+function canBeObjective(unitType: ScenarioUnit["type"]) {
+  return (
+    unitType === "aircraft" ||
+    unitType === "ship" ||
+    unitType === "facility" ||
+    unitType === "airbase"
+  );
 }
 
 // Cesium Ion access token. Provide via client/.env -> VITE_CESIUM_ION_TOKEN=<your-token>
@@ -205,7 +232,7 @@ export default function CesiumScenarioMap({
   game,
   mobileView,
   embedded = false,
-  showToolbar = true,
+  showToolbar = false,
   showRoutes = true,
   showRanges = true,
   baseLayer: controlledBaseLayer,
@@ -369,6 +396,9 @@ export default function CesiumScenarioMap({
       }
     | null
   >(null);
+  const [unitContextView, setUnitContextView] = useState<"actions" | "weapons">(
+    "actions"
+  );
 
   // Mission creator dialog (Patrol / Strike). Tactical layout can control this
   // from its sidebar; legacy map toolbar falls back to local state.
@@ -558,30 +588,46 @@ export default function CesiumScenarioMap({
   setUnitPositionRef.current = onSetUnitPosition;
   updateUnitRef.current = onUpdateUnit;
 
+  const resolveScenarioUnit = useCallback(
+    (current: ScenarioUnit): ScenarioUnit | null => {
+      const scenario = game.currentScenario;
+      const unit =
+        current.type === "aircraft"
+          ? scenario.getAircraft(current.unit.id)
+          : current.type === "ship"
+            ? scenario.getShip(current.unit.id)
+            : current.type === "facility"
+              ? scenario.getFacility(current.unit.id)
+              : current.type === "airbase"
+                ? scenario.getAirbase(current.unit.id)
+                : scenario.getReferencePoint(current.unit.id);
+      if (!unit) return null;
+      return { ...current, unit } as ScenarioUnit;
+    },
+    [game]
+  );
+
   const refreshSelectedUnitFromScenario = useCallback(() => {
     const current = selectedUnitRef.current;
     if (!current) return;
-    const scenario = game.currentScenario;
-    const unit =
-      current.type === "aircraft"
-        ? scenario.getAircraft(current.unit.id)
-        : current.type === "ship"
-          ? scenario.getShip(current.unit.id)
-          : current.type === "facility"
-            ? scenario.getFacility(current.unit.id)
-            : current.type === "airbase"
-              ? scenario.getAirbase(current.unit.id)
-              : scenario.getReferencePoint(current.unit.id);
-    if (!unit) {
+    const next = resolveScenarioUnit(current);
+    if (!next) {
       entitiesRef.current?.setSelected(null);
       selectedUnitRef.current = null;
       setSelectedUnit(null);
       return;
     }
-    const next = { ...current, unit } as ScenarioUnit;
     selectedUnitRef.current = next;
     setSelectedUnit(next);
-  }, [game]);
+  }, [resolveScenarioUnit]);
+
+  const refreshContextUnitFromScenario = useCallback(() => {
+    setContextMenu((current) => {
+      if (current?.kind !== "unit") return current;
+      const next = resolveScenarioUnit(current.unit);
+      return next ? { ...current, unit: next } : null;
+    });
+  }, [resolveScenarioUnit]);
 
   const applyRuntimeUpdateUnit = useCallback(
     async (update: RuntimeUpdateUnitRequest) => {
@@ -598,6 +644,209 @@ export default function CesiumScenarioMap({
     },
     [
       onUpdateUnit,
+      refreshSelectedUnitFromScenario,
+      reportRuntimeFailure,
+      reportRuntimeUnavailable,
+    ]
+  );
+
+  const toggleObjectiveForUnit = useCallback(
+    (unit: ScenarioUnit) => {
+      if (!canBeObjective(unit.type)) return;
+      const s = game.currentScenario;
+      const currentUnit =
+        unit.type === "aircraft"
+          ? s.getAircraft(unit.unit.id)
+          : unit.type === "ship"
+            ? s.getShip(unit.unit.id)
+            : unit.type === "facility"
+              ? s.getFacility(unit.unit.id)
+              : s.getAirbase(unit.unit.id);
+      if (!currentUnit) return;
+      void applyRuntimeUpdateUnit({
+        unit_type: toRuntimeUnitType(unit.type),
+        unit_id: unit.unit.id,
+        patch: { is_objective: !currentUnit.isObjective },
+      });
+    },
+    [applyRuntimeUpdateUnit, game]
+  );
+
+  const toggleRoutePlotForUnit = useCallback(
+    (unit: ScenarioUnit) => {
+      if (!canPlotUnitRoute(unit.type)) return;
+      if (routePlotRef.current?.unitId === unit.unit.id) {
+        const plot = routePlotRef.current;
+        const u =
+          plot.type === "aircraft"
+            ? game.currentScenario.getAircraft(plot.unitId)
+            : game.currentScenario.getShip(plot.unitId);
+        if (u && u.desiredRoute.length > 0) {
+          const route = u.desiredRoute.map(([latitude, longitude]) => [
+            latitude,
+            longitude,
+          ]);
+          if (onMoveUnit) {
+            void Promise.resolve(onMoveUnit(plot.type, plot.unitId, route))
+              .then(refreshSelectedUnitFromScenario)
+              .catch((err) => {
+                reportRuntimeFailure("submitRoute", err);
+              });
+          } else {
+            reportRuntimeUnavailable("submitRoute");
+          }
+        }
+        if (viewerRef.current && routeEntityRef.current) {
+          viewerRef.current.entities.remove(routeEntityRef.current);
+          routeEntityRef.current = null;
+        }
+        routePlotRef.current = null;
+        setRoutePlotting(null);
+        if (viewerRef.current) viewerRef.current.canvas.style.cursor = "";
+        return;
+      }
+      startPlotRoute(unit.unit.id, unit.type);
+    },
+    [
+      game,
+      onMoveUnit,
+      refreshSelectedUnitFromScenario,
+      reportRuntimeFailure,
+      reportRuntimeUnavailable,
+      startPlotRoute,
+    ]
+  );
+
+  const addWeaponToUnit = useCallback(
+    (unit: ScenarioUnit, unitId: string, weaponClassName: string) => {
+      if (!canCarryWeapons(unit.type)) return [];
+      const tmpl = WeaponDb.find((w) => w.className === weaponClassName);
+      if (!tmpl) return [];
+      const carrierType = unit.type as RuntimeWeaponCarrierType;
+      const s = game.currentScenario;
+      const currentUnit =
+        unit.type === "aircraft"
+          ? s.getAircraft(unitId)
+          : unit.type === "ship"
+            ? s.getShip(unitId)
+            : s.getFacility(unitId);
+      if (!onAddWeapon) {
+        reportRuntimeUnavailable("addWeapon");
+        return currentUnit?.weapons ?? [];
+      }
+      void Promise.resolve(
+        onAddWeapon({
+          unit_type: carrierType,
+          unit_id: unitId,
+          class_name: tmpl.className,
+          speed: tmpl.speed,
+          max_fuel: tmpl.maxFuel,
+          fuel_rate: tmpl.fuelRate,
+          range: tmpl.range,
+          lethality: tmpl.lethality,
+        })
+      )
+        .then(() => {
+          refreshSelectedUnitFromScenario();
+          refreshContextUnitFromScenario();
+        })
+        .catch((err) => {
+          reportRuntimeFailure("addWeapon", err);
+        });
+      return currentUnit?.weapons ?? [];
+    },
+    [
+      game,
+      onAddWeapon,
+      refreshContextUnitFromScenario,
+      refreshSelectedUnitFromScenario,
+      reportRuntimeFailure,
+      reportRuntimeUnavailable,
+    ]
+  );
+
+  const deleteWeaponFromUnit = useCallback(
+    (unit: ScenarioUnit, unitId: string, weaponId: string) => {
+      if (!canCarryWeapons(unit.type)) return [];
+      const carrierType = unit.type as RuntimeWeaponCarrierType;
+      const s = game.currentScenario;
+      const currentUnit =
+        unit.type === "aircraft"
+          ? s.getAircraft(unitId)
+          : unit.type === "ship"
+            ? s.getShip(unitId)
+            : s.getFacility(unitId);
+      if (!onDeleteWeapon) {
+        reportRuntimeUnavailable("deleteWeapon");
+        return currentUnit?.weapons ?? [];
+      }
+      void Promise.resolve(
+        onDeleteWeapon({
+          unit_type: carrierType,
+          unit_id: unitId,
+          weapon_id: weaponId,
+        })
+      )
+        .then(() => {
+          refreshSelectedUnitFromScenario();
+          refreshContextUnitFromScenario();
+        })
+        .catch((err) => {
+          reportRuntimeFailure("deleteWeapon", err);
+        });
+      return currentUnit?.weapons ?? [];
+    },
+    [
+      game,
+      onDeleteWeapon,
+      refreshContextUnitFromScenario,
+      refreshSelectedUnitFromScenario,
+      reportRuntimeFailure,
+      reportRuntimeUnavailable,
+    ]
+  );
+
+  const updateWeaponQuantityForUnit = useCallback(
+    (
+      unit: ScenarioUnit,
+      unitId: string,
+      weaponId: string,
+      increment: number
+    ) => {
+      if (!canCarryWeapons(unit.type)) return [];
+      const carrierType = unit.type as RuntimeWeaponCarrierType;
+      const s = game.currentScenario;
+      const currentUnit =
+        unit.type === "aircraft"
+          ? s.getAircraft(unitId)
+          : unit.type === "ship"
+            ? s.getShip(unitId)
+            : s.getFacility(unitId);
+      if (!onUpdateWeaponQuantity) {
+        reportRuntimeUnavailable("updateWeaponQuantity");
+        return currentUnit?.weapons ?? [];
+      }
+      void Promise.resolve(
+        onUpdateWeaponQuantity({
+          unit_type: carrierType,
+          unit_id: unitId,
+          weapon_id: weaponId,
+          increment,
+        })
+      )
+        .then(() => {
+          refreshSelectedUnitFromScenario();
+          refreshContextUnitFromScenario();
+        })
+        .catch((err) => {
+          reportRuntimeFailure("updateWeaponQuantity", err);
+        });
+      return currentUnit?.weapons ?? [];
+    },
+    [
+      game,
+      onUpdateWeaponQuantity,
+      refreshContextUnitFromScenario,
       refreshSelectedUnitFromScenario,
       reportRuntimeFailure,
       reportRuntimeUnavailable,
@@ -969,6 +1218,7 @@ export default function CesiumScenarioMap({
       // first-stage context menu, so it doesn't appear unanchored next to
       // a freshly opened menu at a different screen location.
       setClassChooser(null);
+      setUnitContextView("actions");
       // Cesium gives canvas-local coordinates; MUI Menu anchorPosition is
       // viewport-based (position: fixed). When embedded in the tactical
       // layout, the canvas is offset by the left sidebar, so we must add
@@ -1132,39 +1382,6 @@ export default function CesiumScenarioMap({
     setSelectedUnit(null);
   };
 
-  // Toolbar -> map: load a scenario JSON, reset camera, re-render toolbar.
-  const handleLoadScenarioJson = useCallback(
-    (json: string) => {
-      try {
-        game.loadScenario(json);
-        const viewer = viewerRef.current;
-        if (viewer) {
-          const [lon, lat] = game.mapView.currentCameraCenter ?? [120, 20];
-          const zoom = game.mapView.currentCameraZoom ?? 5;
-          viewer.camera.flyTo({
-            destination: Cartesian3.fromDegrees(
-              lon,
-              lat,
-              olZoomToAltitude(zoom)
-            ),
-            duration: 0.6,
-          });
-        }
-        // Drop any in-flight placement / selection since IDs are gone.
-        placementRef.current = null;
-        setPlacement(null);
-        entitiesRef.current?.setSelected(null);
-        selectedUnitRef.current = null;
-        setSelectedUnit(null);
-        setCurrentScenarioTimeToContext(game.currentScenario.currentTime);
-        bumpScenario();
-      } catch (err) {
-        console.error("[Cesium] loadScenario failed:", err);
-      }
-    },
-    [game, bumpScenario, setCurrentScenarioTimeToContext, setPlacement]
-  );
-
   return (
     <>
       <div
@@ -1191,33 +1408,6 @@ export default function CesiumScenarioMap({
           pointerEvents: "none",
         }}
       >
-        {/* Left rail toolbar */}
-        {showToolbar && (
-          <CesiumToolbar
-            game={game}
-            baseLayer={baseLayer}
-            onBaseLayerChange={setBaseLayer}
-            onLoadScenarioJson={handleLoadScenarioJson}
-            placement={placement}
-            onBeginPlace={(p) => {
-              placementRef.current = p;
-              setPlacement(p);
-            }}
-            onCancelPlace={() => {
-              placementRef.current = null;
-              setPlacement(null);
-            }}
-            scenarioTick={scenarioTick}
-            onToggleEraser={toggleEraser}
-            onToggleGodMode={toggleGodMode}
-            onOpenMissionCreator={() => setMissionCreatorVisible(true)}
-            onScenarioTimeChange={setCurrentScenarioTimeToContext}
-            onPlay={onPlay}
-            onPause={onPause}
-            onStep={onStep}
-            onReset={onReset}
-          />
-        )}
         <div style={{ pointerEvents: "auto" }}>
           <BottomInfoDisplay mobileView={mobileView} />
         </div>
@@ -1236,202 +1426,6 @@ export default function CesiumScenarioMap({
               selection={selectedUnit}
               scenario={game.currentScenario}
               onClose={handleClosePopup}
-              onToggleObjective={
-                selectedUnit.type === "aircraft" ||
-                selectedUnit.type === "ship" ||
-                selectedUnit.type === "facility" ||
-                selectedUnit.type === "airbase"
-                  ? () => {
-                      // 从 scenario 重拍取单位引用后翻转 isObjective；避免使用
-                      // stale 的 selectedUnit 快照，同时同步更新 selectedUnit
-                      // 以让详情卡 header 即时重渲染 ⭐ 状态。
-                      const s = game.currentScenario;
-                      const sel = selectedUnit;
-                      const u =
-                        sel.type === "aircraft"
-                          ? s.getAircraft(sel.unit.id)
-                          : sel.type === "ship"
-                            ? s.getShip(sel.unit.id)
-                            : sel.type === "facility"
-                              ? s.getFacility(sel.unit.id)
-                              : s.getAirbase(sel.unit.id);
-                      if (!u) return;
-                      void applyRuntimeUpdateUnit({
-                        unit_type: toRuntimeUnitType(sel.type),
-                        unit_id: sel.unit.id,
-                        patch: { is_objective: !u.isObjective },
-                      });
-                      // ScenarioUnit 联合类型；使用 setSelectedUnit 重新装载
-                      // 让 React 重渲染 InfoCard。
-                      selectedUnitRef.current = sel;
-                    }
-                  : undefined
-              }
-              onPlotRoute={
-                selectedUnit.type === "aircraft" || selectedUnit.type === "ship"
-                  ? () => {
-                      if (
-                        routePlotRef.current?.unitId === selectedUnit.unit.id
-                      ) {
-                        // Already plotting this unit -> commit via the same
-                        // path as the double-click handler.
-                        const plot = routePlotRef.current;
-                        const u =
-                          plot.type === "aircraft"
-                            ? game.currentScenario.getAircraft(plot.unitId)
-                            : game.currentScenario.getShip(plot.unitId);
-                        if (u && u.desiredRoute.length > 0) {
-                          const route = u.desiredRoute.map(
-                            ([latitude, longitude]) => [latitude, longitude]
-                          );
-                          if (onMoveUnit) {
-                            void Promise.resolve(
-                              onMoveUnit(plot.type, plot.unitId, route)
-                            ).catch((err) => {
-                              reportRuntimeFailure("submitRoute", err);
-                            });
-                          } else {
-                            reportRuntimeUnavailable("submitRoute");
-                          }
-                        }
-                        if (viewerRef.current && routeEntityRef.current) {
-                          viewerRef.current.entities.remove(
-                            routeEntityRef.current
-                          );
-                          routeEntityRef.current = null;
-                        }
-                        routePlotRef.current = null;
-                        setRoutePlotting(null);
-                        if (viewerRef.current)
-                          viewerRef.current.canvas.style.cursor = "";
-                      } else {
-                        startPlotRoute(
-                          selectedUnit.unit.id,
-                          selectedUnit.type as "aircraft" | "ship"
-                        );
-                      }
-                    }
-                  : undefined
-              }
-              onClearRoute={
-                selectedUnit.type === "aircraft" || selectedUnit.type === "ship"
-                  ? () =>
-                      clearUnitRoute(
-                        selectedUnit.unit.id,
-                        selectedUnit.type as "aircraft" | "ship"
-                      )
-                  : undefined
-              }
-              routePlotting={routePlotting === selectedUnit.unit.id}
-              onAddWeapon={
-                selectedUnit.type === "aircraft" ||
-                selectedUnit.type === "ship" ||
-                selectedUnit.type === "facility"
-                  ? (unitId: string, weaponClassName: string) => {
-                      const tmpl = WeaponDb.find(
-                        (w) => w.className === weaponClassName
-                      );
-                      if (!tmpl) return [];
-                      const kind = selectedUnit.type;
-                      const carrierType = kind as RuntimeWeaponCarrierType;
-                      const s = game.currentScenario;
-                      const currentUnit =
-                        kind === "aircraft"
-                          ? s.getAircraft(unitId)
-                          : kind === "ship"
-                            ? s.getShip(unitId)
-                            : s.getFacility(unitId);
-                      if (!onAddWeapon) {
-                        reportRuntimeUnavailable("addWeapon");
-                        return currentUnit?.weapons ?? [];
-                      }
-                      void Promise.resolve(
-                        onAddWeapon({
-                          unit_type: carrierType,
-                          unit_id: unitId,
-                          class_name: tmpl.className,
-                          speed: tmpl.speed,
-                          max_fuel: tmpl.maxFuel,
-                          fuel_rate: tmpl.fuelRate,
-                          range: tmpl.range,
-                          lethality: tmpl.lethality,
-                        })
-                      )
-                        .then(refreshSelectedUnitFromScenario)
-                        .catch((err) => {
-                          reportRuntimeFailure("addWeapon", err);
-                        });
-                      return currentUnit?.weapons ?? [];
-                    }
-                  : undefined
-              }
-              onDeleteWeapon={
-                selectedUnit.type === "aircraft" ||
-                selectedUnit.type === "ship" ||
-                selectedUnit.type === "facility"
-                  ? (unitId: string, weaponId: string) => {
-                      const kind = selectedUnit.type;
-                      const carrierType = kind as RuntimeWeaponCarrierType;
-                      const s = game.currentScenario;
-                      const currentUnit =
-                        kind === "aircraft"
-                          ? s.getAircraft(unitId)
-                          : kind === "ship"
-                            ? s.getShip(unitId)
-                            : s.getFacility(unitId);
-                      if (!onDeleteWeapon) {
-                        reportRuntimeUnavailable("deleteWeapon");
-                        return currentUnit?.weapons ?? [];
-                      }
-                      void Promise.resolve(
-                        onDeleteWeapon({
-                          unit_type: carrierType,
-                          unit_id: unitId,
-                          weapon_id: weaponId,
-                        })
-                      )
-                        .then(refreshSelectedUnitFromScenario)
-                        .catch((err) => {
-                          reportRuntimeFailure("deleteWeapon", err);
-                        });
-                      return currentUnit?.weapons ?? [];
-                    }
-                  : undefined
-              }
-              onUpdateWeaponQuantity={
-                selectedUnit.type === "aircraft" ||
-                selectedUnit.type === "ship" ||
-                selectedUnit.type === "facility"
-                  ? (unitId: string, weaponId: string, increment: number) => {
-                      const kind = selectedUnit.type;
-                      const carrierType = kind as RuntimeWeaponCarrierType;
-                      const s = game.currentScenario;
-                      const currentUnit =
-                        kind === "aircraft"
-                          ? s.getAircraft(unitId)
-                          : kind === "ship"
-                            ? s.getShip(unitId)
-                            : s.getFacility(unitId);
-                      if (!onUpdateWeaponQuantity) {
-                        reportRuntimeUnavailable("updateWeaponQuantity");
-                        return currentUnit?.weapons ?? [];
-                      }
-                      void Promise.resolve(
-                        onUpdateWeaponQuantity({
-                          unit_type: carrierType,
-                          unit_id: unitId,
-                          weapon_id: weaponId,
-                          increment,
-                        })
-                      )
-                        .then(refreshSelectedUnitFromScenario)
-                        .catch((err) => {
-                          reportRuntimeFailure("updateWeaponQuantity", err);
-                        });
-                      return currentUnit?.weapons ?? [];
-                    }
-                  : undefined
-              }
             />
           </div>
         )}
@@ -1442,6 +1436,7 @@ export default function CesiumScenarioMap({
         onClose={() => {
           setContextMenu(null);
           setClassChooser(null);
+          setUnitContextView("actions");
         }}
         anchorReference="anchorPosition"
         anchorPosition={
@@ -1449,9 +1444,102 @@ export default function CesiumScenarioMap({
             ? { top: contextMenu.screenY + 8, left: contextMenu.screenX + 8 }
             : undefined
         }
-        slotProps={{ paper: { sx: { minWidth: 160 } } }}
+        slotProps={{
+          paper: {
+            sx: {
+              minWidth:
+                contextMenu?.kind === "unit" && unitContextView === "weapons"
+                  ? 560
+                  : 180,
+              maxWidth: "calc(100vw - 24px)",
+            },
+          },
+        }}
       >
         {contextMenu?.kind === "unit" &&
+          unitContextView === "weapons" &&
+          canCarryWeapons(contextMenu.unit.type) && (
+            <Box
+              sx={{
+                width: 540,
+                maxWidth: "calc(100vw - 40px)",
+                backgroundColor: "#282c34",
+                color: "white",
+                p: 1,
+              }}
+            >
+              <ListSubheader
+                disableSticky
+                sx={{
+                  bgcolor: "transparent",
+                  color: "#cfd8dc",
+                  lineHeight: "28px",
+                  px: 0.5,
+                }}
+              >
+                {t("toolbar.weapons.title")} ·{" "}
+                {localizeUnitName(contextMenu.unit.unit.name)}
+              </ListSubheader>
+              <WeaponTable
+                unitWithWeapon={
+                  contextMenu.unit.unit as Aircraft | Ship | Facility
+                }
+                handleAddWeapon={(unitId, cls) =>
+                  addWeaponToUnit(contextMenu.unit, unitId, cls)
+                }
+                handleDeleteWeapon={(unitId, weaponId) =>
+                  deleteWeaponFromUnit(contextMenu.unit, unitId, weaponId)
+                }
+                handleUpdateWeaponQuantity={(unitId, weaponId, inc) =>
+                  updateWeaponQuantityForUnit(
+                    contextMenu.unit,
+                    unitId,
+                    weaponId,
+                    inc
+                  )
+                }
+                handleCloseOnMap={() => {
+                  setContextMenu(null);
+                  setUnitContextView("actions");
+                }}
+              />
+              <MenuItem
+                onClick={() => setUnitContextView("actions")}
+                sx={{
+                  mt: 1,
+                  borderRadius: 1,
+                  color: "white",
+                  justifyContent: "center",
+                }}
+              >
+                {t("toolbar.weapons.back")}
+              </MenuItem>
+            </Box>
+          )}
+        {contextMenu?.kind === "unit" && unitContextView === "actions" && (
+          <ListSubheader sx={{ lineHeight: "28px", fontSize: 11 }}>
+            {t("toolbar.context.title")} ·{" "}
+            {localizeUnitName(contextMenu.unit.unit.name)}
+          </ListSubheader>
+        )}
+        {contextMenu?.kind === "unit" &&
+          unitContextView === "actions" &&
+          canPlotUnitRoute(contextMenu.unit.type) && (
+            <MenuItem
+              onClick={() => {
+                if (contextMenu.kind !== "unit") return;
+                const c = contextMenu;
+                setContextMenu(null);
+                toggleRoutePlotForUnit(c.unit);
+              }}
+            >
+              {routePlotting === contextMenu.unit.unit.id
+                ? t("toolbar.route.finish")
+                : t("toolbar.route.plot")}
+            </MenuItem>
+          )}
+        {contextMenu?.kind === "unit" &&
+          unitContextView === "actions" &&
           (contextMenu.unit.type === "aircraft" ||
             contextMenu.unit.type === "ship") && (
             <MenuItem
@@ -1465,10 +1553,11 @@ export default function CesiumScenarioMap({
                 );
               }}
             >
-              {t("toolbar.context.clearRoute")}
+              {t("toolbar.route.clear")}
             </MenuItem>
           )}
         {contextMenu?.kind === "unit" &&
+          unitContextView === "actions" &&
           (contextMenu.unit.type === "aircraft" ||
             contextMenu.unit.type === "ship" ||
             contextMenu.unit.type === "facility" ||
@@ -1478,21 +1567,7 @@ export default function CesiumScenarioMap({
                 if (contextMenu.kind !== "unit") return;
                 const c = contextMenu;
                 setContextMenu(null);
-                const s = game.currentScenario;
-                const u =
-                  c.unit.type === "aircraft"
-                    ? s.getAircraft(c.unit.unit.id)
-                    : c.unit.type === "ship"
-                      ? s.getShip(c.unit.unit.id)
-                      : c.unit.type === "facility"
-                        ? s.getFacility(c.unit.unit.id)
-                        : s.getAirbase(c.unit.unit.id);
-                if (!u) return;
-                void applyRuntimeUpdateUnit({
-                  unit_type: toRuntimeUnitType(c.unit.type),
-                  unit_id: c.unit.unit.id,
-                  patch: { is_objective: !u.isObjective },
-                });
+                toggleObjectiveForUnit(c.unit);
               }}
               sx={{ color: "warning.main" }}
             >
@@ -1511,7 +1586,14 @@ export default function CesiumScenarioMap({
               })()}
             </MenuItem>
           )}
-        {contextMenu?.kind === "unit" && (
+        {contextMenu?.kind === "unit" &&
+          unitContextView === "actions" &&
+          canCarryWeapons(contextMenu.unit.type) && (
+            <MenuItem onClick={() => setUnitContextView("weapons")}>
+              {t("toolbar.weapons.open")}
+            </MenuItem>
+          )}
+        {contextMenu?.kind === "unit" && unitContextView === "actions" && (
           <MenuItem
             onClick={() => {
               if (contextMenu.kind !== "unit") return;

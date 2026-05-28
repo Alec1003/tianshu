@@ -367,6 +367,10 @@ function boolValue(value: unknown): boolean | undefined {
   return typeof value === "boolean" ? value : undefined;
 }
 
+function withoutModelSecret<T extends { apiKey?: string }>(value: T): T {
+  return { ...value, apiKey: "" };
+}
+
 export function normalizeModelConfig(value: unknown): ModelConfig {
   const parsed = modelConfigSchema.safeParse(value);
   if (parsed.success) return parsed.data;
@@ -543,12 +547,12 @@ function uniqueProfiles(values: unknown): ModelProfile[] {
 }
 
 export function readModelProfileState(): ModelProfileState {
-  const modelConfig = normalizeModelConfig(
-    readLocalJson(MODEL_STORAGE_KEY.model)
+  const modelConfig = withoutModelSecret(
+    normalizeModelConfig(readLocalJson(MODEL_STORAGE_KEY.model))
   );
   const profiles = uniqueProfiles(
     readLocalJson(MODEL_STORAGE_KEY.modelProfiles)
-  );
+  ).map(withoutModelSecret);
   const storedActiveId =
     stringValue(readLocalJson(MODEL_STORAGE_KEY.activeModelProfileId)) ?? "";
   const storedActiveExists = profiles.some((p) => p.id === storedActiveId);
@@ -595,9 +599,8 @@ export function readPersistedProviderConfigs(): Record<string, ProviderConfig> {
     : {};
   const configs = createDefaultProviderConfigs();
   for (const providerId of Object.keys(rawProviders)) {
-    configs[providerId] = normalizeProviderConfig(
-      providerId,
-      rawProviders[providerId]
+    configs[providerId] = withoutModelSecret(
+      normalizeProviderConfig(providerId, rawProviders[providerId])
     );
   }
   return configs;
@@ -608,8 +611,11 @@ export function writeLegacyModelState(
   modelProfiles: ModelProfile[],
   activeModelProfileId: string
 ): void {
-  writeLocalJson(MODEL_STORAGE_KEY.model, modelConfig);
-  writeLocalJson(MODEL_STORAGE_KEY.modelProfiles, modelProfiles);
+  writeLocalJson(MODEL_STORAGE_KEY.model, withoutModelSecret(modelConfig));
+  writeLocalJson(
+    MODEL_STORAGE_KEY.modelProfiles,
+    modelProfiles.map(withoutModelSecret)
+  );
   writeLocalJson(MODEL_STORAGE_KEY.activeModelProfileId, activeModelProfileId);
 }
 
@@ -620,7 +626,7 @@ export function providerConfigFromLegacyModel(
   return {
     providerId,
     baseUrl: config.baseUrl,
-    apiKey: config.apiKey,
+    apiKey: "",
     enabled: true,
   };
 }

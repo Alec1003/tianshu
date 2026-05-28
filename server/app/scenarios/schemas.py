@@ -44,6 +44,9 @@ class ScenarioListItem(BaseModel):
     owner_id: uuid.UUID | None
     version: int
     status: ScenarioStatus
+    mission_count: int = 0
+    unit_count: int = 0
+    side_count: int = 0
     created_at: datetime
     updated_at: datetime
 

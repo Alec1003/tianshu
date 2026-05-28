@@ -1,8 +1,5 @@
-import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
-  Box,
-  Button,
   Card,
   CardContent,
   CardHeader,
@@ -13,17 +10,12 @@ import {
   Typography,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
-import RouteIcon from "@mui/icons-material/Route";
-import ClearIcon from "@mui/icons-material/Clear";
-import RocketLaunchIcon from "@mui/icons-material/RocketLaunch";
 import StarIcon from "@mui/icons-material/Star";
-import StarBorderIcon from "@mui/icons-material/StarBorder";
 
 import Aircraft from "@/game/units/Aircraft";
 import Airbase from "@/game/units/Airbase";
 import Facility from "@/game/units/Facility";
 import Ship from "@/game/units/Ship";
-import Weapon from "@/game/units/Weapon";
 import Scenario from "@/game/Scenario";
 import type { Mission } from "@/game/Game";
 import type { ScenarioUnit } from "@/gui/map/CesiumScenarioEntities";
@@ -32,34 +24,13 @@ import {
   localizeSideName,
   localizeUnitName,
 } from "@/i18n/entityNames";
-import WeaponTable from "@/gui/map/feature/shared/WeaponTable";
 
 interface CesiumUnitInfoCardProps {
   selection: ScenarioUnit;
   scenario: Scenario;
   onClose: () => void;
-  // Optional route actions; only provided for aircraft / ship in CesiumScenarioMap.
-  onPlotRoute?: () => void;
-  onClearRoute?: () => void;
-  routePlotting?: boolean;
-  // Optional weapon-loadout handlers. When all three are provided (and the
-  // selection is an aircraft / ship / facility), the card exposes a "Weapons"
-  // toggle that opens an inline WeaponTable for adding, removing and
-  // adjusting quantities — mirroring the OL feature popup capabilities.
-  onAddWeapon?: (unitId: string, weaponClassName: string) => Weapon[];
-  onDeleteWeapon?: (unitId: string, weaponId: string) => Weapon[];
-  onUpdateWeaponQuantity?: (
-    unitId: string,
-    weaponId: string,
-    increment: number
-  ) => Weapon[];
-  // 关键单位切换：仅 aircraft/ship/facility/airbase 支持。提供时在详情卡
-  // 按钮区多一个切换按钮，Toggle 后调用方需自行 bumpScenario。
-  onToggleObjective?: () => void;
 }
 
-// Side-by-side label/value row. Empty values fall back to N/A so the card
-// retains a consistent grid even for sparsely populated reference points.
 function Row({ label, value }: { label: string; value: string }) {
   return (
     <Stack direction="row" spacing={1} sx={{ minWidth: 0 }}>
@@ -120,23 +91,9 @@ export default function CesiumUnitInfoCard({
   selection,
   scenario,
   onClose,
-  onPlotRoute,
-  onClearRoute,
-  routePlotting,
-  onAddWeapon,
-  onDeleteWeapon,
-  onUpdateWeaponQuantity,
-  onToggleObjective,
 }: CesiumUnitInfoCardProps) {
   const { t } = useTranslation();
   const { type, unit } = selection;
-  // "default" shows the read-only summary; "weapons" swaps in the loadout
-  // editor (reused from the OL feature popup).
-  const [view, setView] = useState<"default" | "weapons">("default");
-  // Unit kinds that can carry weapons. Reference points / airbases cannot.
-  const supportsWeapons =
-    type === "aircraft" || type === "ship" || type === "facility";
-  // 参考点不入胜负判定范围；airbase 可作为关键设施目标。
   const supportsObjective =
     type === "aircraft" ||
     type === "ship" ||
@@ -145,9 +102,6 @@ export default function CesiumUnitInfoCard({
   const isObjective = supportsObjective
     ? Boolean((unit as Aircraft | Ship | Facility | Airbase).isObjective)
     : false;
-  const canEditWeapons =
-    supportsWeapons &&
-    Boolean(onAddWeapon && onDeleteWeapon && onUpdateWeaponQuantity);
   const rawSideName = scenario.getSideName(
     (unit as { sideId?: string }).sideId ?? null
   );
@@ -155,8 +109,6 @@ export default function CesiumUnitInfoCard({
   const position = `${fmt(unit.latitude, 3)}, ${fmt(unit.longitude, 3)}`;
   const assignedMission = scenario.getMissionByAssignedUnitId(unit.id);
 
-  // Per-type details. We deliberately keep each branch tight; the card is a
-  // read-only summary, not a full entity editor.
   const extraRows: { label: string; value: string }[] = [];
   extraRows.push({
     label: "任务",
@@ -215,7 +167,7 @@ export default function CesiumUnitInfoCard({
       });
       if (a.isTanker) {
         extraRows.push({
-          label: "Tanker",
+          label: "加油能力",
           value: `${fmt(a.fuelOffloadCapacity, 0)} / ${fmt(
             a.refuelRange,
             0
@@ -251,8 +203,6 @@ export default function CesiumUnitInfoCard({
     });
   }
 
-  // Fuel progress bar (aircraft / ship). Visualizes currentFuel / maxFuel so
-  // users can spot bingo-fuel without reading the numeric ratio.
   const fuelBar = (() => {
     if (type !== "aircraft" && type !== "ship") return null;
     const u = unit as Aircraft | Ship;
@@ -290,10 +240,7 @@ export default function CesiumUnitInfoCard({
   return (
     <Card
       sx={{
-        // Outer wrapper handles fixed positioning; we just need card sizing.
-        // Expand when showing the weapon loadout editor so the WeaponTable
-        // (minWidth ~500px) fits without horizontal scrolling.
-        width: view === "weapons" ? 560 : 280,
+        width: 280,
         backgroundColor: "rgba(255,255,255,0.96)",
         boxShadow: 4,
       }}
@@ -335,138 +282,14 @@ export default function CesiumUnitInfoCard({
       />
       <Divider />
       <CardContent sx={{ py: 1.25, px: 1.5, "&:last-child": { pb: 1.25 } }}>
-        {view === "default" && (
-          <>
-            <Stack spacing={0.5}>
-              <Row label={t("unit.field.side")} value={sideName} />
-              <Row label={t("unit.field.position")} value={position} />
-              {extraRows.map((r) => (
-                <Row key={r.label} label={r.label} value={r.value} />
-              ))}
-              {fuelBar}
-            </Stack>
-            {(canEditWeapons ||
-              ((type === "aircraft" || type === "ship") &&
-                (onPlotRoute || onClearRoute))) && <Divider sx={{ my: 1 }} />}
-            <Stack
-              direction="row"
-              spacing={0.75}
-              sx={{ flexWrap: "wrap", rowGap: 0.5 }}
-            >
-              {(type === "aircraft" || type === "ship") && onPlotRoute && (
-                <Button
-                  size="small"
-                  variant={routePlotting ? "contained" : "outlined"}
-                  color="primary"
-                  startIcon={<RouteIcon fontSize="small" />}
-                  onClick={onPlotRoute}
-                  sx={{ fontSize: 11, py: 0.25 }}
-                >
-                  {routePlotting
-                    ? t("toolbar.route.finish")
-                    : t("toolbar.route.plot")}
-                </Button>
-              )}
-              {(type === "aircraft" || type === "ship") && onClearRoute && (
-                <Button
-                  size="small"
-                  variant="outlined"
-                  color="error"
-                  startIcon={<ClearIcon fontSize="small" />}
-                  onClick={onClearRoute}
-                  sx={{ fontSize: 11, py: 0.25 }}
-                >
-                  {t("toolbar.route.clear")}
-                </Button>
-              )}
-              {canEditWeapons && (
-                <Button
-                  size="small"
-                  variant="outlined"
-                  color="secondary"
-                  startIcon={<RocketLaunchIcon fontSize="small" />}
-                  onClick={() => setView("weapons")}
-                  sx={{ fontSize: 11, py: 0.25 }}
-                >
-                  {t("toolbar.weapons.open")}
-                </Button>
-              )}
-              {supportsObjective && onToggleObjective && (
-                <Button
-                  size="small"
-                  variant={isObjective ? "contained" : "outlined"}
-                  color="warning"
-                  startIcon={
-                    isObjective ? (
-                      <StarIcon fontSize="small" />
-                    ) : (
-                      <StarBorderIcon fontSize="small" />
-                    )
-                  }
-                  onClick={onToggleObjective}
-                  sx={{ fontSize: 11, py: 0.25 }}
-                  title="标记为关键单位：被击毁后对方立即胜。"
-                >
-                  {isObjective ? "取消关键" : "设为关键"}
-                </Button>
-              )}
-            </Stack>
-            {routePlotting && (
-              <Typography
-                variant="caption"
-                sx={{ mt: 0.5, color: "text.secondary", fontSize: 10 }}
-              >
-                {t("toolbar.route.hint")}
-              </Typography>
-            )}
-          </>
-        )}
-        {view === "weapons" && canEditWeapons && supportsWeapons && (
-          <Box
-            sx={{
-              // WeaponTable was authored for the OL dark popover; we recreate
-              // that backdrop locally so its white text / icons stay legible.
-              backgroundColor: "#282c34",
-              color: "white",
-              borderRadius: 1,
-              p: 1,
-              mx: -1,
-            }}
-          >
-            <Typography
-              variant="caption"
-              sx={{ color: "#cfcfcf", display: "block", mb: 0.5, px: 0.5 }}
-            >
-              {t("toolbar.weapons.title")}
-            </Typography>
-            <WeaponTable
-              unitWithWeapon={unit as Aircraft | Ship | Facility}
-              handleAddWeapon={(unitId, cls) => onAddWeapon!(unitId, cls) ?? []}
-              handleDeleteWeapon={(unitId, weaponId) =>
-                onDeleteWeapon!(unitId, weaponId) ?? []
-              }
-              handleUpdateWeaponQuantity={(unitId, weaponId, inc) =>
-                onUpdateWeaponQuantity!(unitId, weaponId, inc) ?? []
-              }
-              handleCloseOnMap={onClose}
-            />
-            <Stack direction="row" sx={{ mt: 1, justifyContent: "flex-end" }}>
-              <Button
-                size="small"
-                variant="outlined"
-                onClick={() => setView("default")}
-                sx={{
-                  fontSize: 11,
-                  py: 0.25,
-                  color: "white",
-                  borderColor: "rgba(255,255,255,0.5)",
-                }}
-              >
-                {t("toolbar.weapons.back")}
-              </Button>
-            </Stack>
-          </Box>
-        )}
+        <Stack spacing={0.5}>
+          <Row label={t("unit.field.side")} value={sideName} />
+          <Row label={t("unit.field.position")} value={position} />
+          {extraRows.map((r) => (
+            <Row key={r.label} label={r.label} value={r.value} />
+          ))}
+          {fuelBar}
+        </Stack>
       </CardContent>
     </Card>
   );

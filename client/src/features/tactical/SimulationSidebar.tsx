@@ -47,7 +47,7 @@ import type { GameOutcome, Mission } from "@/game/Game";
 import type Scenario from "@/game/Scenario";
 import type Side from "@/game/Side";
 import type { RuntimeVisibility } from "@/api/types";
-import type { CesiumPlacement } from "@/gui/map/CesiumToolbar";
+import type { CesiumPlacement } from "@/gui/map/CesiumMapTypes";
 import SideEditor from "@/gui/map/toolbar/SideEditor";
 import { AirbaseDb, AircraftDb, FacilityDb, ShipDb } from "@/game/db/UnitDb";
 import {
@@ -115,7 +115,6 @@ interface SimulationSidebarProps {
   onOpenMissionEditor: (missionId: string) => void;
   onDeleteMission: (missionId: string) => void;
   onBeginPlacement: (placement: CesiumPlacement) => void;
-  onScenarioMutation: () => void;
   onSwitchSide?: (sideId: string) => void | Promise<void>;
   onCreateSide?: (
     name: string,
@@ -1088,7 +1087,6 @@ export default function SimulationSidebar({
   onOpenMissionEditor,
   onDeleteMission,
   onBeginPlacement,
-  onScenarioMutation,
   onSwitchSide,
   onCreateSide,
   onUpdateSide,
@@ -1173,11 +1171,6 @@ export default function SimulationSidebar({
       anchorEl: null,
       sideId: null,
     });
-  };
-
-  const refreshScenarioAfterSideMutation = () => {
-    closeSideEditor();
-    onScenarioMutation();
   };
 
   const closePlacementMenu = () => setPlacementMenu(null);
@@ -1282,18 +1275,10 @@ export default function SimulationSidebar({
                     key={side.id}
                     onEdit={(event) => openSideEditor(event, side.id)}
                     onSelect={() => {
-                      if (onSwitchSide) {
-                        void Promise.resolve(onSwitchSide(side.id)).catch(
-                          (err) =>
-                            console.error(
-                              "[AICC] runtime side switch failed",
-                              err
-                            )
-                        );
-                      } else {
-                        game.switchCurrentSide(side.id);
-                        onScenarioMutation();
-                      }
+                      if (!onSwitchSide) return;
+                      void Promise.resolve(onSwitchSide(side.id)).catch(
+                        () => undefined
+                      );
                     }}
                     side={side}
                     unitCount={countUnitsForSide(scenario, side.id)}
@@ -1790,22 +1775,12 @@ export default function SimulationSidebar({
 
       <SideEditor
         addSide={(name, color, hostiles, allies, doctrine) => {
-          if (onCreateSide) {
-            void Promise.resolve(
-              onCreateSide(name, color, hostiles, allies, doctrine)
-            )
-              .then(closeSideEditor)
-              .catch((err) =>
-                console.error("[AICC] runtime side create failed", err)
-              );
-          } else {
-            game.addSide(name, color, hostiles, allies, doctrine);
-            const createdSide = scenario.sides[scenario.sides.length - 1];
-            if (createdSide) {
-              game.switchCurrentSide(createdSide.id);
-            }
-            refreshScenarioAfterSideMutation();
-          }
+          if (!onCreateSide) return;
+          void Promise.resolve(
+            onCreateSide(name, color, hostiles, allies, doctrine)
+          )
+            .then(closeSideEditor)
+            .catch(() => undefined);
         }}
         allies={
           editorSideId ? scenario.relationships.getAllies(editorSideId) : []
@@ -1821,16 +1796,10 @@ export default function SimulationSidebar({
           ) {
             return;
           }
-          if (onDeleteSide) {
-            void Promise.resolve(onDeleteSide(sideId))
-              .then(closeSideEditor)
-              .catch((err) =>
-                console.error("[AICC] runtime side delete failed", err)
-              );
-          } else {
-            game.deleteSide(sideId);
-            refreshScenarioAfterSideMutation();
-          }
+          if (!onDeleteSide) return;
+          void Promise.resolve(onDeleteSide(sideId))
+            .then(closeSideEditor)
+            .catch(() => undefined);
         }}
         doctrine={
           editorSideId
@@ -1845,18 +1814,12 @@ export default function SimulationSidebar({
         side={selectedSideForEditor}
         sides={scenario.sides}
         updateSide={(sideId, name, color, hostiles, allies, doctrine) => {
-          if (onUpdateSide) {
-            void Promise.resolve(
-              onUpdateSide(sideId, name, color, hostiles, allies, doctrine)
-            )
-              .then(closeSideEditor)
-              .catch((err) =>
-                console.error("[AICC] runtime side update failed", err)
-              );
-          } else {
-            game.updateSide(sideId, name, color, hostiles, allies, doctrine);
-            refreshScenarioAfterSideMutation();
-          }
+          if (!onUpdateSide) return;
+          void Promise.resolve(
+            onUpdateSide(sideId, name, color, hostiles, allies, doctrine)
+          )
+            .then(closeSideEditor)
+            .catch(() => undefined);
         }}
       />
       {typeof document !== "undefined" &&

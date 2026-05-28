@@ -5,6 +5,8 @@ from types import SimpleNamespace
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.schema import CreateIndex, CreateTable
 
+from app.ai.command_models import CommandProposalRecord
+from app.ai.model_config_models import AIModelProviderConfig
 from app.aicc_runtime.models import RuntimeEvent, RuntimeState
 from app.auth.models import User
 from app.db import session as db_session_mod
@@ -66,15 +68,30 @@ def test_scenario_json_columns_compile_as_jsonb_for_postgres() -> None:
             dialect=postgresql.dialect()
         )
     )
+    command_proposal_ddl = str(
+        CreateTable(CommandProposalRecord.__table__).compile(
+            dialect=postgresql.dialect()
+        )
+    )
+    model_config_ddl = str(
+        CreateTable(AIModelProviderConfig.__table__).compile(
+            dialect=postgresql.dialect()
+        )
+    )
 
     assert "data JSONB NOT NULL" in ddl
     assert "data JSONB NOT NULL" in unit_ddl
     assert "scenario JSONB NOT NULL" in runtime_state_ddl
     assert "runtime_metadata JSONB NOT NULL" in runtime_state_ddl
+    assert "scenario_id VARCHAR(120) NOT NULL" in runtime_state_ddl
     assert "payload JSONB NOT NULL" in runtime_event_ddl
     assert "unit_changes JSONB NOT NULL" in runtime_event_ddl
     assert "score JSONB NOT NULL" in training_score_ddl
     assert "metrics JSONB NOT NULL" in training_score_ddl
+    assert "scenario_id VARCHAR(120) NOT NULL" in command_proposal_ddl
+    assert "adjudication JSONB NOT NULL" in command_proposal_ddl
+    assert "execution JSONB NOT NULL" in command_proposal_ddl
+    assert "custom_models JSONB NOT NULL" in model_config_ddl
 
 
 def test_user_foreign_keys_compile_as_uuid_for_postgres() -> None:
@@ -99,6 +116,16 @@ def test_user_foreign_keys_compile_as_uuid_for_postgres() -> None:
             dialect=postgresql.dialect()
         )
     )
+    command_proposal_ddl = str(
+        CreateTable(CommandProposalRecord.__table__).compile(
+            dialect=postgresql.dialect()
+        )
+    )
+    model_config_ddl = str(
+        CreateTable(AIModelProviderConfig.__table__).compile(
+            dialect=postgresql.dialect()
+        )
+    )
 
     assert "id UUID NOT NULL" in user_ddl
     assert "owner_id UUID" in scenario_ddl
@@ -113,6 +140,10 @@ def test_user_foreign_keys_compile_as_uuid_for_postgres() -> None:
     assert 'FOREIGN KEY(owner_id) REFERENCES "user" (id)' in runtime_event_ddl
     assert "owner_id UUID" in training_score_ddl
     assert 'FOREIGN KEY(owner_id) REFERENCES "user" (id)' in training_score_ddl
+    assert "owner_id UUID NOT NULL" in command_proposal_ddl
+    assert 'FOREIGN KEY(owner_id) REFERENCES "user" (id)' in command_proposal_ddl
+    assert "owner_id UUID NOT NULL" in model_config_ddl
+    assert 'FOREIGN KEY(owner_id) REFERENCES "user" (id)' in model_config_ddl
 
 
 def test_unit_asset_has_scoped_unique_indexes_for_postgres() -> None:
@@ -129,3 +160,39 @@ def test_unit_asset_has_scoped_unique_indexes_for_postgres() -> None:
         "CREATE UNIQUE INDEX uq_unit_asset_owner_type_name "
         "ON unit_asset (owner_id, type, name) WHERE owner_id IS NOT NULL"
     ) in index_ddls["uq_unit_asset_owner_type_name"]
+
+
+def test_runtime_state_has_scoped_unique_index_for_postgres() -> None:
+    index_ddls = {
+        index.name: str(CreateIndex(index).compile(dialect=postgresql.dialect()))
+        for index in RuntimeState.__table__.indexes
+    }
+
+    assert (
+        "CREATE UNIQUE INDEX ix_runtime_state_owner_scenario "
+        "ON runtime_state (owner_id, scenario_id)"
+    ) in index_ddls["ix_runtime_state_owner_scenario"]
+
+
+def test_command_proposal_has_scenario_scope_index_for_postgres() -> None:
+    index_ddls = {
+        index.name: str(CreateIndex(index).compile(dialect=postgresql.dialect()))
+        for index in CommandProposalRecord.__table__.indexes
+    }
+
+    assert (
+        "CREATE INDEX ix_command_proposal_owner_scenario_status "
+        "ON command_proposal (owner_id, scenario_id, status)"
+    ) in index_ddls["ix_command_proposal_owner_scenario_status"]
+
+
+def test_ai_model_provider_config_has_owner_provider_unique_index() -> None:
+    index_ddls = {
+        index.name: str(CreateIndex(index).compile(dialect=postgresql.dialect()))
+        for index in AIModelProviderConfig.__table__.indexes
+    }
+
+    assert (
+        "CREATE UNIQUE INDEX uq_ai_model_provider_owner_provider "
+        "ON ai_model_provider_config (owner_id, provider_id)"
+    ) in index_ddls["uq_ai_model_provider_owner_provider"]

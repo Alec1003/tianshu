@@ -17,6 +17,11 @@ const customModel: ModelConfig = {
   model: "gpt-5-mini",
 };
 
+const customModelWithoutSecret: ModelConfig = {
+  ...customModel,
+  apiKey: "",
+};
+
 describe("modelProfiles", () => {
   beforeEach(() => {
     window.localStorage.clear();
@@ -30,9 +35,9 @@ describe("modelProfiles", () => {
 
     const state = readModelProfileState();
 
-    expect(state.modelConfig).toEqual(customModel);
+    expect(state.modelConfig).toEqual(customModelWithoutSecret);
     expect(state.modelProfiles).toHaveLength(1);
-    expect(state.modelProfiles[0]).toMatchObject(customModel);
+    expect(state.modelProfiles[0]).toMatchObject(customModelWithoutSecret);
     expect(state.activeModelProfileId).toBe(state.modelProfiles[0].id);
   });
 
@@ -62,11 +67,12 @@ describe("modelProfiles", () => {
 
     const state = readModelProfileState();
 
-    expect(state.modelConfig).toEqual(customModel);
+    expect(state.modelConfig).toEqual(customModelWithoutSecret);
     expect(state.activeModelProfileId).toBe(savedProfile.id);
-    expect(profileToConfig(state.modelProfiles[0])).toEqual(
-      profileToConfig(savedProfile)
-    );
+    expect(profileToConfig(state.modelProfiles[0])).toEqual({
+      ...profileToConfig(savedProfile),
+      apiKey: "",
+    });
   });
 
   it("selects an existing matching profile when no active profile is stored", () => {
@@ -133,7 +139,7 @@ describe("modelProfiles", () => {
     const configs = readPersistedProviderConfigs();
 
     expect(configs.glm).toMatchObject({
-      apiKey: "glm-key",
+      apiKey: "",
       enabled: true,
       verified: true,
     });

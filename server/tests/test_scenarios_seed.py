@@ -28,10 +28,31 @@ def test_template_specs_are_curated_historical_cases() -> None:
 
 def test_template_files_exist_and_have_basic_scenario_shape() -> None:
     scenario_dir = ROOT_DIR / "client" / "src" / "scenarios"
+    minimum_counts = {
+        "midway_1942": {
+            "aircraft": 10,
+            "ships": 8,
+            "facilities": 3,
+            "missions": 8,
+        },
+        "overlord_1944": {
+            "aircraft": 10,
+            "ships": 5,
+            "facilities": 7,
+            "missions": 8,
+        },
+        "desert_storm_1991": {
+            "aircraft": 12,
+            "facilities": 8,
+            "airbases": 5,
+            "missions": 10,
+        },
+    }
 
     for stem, name, description in scenario_seed.template_specs():
         data = json.loads((scenario_dir / f"{stem}.json").read_text(encoding="utf-8"))
         current = data["currentScenario"]
+        expected = minimum_counts[stem]
 
         assert current["name"] == name
         assert description
@@ -39,6 +60,9 @@ def test_template_files_exist_and_have_basic_scenario_shape() -> None:
         assert current["relationships"]["hostiles"]
         assert current["doctrine"]
         assert "historicalCase" in current
+        assert current["historicalCase"]["complexity"]
+        for collection, minimum in expected.items():
+            assert len(current[collection]) >= minimum
 
 
 @pytest.mark.asyncio

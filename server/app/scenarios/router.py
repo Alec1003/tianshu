@@ -76,10 +76,14 @@ async def _build_training_score_for_scenario(
     return build_training_score(sc, events, aar_records)
 
 
-def _bridge_for_user(request: Request, user: User) -> Any:
+def _bridge_for_user(
+    request: Request,
+    user: User,
+    scenario_id: str | None = None,
+) -> Any:
     registry = getattr(request.app.state, "bridge_registry", None)
     if registry is not None:
-        return registry.get_bridge_for_user(user)
+        return registry.get_bridge_for_user(user, scenario_id=scenario_id)
     return request.app.state.bridge
 
 
@@ -359,7 +363,7 @@ async def activate_scenario(
     except ScenarioServiceError as exc:
         _raise_scenario_http(exc)
 
-    bridge = _bridge_for_user(request, user)
+    bridge = _bridge_for_user(request, user, scenario_id=sc.id)
 
     # If the runtime already has this scenario loaded (same inner currentScenario.id),
     # skip the reload so MCP-deployed units and other in-memory changes are preserved.
@@ -371,7 +375,7 @@ async def activate_scenario(
     scenario_json = json.dumps(sc.data, ensure_ascii=False)
     before_scenario = bridge.runtime.get_exported_scenario()
     await asyncio.to_thread(bridge.runtime.load_scenario_from_json, scenario_json)
-    await save_runtime_state(session, user, bridge.runtime)
+    await save_runtime_state(session, user, bridge.runtime, scenario_id=sc.id)
     await record_runtime_event(
         session,
         user,

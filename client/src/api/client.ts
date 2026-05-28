@@ -21,6 +21,13 @@ export class ApiError extends Error {
 }
 
 const TOKEN_KEY = "aicc.auth.token";
+let runtimeScenarioContext = "";
+
+export function setRuntimeScenarioContext(
+  scenarioId: string | null | undefined
+): void {
+  runtimeScenarioContext = (scenarioId ?? "").trim();
+}
 
 export function getStoredToken(): string | null {
   return localStorage.getItem(TOKEN_KEY);
@@ -63,6 +70,15 @@ export async function apiCall<T = unknown>(
 
   const token = getStoredToken();
   if (token) headers.set("Authorization", `Bearer ${token}`);
+  if (
+    runtimeScenarioContext &&
+    (path.startsWith("/api/ai/runtime") ||
+      path.startsWith("/api/ai/command") ||
+      path.startsWith("/api/ai/chat") ||
+      path.startsWith("/api/ai/skills"))
+  ) {
+    headers.set("X-AICC-Scenario-Id", runtimeScenarioContext);
+  }
 
   let body: BodyInit | undefined;
   if (options.json !== undefined) {

@@ -21,6 +21,7 @@ from pydantic_ai.providers.openai import OpenAIProvider
 
 from app.ai.models import AgentExecutionSummary, SkillExecutionResult
 from app.ai.skill_registry import AICCSkillRegistry
+from app.security.url_guard import normalize_and_validate_base_url
 
 
 SYSTEM_PROMPT = """
@@ -127,6 +128,16 @@ _OPENAI_COMPAT_DEFAULT_BASE_URL: dict[str, str] = {
 _NO_API_KEY_PROVIDERS = {"ollama", "custom"}
 
 
+def _safe_user_base_url(provider: str, base_url: str) -> str:
+    """Validate user-supplied model endpoints before SDK clients can call them."""
+    if not base_url.strip():
+        return ""
+    return normalize_and_validate_base_url(
+        base_url,
+        allow_private_network=provider.strip().lower() == "ollama",
+    )
+
+
 def can_build_model_override(
     provider: str,
     model_name: str,
@@ -174,7 +185,7 @@ def resolve_model(model_id: str, api_key: str, base_url: str) -> Any:
         if api_key:
             kwargs["api_key"] = api_key
         if base_url:
-            kwargs["base_url"] = base_url
+            kwargs["base_url"] = _safe_user_base_url(provider, base_url)
         return OpenAIModel(name or "gpt-4o", provider=OpenAIProvider(**kwargs))
 
     if provider == "openai-responses":
@@ -182,7 +193,7 @@ def resolve_model(model_id: str, api_key: str, base_url: str) -> Any:
         if api_key:
             kwargs["api_key"] = api_key
         if base_url:
-            kwargs["base_url"] = base_url
+            kwargs["base_url"] = _safe_user_base_url(provider, base_url)
         return OpenAIResponsesModel(
             name or "gpt-5-mini",
             provider=OpenAIProvider(**kwargs),
@@ -193,14 +204,18 @@ def resolve_model(model_id: str, api_key: str, base_url: str) -> Any:
         if api_key:
             kwargs["api_key"] = api_key
         if base_url:
-            kwargs["base_url"] = base_url
+            kwargs["base_url"] = _safe_user_base_url(provider, base_url)
         return AnthropicModel(
             name or "claude-3-5-sonnet-20241022",
             provider=AnthropicProvider(**kwargs),
         )
 
     if provider in _OPENAI_COMPAT_DEFAULT_BASE_URL or provider == "custom":
-        effective_base = base_url or _OPENAI_COMPAT_DEFAULT_BASE_URL.get(provider, "")
+        effective_base = (
+            _safe_user_base_url(provider, base_url)
+            if base_url
+            else _OPENAI_COMPAT_DEFAULT_BASE_URL.get(provider, "")
+        )
         if not effective_base:
             # ``custom`` without an explicit base_url is unusable — bail out so
             # the bridge can fall back to the global agent / regex planner.

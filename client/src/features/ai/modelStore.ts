@@ -134,6 +134,25 @@ function syncLegacy(
   );
 }
 
+function stripProviderSecrets(
+  providerConfigs: Record<string, ProviderConfig>
+): Record<string, ProviderConfig> {
+  return Object.fromEntries(
+    Object.entries(providerConfigs).map(([providerId, config]) => [
+      providerId,
+      { ...config, apiKey: "" },
+    ])
+  );
+}
+
+function stripProfileSecrets(profiles: ModelProfile[]): ModelProfile[] {
+  return profiles.map((profile) => ({ ...profile, apiKey: "" }));
+}
+
+function stripModelSecret(config: ModelConfig): ModelConfig {
+  return { ...config, apiKey: "" };
+}
+
 function createInitialState(): Pick<
   ModelConfigStoreState,
   | "providerConfigs"
@@ -514,11 +533,11 @@ export const useModelConfigStore = create<ModelConfigStoreState>()(
       name: MODEL_STORAGE_KEY.configCenter,
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
-        providerConfigs: state.providerConfigs,
-        modelProfiles: state.modelProfiles,
+        providerConfigs: stripProviderSecrets(state.providerConfigs),
+        modelProfiles: stripProfileSecrets(state.modelProfiles),
         activeModelProfileId: state.activeModelProfileId,
         defaultModelProfileId: state.defaultModelProfileId,
-        activeModelConfig: state.activeModelConfig,
+        activeModelConfig: stripModelSecret(state.activeModelConfig),
         showUnverifiedModels: state.showUnverifiedModels,
       }),
       onRehydrateStorage: () => (state) => {

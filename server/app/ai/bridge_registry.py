@@ -7,6 +7,7 @@ from typing import Protocol
 
 from app.ai.bridge import AICCOpenClawBridge, DEFAULT_SCENARIO_PATH
 from app.aicc_runtime.runtime import AICCRuntime
+from app.aicc_runtime.persistence import runtime_context_id
 
 
 class UserRef(Protocol):
@@ -35,7 +36,7 @@ class AICCBridgeRegistry:
         self._llm_model = llm_model
         self._llm_api_key = llm_api_key
         self._llm_base_url = llm_base_url
-        self._bridges: dict[str, AICCOpenClawBridge] = {}
+        self._bridges: dict[tuple[str, str], AICCOpenClawBridge] = {}
 
     @classmethod
     def from_env(cls) -> "AICCBridgeRegistry":
@@ -55,10 +56,16 @@ class AICCBridgeRegistry:
     def _user_key(user: UserRef) -> str:
         return str(user.id)
 
-    def get_bridge_for_user(self, user: UserRef) -> AICCOpenClawBridge:
+    def get_bridge_for_user(
+        self,
+        user: UserRef,
+        scenario_id: str | None = None,
+    ) -> AICCOpenClawBridge:
         user_key = self._user_key(user)
+        context_key = runtime_context_id(scenario_id)
+        bridge_key = (user_key, context_key)
         with self._lock:
-            bridge = self._bridges.get(user_key)
+            bridge = self._bridges.get(bridge_key)
             if bridge is None:
                 bridge = AICCOpenClawBridge(
                     scenario_path=self._scenario_path,
@@ -66,11 +73,15 @@ class AICCBridgeRegistry:
                     llm_api_key=self._llm_api_key,
                     llm_base_url=self._llm_base_url,
                 )
-                self._bridges[user_key] = bridge
+                self._bridges[bridge_key] = bridge
             return bridge
 
-    def get_runtime_for_user(self, user: UserRef) -> AICCRuntime:
-        return self.get_bridge_for_user(user).runtime
+    def get_runtime_for_user(
+        self,
+        user: UserRef,
+        scenario_id: str | None = None,
+    ) -> AICCRuntime:
+        return self.get_bridge_for_user(user, scenario_id=scenario_id).runtime
 
     def clear(self) -> None:
         with self._lock:

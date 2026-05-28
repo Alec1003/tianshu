@@ -88,6 +88,42 @@ async def test_runtime_state_save_updates_one_user_snapshot(db_session, user) ->
 
 
 @pytest.mark.anyio
+async def test_runtime_state_is_scoped_by_scenario_context(db_session, user) -> None:
+    first = await save_runtime_state(
+        db_session,
+        user,
+        _FakeRuntime("runtime-alpha"),
+        scenario_id="scenario-alpha",
+    )
+    second = await save_runtime_state(
+        db_session,
+        user,
+        _FakeRuntime("runtime-bravo"),
+        scenario_id="scenario-bravo",
+    )
+
+    assert first is not None
+    assert second is not None
+    assert first.id != second.id
+
+    loaded_alpha = await load_runtime_state(
+        db_session,
+        user,
+        scenario_id="scenario-alpha",
+    )
+    loaded_bravo = await load_runtime_state(
+        db_session,
+        user,
+        scenario_id="scenario-bravo",
+    )
+
+    assert loaded_alpha is not None
+    assert loaded_bravo is not None
+    assert loaded_alpha.scenario["currentScenario"]["id"] == "runtime-alpha"
+    assert loaded_bravo.scenario["currentScenario"]["id"] == "runtime-bravo"
+
+
+@pytest.mark.anyio
 async def test_runtime_state_restore_and_ensure_are_per_runtime_once(
     db_session,
     user,

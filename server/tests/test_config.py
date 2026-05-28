@@ -6,6 +6,7 @@ from app.config import (
     DEFAULT_CORS_ORIGINS,
     DEFAULT_DATABASE_URL,
     DEFAULT_JWT_SECRET,
+    MIN_PRODUCTION_MODEL_CONFIG_SECRET_LENGTH,
     MIN_PRODUCTION_JWT_SECRET_LENGTH,
     Settings,
     parse_cors_origins,
@@ -94,6 +95,7 @@ def test_production_accepts_hardened_settings() -> None:
         env="production",
         database_url="postgresql+asyncpg://aicc:secret@db/aicc",
         jwt_secret="x" * MIN_PRODUCTION_JWT_SECRET_LENGTH,
+        model_config_secret="m" * MIN_PRODUCTION_MODEL_CONFIG_SECRET_LENGTH,
         first_user_is_superuser=False,
     )
 

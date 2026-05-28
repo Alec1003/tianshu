@@ -47,3 +47,18 @@ def test_bridge_registry_reuses_bridge_per_user_and_isolates_users(
     assert registry.get_runtime_for_user(user_a) is bridge_a1.runtime
     assert bridge_a1.scenario_path == scenario_path
     assert bridge_a1.llm_model == "openai:test"
+
+
+def test_bridge_registry_isolates_scenarios_for_the_same_user(monkeypatch) -> None:
+    monkeypatch.setattr(registry_mod, "AICCOpenClawBridge", _FakeBridge)
+    registry = AICCBridgeRegistry(scenario_path=Path("scenario.json"))
+    user = SimpleNamespace(id="user-a")
+
+    bridge_default = registry.get_bridge_for_user(user)
+    bridge_alpha_1 = registry.get_bridge_for_user(user, scenario_id="scenario-alpha")
+    bridge_alpha_2 = registry.get_bridge_for_user(user, scenario_id="scenario-alpha")
+    bridge_bravo = registry.get_bridge_for_user(user, scenario_id="scenario-bravo")
+
+    assert bridge_alpha_1 is bridge_alpha_2
+    assert bridge_default is not bridge_alpha_1
+    assert bridge_alpha_1 is not bridge_bravo

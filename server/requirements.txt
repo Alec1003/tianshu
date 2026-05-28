@@ -12,6 +12,7 @@ sqlalchemy[asyncio]==2.0.36
 alembic==1.14.0
 aiosqlite==0.20.0
 asyncpg>=0.29,<1
+cryptography>=43,<45
 # fastapi-users 14 已切到 pwdlib，bcrypt 由 pwdlib[argon2,bcrypt] 间接拉取，
 # 此处不再单独锁定。如需 argon2，pwdlib 同名 extra 会自动安装 argon2-cffi。
 

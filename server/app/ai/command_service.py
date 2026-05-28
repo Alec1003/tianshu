@@ -16,6 +16,7 @@ from app.ai.models import (
     SkillExecutionResult,
     StructuredCommandStep,
 )
+from app.aicc_runtime.persistence import runtime_context_id
 from app.auth.models import User
 
 
@@ -75,14 +76,17 @@ async def save_command_proposal(
     session: AsyncSession,
     user: User,
     proposal: CommandProposal,
+    scenario_id: str | None = None,
 ) -> CommandProposal:
     """Create or update a proposal row scoped to ``user``."""
 
+    context_id = runtime_context_id(scenario_id)
     record = await session.get(CommandProposalRecord, proposal.id)
     if record is None:
         record = CommandProposalRecord(
             id=proposal.id,
             owner_id=user.id,
+            scenario_id=context_id,
             command=proposal.command,
             source=proposal.source,
             status=proposal.status,
@@ -98,6 +102,9 @@ async def save_command_proposal(
     else:
         if not _same_owner(record, user):
             raise CommandProposalNotFoundError(proposal.id)
+        if record.scenario_id != context_id:
+            raise CommandProposalNotFoundError(proposal.id)
+        record.scenario_id = context_id
         record.command = proposal.command
         record.source = proposal.source
         record.status = proposal.status
@@ -130,20 +137,28 @@ async def save_command_proposal(
         )
 
     await session.commit()
-    return await get_command_proposal(session, user, proposal.id)
+    return await get_command_proposal(
+        session,
+        user,
+        proposal.id,
+        scenario_id=scenario_id,
+    )
 
 
 async def get_command_proposal(
     session: AsyncSession,
     user: User,
     proposal_id: str,
+    scenario_id: str | None = None,
 ) -> CommandProposal:
+    context_id = runtime_context_id(scenario_id)
     stmt = (
         select(CommandProposalRecord)
         .options(selectinload(CommandProposalRecord.steps))
         .where(
             CommandProposalRecord.id == proposal_id,
             CommandProposalRecord.owner_id == user.id,
+            CommandProposalRecord.scenario_id == context_id,
         )
     )
     result = await session.execute(stmt)
@@ -157,13 +172,18 @@ async def list_command_proposals(
     session: AsyncSession,
     user: User,
     *,
+    scenario_id: str | None = None,
     status: str | None = None,
     limit: int = 50,
 ) -> Sequence[CommandProposal]:
+    context_id = runtime_context_id(scenario_id)
     stmt = (
         select(CommandProposalRecord)
         .options(selectinload(CommandProposalRecord.steps))
-        .where(CommandProposalRecord.owner_id == user.id)
+        .where(
+            CommandProposalRecord.owner_id == user.id,
+            CommandProposalRecord.scenario_id == context_id,
+        )
     )
     if status:
         stmt = stmt.where(CommandProposalRecord.status == status)

@@ -9,7 +9,14 @@
     "historicalCase": {
       "date": "1942-06-04",
       "location": "Midway Atoll, Central Pacific",
-      "basis": "Battle of Midway carrier engagement; positions and forces are intentionally abstracted for training simulation."
+      "basis": "Battle of Midway carrier engagement; positions and forces are intentionally abstracted for training simulation.",
+      "complexity": [
+        "carrier strike coordination",
+        "combat air patrol",
+        "island air defense",
+        "scouting and delayed target discovery",
+        "key carrier objective protection"
+      ]
     },
     "sides": [
       {
@@ -40,7 +47,12 @@
         "maxFuel": 9500,
         "fuelRate": 850,
         "range": 85,
-        "route": [[30.55, -178.65]],
+        "route": [
+          [
+            30.55,
+            -178.65
+          ]
+        ],
         "selected": false,
         "sideColor": "blue",
         "weapons": [
@@ -85,7 +97,12 @@
         "maxFuel": 7600,
         "fuelRate": 780,
         "range": 45,
-        "route": [[30.4, -178.45]],
+        "route": [
+          [
+            30.4,
+            -178.45
+          ]
+        ],
         "selected": false,
         "sideColor": "blue",
         "weapons": [
@@ -130,7 +147,16 @@
         "maxFuel": 8200,
         "fuelRate": 760,
         "range": 70,
-        "route": [[30.05, -178.0], [30.72, -178.8]],
+        "route": [
+          [
+            30.05,
+            -178
+          ],
+          [
+            30.72,
+            -178.8
+          ]
+        ],
         "selected": false,
         "sideColor": "red",
         "weapons": [
@@ -175,7 +201,12 @@
         "maxFuel": 9000,
         "fuelRate": 820,
         "range": 65,
-        "route": [[28.21, -177.37]],
+        "route": [
+          [
+            28.21,
+            -177.37
+          ]
+        ],
         "selected": false,
         "sideColor": "red",
         "weapons": [
@@ -205,6 +236,342 @@
         "rtb": false,
         "targetId": "midway-airbase-midway",
         "desiredRoute": []
+      },
+      {
+        "id": "midway-extra-air-hornet-sbd",
+        "name": "Hornet SBD 俯冲轰炸机编队",
+        "sideId": "side-usn",
+        "className": "SBD Dauntless",
+        "latitude": 31.05,
+        "longitude": -176.9,
+        "altitude": 13000,
+        "heading": 300,
+        "speed": 220,
+        "currentFuel": 12000,
+        "maxFuel": 12000,
+        "fuelRate": 900,
+        "range": 85,
+        "route": [
+          [
+            30.75,
+            -178.25
+          ]
+        ],
+        "selected": false,
+        "sideColor": "blue",
+        "weapons": [
+          {
+            "id": "midway-extra-wpn-hornet-bomb",
+            "name": "1000 lb bomb",
+            "sideId": "side-usn",
+            "className": "1000 lb bomb",
+            "latitude": 31.05,
+            "longitude": -176.9,
+            "altitude": 13000,
+            "heading": 300,
+            "speed": 420,
+            "currentFuel": 80,
+            "maxFuel": 80,
+            "fuelRate": 30,
+            "range": 2,
+            "route": [],
+            "sideColor": "blue",
+            "targetId": "",
+            "lethality": 0.72,
+            "maxQuantity": 14,
+            "currentQuantity": 14
+          }
+        ],
+        "homeBaseId": "midway-extra-ship-hornet",
+        "rtb": false,
+        "targetId": "midway-extra-ship-hiryu",
+        "desiredRoute": []
+      },
+      {
+        "id": "midway-extra-air-wildcat-cap",
+        "name": "F4F Wildcat 舰队防空巡逻",
+        "sideId": "side-usn",
+        "className": "F4F Wildcat",
+        "latitude": 30.65,
+        "longitude": -176.55,
+        "altitude": 16000,
+        "heading": 295,
+        "speed": 285,
+        "currentFuel": 12000,
+        "maxFuel": 12000,
+        "fuelRate": 900,
+        "range": 55,
+        "route": [
+          [
+            30.95,
+            -176.95
+          ],
+          [
+            30.25,
+            -176.35
+          ]
+        ],
+        "selected": false,
+        "sideColor": "blue",
+        "weapons": [
+          {
+            "id": "midway-extra-wpn-wildcat-gun",
+            "name": "0.50 cal machine guns",
+            "sideId": "side-usn",
+            "className": "0.50 cal machine guns",
+            "latitude": 30.65,
+            "longitude": -176.55,
+            "altitude": 16000,
+            "heading": 295,
+            "speed": 1400,
+            "currentFuel": 80,
+            "maxFuel": 80,
+            "fuelRate": 30,
+            "range": 1,
+            "route": [],
+            "sideColor": "blue",
+            "targetId": "",
+            "lethality": 0.3,
+            "maxQuantity": 24,
+            "currentQuantity": 24
+          }
+        ],
+        "homeBaseId": "midway-ship-enterprise",
+        "rtb": false,
+        "targetId": "midway-air-zero-cap",
+        "desiredRoute": []
+      },
+      {
+        "id": "midway-extra-air-pby-search",
+        "name": "PBY Catalina 远程搜索机",
+        "sideId": "side-usn",
+        "className": "PBY Catalina",
+        "latitude": 29.05,
+        "longitude": -177.65,
+        "altitude": 7000,
+        "heading": 325,
+        "speed": 125,
+        "currentFuel": 12000,
+        "maxFuel": 12000,
+        "fuelRate": 900,
+        "range": 120,
+        "route": [
+          [
+            30.1,
+            -178.8
+          ],
+          [
+            31,
+            -179.2
+          ]
+        ],
+        "selected": false,
+        "sideColor": "blue",
+        "weapons": [],
+        "homeBaseId": "midway-airbase-midway",
+        "rtb": false,
+        "targetId": "",
+        "desiredRoute": []
+      },
+      {
+        "id": "midway-extra-air-b17",
+        "name": "中途岛 B-17 高空轰炸编队",
+        "sideId": "side-usn",
+        "className": "B-17 Flying Fortress",
+        "latitude": 28.28,
+        "longitude": -177.45,
+        "altitude": 20000,
+        "heading": 315,
+        "speed": 250,
+        "currentFuel": 12000,
+        "maxFuel": 12000,
+        "fuelRate": 900,
+        "range": 95,
+        "route": [
+          [
+            30.25,
+            -178.95
+          ]
+        ],
+        "selected": false,
+        "sideColor": "blue",
+        "weapons": [
+          {
+            "id": "midway-extra-wpn-b17-bomb",
+            "name": "500 lb bomb",
+            "sideId": "side-usn",
+            "className": "500 lb bomb",
+            "latitude": 28.28,
+            "longitude": -177.45,
+            "altitude": 20000,
+            "heading": 315,
+            "speed": 450,
+            "currentFuel": 80,
+            "maxFuel": 80,
+            "fuelRate": 30,
+            "range": 2,
+            "route": [],
+            "sideColor": "blue",
+            "targetId": "",
+            "lethality": 0.45,
+            "maxQuantity": 30,
+            "currentQuantity": 30
+          }
+        ],
+        "homeBaseId": "midway-airbase-midway",
+        "rtb": false,
+        "targetId": "midway-ship-kaga",
+        "desiredRoute": []
+      },
+      {
+        "id": "midway-extra-air-hiryu-d3a",
+        "name": "飞龙 D3A 俯冲轰炸机反击编队",
+        "sideId": "side-ijn",
+        "className": "D3A Val",
+        "latitude": 30.72,
+        "longitude": -178.23,
+        "altitude": 12000,
+        "heading": 100,
+        "speed": 210,
+        "currentFuel": 12000,
+        "maxFuel": 12000,
+        "fuelRate": 900,
+        "range": 70,
+        "route": [
+          [
+            30.4,
+            -176.1
+          ]
+        ],
+        "selected": false,
+        "sideColor": "red",
+        "weapons": [
+          {
+            "id": "midway-extra-wpn-d3a-bomb",
+            "name": "250 kg bomb",
+            "sideId": "side-ijn",
+            "className": "250 kg bomb",
+            "latitude": 30.72,
+            "longitude": -178.23,
+            "altitude": 12000,
+            "heading": 100,
+            "speed": 420,
+            "currentFuel": 80,
+            "maxFuel": 80,
+            "fuelRate": 30,
+            "range": 2,
+            "route": [],
+            "sideColor": "red",
+            "targetId": "",
+            "lethality": 0.62,
+            "maxQuantity": 12,
+            "currentQuantity": 12
+          }
+        ],
+        "homeBaseId": "midway-extra-ship-hiryu",
+        "rtb": false,
+        "targetId": "midway-ship-yorktown",
+        "desiredRoute": []
+      },
+      {
+        "id": "midway-extra-air-hiryu-b5n",
+        "name": "飞龙 B5N 鱼雷反击编队",
+        "sideId": "side-ijn",
+        "className": "B5N Kate",
+        "latitude": 30.68,
+        "longitude": -178.15,
+        "altitude": 6000,
+        "heading": 102,
+        "speed": 210,
+        "currentFuel": 12000,
+        "maxFuel": 12000,
+        "fuelRate": 900,
+        "range": 65,
+        "route": [
+          [
+            30.4,
+            -176.1
+          ]
+        ],
+        "selected": false,
+        "sideColor": "red",
+        "weapons": [
+          {
+            "id": "midway-extra-wpn-hiryu-torpedo",
+            "name": "Type 91 torpedo",
+            "sideId": "side-ijn",
+            "className": "Type 91 torpedo",
+            "latitude": 30.68,
+            "longitude": -178.15,
+            "altitude": 6000,
+            "heading": 102,
+            "speed": 210,
+            "currentFuel": 90,
+            "maxFuel": 90,
+            "fuelRate": 30,
+            "range": 3,
+            "route": [],
+            "sideColor": "red",
+            "targetId": "",
+            "lethality": 0.6,
+            "maxQuantity": 10,
+            "currentQuantity": 10
+          }
+        ],
+        "homeBaseId": "midway-extra-ship-hiryu",
+        "rtb": false,
+        "targetId": "midway-ship-yorktown",
+        "desiredRoute": []
+      },
+      {
+        "id": "midway-extra-air-zero-escort",
+        "name": "零式舰战护航编队",
+        "sideId": "side-ijn",
+        "className": "A6M Zero",
+        "latitude": 30.5,
+        "longitude": -178.55,
+        "altitude": 15500,
+        "heading": 100,
+        "speed": 285,
+        "currentFuel": 12000,
+        "maxFuel": 12000,
+        "fuelRate": 900,
+        "range": 70,
+        "route": [
+          [
+            30.7,
+            -177.4
+          ]
+        ],
+        "selected": false,
+        "sideColor": "red",
+        "weapons": [
+          {
+            "id": "midway-extra-wpn-zero-escort",
+            "name": "20 mm cannon",
+            "sideId": "side-ijn",
+            "className": "20 mm cannon",
+            "latitude": 30.5,
+            "longitude": -178.55,
+            "altitude": 15500,
+            "heading": 100,
+            "speed": 1200,
+            "currentFuel": 80,
+            "maxFuel": 80,
+            "fuelRate": 30,
+            "range": 1,
+            "route": [],
+            "sideColor": "red",
+            "targetId": "",
+            "lethality": 0.35,
+            "maxQuantity": 20,
+            "currentQuantity": 20
+          }
+        ],
+        "homeBaseId": "midway-extra-ship-soryu",
+        "rtb": false,
+        "targetId": "midway-extra-air-wildcat-cap",
+        "desiredRoute": []
       }
     ],
     "ships": [
@@ -213,7 +580,7 @@
         "name": "USS Enterprise (CV-6)",
         "sideId": "side-usn",
         "className": "Yorktown-class carrier",
-        "latitude": 31.0,
+        "latitude": 31,
         "longitude": -176.5,
         "altitude": 0,
         "heading": 285,
@@ -222,7 +589,12 @@
         "maxFuel": 120000,
         "fuelRate": 1400,
         "range": 45,
-        "route": [[31.2, -177.1]],
+        "route": [
+          [
+            31.2,
+            -177.1
+          ]
+        ],
         "sideColor": "blue",
         "weapons": [],
         "aircraft": [],
@@ -242,7 +614,12 @@
         "maxFuel": 110000,
         "fuelRate": 1350,
         "range": 45,
-        "route": [[30.7, -176.7]],
+        "route": [
+          [
+            30.7,
+            -176.7
+          ]
+        ],
         "sideColor": "blue",
         "weapons": [],
         "aircraft": [],
@@ -262,7 +639,12 @@
         "maxFuel": 120000,
         "fuelRate": 1400,
         "range": 45,
-        "route": [[30.35, -178.05]],
+        "route": [
+          [
+            30.35,
+            -178.05
+          ]
+        ],
         "sideColor": "red",
         "weapons": [],
         "aircraft": [],
@@ -282,11 +664,229 @@
         "maxFuel": 115000,
         "fuelRate": 1380,
         "range": 45,
-        "route": [[30.1, -178.2]],
+        "route": [
+          [
+            30.1,
+            -178.2
+          ]
+        ],
         "sideColor": "red",
         "weapons": [],
         "aircraft": [],
         "isObjective": true
+      },
+      {
+        "id": "midway-extra-ship-hornet",
+        "name": "USS Hornet (CV-8)",
+        "sideId": "side-usn",
+        "className": "Yorktown-class carrier",
+        "latitude": 31.25,
+        "longitude": -176.95,
+        "altitude": 0,
+        "heading": 286,
+        "speed": 27,
+        "currentFuel": 120000,
+        "maxFuel": 120000,
+        "fuelRate": 1200,
+        "range": 45,
+        "route": [
+          [
+            31.35,
+            -177.45
+          ]
+        ],
+        "sideColor": "blue",
+        "weapons": [],
+        "aircraft": [],
+        "isObjective": true
+      },
+      {
+        "id": "midway-extra-ship-astoria",
+        "name": "USS Astoria (CA-34) 护航巡洋舰",
+        "sideId": "side-usn",
+        "className": "New Orleans-class cruiser",
+        "latitude": 30.75,
+        "longitude": -176.25,
+        "altitude": 0,
+        "heading": 280,
+        "speed": 30,
+        "currentFuel": 120000,
+        "maxFuel": 120000,
+        "fuelRate": 1200,
+        "range": 40,
+        "route": [
+          [
+            30.9,
+            -176.8
+          ]
+        ],
+        "sideColor": "blue",
+        "weapons": [
+          {
+            "id": "midway-extra-wpn-astoria-aa",
+            "name": "5 in dual-purpose naval gun",
+            "sideId": "side-usn",
+            "className": "5 in dual-purpose naval gun",
+            "latitude": 30.75,
+            "longitude": -176.25,
+            "altitude": 0,
+            "heading": 280,
+            "speed": 2600,
+            "currentFuel": 240,
+            "maxFuel": 240,
+            "fuelRate": 64,
+            "range": 8,
+            "route": [],
+            "sideColor": "blue",
+            "targetId": "",
+            "lethality": 0.4,
+            "maxQuantity": 36,
+            "currentQuantity": 36
+          }
+        ],
+        "aircraft": []
+      },
+      {
+        "id": "midway-extra-ship-hammann",
+        "name": "USS Hammann (DD-412)",
+        "sideId": "side-usn",
+        "className": "Sims-class destroyer",
+        "latitude": 30.55,
+        "longitude": -176.05,
+        "altitude": 0,
+        "heading": 280,
+        "speed": 35,
+        "currentFuel": 120000,
+        "maxFuel": 120000,
+        "fuelRate": 1200,
+        "range": 35,
+        "route": [
+          [
+            30.75,
+            -176.5
+          ]
+        ],
+        "sideColor": "blue",
+        "weapons": [
+          {
+            "id": "midway-extra-wpn-hammann-aa",
+            "name": "40 mm Bofors AA",
+            "sideId": "side-usn",
+            "className": "40 mm Bofors AA",
+            "latitude": 30.55,
+            "longitude": -176.05,
+            "altitude": 0,
+            "heading": 280,
+            "speed": 1800,
+            "currentFuel": 120,
+            "maxFuel": 120,
+            "fuelRate": 32,
+            "range": 4,
+            "route": [],
+            "sideColor": "blue",
+            "targetId": "",
+            "lethality": 0.28,
+            "maxQuantity": 48,
+            "currentQuantity": 48
+          }
+        ],
+        "aircraft": []
+      },
+      {
+        "id": "midway-extra-ship-soryu",
+        "name": "IJN Soryu",
+        "sideId": "side-ijn",
+        "className": "Soryu-class carrier",
+        "latitude": 30.1,
+        "longitude": -178.55,
+        "altitude": 0,
+        "heading": 92,
+        "speed": 30,
+        "currentFuel": 120000,
+        "maxFuel": 120000,
+        "fuelRate": 1200,
+        "range": 45,
+        "route": [
+          [
+            29.9,
+            -177.9
+          ]
+        ],
+        "sideColor": "red",
+        "weapons": [],
+        "aircraft": [],
+        "isObjective": true
+      },
+      {
+        "id": "midway-extra-ship-hiryu",
+        "name": "IJN Hiryu",
+        "sideId": "side-ijn",
+        "className": "Hiryu-class carrier",
+        "latitude": 30.75,
+        "longitude": -178.25,
+        "altitude": 0,
+        "heading": 90,
+        "speed": 30,
+        "currentFuel": 120000,
+        "maxFuel": 120000,
+        "fuelRate": 1200,
+        "range": 45,
+        "route": [
+          [
+            30.55,
+            -177.65
+          ]
+        ],
+        "sideColor": "red",
+        "weapons": [],
+        "aircraft": [],
+        "isObjective": true
+      },
+      {
+        "id": "midway-extra-ship-mikuma",
+        "name": "IJN Mikuma 重巡洋舰",
+        "sideId": "side-ijn",
+        "className": "Mogami-class cruiser",
+        "latitude": 29.85,
+        "longitude": -178.95,
+        "altitude": 0,
+        "heading": 88,
+        "speed": 28,
+        "currentFuel": 120000,
+        "maxFuel": 120000,
+        "fuelRate": 1200,
+        "range": 40,
+        "route": [
+          [
+            29.7,
+            -178.35
+          ]
+        ],
+        "sideColor": "red",
+        "weapons": [
+          {
+            "id": "midway-extra-wpn-mikuma-aa",
+            "name": "Type 96 25 mm AA",
+            "sideId": "side-ijn",
+            "className": "Type 96 25 mm AA",
+            "latitude": 29.85,
+            "longitude": -178.95,
+            "altitude": 0,
+            "heading": 88,
+            "speed": 1500,
+            "currentFuel": 90,
+            "maxFuel": 90,
+            "fuelRate": 30,
+            "range": 3,
+            "route": [],
+            "sideColor": "red",
+            "targetId": "",
+            "lethality": 0.24,
+            "maxQuantity": 60,
+            "currentQuantity": 60
+          }
+        ],
+        "aircraft": []
       }
     ],
     "facilities": [
@@ -302,6 +902,53 @@
         "sideColor": "blue",
         "weapons": [],
         "isObjective": true
+      },
+      {
+        "id": "midway-extra-fac-oil-tanks",
+        "name": "桑德岛油料储罐区",
+        "sideId": "side-usn",
+        "className": "Fuel storage area",
+        "latitude": 28.205,
+        "longitude": -177.36,
+        "altitude": 0,
+        "range": 25,
+        "sideColor": "blue",
+        "weapons": [],
+        "isObjective": true
+      },
+      {
+        "id": "midway-extra-fac-marine-aa",
+        "name": "中途岛海军陆战队高炮阵地",
+        "sideId": "side-usn",
+        "className": "Marine AA battery",
+        "latitude": 28.19,
+        "longitude": -177.39,
+        "altitude": 0,
+        "range": 45,
+        "sideColor": "blue",
+        "weapons": [
+          {
+            "id": "midway-extra-wpn-marine-aa",
+            "name": "3 in AA gun battery",
+            "sideId": "side-usn",
+            "className": "3 in AA gun battery",
+            "latitude": 28.19,
+            "longitude": -177.39,
+            "altitude": 0,
+            "heading": 300,
+            "speed": 2200,
+            "currentFuel": 210,
+            "maxFuel": 210,
+            "fuelRate": 56,
+            "range": 7,
+            "route": [],
+            "sideColor": "blue",
+            "targetId": "",
+            "lethality": 0.32,
+            "maxQuantity": 40,
+            "currentQuantity": 40
+          }
+        ]
       }
     ],
     "airbases": [
@@ -337,6 +984,33 @@
         "longitude": -178.55,
         "altitude": 0,
         "sideColor": "red"
+      },
+      {
+        "id": "midway-extra-rp-us-tf16",
+        "name": "美军第 16 特遣舰队机动区",
+        "sideId": "side-usn",
+        "latitude": 31.15,
+        "longitude": -176.85,
+        "altitude": 0,
+        "sideColor": "blue"
+      },
+      {
+        "id": "midway-extra-rp-ijn-kido-butai",
+        "name": "日方机动部队核心区",
+        "sideId": "side-ijn",
+        "latitude": 30.45,
+        "longitude": -178.65,
+        "altitude": 0,
+        "sideColor": "red"
+      },
+      {
+        "id": "midway-extra-rp-search-fan",
+        "name": "美军搜索扇面",
+        "sideId": "side-usn",
+        "latitude": 30.5,
+        "longitude": -178.8,
+        "altitude": 0,
+        "sideColor": "blue"
       }
     ],
     "missions": [
@@ -344,23 +1018,35 @@
         "id": "midway-mission-us-strike",
         "name": "美军俯冲轰炸机搜索并攻击日方航母",
         "sideId": "side-usn",
-        "assignedUnitIds": ["midway-air-sbd-1", "midway-air-tbd-1"],
-        "assignedTargetIds": ["midway-ship-akagi", "midway-ship-kaga"],
+        "assignedUnitIds": [
+          "midway-air-sbd-1",
+          "midway-air-tbd-1"
+        ],
+        "assignedTargetIds": [
+          "midway-ship-akagi",
+          "midway-ship-kaga"
+        ],
         "active": true
       },
       {
         "id": "midway-mission-ijn-strike",
         "name": "日军攻击中途岛机场",
         "sideId": "side-ijn",
-        "assignedUnitIds": ["midway-air-b5n-1"],
-        "assignedTargetIds": ["midway-airbase-midway"],
+        "assignedUnitIds": [
+          "midway-air-b5n-1"
+        ],
+        "assignedTargetIds": [
+          "midway-airbase-midway"
+        ],
         "active": true
       },
       {
         "id": "midway-mission-zero-cap",
         "name": "日方航母上空防空巡逻",
         "sideId": "side-ijn",
-        "assignedUnitIds": ["midway-air-zero-cap"],
+        "assignedUnitIds": [
+          "midway-air-zero-cap"
+        ],
         "assignedArea": [
           {
             "id": "midway-cap-1",
@@ -384,7 +1070,7 @@
             "id": "midway-cap-3",
             "name": "CAP 南东点",
             "sideId": "side-ijn",
-            "latitude": 30.0,
+            "latitude": 30,
             "longitude": -178.05,
             "altitude": 15000,
             "sideColor": "red"
@@ -393,9 +1079,188 @@
             "id": "midway-cap-4",
             "name": "CAP 南西点",
             "sideId": "side-ijn",
-            "latitude": 30.0,
+            "latitude": 30,
             "longitude": -179.05,
             "altitude": 15000,
+            "sideColor": "red"
+          }
+        ],
+        "active": true
+      },
+      {
+        "id": "midway-extra-mission-hiryu-strike",
+        "name": "Hornet 编队搜索攻击飞龙",
+        "sideId": "side-usn",
+        "assignedUnitIds": [
+          "midway-extra-air-hornet-sbd"
+        ],
+        "assignedTargetIds": [
+          "midway-extra-ship-hiryu"
+        ],
+        "active": true
+      },
+      {
+        "id": "midway-extra-mission-b17-raid",
+        "name": "中途岛陆基轰炸机牵制航母群",
+        "sideId": "side-usn",
+        "assignedUnitIds": [
+          "midway-extra-air-b17"
+        ],
+        "assignedTargetIds": [
+          "midway-ship-kaga",
+          "midway-extra-ship-soryu"
+        ],
+        "active": true
+      },
+      {
+        "id": "midway-extra-mission-us-cap",
+        "name": "美舰队防空巡逻",
+        "sideId": "side-usn",
+        "assignedUnitIds": [
+          "midway-extra-air-wildcat-cap"
+        ],
+        "assignedArea": [
+          {
+            "id": "midway-extra-mission-us-cap-nw",
+            "name": "美舰队防空巡逻 西北",
+            "sideId": "side-usn",
+            "latitude": 31.15,
+            "longitude": -177.2,
+            "altitude": 16000,
+            "sideColor": "blue"
+          },
+          {
+            "id": "midway-extra-mission-us-cap-ne",
+            "name": "美舰队防空巡逻 东北",
+            "sideId": "side-usn",
+            "latitude": 31.15,
+            "longitude": -176.1,
+            "altitude": 16000,
+            "sideColor": "blue"
+          },
+          {
+            "id": "midway-extra-mission-us-cap-se",
+            "name": "美舰队防空巡逻 东南",
+            "sideId": "side-usn",
+            "latitude": 30.2,
+            "longitude": -176.1,
+            "altitude": 16000,
+            "sideColor": "blue"
+          },
+          {
+            "id": "midway-extra-mission-us-cap-sw",
+            "name": "美舰队防空巡逻 西南",
+            "sideId": "side-usn",
+            "latitude": 30.2,
+            "longitude": -177.2,
+            "altitude": 16000,
+            "sideColor": "blue"
+          }
+        ],
+        "active": true
+      },
+      {
+        "id": "midway-extra-mission-pby-search",
+        "name": "PBY 远程搜索扇面",
+        "sideId": "side-usn",
+        "assignedUnitIds": [
+          "midway-extra-air-pby-search"
+        ],
+        "assignedArea": [
+          {
+            "id": "midway-extra-mission-pby-search-nw",
+            "name": "PBY 远程搜索扇面 西北",
+            "sideId": "side-usn",
+            "latitude": 31.3,
+            "longitude": -179.4,
+            "altitude": 7000,
+            "sideColor": "blue"
+          },
+          {
+            "id": "midway-extra-mission-pby-search-ne",
+            "name": "PBY 远程搜索扇面 东北",
+            "sideId": "side-usn",
+            "latitude": 31.3,
+            "longitude": -177.7,
+            "altitude": 7000,
+            "sideColor": "blue"
+          },
+          {
+            "id": "midway-extra-mission-pby-search-se",
+            "name": "PBY 远程搜索扇面 东南",
+            "sideId": "side-usn",
+            "latitude": 29.2,
+            "longitude": -177.7,
+            "altitude": 7000,
+            "sideColor": "blue"
+          },
+          {
+            "id": "midway-extra-mission-pby-search-sw",
+            "name": "PBY 远程搜索扇面 西南",
+            "sideId": "side-usn",
+            "latitude": 29.2,
+            "longitude": -179.4,
+            "altitude": 7000,
+            "sideColor": "blue"
+          }
+        ],
+        "active": true
+      },
+      {
+        "id": "midway-extra-mission-hiryu-counter",
+        "name": "飞龙反击约克城",
+        "sideId": "side-ijn",
+        "assignedUnitIds": [
+          "midway-extra-air-hiryu-d3a",
+          "midway-extra-air-hiryu-b5n"
+        ],
+        "assignedTargetIds": [
+          "midway-ship-yorktown"
+        ],
+        "active": true
+      },
+      {
+        "id": "midway-extra-mission-ijn-escort",
+        "name": "日方攻击编队护航",
+        "sideId": "side-ijn",
+        "assignedUnitIds": [
+          "midway-extra-air-zero-escort"
+        ],
+        "assignedArea": [
+          {
+            "id": "midway-extra-mission-ijn-escort-nw",
+            "name": "日方攻击编队护航 西北",
+            "sideId": "side-ijn",
+            "latitude": 31,
+            "longitude": -178.9,
+            "altitude": 15500,
+            "sideColor": "red"
+          },
+          {
+            "id": "midway-extra-mission-ijn-escort-ne",
+            "name": "日方攻击编队护航 东北",
+            "sideId": "side-ijn",
+            "latitude": 31,
+            "longitude": -177.5,
+            "altitude": 15500,
+            "sideColor": "red"
+          },
+          {
+            "id": "midway-extra-mission-ijn-escort-se",
+            "name": "日方攻击编队护航 东南",
+            "sideId": "side-ijn",
+            "latitude": 30,
+            "longitude": -177.5,
+            "altitude": 15500,
+            "sideColor": "red"
+          },
+          {
+            "id": "midway-extra-mission-ijn-escort-sw",
+            "name": "日方攻击编队护航 西南",
+            "sideId": "side-ijn",
+            "latitude": 30,
+            "longitude": -178.9,
+            "altitude": 15500,
             "sideColor": "red"
           }
         ],
@@ -404,8 +1269,12 @@
     ],
     "relationships": {
       "hostiles": {
-        "side-usn": ["side-ijn"],
-        "side-ijn": ["side-usn"]
+        "side-usn": [
+          "side-ijn"
+        ],
+        "side-ijn": [
+          "side-usn"
+        ]
       },
       "allies": {
         "side-usn": [],
@@ -434,8 +1303,14 @@
   "currentSideId": "side-usn",
   "selectedUnitId": "",
   "mapView": {
-    "defaultCenter": [28.21, -177.37],
-    "currentCameraCenter": [28.21, -177.37],
+    "defaultCenter": [
+      28.21,
+      -177.37
+    ],
+    "currentCameraCenter": [
+      28.21,
+      -177.37
+    ],
     "defaultZoom": 5,
     "currentCameraZoom": 5
   }

@@ -24,6 +24,7 @@ import {
   deleteRuntimeWeapon,
   updateRuntimeWeaponQuantity,
 } from "@/api/ai";
+import { setRuntimeScenarioContext } from "@/api/client";
 import type {
   RuntimeAttackRequest,
   RuntimeAddWeaponRequest,
@@ -120,8 +121,11 @@ export default class RuntimeController {
   private latestSnapshot: RuntimeSnapshot | null = null;
 
   constructor(
-    private readonly api: RuntimeApiClient = defaultRuntimeApiClient
-  ) {}
+    private readonly api: RuntimeApiClient = defaultRuntimeApiClient,
+    runtimeScenarioId: string | null | undefined = ""
+  ) {
+    setRuntimeScenarioContext(runtimeScenarioId);
+  }
 
   get snapshot(): RuntimeSnapshot | null {
     return this.latestSnapshot;

@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 
 import { apiCall } from "@/api/client";
+import { saveServerModelProvider } from "@/api/modelConfig";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
@@ -180,6 +181,7 @@ export default function ModelConfigCenter() {
   const [modelQuery, setModelQuery] = useState("");
   const [customModelDraft, setCustomModelDraft] = useState("");
   const [checkingProvider, setCheckingProvider] = useState(false);
+  const [savingProvider, setSavingProvider] = useState(false);
   const [checkResult, setCheckResult] = useState<ModelCheckResponse | null>(
     null
   );
@@ -294,11 +296,32 @@ export default function ModelConfigCenter() {
     setSelectedProviderId(fallbackId);
   };
 
-  const saveProvider = (values: ProviderConfigFormValues) => {
-    updateProviderConfig(selectedProviderId, {
-      ...values,
-      providerId: selectedProviderId,
-    });
+  const saveProvider = async (values: ProviderConfigFormValues) => {
+    setSavingProvider(true);
+    try {
+      const saved = await saveServerModelProvider(selectedProviderId, {
+        displayName: values.displayName,
+        baseUrl: values.baseUrl,
+        apiKey: values.apiKey.trim() ? values.apiKey : undefined,
+        enabled: values.enabled,
+        verified: values.verified,
+        lastCheckedAt: values.lastCheckedAt,
+        customModels: values.customModels.map((model) => ({ ...model })),
+      });
+      const localValues = {
+        ...values,
+        apiKey: "",
+        verified: saved.verified,
+        lastCheckedAt: saved.lastCheckedAt,
+      };
+      updateProviderConfig(selectedProviderId, {
+        ...localValues,
+        providerId: selectedProviderId,
+      });
+      reset(localValues);
+    } finally {
+      setSavingProvider(false);
+    }
   };
 
   const testProvider = async () => {
@@ -837,6 +860,7 @@ export default function ModelConfigCenter() {
               </div>
               <Button
                 className="h-10 rounded-md border border-cyan-300/20 bg-gradient-to-r from-cyan-500 to-blue-500 px-5 text-white shadow-[0_0_28px_rgba(34,211,238,0.18)] hover:from-cyan-400 hover:to-blue-400"
+                disabled={savingProvider}
                 type="submit"
               >
                 {isDirty ? "保存更改" : "保存配置"}

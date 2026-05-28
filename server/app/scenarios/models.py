@@ -98,6 +98,54 @@ class Scenario(Base):
         nullable=False,
     )
 
+    @staticmethod
+    def _scenario_root(data: dict | None) -> dict:
+        if not isinstance(data, dict):
+            return {}
+        root = data.get("currentScenario")
+        return root if isinstance(root, dict) else data
+
+    @staticmethod
+    def _list_len(root: dict, key: str) -> int:
+        value = root.get(key)
+        return len(value) if isinstance(value, list) else 0
+
+    @staticmethod
+    def _nested_aircraft_count(root: dict, carrier_key: str) -> int:
+        carriers = root.get(carrier_key)
+        if not isinstance(carriers, list):
+            return 0
+        count = 0
+        for carrier in carriers:
+            if not isinstance(carrier, dict):
+                continue
+            aircraft = carrier.get("aircraft")
+            if isinstance(aircraft, list):
+                count += len(aircraft)
+        return count
+
+    @property
+    def mission_count(self) -> int:
+        root = self._scenario_root(self.data)
+        return self._list_len(root, "missions")
+
+    @property
+    def side_count(self) -> int:
+        root = self._scenario_root(self.data)
+        return self._list_len(root, "sides")
+
+    @property
+    def unit_count(self) -> int:
+        root = self._scenario_root(self.data)
+        return (
+            self._list_len(root, "aircraft")
+            + self._nested_aircraft_count(root, "airbases")
+            + self._nested_aircraft_count(root, "ships")
+            + self._list_len(root, "ships")
+            + self._list_len(root, "facilities")
+            + self._list_len(root, "airbases")
+        )
+
     aar_records: Mapped[list["AarRecord"]] = relationship(
         back_populates="scenario", cascade="all, delete-orphan", lazy="selectin"
     )

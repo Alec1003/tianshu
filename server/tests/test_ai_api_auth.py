@@ -141,9 +141,10 @@ class _FakeBridge:
 
 
 class _UserScopedFakeBridge(_FakeBridge):
-    def __init__(self, user_id: str) -> None:
-        super().__init__(f"demo:{user_id}")
+    def __init__(self, user_id: str, scenario_id: str = "__default__") -> None:
+        super().__init__(f"demo:{user_id}:{scenario_id}")
         self.user_id = user_id
+        self.scenario_id = scenario_id
 
     def exported_scenario(self) -> dict:
         return {"currentScenario": {"id": self.runtime.game.current_scenario.id}}
@@ -151,14 +152,20 @@ class _UserScopedFakeBridge(_FakeBridge):
 
 class _FakeBridgeRegistry:
     def __init__(self) -> None:
-        self.bridges: dict[str, _UserScopedFakeBridge] = {}
+        self.bridges: dict[tuple[str, str], _UserScopedFakeBridge] = {}
 
-    def get_bridge_for_user(self, user) -> _UserScopedFakeBridge:
+    def get_bridge_for_user(
+        self,
+        user,
+        scenario_id: str | None = None,
+    ) -> _UserScopedFakeBridge:
         user_id = str(user.id)
-        bridge = self.bridges.get(user_id)
+        context_id = scenario_id or "__default__"
+        bridge_key = (user_id, context_id)
+        bridge = self.bridges.get(bridge_key)
         if bridge is None:
-            bridge = _UserScopedFakeBridge(user_id)
-            self.bridges[user_id] = bridge
+            bridge = _UserScopedFakeBridge(user_id, context_id)
+            self.bridges[bridge_key] = bridge
         return bridge
 
 
@@ -462,6 +469,32 @@ def test_ai_runtime_uses_user_scoped_bridge_registry() -> None:
 
     assert user_a_response.status_code == 200
     assert user_b_response.status_code == 200
-    assert user_a_response.json() == {"currentScenario": {"id": "demo:user-a"}}
-    assert user_b_response.json() == {"currentScenario": {"id": "demo:user-b"}}
-    assert set(registry.bridges) == {"user-a", "user-b"}
+    assert user_a_response.json() == {
+        "currentScenario": {"id": "demo:user-a:__default__"}
+    }
+    assert user_b_response.json() == {
+        "currentScenario": {"id": "demo:user-b:__default__"}
+    }
+    assert set(registry.bridges) == {
+        ("user-a", "__default__"),
+        ("user-b", "__default__"),
+    }
+
+
+def test_ai_runtime_uses_scenario_scoped_bridge_registry() -> None:
+    client, registry = _build_registry_client()
+
+    alpha_response = client.get(
+        "/api/ai/runtime/scenario",
+        headers={"x-test-user": "user-a", "x-aicc-scenario-id": "alpha"},
+    )
+    bravo_response = client.get(
+        "/api/ai/runtime/scenario",
+        headers={"x-test-user": "user-a", "x-aicc-scenario-id": "bravo"},
+    )
+
+    assert alpha_response.status_code == 200
+    assert bravo_response.status_code == 200
+    assert alpha_response.json() == {"currentScenario": {"id": "demo:user-a:alpha"}}
+    assert bravo_response.json() == {"currentScenario": {"id": "demo:user-a:bravo"}}
+    assert set(registry.bridges) == {("user-a", "alpha"), ("user-a", "bravo")}

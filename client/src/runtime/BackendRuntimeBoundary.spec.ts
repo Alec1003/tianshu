@@ -39,6 +39,10 @@ const forbiddenPatterns = [
       /\bgame\.(?:addAircraft|addShip|addFacility|addAirbase|addReferencePoint|removeAircraft|removeShip|removeFacility|removeAirbase|removeReferencePoint)\s*\(/,
   },
   {
+    label: "frontend local side mutation",
+    pattern: /\bgame\.(?:addSide|deleteSide|updateSide)\s*\(/,
+  },
+  {
     label: "frontend local route commit",
     pattern: /\bgame\.commitRoute\s*\(/,
   },
@@ -94,6 +98,15 @@ describe("backend runtime boundary", () => {
     );
     expect(
       existsSync(join(srcRoot, "gui", "map", "OpenLayersScenarioMap.tsx"))
+    ).toBe(false);
+  });
+
+  test("legacy local-engine toolbars are removed", () => {
+    expect(existsSync(join(srcRoot, "gui", "map", "CesiumToolbar.tsx"))).toBe(
+      false
+    );
+    expect(
+      existsSync(join(srcRoot, "gui", "map", "toolbar", "Toolbar.tsx"))
     ).toBe(false);
   });
 

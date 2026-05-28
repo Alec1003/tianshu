@@ -6,6 +6,7 @@ from typing import Literal
 from urllib import error, request
 
 from app.ai.models import ModelCheckRequest, ModelCheckResponse
+from app.security.url_guard import UnsafeBaseUrlError, normalize_and_validate_base_url
 
 
 @dataclass
@@ -17,15 +18,8 @@ class _ProbeResult:
     reachable: bool
 
 
-def _normalize_base_url(base_url: str) -> str:
-    normalized = base_url.strip().rstrip("/")
-    if not normalized.startswith(("http://", "https://")):
-        normalized = f"https://{normalized}"
-    return normalized
-
-
 def _candidate_model_endpoints(base_url: str) -> list[str]:
-    normalized = _normalize_base_url(base_url)
+    normalized = base_url.strip().rstrip("/")
     if normalized.endswith("/models"):
         return [normalized]
 
@@ -35,7 +29,24 @@ def _candidate_model_endpoints(base_url: str) -> list[str]:
     return candidates
 
 
-def _probe_models_endpoint(endpoint: str, api_key: str) -> _ProbeResult:
+class _SafeRedirectHandler(request.HTTPRedirectHandler):
+    def __init__(self, *, allow_private_network: bool) -> None:
+        self._allow_private_network = allow_private_network
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):  # noqa: ANN001
+        normalize_and_validate_base_url(
+            newurl,
+            allow_private_network=self._allow_private_network,
+        )
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
+def _probe_models_endpoint(
+    endpoint: str,
+    api_key: str,
+    *,
+    allow_private_network: bool,
+) -> _ProbeResult:
     headers = {
         "Accept": "application/json",
     }
@@ -43,8 +54,11 @@ def _probe_models_endpoint(endpoint: str, api_key: str) -> _ProbeResult:
         headers["Authorization"] = f"Bearer {api_key}"
 
     req = request.Request(endpoint, headers=headers, method="GET")
+    opener = request.build_opener(
+        _SafeRedirectHandler(allow_private_network=allow_private_network)
+    )
     try:
-        with request.urlopen(req, timeout=12) as resp:
+        with opener.open(req, timeout=12) as resp:
             body = resp.read().decode("utf-8", errors="replace")
             parsed = json.loads(body) if body else {}
             return _ProbeResult(
@@ -83,11 +97,33 @@ def _probe_models_endpoint(endpoint: str, api_key: str) -> _ProbeResult:
 
 
 def check_model_connectivity(payload: ModelCheckRequest) -> ModelCheckResponse:
-    endpoints = _candidate_model_endpoints(payload.baseUrl)
+    allow_private_network = payload.provider.strip().lower() == "ollama"
+    try:
+        normalized_base_url = normalize_and_validate_base_url(
+            payload.baseUrl,
+            allow_private_network=allow_private_network,
+        )
+    except UnsafeBaseUrlError as exc:
+        return ModelCheckResponse(
+            status="error",
+            message=f"Base URL blocked: {exc}",
+            provider=payload.provider,
+            endpoint="",
+            auth_ok=False,
+            models_listed=False,
+            checked_model=payload.model or None,
+            sample_models=[],
+        )
+
+    endpoints = _candidate_model_endpoints(normalized_base_url)
     last_result: _ProbeResult | None = None
 
     for endpoint in endpoints:
-        result = _probe_models_endpoint(endpoint, payload.apiKey)
+        result = _probe_models_endpoint(
+            endpoint,
+            payload.apiKey,
+            allow_private_network=allow_private_network,
+        )
         last_result = result
 
         if result.http_status == 404 and len(endpoints) > 1:

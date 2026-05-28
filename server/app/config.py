@@ -17,6 +17,7 @@ DEFAULT_CORS_ORIGINS = "http://localhost:3000,http://127.0.0.1:3000"
 DEFAULT_DATABASE_URL = "sqlite+aiosqlite:///./data/aicc.db"
 DEFAULT_JWT_SECRET = "aicc-dev-secret-change-me-in-production"
 MIN_PRODUCTION_JWT_SECRET_LENGTH = 32
+MIN_PRODUCTION_MODEL_CONFIG_SECRET_LENGTH = 32
 
 
 def parse_cors_origins(raw: str) -> list[str]:
@@ -88,6 +89,13 @@ class Settings(BaseSettings):
     llm_model: str = Field(default="", description="Pydantic-AI model ID.")
     llm_api_key: str = Field(default="", description="API key for the LLM provider.")
     llm_base_url: str = Field(default="", description="Optional custom base URL (proxy / local LLM).")
+    model_config_secret: str = Field(
+        default="",
+        description=(
+            "Secret used to encrypt per-user model provider API keys. "
+            "Defaults to AICC_JWT_SECRET in development only."
+        ),
+    )
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -119,6 +127,14 @@ def validate_production_settings(settings: Settings) -> None:
         errors.append("AICC_FIRST_USER_IS_SUPERUSER must be false in production")
     if settings.database_url.strip().startswith("sqlite"):
         errors.append("AICC_DATABASE_URL must use PostgreSQL in production")
+    model_secret = settings.model_config_secret.strip()
+    if len(model_secret) < MIN_PRODUCTION_MODEL_CONFIG_SECRET_LENGTH:
+        errors.append(
+            "AICC_MODEL_CONFIG_SECRET must be at least "
+            f"{MIN_PRODUCTION_MODEL_CONFIG_SECRET_LENGTH} characters"
+        )
+    if model_secret == jwt_secret:
+        errors.append("AICC_MODEL_CONFIG_SECRET must be distinct from AICC_JWT_SECRET")
 
     if errors:
         raise RuntimeError("Unsafe production settings: " + "; ".join(errors))

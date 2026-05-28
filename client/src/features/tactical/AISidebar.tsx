@@ -57,7 +57,7 @@ import {
 } from "@/api/ai";
 import { Button } from "@/components/ui/button";
 import type { CommandProposal } from "@/api/types";
-import type { CesiumBaseLayerKey } from "@/gui/map/CesiumToolbar";
+import type { CesiumBaseLayerKey } from "@/gui/map/CesiumMapTypes";
 import { cn } from "@/lib/utils";
 import { apiCall, getStoredToken } from "@/api/client";
 import {
@@ -396,6 +396,18 @@ export default function AISidebar({
   useEffect(() => {
     modelConfigRef.current = modelConfig;
   }, [modelConfig]);
+  const modelProviderIdRef = useRef(modelConfig.provider);
+  useEffect(() => {
+    const activeProfile = modelProfiles.find(
+      (profile) => profile.id === activeModelProfileId
+    );
+    modelProviderIdRef.current =
+      activeProfile?.providerId ?? modelConfig.provider;
+  }, [activeModelProfileId, modelConfig.provider, modelProfiles]);
+  const scenarioIdRef = useRef<string | undefined>(scenarioId);
+  useEffect(() => {
+    scenarioIdRef.current = scenarioId;
+  }, [scenarioId]);
   const chatModeRef = useRef<AIChatMode>(chatMode);
   useEffect(() => {
     chatModeRef.current = chatMode;
@@ -410,10 +422,15 @@ export default function AISidebar({
           const h: Record<string, string> = {};
           const token = getStoredToken();
           if (token) h.Authorization = `Bearer ${token}`;
+          if (modelProviderIdRef.current) {
+            h["X-AICC-Model-Provider-Id"] = modelProviderIdRef.current;
+          }
           if (m.provider) h["X-AICC-Model-Provider"] = m.provider;
           if (m.model) h["X-AICC-Model-Name"] = m.model;
-          if (m.apiKey) h["X-AICC-Model-Api-Key"] = m.apiKey;
           if (m.baseUrl) h["X-AICC-Model-Base-Url"] = m.baseUrl;
+          if (scenarioIdRef.current) {
+            h["X-AICC-Scenario-Id"] = scenarioIdRef.current;
+          }
           h["X-AICC-Chat-Mode"] = chatModeRef.current;
           return h;
         },

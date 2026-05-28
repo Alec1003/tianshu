@@ -26,7 +26,7 @@ class RegisteredSkill:
 
 
 class AICCSkillRegistry:
-    """Skill registry for mapping OpenClaw-style tool calls to native AICC control APIs."""
+    """Skill registry for mapping AI tool calls to native AICC runtime APIs."""
 
     def __init__(self, runtime: AICCRuntime) -> None:
         self.runtime = runtime
@@ -37,11 +37,11 @@ class AICCSkillRegistry:
         self._skills[skill.name] = skill
 
     def _register_all(self) -> None:
-        # --------------------------- 仿真生命周期 Skill 区 ---------------------------
+        # --------------------------- simulation lifecycle skills ---------------------------
         self._register(
             RegisteredSkill(
                 name="simulation_start",
-                description="启动/继续仿真",
+                description="启动或继续当前仿真推演。",
                 parameters={},
                 func=self.runtime.start_simulation,
             )
@@ -49,7 +49,7 @@ class AICCSkillRegistry:
         self._register(
             RegisteredSkill(
                 name="simulation_pause",
-                description="暂停仿真",
+                description="暂停当前仿真推演。",
                 parameters={},
                 func=self.runtime.pause_simulation,
             )
@@ -57,7 +57,7 @@ class AICCSkillRegistry:
         self._register(
             RegisteredSkill(
                 name="simulation_stop",
-                description="停止仿真并复位到初始状态",
+                description="停止仿真并恢复到初始状态。",
                 parameters={},
                 func=self.runtime.stop_simulation,
             )
@@ -65,7 +65,7 @@ class AICCSkillRegistry:
         self._register(
             RegisteredSkill(
                 name="simulation_reset",
-                description="重置仿真状态",
+                description="重置当前仿真状态。",
                 parameters={},
                 func=self.runtime.reset_simulation,
             )
@@ -73,16 +73,17 @@ class AICCSkillRegistry:
         self._register(
             RegisteredSkill(
                 name="simulation_step",
-                description="执行单步/多步推演",
+                description="按指定步数推进后端权威仿真。",
                 parameters={"steps": {"type": "integer", "default": 1}},
                 func=self.runtime.step_simulation,
             )
         )
-        # --------------------------- 作战单元控制 Skill 区 ---------------------------
+
+        # --------------------------- unit control skills ---------------------------
         self._register(
             RegisteredSkill(
                 name="deploy_aircraft",
-                description="部署飞机作战单元",
+                description="在指定经纬度部署飞机单位。",
                 parameters={
                     "class_name": {"type": "string"},
                     "latitude": {"type": "number"},
@@ -96,7 +97,7 @@ class AICCSkillRegistry:
         self._register(
             RegisteredSkill(
                 name="deploy_ship",
-                description="部署舰艇作战单元",
+                description="在指定经纬度部署舰艇单位。",
                 parameters={
                     "class_name": {"type": "string"},
                     "latitude": {"type": "number"},
@@ -110,7 +111,7 @@ class AICCSkillRegistry:
         self._register(
             RegisteredSkill(
                 name="deploy_facility",
-                description="部署地面设施单元",
+                description="在指定经纬度部署地面设施单位。",
                 parameters={
                     "class_name": {"type": "string"},
                     "latitude": {"type": "number"},
@@ -124,7 +125,7 @@ class AICCSkillRegistry:
         self._register(
             RegisteredSkill(
                 name="deploy_airbase",
-                description="部署机场单元",
+                description="在指定经纬度部署机场或空军基地。",
                 parameters={
                     "class_name": {"type": "string"},
                     "latitude": {"type": "number"},
@@ -138,7 +139,7 @@ class AICCSkillRegistry:
         self._register(
             RegisteredSkill(
                 name="deploy_obstacle",
-                description="部署仿真环境障碍/约束区",
+                description="部署仿真环境障碍或约束区域。",
                 parameters={
                     "class_name": {"type": "string"},
                     "latitude": {"type": "number"},
@@ -158,7 +159,7 @@ class AICCSkillRegistry:
         self._register(
             RegisteredSkill(
                 name="deploy_reference_point",
-                description="新增参考点",
+                description="新增地图参考点或航路点。",
                 parameters={
                     "name": {"type": "string"},
                     "latitude": {"type": "number"},
@@ -171,7 +172,7 @@ class AICCSkillRegistry:
         self._register(
             RegisteredSkill(
                 name="delete_unit",
-                description="删除作战单元",
+                description="删除指定仿真单位。",
                 parameters={
                     "unit_type": {"type": "string"},
                     "unit_id": {"type": "string"},
@@ -182,7 +183,7 @@ class AICCSkillRegistry:
         self._register(
             RegisteredSkill(
                 name="move_unit",
-                description="机动作战单元（飞机/舰艇）",
+                description="为飞机或舰艇设置机动航线。",
                 parameters={
                     "unit_type": {"type": "string", "enum": ["aircraft", "ship"]},
                     "unit_id": {"type": "string"},
@@ -194,7 +195,7 @@ class AICCSkillRegistry:
         self._register(
             RegisteredSkill(
                 name="update_unit_state",
-                description="更新作战单元状态参数",
+                description="更新指定单位的状态或参数。",
                 parameters={
                     "unit_type": {"type": "string"},
                     "unit_id": {"type": "string"},
@@ -203,11 +204,12 @@ class AICCSkillRegistry:
                 func=self.runtime.update_unit_state,
             )
         )
-        # --------------------------- 态势事件控制 Skill 区 ---------------------------
+
+        # --------------------------- situation and event skills ---------------------------
         self._register(
             RegisteredSkill(
                 name="trigger_tactical_event",
-                description="触发战术事件",
+                description="触发指定战术事件。",
                 parameters={
                     "event_name": {"type": "string"},
                     "payload": {"type": "object", "required": False},
@@ -218,7 +220,7 @@ class AICCSkillRegistry:
         self._register(
             RegisteredSkill(
                 name="update_situation_layer",
-                description="更新态势图层",
+                description="更新态势图层，例如参考点或障碍区域。",
                 parameters={
                     "layer_name": {"type": "string"},
                     "operation": {"type": "string"},
@@ -227,19 +229,27 @@ class AICCSkillRegistry:
                 func=self.runtime.update_situation_layer,
             )
         )
-        # --------------------------- 剧本推演控制 Skill 区 ---------------------------
+
+        # --------------------------- scripted playback skills ---------------------------
         self._register(
             RegisteredSkill(
                 name="load_script",
-                description="加载剧本动作序列",
-                parameters={"script": {"type": "array|string"}},
+                description="加载脚本化推演动作序列。",
+                parameters={
+                    "script": {
+                        "oneOf": [
+                            {"type": "array", "items": {"type": "string"}},
+                            {"type": "string"},
+                        ]
+                    }
+                },
                 func=self.runtime.load_script,
             )
         )
         self._register(
             RegisteredSkill(
                 name="execute_script_step",
-                description="执行剧本单步",
+                description="执行当前脚本的下一步动作。",
                 parameters={},
                 func=self.runtime.execute_script_step,
             )
@@ -247,7 +257,7 @@ class AICCSkillRegistry:
         self._register(
             RegisteredSkill(
                 name="control_script_flow",
-                description="控制剧本流程（pause/resume/reset）",
+                description="控制脚本流程，支持 pause、resume、reset。",
                 parameters={"action": {"type": "string"}},
                 func=self.runtime.control_script_flow,
             )
@@ -255,7 +265,7 @@ class AICCSkillRegistry:
         self._register(
             RegisteredSkill(
                 name="load_scenario_snapshot",
-                description="Load an already authorized scenario JSON snapshot.",
+                description="加载已授权的想定 JSON 快照。",
                 parameters={
                     "scenario_json": {"type": "string"},
                     "scenario_id": {"type": "string", "required": False},
@@ -267,7 +277,7 @@ class AICCSkillRegistry:
         self._register(
             RegisteredSkill(
                 name="load_scenario_file",
-                description="加载场景文件",
+                description="从服务端文件路径加载想定文件。",
                 parameters={"scenario_path": {"type": "string"}},
                 func=self.runtime.load_scenario_from_file,
             )
@@ -275,7 +285,7 @@ class AICCSkillRegistry:
         self._register(
             RegisteredSkill(
                 name="load_scenario_json",
-                description="加载场景 JSON 文本",
+                description="加载完整想定 JSON 文本。",
                 parameters={"scenario_json": {"type": "string"}},
                 func=self.runtime.load_scenario_from_json,
             )
@@ -303,10 +313,5 @@ class AICCSkillRegistry:
     def execute(self, skill_name: str, parameters: dict[str, Any]) -> dict[str, Any]:
         if skill_name not in self._skills:
             raise ValueError(f"Skill not registered: {skill_name}")
-        # NOTE: keep direct mapping only. Validation/audit hooks can be added here.
-        # -------------------------- Skill validation extension --------------------------
-        # Add strict schema validation and RBAC checks in this section.
-        # ------------------------------------------------------------------------------
         skill = self._skills[skill_name]
         return skill.func(**parameters)
-

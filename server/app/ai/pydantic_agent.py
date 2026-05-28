@@ -446,6 +446,39 @@ def build_agent(
         return _exec(ctx.deps, "deploy_airbase", params)
 
     @agent.tool
+    def deploy_obstacle(
+        ctx: RunContext[AgentDeps],
+        class_name: str,
+        latitude: float,
+        longitude: float,
+        side: str = "",
+        name: str = "",
+        radius_nm: float = 15.0,
+        obstacle_type: str = "no_go",
+        movement_penalty: float = 1.0,
+        detection_penalty: float = 0.0,
+        communication_penalty: float = 0.0,
+        affected_domains: list[str] | None = None,
+    ) -> dict[str, Any]:
+        """Deploy an environment obstacle / constraint zone at the given lat/lon."""
+        params: dict[str, Any] = {
+            "class_name": class_name,
+            "latitude": latitude,
+            "longitude": longitude,
+            "radius_nm": radius_nm,
+            "obstacle_type": obstacle_type,
+            "movement_penalty": movement_penalty,
+            "detection_penalty": detection_penalty,
+            "communication_penalty": communication_penalty,
+            "affected_domains": affected_domains or ["aircraft", "ship"],
+        }
+        if side:
+            params["side"] = side
+        if name:
+            params["name"] = name
+        return _exec(ctx.deps, "deploy_obstacle", params)
+
+    @agent.tool
     def deploy_reference_point(
         ctx: RunContext[AgentDeps],
         name: str,
@@ -513,6 +546,56 @@ def build_agent(
             "event_name": event_name,
             "payload": payload or {},
         })
+
+    @agent.tool
+    def update_situation_layer(
+        ctx: RunContext[AgentDeps],
+        layer_name: str,
+        operation: str,
+        payload: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Update a situation layer such as reference_points or obstacles."""
+        return _exec(ctx.deps, "update_situation_layer", {
+            "layer_name": layer_name,
+            "operation": operation,
+            "payload": payload or {},
+        })
+
+    @agent.tool
+    def load_script(
+        ctx: RunContext[AgentDeps],
+        script: list[str],
+    ) -> dict[str, Any]:
+        """Load a scripted sequence of simulation actions for staged playback."""
+        return _exec(ctx.deps, "load_script", {"script": script})
+
+    @agent.tool
+    def execute_script_step(ctx: RunContext[AgentDeps]) -> dict[str, Any]:
+        """Execute the next scripted simulation step."""
+        return _exec(ctx.deps, "execute_script_step", {})
+
+    @agent.tool
+    def control_script_flow(
+        ctx: RunContext[AgentDeps],
+        action: str,
+    ) -> dict[str, Any]:
+        """Control scripted playback. action: pause | resume | reset."""
+        return _exec(ctx.deps, "control_script_flow", {"action": action})
+
+    @agent.tool
+    def load_scenario_snapshot(
+        ctx: RunContext[AgentDeps],
+        scenario_json: str,
+        scenario_id: str = "",
+        name: str = "",
+    ) -> dict[str, Any]:
+        """Load an already authorized scenario JSON snapshot."""
+        params = {"scenario_json": scenario_json}
+        if scenario_id:
+            params["scenario_id"] = scenario_id
+        if name:
+            params["name"] = name
+        return _exec(ctx.deps, "load_scenario_snapshot", params)
 
     @agent.tool
     def load_scenario_file(

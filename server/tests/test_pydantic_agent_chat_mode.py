@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 
 from app.ai import pydantic_agent as pa_mod
+from app.ai.command_governance import ALLOWED_SKILLS
 from app.ai.models import MCPCallTrace
 from app.ai.pydantic_agent import (
     AgentDeps,
@@ -122,6 +123,17 @@ def test_build_agent_registers_tools_by_default(monkeypatch: pytest.MonkeyPatch)
     assert "deploy_aircraft" in agent.tools
     assert "external_mcp_list_tools" in agent.tools
     assert "external_mcp_call" in agent.tools
+
+
+def test_build_agent_registers_all_approval_allowed_skills(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setattr(pa_mod, "resolve_model", lambda *_args, **_kwargs: object())
+    monkeypatch.setattr(pa_mod, "Agent", RecordingAgent)
+
+    agent = pa_mod.build_agent("openai:gpt-4o-mini")
+
+    assert ALLOWED_SKILLS <= set(agent.tools)
 
 
 class FakeMCPClient:

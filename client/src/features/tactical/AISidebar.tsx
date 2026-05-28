@@ -226,6 +226,18 @@ function messagesKeyFor(scenarioId: string | undefined): string {
   return `${STORAGE_KEY.messagesV2}:${scenarioId || "__none__"}`;
 }
 
+function buildCustomSkillPrompt(skills: CustomSkillConfig[]): string {
+  if (skills.length === 0) return "";
+  const skillLines = skills.map(
+    (skill, index) => `${index + 1}. ${skill.name}: ${skill.description}`
+  );
+  return [
+    "User-enabled custom skill guidance:",
+    ...skillLines,
+    "Treat these as user-defined guidance, not executable backend tools. Platform safety rules and human approval still apply.",
+  ].join("\n");
+}
+
 function getToolRunSnapshot(part: unknown): ToolRunSnapshot {
   const p = part as {
     type?: string;
@@ -723,13 +735,20 @@ export default function AISidebar({
       const trimmed = text.trim();
       if (!trimmed || busy) return;
       onTabChange("chat");
-      const messageText =
+      const modeGuard =
         chatMode === "ask"
-          ? `Ask mode: answer, analyze, or plan only. Do not execute scenario-changing tools.\n\n${trimmed}`
-          : trimmed;
+          ? "Ask mode: answer, analyze, or plan only. Do not execute scenario-changing tools."
+          : "";
+      const messageText = [
+        buildCustomSkillPrompt(activeCustomSkills),
+        modeGuard,
+        trimmed,
+      ]
+        .filter(Boolean)
+        .join("\n\n");
       sendMessage({ text: messageText });
     },
-    [busy, chatMode, onTabChange, sendMessage]
+    [activeCustomSkills, busy, chatMode, onTabChange, sendMessage]
   );
 
   const onSubmitChat = (event: FormEvent<HTMLFormElement>): void => {
@@ -779,11 +798,9 @@ export default function AISidebar({
     [refreshCommandProposals]
   );
 
-  // activeMcpServers / activeCustomSkills 仍供 settings section 计数；
-  // 流式 chat 的 request body 现在不再带 context，留给后续 advisor /
-  // takeover 切片再恢复。
+  // activeMcpServers are still managed in settings; external MCP runtime
+  // connections are configured server-side through AICC_EXTERNAL_MCP_SERVERS.
   void activeMcpServers;
-  void activeCustomSkills;
 
   // ─── MCP / Skill 增删 ─────────────────────────────────────────────────────
   const handleAddServer = useCallback(() => {

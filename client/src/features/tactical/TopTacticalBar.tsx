@@ -134,7 +134,7 @@ export default function TopTacticalBar({
           <div className="hidden sm:block">
             <div className="flex items-center gap-2">
               <span className="font-mono text-sm font-bold tracking-widest text-slate-100">
-                AICC
+                天枢
               </span>
               <span className="rounded border border-cyan-400/20 bg-cyan-400/10 px-1 py-px font-mono text-[9px] uppercase text-cyan-300">
                 指挥

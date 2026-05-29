@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from types import SimpleNamespace
 
 from sqlalchemy.dialects import postgresql
@@ -172,6 +173,30 @@ def test_runtime_state_has_scoped_unique_index_for_postgres() -> None:
         "CREATE UNIQUE INDEX ix_runtime_state_owner_scenario "
         "ON runtime_state (owner_id, scenario_id)"
     ) in index_ddls["ix_runtime_state_owner_scenario"]
+
+
+def test_runtime_state_postgres_migration_drops_legacy_owner_unique_index() -> None:
+    class FakeConn:
+        def __init__(self) -> None:
+            self.sql: list[str] = []
+
+        async def execute(self, statement) -> None:
+            self.sql.append(str(statement))
+
+    conn = FakeConn()
+
+    asyncio.run(db_session_mod._migrate_runtime_state_scope_postgres(conn))
+
+    assert (
+        "ALTER TABLE runtime_state DROP CONSTRAINT IF EXISTS ix_runtime_state_owner_id"
+        in conn.sql
+    )
+    assert "DROP INDEX IF EXISTS ix_runtime_state_owner_id" in conn.sql
+    assert (
+        "CREATE UNIQUE INDEX IF NOT EXISTS ix_runtime_state_owner_scenario "
+        "ON runtime_state (owner_id, scenario_id)"
+        in conn.sql
+    )
 
 
 def test_command_proposal_has_scenario_scope_index_for_postgres() -> None:

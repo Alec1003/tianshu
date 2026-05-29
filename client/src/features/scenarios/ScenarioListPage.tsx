@@ -504,7 +504,7 @@ export default function ScenarioListPage() {
         </nav>
 
         <div className="mt-auto text-xs leading-7 text-slate-600">
-          <div>AICC Tactical Workspace</div>
+          <div>天枢战术工作空间</div>
           <div>v0.2.0</div>
         </div>
       </aside>
@@ -707,7 +707,7 @@ function Brand({ compact = false }: { compact?: boolean }) {
       {!compact && (
         <div>
           <div className="text-sm font-semibold tracking-[0.18em] text-white">
-            AICC COMMAND
+            天枢平台
           </div>
           <div className="mt-1 text-xs tracking-[0.16em] text-slate-500">
             AI TACTICAL WORKSPACE
@@ -1220,7 +1220,7 @@ function DataAssetWorkspace() {
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = url;
-    anchor.download = `aicc-unit-assets-${new Date()
+    anchor.download = `tianshu-unit-assets-${new Date()
       .toISOString()
       .slice(0, 10)}.json`;
     document.body.appendChild(anchor);
@@ -1607,7 +1607,7 @@ function AddUnitAssetDialog({
         type: form.type,
         query,
         context:
-          "Generate editable AICC unit asset form values for a simulation database.",
+          "Generate editable 天枢平台 unit asset form values for a simulation database.",
       });
       setForm((prev) => ({
         ...prev,

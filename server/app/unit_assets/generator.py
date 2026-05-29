@@ -294,7 +294,7 @@ def _unit_asset_json_schema(asset_type: UnitAssetType) -> dict[str, Any]:
 
 def _unit_asset_prompt(asset_type: UnitAssetType, query: str, context: str) -> str:
     return f"""
-Generate a simulator unit asset for AICC.
+Generate a simulator unit asset for 天枢平台.
 
 Requested type: {asset_type}
 User query: {query}
@@ -449,7 +449,7 @@ def _responses_json(
         "text": {
             "format": {
                 "type": "json_schema",
-                "name": "aicc_unit_asset",
+                "name": "tianshu_unit_asset",
                 "strict": True,
                 "schema": _unit_asset_json_schema(asset_type),
             }

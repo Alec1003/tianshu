@@ -165,7 +165,7 @@ const DEFAULT_MCP_SERVERS: MCPServerConfig[] = [
       typeof crypto !== "undefined" && "randomUUID" in crypto
         ? crypto.randomUUID()
         : `mcp-${Date.now()}`,
-    name: "AICC MCP",
+    name: "天枢 MCP",
     endpoint: "stdio://local-aicc-mcp",
     transport: "stdio",
     enabled: true,
@@ -953,7 +953,7 @@ export default function AISidebar({
                   AI Copilot
                 </div>
                 <div className="flex items-center gap-1.5 text-sm font-semibold text-slate-100 leading-tight">
-                  AICC 助手
+                  天枢助手
                   {scenarioId && (
                     <span
                       className="rounded bg-slate-800/50 px-1.5 py-0.5 font-mono text-[9px] font-normal tracking-wider text-slate-400"

@@ -1,16 +1,16 @@
-# AICC Embedded Backend
+# 天枢平台 Embedded Backend
 
 ## Design Summary
 - Single FastAPI process.
 - No extra OpenClaw gateway process and no extra OpenClaw-only port.
-- AICC native simulation functions are wrapped as Skills and called in-process.
-- External MCP support is client-only: AICC connects to operator-configured MCP
-  servers and lets the LLM call their tools, but domain tools live outside AICC.
+- 天枢平台 native simulation functions are wrapped as Skills and called in-process.
+- External MCP support is client-only: 天枢平台 connects to operator-configured MCP
+  servers and lets the LLM call their tools, but domain tools live outside 天枢平台.
 
 ## Directory
 - `app/main.py`: FastAPI app entry.
 - `app/api/ai.py`: `/api/ai/command` API.
-- `app/ai/agent.py`: AICC Commander agent (NL parsing + skill dispatch).
+- `app/ai/agent.py`: 天枢平台 Commander agent (NL parsing + skill dispatch).
 - `app/ai/openclaw_sdk_adapter.py`: Embedded OpenClaw SDK adapter seam (in-process).
 - `app/ai/skill_registry.py`: Skill definitions and registration.
 - `app/ai/mcp_client.py`: external MCP client for stdio / Streamable HTTP servers.
@@ -75,9 +75,9 @@ $env:AICC_EXTERNAL_MCP_SERVERS='[
 ```
 
 
-## AICC MCP Server (Sprint 1 / P0)
+## 天枢平台 MCP Server (Sprint 1 / P0)
 
-把 AICC 的想定（scenarios）+ 单位 + 威胁 + AAR 通过标准 [Model Context
+把天枢平台的想定（scenarios）+ 单位 + 威胁 + AAR 通过标准 [Model Context
 Protocol](https://modelcontextprotocol.io) 暴露给任意 MCP 客户端
 （Claude Desktop、Cursor、自家 agent runtime、hermes-agent 等）。
 
@@ -150,7 +150,7 @@ stdout 是协议通道（不要 print），日志走 stderr。
 ```json
 {
   "mcpServers": {
-    "aicc": {
+    "tianshu": {
       "command": "C:\\Users\\11631\\Desktop\\AICC-master\\.python312\\python.exe",
       "args": ["-m", "app.mcp"],
       "cwd": "C:\\Users\\11631\\Desktop\\AICC-master\\server",
@@ -164,7 +164,7 @@ stdout 是协议通道（不要 print），日志走 stderr。
 }
 ```
 
-重启 Claude Desktop 后会在工具栏看到 `aicc`，可以让模型：
+重启 Claude Desktop 后会在工具栏看到 `tianshu`，可以让模型：
 
 - 列出我所有想定
 - 读 `tpl-blank_scenario` 的 sides 列表
@@ -242,7 +242,7 @@ HTTP 模式核心特性：
 ```json
 {
   "mcpServers": {
-    "aicc-http": {
+    "tianshu-http": {
       "url": "http://localhost:8000/api/mcp/",
       "headers": {
         "Authorization": "Bearer <jwt>"

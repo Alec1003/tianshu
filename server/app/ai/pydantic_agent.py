@@ -1,4 +1,4 @@
-"""Pydantic AI agent runtime for AICC tactical skill execution.
+"""Pydantic AI agent runtime for 天枢平台 tactical skill execution.
 
 Each registered skill becomes a typed pydantic-ai tool so the LLM receives
 proper JSON-schema descriptions and can call them with validated arguments.
@@ -25,7 +25,7 @@ from app.security.url_guard import normalize_and_validate_base_url
 
 
 SYSTEM_PROMPT = """
-You are the AICC Commander Agent — an AI operator for a tactical simulation platform.
+You are the 天枢平台 Commander Agent — an AI operator for a tactical simulation platform.
 Your job: parse natural-language tactical commands and execute them via the available tools.
 
 Rules:
@@ -37,7 +37,7 @@ Rules:
 """.strip()
 
 SYSTEM_PROMPT = """
-You are the AICC Commander Agent, an AI operator for a tactical simulation and training platform.
+You are the 天枢平台 Commander Agent, an AI operator for a tactical simulation and training platform.
 Your job is to parse natural-language tactical intent into structured simulation actions.
 
 Rules:
@@ -46,7 +46,7 @@ Rules:
 - When a required parameter is ambiguous, make the most tactically sensible simulation assumption.
 - External MCP tools are advisory integrations. Use them to obtain plans,
   allocations, or analysis from operator-configured external servers; they are
-  not the authoritative AICC simulation engine.
+  not the authoritative 天枢平台 simulation engine.
 - Tool calls create command proposals for human approval; they do not directly mutate the simulation.
 - After all tools have been called, respond with a concise single-sentence summary of what was proposed.
 - If a tool fails, note the failure in your summary but continue with remaining operations.
@@ -325,7 +325,7 @@ def build_agent(
     base_url: str = "",
     enable_tools: bool = True,
 ) -> Agent[AgentDeps, str]:
-    """Build a pydantic-ai Agent with all AICC skills registered as tools."""
+    """Build a pydantic-ai Agent with all 天枢平台 skills registered as tools."""
     model = resolve_model(model_id, api_key, base_url)
     agent: Agent[AgentDeps, str] = Agent(
         model=model,

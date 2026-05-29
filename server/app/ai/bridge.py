@@ -25,7 +25,7 @@ DEFAULT_SCENARIO_PATH = ROOT_DIR / "client" / "src" / "scenarios" / "SCS.json"
 
 
 class AICCOpenClawBridge:
-    """Unified bridge for AICC agent, skill registry, and external MCP client."""
+    """Unified bridge for 天枢平台 agent, skill registry, and external MCP client."""
 
     def __init__(
         self,

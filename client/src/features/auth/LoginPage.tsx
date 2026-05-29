@@ -152,7 +152,7 @@ export default function LoginPage() {
                 </h1>
 
                 <p className="mt-5 max-w-[620px] text-base leading-7 text-slate-400">
-                  AICC 将场景、模型与推演流程连接成一个克制、高效、可协作的 AI
+                  天枢平台将场景、模型与推演流程连接成一个克制、高效、可协作的 AI
                   平台。
                 </p>
               </motion.div>
@@ -212,7 +212,7 @@ export default function LoginPage() {
                         {isRegister ? "创建访问身份" : "欢迎回来"}
                       </p>
                       <h2 className="mt-2 text-2xl font-semibold tracking-normal text-white">
-                        {isRegister ? "开始使用 AICC" : "登录 AICC AI 平台"}
+                        {isRegister ? "开始使用天枢平台" : "登录天枢平台"}
                       </h2>
                       <p className="mt-3 text-sm leading-6 text-slate-400">
                         {isRegister
@@ -391,7 +391,7 @@ function BrandMark() {
       </div>
       <div>
         <div className="text-sm font-semibold tracking-[0.34em] text-white">
-          AICC
+          天枢
         </div>
         <div className="mt-1 text-xs tracking-[0.18em] text-slate-500">
           AI PLATFORM

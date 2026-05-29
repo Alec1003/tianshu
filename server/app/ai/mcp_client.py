@@ -23,7 +23,7 @@ SUPPORTED_TRANSPORTS = {"stdio", "streamable_http"}
 class MCPServerConfig:
     """Operator-managed external MCP server config.
 
-    AICC intentionally does not define weapon-allocation, path-planning, or
+    天枢平台 intentionally does not define weapon-allocation, path-planning, or
     other domain tools here. Those tools live in external MCP servers; this
     client only connects, lists, and calls them for the LLM agent.
     """
@@ -47,7 +47,7 @@ class MCPServerConfig:
 
 
 class MCPClientSkeleton:
-    """Backwards-compatible external MCP client used by AICC's LLM agent."""
+    """Backwards-compatible external MCP client used by 天枢平台's LLM agent."""
 
     def __init__(self) -> None:
         self._servers: dict[str, MCPServerConfig] = {}

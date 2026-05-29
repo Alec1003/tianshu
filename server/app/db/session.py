@@ -193,6 +193,10 @@ async def _migrate_runtime_state_scope_postgres(conn) -> None:
         text("ALTER TABLE runtime_state DROP CONSTRAINT IF EXISTS runtime_state_owner_id_key")
     )
     await conn.execute(
+        text("ALTER TABLE runtime_state DROP CONSTRAINT IF EXISTS ix_runtime_state_owner_id")
+    )
+    await conn.execute(text("DROP INDEX IF EXISTS ix_runtime_state_owner_id"))
+    await conn.execute(
         text(
             "CREATE UNIQUE INDEX IF NOT EXISTS ix_runtime_state_owner_scenario "
             "ON runtime_state (owner_id, scenario_id)"

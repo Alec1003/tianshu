@@ -102,7 +102,7 @@ const STORAGE_KEY = {
 const DEFAULT_MCP_SERVERS: MCPServerConfig[] = [
   {
     id: crypto.randomUUID(),
-    name: "AICC MCP Skeleton",
+    name: "天枢 MCP",
     endpoint: "stdio://local-aicc-mcp",
     transport: "stdio",
     enabled: true,
@@ -511,7 +511,7 @@ export default function OpenClawAssistantPanel({
     return (
       <div className="openclaw-panel-body">
         <section className="openclaw-hero">
-          <h4>AICC Command Assistant</h4>
+          <h4>天枢指挥助手</h4>
           <p>
             Use natural language to invoke OpenClaw skills for simulation, unit,
             script and situation control.
@@ -931,7 +931,7 @@ export default function OpenClawAssistantPanel({
           <header className="openclaw-panel-header">
             <div className="openclaw-panel-title">
               <h3>OpenClaw</h3>
-              <span>AICC Command UI</span>
+              <span>天枢指挥界面</span>
             </div>
             <div className="openclaw-panel-actions">
               <button type="button" onClick={() => setActiveTab("chat")}>

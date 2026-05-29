@@ -26,7 +26,7 @@ class RegisteredSkill:
 
 
 class AICCSkillRegistry:
-    """Skill registry for mapping AI tool calls to native AICC runtime APIs."""
+    """Skill registry for mapping AI tool calls to native 天枢平台 runtime APIs."""
 
     def __init__(self, runtime: AICCRuntime) -> None:
         self.runtime = runtime

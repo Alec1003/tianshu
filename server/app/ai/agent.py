@@ -30,10 +30,10 @@ class PlannedSkillCall:
 
 
 class AICCCommanderAgent:
-    """AICC 指挥智能体（OpenClaw 嵌入式适配层）。"""
+    """天枢平台指挥智能体（OpenClaw 嵌入式适配层）。"""
 
     SYSTEM_PROMPT = """
-你是 AICC 指挥智能体。你的任务：
+你是天枢平台指挥智能体。你的任务：
 1) 解析自然语言作战控制指令
 2) 识别意图并提取参数
 3) 映射到已注册 Skill
@@ -522,7 +522,7 @@ class AICCCommanderAgent:
     def _build_no_skill_message(self, command: str) -> str:
         if NON_ACTION_CHAT_RE.match(command.strip()):
             return (
-                "I can execute AICC control skills. Try one of these commands:\n"
+                "I can execute 天枢平台 control skills. Try one of these commands:\n"
                 "1) start simulation\n"
                 "2) step simulation 3 steps\n"
                 "3) deploy BLUE aircraft F-16 at 22.1 121.5\n"

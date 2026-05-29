@@ -132,7 +132,7 @@ function createAiccGameFromJson(scenarioJson: object | null | undefined): Game {
   const now = Math.floor(Date.now() / 1000);
   const currentScenario = new Scenario({
     id: randomUUID(),
-    name: "AICC Tactical Simulation",
+    name: "天枢战术推演",
     startTime: now,
     currentTime: now,
     duration: 14400,
@@ -509,7 +509,7 @@ export default function AITacticalCommandPlatform({
         runtimeVisibilityRef.current = null;
       } catch (err) {
         console.error("[AICC] loadScenario failed:", err);
-        window.alert("场景加载失败：文件可能不是合法的 AICC 场景。");
+        window.alert("场景加载失败：文件可能不是合法的天枢平台场景。");
         return;
       }
       // Remember the (cloned) source so 重置 can re-apply the same scenario
@@ -637,10 +637,10 @@ export default function AITacticalCommandPlatform({
       const url = URL.createObjectURL(blob);
       const ts = new Date().toISOString().replace(/[:.]/g, "_");
       const safeName =
-        (game.currentScenario.name || "aicc_scenario")
+        (game.currentScenario.name || "tianshu_scenario")
           .trim()
           .replace(/[^A-Za-z0-9_-]+/g, "_")
-          .slice(0, 60) || "aicc_scenario";
+          .slice(0, 60) || "tianshu_scenario";
       const a = document.createElement("a");
       a.href = url;
       a.download = `${safeName}_${ts}.json`;

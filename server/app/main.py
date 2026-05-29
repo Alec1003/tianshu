@@ -80,7 +80,7 @@ def create_app() -> FastAPI:
     settings = get_settings()
     validate_production_settings(settings)
     app = FastAPI(
-        title="AICC Tactical Backend",
+        title="天枢平台后端",
         version="0.2.0",
         description=(
             "FastAPI backend: AI skill bridge + user auth + scenario "

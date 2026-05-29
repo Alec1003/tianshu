@@ -1,6 +1,6 @@
-# AICC 大模型指挥控制平台
+# 天枢平台
 
-AICC 是一个面向作战想定推演、态势显示和大模型辅助指挥的 Web 平台。当前主入口是 `http://localhost:3000/`，前端以 Cesium 地图为核心承载想定场景，后端提供嵌入式 AICC 风格的 AI 指令执行能力。
+天枢平台是一个面向作战想定推演、态势显示和大模型辅助指挥的 Web 平台。当前主入口是 `http://localhost:3000/`，前端以 Cesium 地图为核心承载想定场景，后端提供嵌入式 AI 指令执行能力。
 
 本 README 以当前仓库代码为准，已移除旧平台官网、Discord 和过期本地路径说明。
 
@@ -21,7 +21,7 @@ AICC 是一个面向作战想定推演、态势显示和大模型辅助指挥的
 | --- | --- |
 | 前端 | React 18、Vite 6、TypeScript、Cesium、MUI、i18next、Vitest |
 | 后端 | Python 3.12、FastAPI、Uvicorn、Pydantic、Gymnasium |
-| AI/指挥 | AICC command bridge、AICC runtime skill registry |
+| AI/指挥 | 天枢平台 command bridge、runtime skill registry |
 | 部署 | Docker Compose、前端端口 `3000`、后端端口 `8000` |
 
 ## 快速启动
@@ -129,7 +129,7 @@ FastAPI 后端默认监听 `8000`：
 ├─ server/                  # FastAPI AI 后端
 │  ├─ app/ai/               # AI bridge、skill registry、模型检查
 │  ├─ app/api/              # HTTP API 路由
-│  └─ app/aicc_runtime/       # AICC runtime 适配层（内部兼容路径）
+│  └─ app/aicc_runtime/       # 天枢平台 runtime 适配层（内部兼容路径）
 ├─ gym/                     # Python/Gym 仿真环境
 ├─ docs/                    # 项目文档
 ├─ docker-compose.yml       # 本地容器编排

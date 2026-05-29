@@ -170,7 +170,7 @@ const panelMeta: Record<
   assets: {
     eyebrow: "Assets",
     title: "作战单位",
-    description: "AICC 场景对象和可见单位统计",
+    description: "天枢平台场景对象和可见单位统计",
   },
 };
 
@@ -667,7 +667,7 @@ function PlacementFloatingMenu({
           </div>
           <div className="min-w-0">
             <div className="text-[10px] uppercase tracking-[0.24em] text-cyan-300/70">
-              AICC {meta.eyebrow}
+              天枢 {meta.eyebrow}
             </div>
             <div className="mt-0.5 truncate text-sm font-semibold text-slate-100">
               {meta.title}
@@ -1751,7 +1751,7 @@ export default function SimulationSidebar({
     >
       <div className="mb-4 px-1">
         <div className="text-xs uppercase tracking-[0.26em] text-cyan-300/70">
-          AICC {meta.eyebrow}
+          天枢 {meta.eyebrow}
         </div>
         <div className="mt-1.5 text-xl font-semibold text-slate-100">
           {meta.title}

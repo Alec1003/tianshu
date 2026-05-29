@@ -217,7 +217,7 @@ async def mcp_lifespan(server: FastMCP) -> AsyncIterator[McpAppContext]:  # noqa
 
 
 mcp = FastMCP(
-    name="AICC Tactical",
+    name="天枢平台",
     lifespan=mcp_lifespan,
     json_response=True,
     # Streamable HTTP gets mounted under FastAPI's ``/api/mcp`` prefix; we

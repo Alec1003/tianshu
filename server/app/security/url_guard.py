@@ -22,6 +22,7 @@ _TRUSTED_PUBLIC_HOSTS = {
 _BLOCKED_IPS = {
     ipaddress.ip_address("169.254.169.254"),
     ipaddress.ip_address("100.100.100.200"),
+    ipaddress.ip_address("fd00:ec2::254"),
 }
 _BLOCKED_SUFFIXES = (
     ".localhost",
@@ -100,6 +101,8 @@ def _validate_ip(
 ) -> None:
     if address in _BLOCKED_IPS:
         raise UnsafeBaseUrlError("base URL points to a metadata service")
+    if address.is_link_local or address.is_multicast or address.is_unspecified:
+        raise UnsafeBaseUrlError("base URL points to a private or non-routable network")
     if allow_private_network and (address.is_loopback or address.is_private):
         return
     if not address.is_global:

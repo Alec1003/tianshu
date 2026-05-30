@@ -8,7 +8,6 @@ import {
   createModelProfile,
   createModelProfileId,
   getModelProviderDefinition,
-  getProviderModels,
   listModelProviderDefinitions,
   modelProfileLabel,
   normalizeProviderConfig,
@@ -47,6 +46,7 @@ interface ModelConfigStoreState {
     providerId: string,
     patch: Partial<ProviderConfig>
   ) => void;
+  hydrateProviderConfigs: (configs: Partial<ProviderConfig>[]) => void;
   setProviderEnabled: (providerId: string, enabled: boolean) => void;
   markProviderChecked: (providerId: string, verified: boolean) => void;
   addCustomModel: (providerId: string, modelId: string) => void;
@@ -198,17 +198,49 @@ export const useModelConfigStore = create<ModelConfigStoreState>()(
           const current =
             state.providerConfigs[providerId] ??
             normalizeProviderConfig(providerId, {});
+          const credentialsChanged =
+            (patch.apiKey !== undefined && patch.apiKey !== current.apiKey) ||
+            (patch.baseUrl !== undefined && patch.baseUrl !== current.baseUrl);
           const providerConfigs = {
             ...state.providerConfigs,
             [providerId]: normalizeProviderConfig(providerId, {
               ...current,
               ...patch,
               verified:
-                patch.apiKey !== undefined || patch.baseUrl !== undefined
-                  ? false
-                  : (patch.verified ?? current.verified),
+                patch.verified ??
+                (credentialsChanged ? false : current.verified),
             }),
           };
+          const activeProfile = state.modelProfiles.find(
+            (profile) => profile.id === state.activeModelProfileId
+          );
+          const activeModelConfig = activeConfigFromProfile(
+            activeProfile,
+            providerConfigs
+          );
+          const next = { providerConfigs, activeModelConfig };
+          syncLegacy({ ...state, ...next });
+          return next;
+        });
+      },
+
+      hydrateProviderConfigs: (configs) => {
+        set((state) => {
+          const providerConfigs = { ...state.providerConfigs };
+          for (const config of configs) {
+            if (!config.providerId) continue;
+            const current =
+              providerConfigs[config.providerId] ??
+              normalizeProviderConfig(config.providerId, {});
+            providerConfigs[config.providerId] = normalizeProviderConfig(
+              config.providerId,
+              {
+                ...current,
+                ...config,
+                apiKey: "",
+              }
+            );
+          }
           const activeProfile = state.modelProfiles.find(
             (profile) => profile.id === state.activeModelProfileId
           );
@@ -240,9 +272,7 @@ export const useModelConfigStore = create<ModelConfigStoreState>()(
           const current =
             state.providerConfigs[providerId] ??
             normalizeProviderConfig(providerId, {});
-          if (
-            getProviderModels(providerId, current).some((m) => m.id === trimmed)
-          ) {
+          if (current.customModels.some((model) => model.id === trimmed)) {
             return {};
           }
           return {
@@ -252,7 +282,13 @@ export const useModelConfigStore = create<ModelConfigStoreState>()(
                 ...current,
                 customModels: [
                   ...current.customModels,
-                  { id: trimmed, group: "Custom", recommended: true },
+                  {
+                    id: trimmed,
+                    group: "Custom",
+                    recommended: true,
+                    checkStatus: "untested",
+                    checkMessage: "",
+                  },
                 ],
               },
             },
@@ -505,7 +541,7 @@ export const useModelConfigStore = create<ModelConfigStoreState>()(
           );
           if (!enabled) return [];
           if (!state.showUnverifiedModels && !verified) return [];
-          return getProviderModels(definition.id, config).map((model) => {
+          return (config?.customModels ?? []).map((model) => {
             const profile = state.modelProfiles.find(
               (item) =>
                 item.providerId === definition.id && item.model === model.id

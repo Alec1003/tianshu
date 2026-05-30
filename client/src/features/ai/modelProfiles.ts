@@ -11,6 +11,9 @@ export interface ProviderModel {
   group?: string;
   contextWindow?: number;
   recommended?: boolean;
+  checkStatus?: "untested" | "checking" | "ok" | "partial" | "error";
+  checkMessage?: string;
+  checkedAt?: string;
 }
 
 export interface ModelProviderDefinition {
@@ -31,6 +34,7 @@ export interface ProviderConfig {
   providerId: string;
   displayName: string;
   apiKey: string;
+  apiKeySet: boolean;
   baseUrl: string;
   enabled: boolean;
   verified: boolean;
@@ -78,6 +82,7 @@ export const providerConfigSchema = z.object({
   providerId: z.string().trim().min(1),
   displayName: z.string().trim().min(1),
   apiKey: z.string().default(""),
+  apiKeySet: z.boolean().default(false),
   baseUrl: z.string().default(""),
   enabled: z.boolean().default(false),
   verified: z.boolean().default(false),
@@ -90,6 +95,11 @@ export const providerConfigSchema = z.object({
         group: z.string().optional(),
         contextWindow: z.number().optional(),
         recommended: z.boolean().optional(),
+        checkStatus: z
+          .enum(["untested", "checking", "ok", "partial", "error"])
+          .optional(),
+        checkMessage: z.string().optional(),
+        checkedAt: z.string().optional(),
       })
     )
     .default([]),
@@ -385,6 +395,7 @@ export function createProviderConfig(
     providerId: definition.id,
     displayName: definition.name,
     apiKey: "",
+    apiKeySet: false,
     baseUrl: definition.defaultBaseUrl,
     enabled: definition.enabledByDefault,
     verified: false,
@@ -627,6 +638,7 @@ export function providerConfigFromLegacyModel(
     providerId,
     baseUrl: config.baseUrl,
     apiKey: "",
+    apiKeySet: false,
     enabled: true,
   };
 }

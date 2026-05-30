@@ -1,4 +1,4 @@
-import {
+﻿import {
   useCallback,
   useContext,
   useEffect,
@@ -16,6 +16,7 @@ import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import {
   Activity,
+  ArrowRightLeft,
   Bot,
   Box,
   BrainCircuit,
@@ -27,6 +28,7 @@ import {
   Eye,
   FileInput,
   FolderKanban,
+  GitBranch,
   LayoutGrid,
   List as ListIcon,
   LogOut,
@@ -47,6 +49,7 @@ import {
 } from "lucide-react";
 
 import { ApiError } from "@/api/client";
+import BrandLogo from "@/components/brand/BrandLogo";
 import {
   createScenario,
   deleteScenario,
@@ -71,6 +74,7 @@ import type {
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useAuth } from "@/features/auth/useAuth";
+import ScenarioCompareDialog from "@/features/scenarios/ScenarioCompareDialog";
 import Dba from "@/game/db/Dba";
 import type { IAircraftModel } from "@/game/db/models/Aircraft";
 import type { IAirbaseModel } from "@/game/db/models/Airbase";
@@ -367,6 +371,8 @@ export default function ScenarioListPage() {
   const [view, setView] = useState<ViewMode>("grid");
   const [activeModule, setActiveModule] = useState<WorkspaceModule>("projects");
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [compareOpen, setCompareOpen] = useState(false);
+  const [compareIds, setCompareIds] = useState<string[]>([]);
   const [accountOpen, setAccountOpen] = useState(false);
   const accountRef = useRef<HTMLDivElement | null>(null);
 
@@ -397,6 +403,14 @@ export default function ScenarioListPage() {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  useEffect(() => {
+    setCompareIds((prev) =>
+      prev.filter((id) =>
+        items.some((item) => item.id === id && !item.is_template)
+      )
+    );
+  }, [items]);
 
   const myScenarios = useMemo(
     () => items.filter((item) => !item.is_template),
@@ -434,6 +448,7 @@ export default function ScenarioListPage() {
     try {
       await deleteScenario(id);
       setItems((prev) => prev.filter((item) => item.id !== id));
+      setCompareIds((prev) => prev.filter((itemId) => itemId !== id));
     } catch (err) {
       window.alert(err instanceof ApiError ? err.message : "删除失败");
     }
@@ -442,10 +457,22 @@ export default function ScenarioListPage() {
   const handleDuplicate = async (item: ScenarioListItem) => {
     try {
       const detail = await getScenario(item.id);
+      const branchDepth = (item.branch_meta?.branch_depth ?? 0) + 1;
+      const payload = JSON.parse(JSON.stringify(detail.data)) as Record<
+        string,
+        unknown
+      >;
+      const currentScenario = payload.currentScenario as
+        | Record<string, unknown>
+        | undefined;
+      if (currentScenario) {
+        currentScenario.id = crypto.randomUUID();
+        currentScenario.name = `${item.name} / 分支 ${branchDepth}`;
+      }
       const created = await createScenario({
-        name: `${item.name} 副本`,
+        name: `${item.name} / 分支 ${branchDepth}`,
         description: item.description,
-        data: detail.data,
+        data: payload,
         status: "draft",
       });
       navigate(`/play/${created.id}`);
@@ -453,6 +480,19 @@ export default function ScenarioListPage() {
       window.alert(err instanceof ApiError ? err.message : "复制失败");
     }
   };
+
+  const handleToggleCompare = useCallback((item: ScenarioListItem) => {
+    setCompareIds((prev) => {
+      if (prev.includes(item.id)) {
+        return prev.filter((id) => id !== item.id);
+      }
+      if (prev.length >= 4) {
+        window.alert("最多同时对比 4 个推演项目");
+        return prev;
+      }
+      return [...prev, item.id];
+    });
+  }, []);
 
   return (
     <div className="dark relative min-h-screen overflow-hidden bg-[#020612] text-slate-100">
@@ -550,6 +590,17 @@ export default function ScenarioListPage() {
 
               {isProjectWorkspace && (
                 <div className="flex flex-wrap gap-3">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="h-12 rounded-xl border border-cyan-200/15 bg-slate-950/45 px-5 text-slate-200 hover:bg-white/[0.06]"
+                    onClick={() => setCompareOpen(true)}
+                    disabled={compareIds.length < 2}
+                  >
+                    <ArrowRightLeft className="size-4" />
+                    方案对比
+                    {compareIds.length > 0 ? ` (${compareIds.length})` : ""}
+                  </Button>
                   <Button
                     type="button"
                     className="h-12 rounded-xl border border-cyan-200/25 bg-gradient-to-r from-cyan-400 to-blue-600 px-5 text-white shadow-[0_18px_46px_rgba(14,165,233,0.28)] hover:shadow-[0_22px_56px_rgba(14,165,233,0.38)]"
@@ -651,7 +702,11 @@ export default function ScenarioListPage() {
                 items={filteredItems}
                 isTemplateSection={isTemplateWorkspace}
                 onOpen={handleOpen}
+                compareIds={compareIds}
                 onDuplicate={isTemplateWorkspace ? undefined : handleDuplicate}
+                onToggleCompare={
+                  isTemplateWorkspace ? undefined : handleToggleCompare
+                }
                 onDelete={isTemplateWorkspace ? undefined : handleDelete}
               />
             ) : (
@@ -659,6 +714,7 @@ export default function ScenarioListPage() {
                 items={filteredItems}
                 isTemplateSection={isTemplateWorkspace}
                 onOpen={handleOpen}
+                compareIds={compareIds}
                 onDuplicate={isTemplateWorkspace ? undefined : handleDuplicate}
                 onDelete={isTemplateWorkspace ? undefined : handleDelete}
               />
@@ -676,6 +732,13 @@ export default function ScenarioListPage() {
           }}
         />
       )}
+
+      <ScenarioCompareDialog
+        open={compareOpen}
+        scenarioIds={compareIds}
+        onClose={() => setCompareOpen(false)}
+        onOpenScenario={(id) => navigate(`/play/${id}`)}
+      />
     </div>
   );
 }
@@ -700,10 +763,7 @@ function WorkspaceBackdrop() {
 function Brand({ compact = false }: { compact?: boolean }) {
   return (
     <div className="flex items-center gap-3">
-      <div className="relative grid size-11 place-items-center rounded-2xl border border-cyan-200/20 bg-white/[0.04] shadow-[0_0_32px_rgba(56,189,248,0.16)]">
-        <div className="absolute inset-2 rounded-xl bg-gradient-to-br from-cyan-300/25 to-blue-500/20" />
-        <BrainCircuit className="relative size-5 text-cyan-100" />
-      </div>
+      <BrandLogo frameClassName="size-11" imageClassName="scale-[1.08]" />
       {!compact && (
         <div>
           <div className="text-sm font-semibold tracking-[0.18em] text-white">
@@ -785,7 +845,9 @@ interface ProjectActions {
   items: ScenarioListItem[];
   onOpen: (id: string) => void;
   onDuplicate?: (item: ScenarioListItem) => void;
+  onToggleCompare?: (item: ScenarioListItem) => void;
   onDelete?: (id: string, name: string) => void;
+  compareIds?: string[];
   isTemplateSection?: boolean;
 }
 
@@ -793,7 +855,9 @@ function ProjectGrid({
   items,
   onOpen,
   onDuplicate,
+  onToggleCompare,
   onDelete,
+  compareIds = [],
   isTemplateSection,
 }: ProjectActions) {
   return (
@@ -804,7 +868,11 @@ function ProjectGrid({
           item={item}
           index={index}
           onOpen={() => onOpen(item.id)}
+          selectedForCompare={compareIds.includes(item.id)}
           onDuplicate={onDuplicate ? () => onDuplicate(item) : undefined}
+          onToggleCompare={
+            onToggleCompare ? () => onToggleCompare(item) : undefined
+          }
           onDelete={onDelete ? () => onDelete(item.id, item.name) : undefined}
           isTemplateSection={isTemplateSection}
         />
@@ -817,14 +885,18 @@ function ProjectCard({
   item,
   index,
   onOpen,
+  selectedForCompare,
   onDuplicate,
+  onToggleCompare,
   onDelete,
   isTemplateSection,
 }: {
   item: ScenarioListItem;
   index: number;
   onOpen: () => void;
+  selectedForCompare?: boolean;
   onDuplicate?: () => void;
+  onToggleCompare?: () => void;
   onDelete?: () => void;
   isTemplateSection?: boolean;
 }) {
@@ -846,7 +918,14 @@ function ProjectCard({
   }, [menuOpen]);
 
   return (
-    <Card className="group relative overflow-hidden rounded-2xl border-cyan-200/10 bg-[#06111f]/78 shadow-[0_18px_70px_rgba(0,0,0,0.28)] transition-all duration-300 hover:-translate-y-1 hover:border-cyan-200/30 hover:shadow-[0_26px_80px_rgba(14,165,233,0.16)]">
+    <Card
+      className={cn(
+        "group relative overflow-hidden rounded-2xl bg-[#06111f]/78 shadow-[0_18px_70px_rgba(0,0,0,0.28)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_26px_80px_rgba(14,165,233,0.16)]",
+        selectedForCompare
+          ? "border-cyan-200/35 shadow-[0_0_0_1px_rgba(125,211,252,0.12)]"
+          : "border-cyan-200/10 hover:border-cyan-200/30"
+      )}
+    >
       <div
         className="pointer-events-none absolute -inset-px opacity-0 blur-xl transition-opacity duration-300 group-hover:opacity-100"
         style={{ backgroundColor: visualMeta.glow }}
@@ -878,6 +957,12 @@ function ProjectCard({
         <div className="text-base font-semibold text-white line-clamp-1">
           {item.name}
         </div>
+        {item.branch_meta && (
+          <div className="mt-2 inline-flex items-center gap-1 rounded-full border border-cyan-200/15 bg-cyan-200/[0.06] px-2 py-1 text-[11px] text-cyan-100">
+            <GitBranch className="size-3" />
+            {item.branch_meta.branch_label}
+          </div>
+        )}
         <p className="mt-1 min-h-[2.5rem] text-sm leading-5 text-slate-500 line-clamp-2">
           {item.description ||
             "暂无描述，可进入项目继续配置目标、任务与推演参数。"}
@@ -925,6 +1010,8 @@ function ProjectCard({
               <ProjectMenu
                 onOpen={onOpen}
                 onDuplicate={onDuplicate}
+                onToggleCompare={onToggleCompare}
+                selectedForCompare={selectedForCompare}
                 onDelete={onDelete}
                 close={() => setMenuOpen(false)}
               />
@@ -939,11 +1026,15 @@ function ProjectCard({
 function ProjectMenu({
   onOpen,
   onDuplicate,
+  onToggleCompare,
+  selectedForCompare,
   onDelete,
   close,
 }: {
   onOpen: () => void;
   onDuplicate?: () => void;
+  onToggleCompare?: () => void;
+  selectedForCompare?: boolean;
   onDelete?: () => void;
   close: () => void;
 }) {
@@ -971,6 +1062,19 @@ function ProjectMenu({
         >
           <CopyIcon className="size-3.5 text-slate-400" />
           复制项目
+        </button>
+      )}
+      {onToggleCompare && (
+        <button
+          type="button"
+          onClick={() => {
+            close();
+            onToggleCompare();
+          }}
+          className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-slate-200 hover:bg-white/[0.05]"
+        >
+          <ArrowRightLeft className="size-3.5 text-cyan-200" />
+          {selectedForCompare ? "移出对比" : "加入对比"}
         </button>
       )}
       {onDelete && (
@@ -1048,6 +1152,7 @@ function ProjectList({
   onOpen,
   onDuplicate,
   onDelete,
+  compareIds = [],
   isTemplateSection,
 }: ProjectActions) {
   return (
@@ -1071,7 +1176,10 @@ function ProjectList({
             return (
               <tr
                 key={item.id}
-                className="border-t border-cyan-200/5 hover:bg-white/[0.03]"
+                className={cn(
+                  "border-t border-cyan-200/5 hover:bg-white/[0.03]",
+                  compareIds.includes(item.id) && "bg-cyan-300/[0.04]"
+                )}
               >
                 <td
                   className="max-w-[360px] cursor-pointer px-4 py-4"

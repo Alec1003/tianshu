@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 
 import { ApiError } from "@/api/client";
+import BrandLogo from "@/components/brand/BrandLogo";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -152,8 +153,8 @@ export default function LoginPage() {
                 </h1>
 
                 <p className="mt-5 max-w-[620px] text-base leading-7 text-slate-400">
-                  天枢平台将场景、模型与推演流程连接成一个克制、高效、可协作的 AI
-                  平台。
+                  天枢平台将场景、模型与推演流程连接成一个克制、高效、可协作的
+                  AI 平台。
                 </p>
               </motion.div>
 
@@ -385,10 +386,7 @@ function AuthBackground({ reduce }: { reduce: boolean }) {
 function BrandMark() {
   return (
     <div className="flex items-center gap-3">
-      <div className="relative grid size-11 place-items-center rounded-2xl border border-cyan-200/20 bg-white/[0.04] shadow-[0_0_32px_rgba(56,189,248,0.16)] backdrop-blur-xl">
-        <div className="absolute inset-2 rounded-xl bg-gradient-to-br from-cyan-300/25 to-blue-500/20" />
-        <Cpu className="relative size-5 text-cyan-100" strokeWidth={1.6} />
-      </div>
+      <BrandLogo frameClassName="size-11" imageClassName="scale-[1.08]" />
       <div>
         <div className="text-sm font-semibold tracking-[0.34em] text-white">
           天枢

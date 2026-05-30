@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 
 import pytest
 
+from app.aicc_runtime.models import RuntimeEvent
 from app.scenarios import service as svc
 from app.scenarios.errors import (
     ScenarioForbiddenError,
@@ -250,6 +251,113 @@ async def test_list_excludes_templates_when_flag_off(db_session, user):
 
     rows = await svc.list_scenarios(db_session, user, include_templates=False)
     assert all(not r.is_template for r in rows)
+
+
+async def test_create_branch_scenario_preserves_lineage_and_regenerates_runtime_id(
+    db_session,
+    user,
+):
+    source = await svc.create_scenario(
+        db_session,
+        user,
+        name="Base Plan",
+        description="baseline",
+        data={
+            "currentScenario": {
+                "id": "runtime-base",
+                "name": "Base Plan",
+                "sides": [],
+                "missions": [],
+                "aircraft": [],
+                "ships": [],
+                "facilities": [],
+                "airbases": [],
+            }
+        },
+    )
+
+    branch = await svc.create_branch_scenario(
+        db_session,
+        user,
+        source.id,
+        name="Base Plan / Alpha",
+    )
+
+    assert branch.id != source.id
+    assert branch.owner_id == user.id
+    assert branch.branch_meta is not None
+    assert branch.branch_meta["parent_scenario_id"] == source.id
+    assert branch.branch_meta["root_scenario_id"] == source.id
+    assert branch.branch_meta["created_from_version"] == source.version
+    assert branch.branch_meta["branch_depth"] == 1
+    assert branch.data["currentScenario"]["name"] == "Base Plan / Alpha"
+    assert branch.data["currentScenario"]["id"] != source.data["currentScenario"]["id"]
+
+
+async def test_build_scenario_compare_items_aggregates_score_timeline_and_aar(
+    db_session,
+    user,
+):
+    base = await svc.create_scenario(
+        db_session,
+        user,
+        name="Base",
+        data={
+            "currentScenario": {
+                "id": "runtime-base",
+                "name": "Base",
+                "sides": [],
+                "missions": [],
+                "aircraft": [],
+                "ships": [],
+                "facilities": [],
+                "airbases": [],
+            }
+        },
+    )
+    branch = await svc.create_branch_scenario(
+        db_session,
+        user,
+        base.id,
+        name="Base / Beta",
+    )
+    db_session.add(
+        RuntimeEvent(
+            owner_id=user.id,
+            scenario_id=base.id,
+            event_type="command.executed",
+            category="command",
+            action="deploy",
+            actor="operator",
+            summary="deploy unit",
+            payload={},
+            unit_changes=[],
+        )
+    )
+    await db_session.commit()
+    await svc.create_aar_record(
+        db_session,
+        user,
+        base.id,
+        outcome_reason="timeout",
+        winner_side_id="blue",
+        summary={"scenarioName": "Base"},
+        ended_at=datetime.now(tz=timezone.utc),
+    )
+
+    items = await svc.build_scenario_compare_items(
+        db_session,
+        user,
+        [base.id, branch.id],
+    )
+    by_id = {item.id: item for item in items}
+
+    assert set(by_id) == {base.id, branch.id}
+    assert by_id[base.id].timeline_event_count == 1
+    assert by_id[base.id].aar_count == 1
+    assert by_id[base.id].training_score.scenario_id == base.id
+    assert by_id[branch.id].branch_meta is not None
+    assert by_id[branch.id].branch_meta.parent_scenario_id == base.id
 
 
 # ---------- AAR --------------------------------------------------------------

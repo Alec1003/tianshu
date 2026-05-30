@@ -290,6 +290,7 @@ export interface AITacticalCommandPlatformProps {
   onSave?: (data: Record<string, unknown>) => Promise<void> | void;
   /** 另存为新 scenario；平台仅负责报上当前 JSON，名称/跳转由上层处理。 */
   onRequestSaveAs?: (data: Record<string, unknown>) => void;
+  onCreateBranch?: (data: Record<string, unknown>) => void;
   /** 返回想定列表。 */
   onExit?: () => void;
   /** 推演结束时异步归档 AAR。可选；失败不阻断 UI。 */
@@ -301,6 +302,7 @@ export default function AITacticalCommandPlatform({
   initialScenarioData,
   onSave,
   onRequestSaveAs,
+  onCreateBranch,
   onExit,
   onPostAar,
 }: AITacticalCommandPlatformProps = {}) {
@@ -333,7 +335,7 @@ export default function AITacticalCommandPlatform({
   const [showRanges, setShowRanges] = useState(false);
   const [mapSceneMode, setMapSceneMode] = useState<CesiumSceneModeKey>("2d");
   const [mapBaseLayer, setMapBaseLayer] =
-    useState<CesiumBaseLayerKey>("darkMatter");
+    useState<CesiumBaseLayerKey>("satellite");
   const [placement, setPlacement] = useState<CesiumPlacement | null>(null);
   const runStateRef = useRef<SimulationRunState>("idle");
   const playLoopRunning = useRef(false);
@@ -1140,6 +1142,11 @@ export default function AITacticalCommandPlatform({
     onRequestSaveAs(captureCurrentScenarioData());
   }, [onRequestSaveAs, captureCurrentScenarioData]);
 
+  const handleCreateBranchClick = useCallback(() => {
+    if (!onCreateBranch) return;
+    onCreateBranch(captureCurrentScenarioData());
+  }, [onCreateBranch, captureCurrentScenarioData]);
+
   const toggleTimelinePanel = useCallback(() => {
     if (!timelinePanelOpen) setAiSidebarOpen(false);
     setTimelinePanelOpen((value) => !value);
@@ -1160,27 +1167,27 @@ export default function AITacticalCommandPlatform({
 
   // 是否需要渲染顶部 mini bar（路由模式才显示；standalone 兼容老入口）。
   const showRouterChrome = Boolean(
-    scenarioMeta && (onSave || onRequestSaveAs || onExit)
+    scenarioMeta && (onSave || onRequestSaveAs || onCreateBranch || onExit)
   );
 
   return (
     <div
       className="dark h-screen overflow-hidden bg-tactical-bg text-tactical-text lg:grid"
       style={{
-        gridTemplateColumns: (() => {
-          const railCol = `64px`;
-          const leftCol = sidebarCollapsed ? null : sidebarTrack;
-          const rightCol = aiSidebarOpen ? aiSidebarTrack : null;
-          return [railCol, leftCol, `minmax(0,1fr)`, rightCol]
-            .filter(Boolean)
-            .join(" ");
-        })(),
+        gridTemplateColumns: [
+          "64px",
+          sidebarCollapsed ? "0px" : sidebarTrack,
+          "minmax(0,1fr)",
+          aiSidebarOpen ? aiSidebarTrack : "0px",
+        ].join(" "),
+        gridTemplateRows: "3.5rem minmax(0,1fr)",
       }}
     >
       <motion.nav
         animate={{ opacity: 1 }}
         className="hidden border-r border-cyan-300/10 bg-[#030912]/95 px-2 py-5 backdrop-blur-2xl lg:flex lg:flex-col"
         initial={{ opacity: 0 }}
+        style={{ gridColumn: "1 / 2", gridRow: "1 / 3" }}
       >
         <div className="mb-7 flex justify-center">
           <div className="grid size-11 place-items-center rounded-2xl border border-cyan-300/18 bg-cyan-300/8 text-cyan-100 shadow-hud-cyan">
@@ -1257,6 +1264,7 @@ export default function AITacticalCommandPlatform({
         <div
           className="relative hidden h-full min-h-0 min-w-0 lg:flex"
           ref={sidebarRef}
+          style={{ gridColumn: "2 / 3", gridRow: "1 / 3" }}
         >
           <SimulationSidebar
             activePanel={activeRailItem}
@@ -1301,7 +1309,10 @@ export default function AITacticalCommandPlatform({
         </div>
       )}
 
-      <main className="relative flex min-h-0 min-w-0 flex-col overflow-hidden bg-[#050914]">
+      <div
+        className="relative z-40 min-w-0"
+        style={{ gridColumn: "3 / 5", gridRow: "1 / 2" }}
+      >
         <TopTacticalBar
           snapshot={snapshot}
           aiSidebarOpen={aiSidebarOpen}
@@ -1314,6 +1325,9 @@ export default function AITacticalCommandPlatform({
           onRequestSaveAs={
             onRequestSaveAs ? () => handleSaveAsClick() : undefined
           }
+          onCreateBranch={
+            onCreateBranch ? () => handleCreateBranchClick() : undefined
+          }
           savingState={savingState}
           timelineOpen={timelinePanelOpen}
           onToggleTimeline={toggleTimelinePanel}
@@ -1322,7 +1336,12 @@ export default function AITacticalCommandPlatform({
             setMapSceneMode((value) => (value === "3d" ? "2d" : "3d"))
           }
         />
+      </div>
 
+      <main
+        className="relative flex min-h-0 min-w-0 flex-col overflow-hidden bg-[#050914]"
+        style={{ gridColumn: "3 / 4", gridRow: "2 / 3" }}
+      >
         {/*
           地图区域：占据 main 列剩余高度。Cesium 在 embedded 模式下用
           position:absolute 填满父容器，所以这里必须 relative + 显式高度。
@@ -1390,6 +1409,8 @@ export default function AITacticalCommandPlatform({
         onMapBaseLayerChange={setMapBaseLayer}
         scenarioId={chatScenarioId}
         settingsOpen={settingsModalOpen}
+        panelClassName="shadow-[-24px_0_70px_rgba(0,0,0,0.35)]"
+        panelStyle={{ gridColumn: "4 / 5", gridRow: "2 / 3" }}
       />
 
       <TimelineReplayPanel

@@ -19,6 +19,7 @@
  * onOpenChange / onTabChange / onApplyScenario(刷新 game)。
  */
 import {
+  type CSSProperties,
   type FormEvent,
   useCallback,
   useEffect,
@@ -147,6 +148,8 @@ interface AISidebarProps {
    * 可选：未提供时降级为单一全局会话。
    */
   scenarioId?: string;
+  panelClassName?: string;
+  panelStyle?: CSSProperties;
 }
 
 const STORAGE_KEY = {
@@ -177,6 +180,31 @@ const QUICK_COMMANDS: string[] = [
   "在 22.1, 121.5 部署一架蓝方 F-16",
   "暂停推演并查看战况",
 ];
+const LEGACY_ASK_MODE_GUARD =
+  "Ask mode: answer, analyze, or plan only. Do not execute scenario-changing tools.";
+
+function stripLegacyModeGuard(text: string): string {
+  return text
+    .split(LEGACY_ASK_MODE_GUARD)
+    .join("")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function sanitizeLegacyModeGuards(messages: UIMessage[]): UIMessage[] {
+  let changed = false;
+  const sanitized = messages.map((message) => {
+    const parts = message.parts.map((part) => {
+      if (!isTextUIPart(part)) return part;
+      const nextText = stripLegacyModeGuard(part.text);
+      if (nextText === part.text) return part;
+      changed = true;
+      return { ...part, text: nextText };
+    });
+    return changed ? { ...message, parts } : message;
+  });
+  return changed ? sanitized : messages;
+}
 
 function safeLoad<T>(key: string, fallback: T): T {
   try {
@@ -348,6 +376,8 @@ export default function AISidebar({
   mapBaseLayer,
   onMapBaseLayerChange,
   scenarioId,
+  panelClassName,
+  panelStyle,
 }: AISidebarProps) {
   const navigate = useNavigate();
   const modelConfig = useModelConfigStore((state) => state.activeModelConfig);
@@ -424,6 +454,7 @@ export default function AISidebar({
   useEffect(() => {
     chatModeRef.current = chatMode;
   }, [chatMode]);
+  const lastSubmittedModeRef = useRef<AIChatMode>("command");
 
   const transport = useMemo(
     () =>
@@ -496,7 +527,9 @@ export default function AISidebar({
   useEffect(() => {
     if (!initializedRef.current) {
       initializedRef.current = true;
-      const initial = safeLoad<UIMessage[]>(messagesKeyFor(scenarioId), []);
+      const initial = sanitizeLegacyModeGuards(
+        safeLoad<UIMessage[]>(messagesKeyFor(scenarioId), [])
+      );
       if (initial.length) setMessages(initial);
       prevScenarioIdRef.current = scenarioId;
       return;
@@ -514,7 +547,9 @@ export default function AISidebar({
       }
     }
     // 切换后：读新 scenario 的历史
-    const next = safeLoad<UIMessage[]>(messagesKeyFor(scenarioId), []);
+    const next = sanitizeLegacyModeGuards(
+      safeLoad<UIMessage[]>(messagesKeyFor(scenarioId), [])
+    );
     setMessages(next);
     prevScenarioIdRef.current = scenarioId;
     // 注意：不依赖 messages，否则会无限循环；切换那一瞬间用闭包里的旧值
@@ -543,7 +578,7 @@ export default function AISidebar({
     if (!wasBusyRef.current) return;
     wasBusyRef.current = false;
     if (status !== "ready") return;
-    if (chatMode === "ask") return;
+    if (lastSubmittedModeRef.current !== "command") return;
     // 找最近一条 assistant 消息，扫它的 tool 调用决定推演意图。
     // ai-sdk v5 的 tool part 有两种形态：
     //   - 静态工具：``{ type: 'tool-<name>', ... }``（pydantic-ai @agent.tool 走这条）
@@ -599,12 +634,11 @@ export default function AISidebar({
     })();
   }, [
     busy,
-    status,
-    chatMode,
     messages,
     onApplyScenario,
     onResumePlay,
     refreshCommandProposals,
+    status,
   ]);
 
   // —— 设置表单局部状态 ——
@@ -735,21 +769,20 @@ export default function AISidebar({
       const trimmed = text.trim();
       if (!trimmed || busy) return;
       onTabChange("chat");
-      const modeGuard =
-        chatMode === "ask"
-          ? "Ask mode: answer, analyze, or plan only. Do not execute scenario-changing tools."
-          : "";
-      const messageText = [
-        buildCustomSkillPrompt(activeCustomSkills),
-        modeGuard,
-        trimmed,
-      ]
+      const submittedMode = chatModeRef.current;
+      lastSubmittedModeRef.current = submittedMode;
+      const messageText = [buildCustomSkillPrompt(activeCustomSkills), trimmed]
         .filter(Boolean)
         .join("\n\n");
       sendMessage({ text: messageText });
     },
-    [activeCustomSkills, busy, chatMode, onTabChange, sendMessage]
+    [activeCustomSkills, busy, onTabChange, sendMessage]
   );
+
+  const handleChatModeChange = useCallback((mode: AIChatMode): void => {
+    chatModeRef.current = mode;
+    setChatMode(mode);
+  }, []);
 
   const onSubmitChat = (event: FormEvent<HTMLFormElement>): void => {
     event.preventDefault();
@@ -939,8 +972,10 @@ export default function AISidebar({
         <aside
           className={cn(
             "relative hidden h-full min-h-0 min-w-0 flex-col border-l",
-            "border-slate-700/50 bg-[#0a0f18]/95 backdrop-blur-2xl lg:flex"
+            "border-slate-700/50 bg-[#0a0f18]/95 backdrop-blur-2xl lg:flex",
+            panelClassName
           )}
+          style={panelStyle}
         >
           {/* 顶部：标题 + tabs + 关闭 */}
           <header className="flex items-center justify-between gap-2 border-b border-slate-700/50 px-3 py-2.5">
@@ -1013,7 +1048,7 @@ export default function AISidebar({
                 proposalError={proposalError}
                 messages={messages}
                 onApproveProposal={(id) => void handleApproveProposal(id)}
-                onChatModeChange={setChatMode}
+                onChatModeChange={handleChatModeChange}
                 onCommandInputChange={setCommandInput}
                 onOpenModelSettings={() => navigate("/ai-models")}
                 onQuickCommand={sendChat}

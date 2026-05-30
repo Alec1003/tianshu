@@ -1279,7 +1279,25 @@ def list_skills(
 
 
 @router.post("/model/check", response_model=ModelCheckResponse)
-def check_model(payload: ModelCheckRequest) -> ModelCheckResponse:
+async def check_model(
+    payload: ModelCheckRequest,
+    session: AsyncSession = Depends(get_async_session),
+    user: User = Depends(current_active_user),
+) -> ModelCheckResponse:
+    if payload.provider and not payload.apiKey:
+        stored_api_key, stored_base_url = await resolve_stored_model_credentials(
+            session,
+            user,
+            provider_id=payload.providerId,
+            provider=payload.provider,
+            base_url=payload.baseUrl,
+        )
+        payload = payload.model_copy(
+            update={
+                "apiKey": stored_api_key,
+                "baseUrl": stored_base_url,
+            }
+        )
     return check_model_connectivity(payload)
 
 

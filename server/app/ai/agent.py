@@ -20,6 +20,14 @@ NON_ACTION_CHAT_RE = re.compile(
     flags=re.I,
 )
 QUOTED_RE = re.compile(r"[\"'“”]([^\"'“”]+)[\"'“”]")
+AIRCRAFT_MODEL_RE = re.compile(
+    r"\b(?:F|J|Su|SU|MiG|MIG|KC|E|EA|A|B|H)-?\s?\d{1,3}[A-Za-z]?\b",
+    flags=re.I,
+)
+AIRCRAFT_MODEL_ALIASES = {
+    "F-16": "F-16C",
+    "F16": "F-16C",
+}
 
 
 @dataclass
@@ -407,7 +415,10 @@ class AICCCommanderAgent:
 
     @staticmethod
     def _detect_unit_type(text: str) -> str | None:
-        if any(keyword in text for keyword in ["加油机", "飞机", "aircraft", "plane"]):
+        if any(
+            keyword in text
+            for keyword in ["加油机", "飞机", "架", "aircraft", "plane"]
+        ) or AIRCRAFT_MODEL_RE.search(text):
             return "aircraft"
         if any(keyword in text for keyword in ["舰", "ship"]):
             return "ship"
@@ -466,13 +477,28 @@ class AICCCommanderAgent:
         }
         if unit_type == "aircraft" and "加油机" in text:
             return "KC-135R Stratotanker"
+        if unit_type == "aircraft":
+            model_match = AIRCRAFT_MODEL_RE.search(text)
+            if model_match:
+                model = model_match.group(0).replace(" ", "").upper()
+                return AIRCRAFT_MODEL_ALIASES.get(model, model)
         return defaults.get(unit_type or "", "Unknown")
 
     @staticmethod
     def _extract_coordinates(
         text: str, default: tuple[float | None, float | None] = (None, None)
     ) -> tuple[float | None, float | None]:
-        numbers = NUMBER_RE.findall(text)
+        aircraft_model_spans = [
+            match.span() for match in AIRCRAFT_MODEL_RE.finditer(text)
+        ]
+        numbers = [
+            match.group(0)
+            for match in NUMBER_RE.finditer(text)
+            if not any(
+                match.start() >= span_start and match.end() <= span_end
+                for span_start, span_end in aircraft_model_spans
+            )
+        ]
         if len(numbers) >= 2:
             return float(numbers[0]), float(numbers[1])
         return default

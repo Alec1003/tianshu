@@ -125,6 +125,7 @@ describe("modelProfiles", () => {
               providerId: "glm",
               displayName: "GLM",
               apiKey: "glm-key",
+              apiKeySet: true,
               baseUrl: "https://open.bigmodel.cn/api/paas/v4",
               enabled: true,
               verified: true,
@@ -140,6 +141,7 @@ describe("modelProfiles", () => {
 
     expect(configs.glm).toMatchObject({
       apiKey: "",
+      apiKeySet: true,
       enabled: true,
       verified: true,
     });

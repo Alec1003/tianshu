@@ -175,6 +175,12 @@ class AICCOpenClawBridge:
             ]
             return summary, proposals
 
+        return self._propose_with_regex(command)
+
+    def _propose_with_regex(
+        self, command: str
+    ) -> tuple[AgentExecutionSummary, list[CommandProposal]]:
+        """Fallback planner used only when no LLM agent is configured."""
         planned_calls = self.agent.plan_command(command)
         summary = AgentExecutionSummary(
             command=command,

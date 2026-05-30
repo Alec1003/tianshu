@@ -17,6 +17,17 @@ export interface AuthTokenResponse {
 
 export type ScenarioStatus = "draft" | "running" | "completed";
 
+export interface ScenarioBranchMeta {
+  parent_scenario_id: string;
+  parent_scenario_name: string;
+  root_scenario_id: string;
+  root_scenario_name: string;
+  branch_label: string;
+  branch_depth: number;
+  created_from_version?: number | null;
+  created_at?: string | null;
+}
+
 export interface ScenarioListItem {
   id: string;
   name: string;
@@ -25,6 +36,7 @@ export interface ScenarioListItem {
   owner_id: string | null;
   version: number;
   status: ScenarioStatus;
+  branch_meta?: ScenarioBranchMeta | null;
   mission_count: number;
   unit_count: number;
   side_count: number;
@@ -150,6 +162,28 @@ export interface TrainingScoreRecord {
   score: TrainingScoreResponse;
   metrics: Record<string, unknown>;
   created_at: string;
+}
+
+export interface ScenarioBranchCreatePayload {
+  name?: string;
+  description?: string;
+  branch_label?: string;
+  status?: ScenarioStatus;
+  data?: Record<string, unknown>;
+}
+
+export interface ScenarioCompareItem extends ScenarioListItem {
+  training_score: TrainingScoreResponse;
+  timeline_event_count: number;
+  latest_event_at?: string | null;
+  aar_count: number;
+  latest_aar_at?: string | null;
+}
+
+export interface ScenarioCompareResponse {
+  baseline_id: string;
+  generated_at: string;
+  items: ScenarioCompareItem[];
 }
 
 export interface SkillExecutionResult {

@@ -208,11 +208,29 @@ if (ionToken) {
   Ion.defaultAccessToken = ionToken;
 }
 
+const DEFAULT_SATELLITE_TILE_URL =
+  "https://webst0{s}.is.autonavi.com/appmaptile?style=6&x={x}&y={y}&z={z}";
+const SATELLITE_TILE_URL =
+  (
+    import.meta.env.VITE_CESIUM_SATELLITE_TILE_URL as string | undefined
+  )?.trim() || DEFAULT_SATELLITE_TILE_URL;
+const DEFAULT_SATELLITE_MAXIMUM_LEVEL = 16;
+
+function parseImageryMaximumLevel(value: string | undefined, fallback: number) {
+  const parsed = Number.parseInt(value?.trim() ?? "", 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+const SATELLITE_MAXIMUM_LEVEL = parseImageryMaximumLevel(
+  import.meta.env.VITE_CESIUM_SATELLITE_MAX_LEVEL as string | undefined,
+  DEFAULT_SATELLITE_MAXIMUM_LEVEL
+);
+
 // Base-layer URL templates. All four are reachable without tokens.
 // `lightVector` = Gaode (Amap) vector w/ Chinese labels.
 // `darkMatter`  = CartoDB Dark Matter raster (tactical / night ops).
-// `satellite`   = Gaode satellite raster. Esri World Imagery returns 403 in
-//                 some local/dev environments, leaving Cesium as a blue globe.
+// `satellite`   = Gaode satellite raster, clamped to z16 by default because
+//                 some sea areas return placeholder tiles at z17+.
 // `sentinel`    = EOX Sentinel-2 cloudless (open ESA Copernicus data, free,
 //                 no key, global mid-res true-color, slightly slower in CN).
 function imageryProviderFor(
@@ -233,9 +251,9 @@ function imageryProviderFor(
       });
     case "satellite":
       return new UrlTemplateImageryProvider({
-        url: "https://webst0{s}.is.autonavi.com/appmaptile?style=6&x={x}&y={y}&z={z}",
+        url: SATELLITE_TILE_URL,
         subdomains: ["1", "2", "3", "4"],
-        maximumLevel: 18,
+        maximumLevel: SATELLITE_MAXIMUM_LEVEL,
       });
     case "sentinel":
       return new UrlTemplateImageryProvider({
@@ -338,7 +356,7 @@ export default function CesiumScenarioMap({
   // Toolbar-driven state. baseLayer + placement live in React so re-renders
   // update the toolbar UI; refs mirror them for the long-lived Cesium effect.
   const [internalBaseLayer, setInternalBaseLayer] =
-    useState<CesiumBaseLayerKey>("darkMatter");
+    useState<CesiumBaseLayerKey>("satellite");
   const baseLayer = controlledBaseLayer ?? internalBaseLayer;
   const setBaseLayer = useCallback(
     (nextBaseLayer: CesiumBaseLayerKey) => {

@@ -89,6 +89,14 @@ class Settings(BaseSettings):
     llm_model: str = Field(default="", description="Pydantic-AI model ID.")
     llm_api_key: str = Field(default="", description="API key for the LLM provider.")
     llm_base_url: str = Field(default="", description="Optional custom base URL (proxy / local LLM).")
+    allow_private_model_base_urls: bool = Field(
+        default=False,
+        description=(
+            "Allow user-configured LLM Base URLs to target private/local networks. "
+            "Development and test environments allow this automatically; production "
+            "must opt in explicitly."
+        ),
+    )
     external_mcp_servers: str = Field(
         default="",
         description=(
@@ -114,6 +122,12 @@ class Settings(BaseSettings):
     @property
     def cors_origin_list(self) -> list[str]:
         return parse_cors_origins(self.cors_origins)
+
+    @property
+    def private_model_base_urls_allowed(self) -> bool:
+        if self.env in {"development", "test"}:
+            return True
+        return self.allow_private_model_base_urls
 
 
 def validate_production_settings(settings: Settings) -> None:

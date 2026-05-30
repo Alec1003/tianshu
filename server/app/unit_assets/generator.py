@@ -14,7 +14,8 @@ import urllib.error
 import urllib.request
 from typing import Any, Literal
 
-from app.security.url_guard import UnsafeBaseUrlError, normalize_and_validate_base_url
+from app.ai.model_endpoint_policy import normalize_model_base_url
+from app.security.url_guard import UnsafeBaseUrlError
 from app.unit_assets.schemas import UnitAssetType
 from app.unit_assets.service import normalize_asset_data
 
@@ -223,10 +224,7 @@ def estimate_unit_asset(
 def _effective_base_url(provider: str, base_url: str) -> str:
     normalized = base_url.strip().rstrip("/")
     if normalized:
-        return normalize_and_validate_base_url(
-            normalized,
-            allow_private_network=provider.strip().lower() == "ollama",
-        )
+        return normalize_model_base_url(provider, normalized)
     return _OPENAI_COMPAT_BASE_URLS.get(provider.strip().lower(), "")
 
 

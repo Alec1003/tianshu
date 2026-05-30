@@ -4,6 +4,8 @@ import { apiCall } from "./client";
 import type {
   AarRecord,
   AarRecordCreatePayload,
+  ScenarioBranchCreatePayload,
+  ScenarioCompareResponse,
   ScenarioCreatePayload,
   ScenarioDetail,
   ScenarioListItem,
@@ -35,6 +37,19 @@ export async function createScenario(
   });
 }
 
+export async function createScenarioBranch(
+  id: string,
+  payload: ScenarioBranchCreatePayload
+): Promise<ScenarioDetail> {
+  return apiCall<ScenarioDetail>(
+    `/api/scenarios/${encodeURIComponent(id)}/branch`,
+    {
+      method: "POST",
+      json: payload,
+    }
+  );
+}
+
 export async function updateScenario(
   id: string,
   patch: ScenarioUpdatePayload
@@ -49,6 +64,16 @@ export async function deleteScenario(id: string): Promise<void> {
   await apiCall<void>(`/api/scenarios/${encodeURIComponent(id)}`, {
     method: "DELETE",
   });
+}
+
+export async function compareScenarios(
+  scenarioIds: string[],
+  baselineId?: string
+): Promise<ScenarioCompareResponse> {
+  const query = new URLSearchParams();
+  scenarioIds.forEach((id) => query.append("scenario_id", id));
+  if (baselineId) query.set("baseline_id", baselineId);
+  return apiCall<ScenarioCompareResponse>(`/api/scenarios/compare?${query}`);
 }
 
 export async function listAarRecords(scenarioId: string): Promise<AarRecord[]> {

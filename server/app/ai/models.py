@@ -265,6 +265,7 @@ class CommandApprovalResponse(BaseModel):
 
 
 class ModelCheckRequest(BaseModel):
+    providerId: str = ""
     provider: str = "openai"
     baseUrl: str = Field(min_length=1)
     apiKey: str = ""

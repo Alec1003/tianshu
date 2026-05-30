@@ -5,6 +5,10 @@ from dataclasses import dataclass
 from typing import Literal
 from urllib import error, request
 
+from app.ai.model_endpoint_policy import (
+    allows_private_model_network,
+    normalize_model_base_url,
+)
 from app.ai.models import ModelCheckRequest, ModelCheckResponse
 from app.security.url_guard import UnsafeBaseUrlError, normalize_and_validate_base_url
 
@@ -97,11 +101,11 @@ def _probe_models_endpoint(
 
 
 def check_model_connectivity(payload: ModelCheckRequest) -> ModelCheckResponse:
-    allow_private_network = payload.provider.strip().lower() == "ollama"
+    allow_private_network = allows_private_model_network(payload.provider)
     try:
-        normalized_base_url = normalize_and_validate_base_url(
+        normalized_base_url = normalize_model_base_url(
+            payload.provider,
             payload.baseUrl,
-            allow_private_network=allow_private_network,
         )
     except UnsafeBaseUrlError as exc:
         return ModelCheckResponse(

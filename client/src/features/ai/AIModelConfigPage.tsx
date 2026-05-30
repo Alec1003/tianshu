@@ -9,7 +9,7 @@ export default function AIModelConfigPage() {
   return (
     <div className="tactical-grid relative flex min-h-screen items-center justify-center overflow-hidden bg-[#030712] px-4 py-6 text-slate-100 sm:px-6">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_12%,rgba(34,211,238,0.16),transparent_28%),radial-gradient(circle_at_82%_22%,rgba(59,130,246,0.13),transparent_30%),linear-gradient(180deg,rgba(3,7,18,0.12),rgba(3,7,18,0.88))]" />
-      <div className="relative flex w-full max-w-[960px] flex-col">
+      <div className="relative flex w-full max-w-[1040px] flex-col">
         <header className="mb-3 flex items-center justify-between gap-3">
           <button
             className="inline-flex h-8 items-center gap-2 rounded-md border border-cyan-300/10 bg-slate-950/40 px-2.5 text-sm text-slate-400 transition-colors hover:border-cyan-300/25 hover:bg-slate-900/80 hover:text-slate-100"
@@ -25,7 +25,7 @@ export default function AIModelConfigPage() {
           </div>
         </header>
 
-        <ModelConfigCenter />
+        <ModelConfigCenter onSaved={() => navigate(-1)} />
       </div>
     </div>
   );

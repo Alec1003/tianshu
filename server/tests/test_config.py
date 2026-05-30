@@ -106,3 +106,16 @@ def test_development_allows_dev_defaults() -> None:
     settings = Settings(env="development")
 
     validate_production_settings(settings)
+
+
+def test_private_model_base_urls_are_dev_default_and_prod_opt_in() -> None:
+    assert Settings(env="development").private_model_base_urls_allowed is True
+    assert Settings(env="test").private_model_base_urls_allowed is True
+    assert Settings(env="production").private_model_base_urls_allowed is False
+    assert (
+        Settings(
+            env="production",
+            allow_private_model_base_urls=True,
+        ).private_model_base_urls_allowed
+        is True
+    )

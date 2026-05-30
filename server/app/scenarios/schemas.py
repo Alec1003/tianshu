@@ -34,6 +34,17 @@ class ScenarioUpdate(BaseModel):
     status: ScenarioStatus | None = None
 
 
+class ScenarioBranchMeta(BaseModel):
+    parent_scenario_id: str
+    parent_scenario_name: str = ""
+    root_scenario_id: str
+    root_scenario_name: str = ""
+    branch_label: str
+    branch_depth: int = Field(default=1, ge=1)
+    created_from_version: int | None = None
+    created_at: datetime | None = None
+
+
 class ScenarioListItem(BaseModel):
     """Light row for list endpoints; omits the heavy ``data`` blob."""
 
@@ -44,6 +55,7 @@ class ScenarioListItem(BaseModel):
     owner_id: uuid.UUID | None
     version: int
     status: ScenarioStatus
+    branch_meta: ScenarioBranchMeta | None = None
     mission_count: int = 0
     unit_count: int = 0
     side_count: int = 0
@@ -55,6 +67,14 @@ class ScenarioListItem(BaseModel):
 
 class ScenarioDetail(ScenarioListItem):
     data: dict[str, Any]
+
+
+class ScenarioBranchCreate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=120)
+    description: str | None = Field(default=None, max_length=2000)
+    branch_label: str | None = Field(default=None, max_length=120)
+    status: ScenarioStatus = Field(default="draft")
+    data: dict[str, Any] | None = None
 
 
 # ---------- AAR ----------
@@ -115,3 +135,17 @@ class TrainingScoreRecordRead(BaseModel):
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class ScenarioCompareItem(ScenarioListItem):
+    training_score: TrainingScoreResponse
+    timeline_event_count: int = 0
+    latest_event_at: datetime | None = None
+    aar_count: int = 0
+    latest_aar_at: datetime | None = None
+
+
+class ScenarioCompareResponse(BaseModel):
+    baseline_id: str
+    generated_at: datetime
+    items: list[ScenarioCompareItem]

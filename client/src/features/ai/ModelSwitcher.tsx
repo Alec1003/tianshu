@@ -25,10 +25,11 @@ import {
 import { cn } from "@/lib/utils";
 import {
   getModelProviderDefinition,
-  getProviderModels,
   listModelProviderDefinitions,
   providerRuntimeId,
+  type ProviderModel,
 } from "./modelProfiles";
+import { listServerModelProviders } from "@/api/modelConfig";
 import { useModelConfigStore, type ModelOption } from "./modelStore";
 
 interface ModelSwitcherProps {
@@ -135,6 +136,9 @@ export default function ModelSwitcher({
     (state) => state.defaultModelProfileId
   );
   const providerConfigs = useModelConfigStore((state) => state.providerConfigs);
+  const hydrateProviderConfigs = useModelConfigStore(
+    (state) => state.hydrateProviderConfigs
+  );
   const showUnverifiedModels = useModelConfigStore(
     (state) => state.showUnverifiedModels
   );
@@ -144,6 +148,35 @@ export default function ModelSwitcher({
   const activeProfile = modelProfiles.find(
     (profile) => profile.id === activeProfileId
   );
+
+  useEffect(() => {
+    let cancelled = false;
+    listServerModelProviders()
+      .then((providers) => {
+        if (cancelled) return;
+        hydrateProviderConfigs(
+          providers.map((provider) => ({
+            providerId: provider.providerId,
+            displayName: provider.displayName,
+            baseUrl: provider.baseUrl,
+            enabled: provider.enabled,
+            verified: provider.verified,
+            lastCheckedAt: provider.lastCheckedAt,
+            customModels: provider.customModels as unknown as ProviderModel[],
+            apiKey: "",
+            apiKeySet: provider.apiKeySet,
+          }))
+        );
+      })
+      .catch(() => {
+        // The switcher can still use the local persisted snapshot if the
+        // backend is temporarily unavailable.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [hydrateProviderConfigs]);
+
   const modelOptions = useMemo<ModelOption[]>(() => {
     return listModelProviderDefinitions().flatMap((definition) => {
       const config = providerConfigs[definition.id];
@@ -152,7 +185,7 @@ export default function ModelSwitcher({
       if (!enabled) return [];
       if (!showUnverifiedModels && !verified) return [];
 
-      return getProviderModels(definition.id, config).map((model) => {
+      return (config?.customModels ?? []).map((model) => {
         const profile = modelProfiles.find(
           (item) => item.providerId === definition.id && item.model === model.id
         );
@@ -181,6 +214,13 @@ export default function ModelSwitcher({
     providerConfigs,
     showUnverifiedModels,
   ]);
+
+  useEffect(() => {
+    if (modelOptions.length === 0) return;
+    if (modelOptions.some((option) => option.isActive)) return;
+    const next = modelOptions[0];
+    if (next) selectModel(next.providerId, next.id);
+  }, [modelOptions, selectModel]);
   const activeDefinition = getModelProviderDefinition(
     activeProfile?.providerId ?? activeModelConfig.provider
   );
@@ -329,7 +369,7 @@ export default function ModelSwitcher({
 
             <div className="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-slate-300">
               <Monitor className="size-4 text-cyan-200/70" />
-              服务器模型
+              已配置模型
             </div>
 
             <div
@@ -340,7 +380,7 @@ export default function ModelSwitcher({
               {rows.length === 0 ? (
                 <div className="flex h-32 flex-col items-center justify-center gap-2 px-4 text-center text-sm text-slate-500">
                   <Cpu className="size-5 text-slate-600" />
-                  未找到匹配模型
+                  未找到已配置模型
                 </div>
               ) : (
                 <div
@@ -461,7 +501,7 @@ export default function ModelSwitcher({
               </button>
               <div className="mt-2 flex items-center gap-2 px-2 text-xs text-slate-500">
                 <Sparkles className="size-3.5" />
-                仅显示已启用 Provider 的模型
+                仅显示配置中心添加的模型
               </div>
             </div>
           </motion.div>

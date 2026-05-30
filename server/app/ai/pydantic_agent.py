@@ -19,9 +19,9 @@ from pydantic_ai.models.openai import OpenAIModel, OpenAIResponsesModel
 from pydantic_ai.providers.anthropic import AnthropicProvider
 from pydantic_ai.providers.openai import OpenAIProvider
 
+from app.ai.model_endpoint_policy import normalize_model_base_url
 from app.ai.models import AgentExecutionSummary, MCPCallTrace, SkillExecutionResult
 from app.ai.skill_registry import AICCSkillRegistry
-from app.security.url_guard import normalize_and_validate_base_url
 
 
 SYSTEM_PROMPT = """
@@ -222,10 +222,7 @@ def _safe_user_base_url(provider: str, base_url: str) -> str:
     """Validate user-supplied model endpoints before SDK clients can call them."""
     if not base_url.strip():
         return ""
-    return normalize_and_validate_base_url(
-        base_url,
-        allow_private_network=provider.strip().lower() == "ollama",
-    )
+    return normalize_model_base_url(provider, base_url)
 
 
 def can_build_model_override(

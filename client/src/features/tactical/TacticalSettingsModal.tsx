@@ -60,7 +60,7 @@ const BASE_LAYER_OPTIONS: Array<{
 }> = [
   { id: "darkMatter", label: "战术暗色", desc: "夜间态势与高对比目标显示" },
   { id: "lightVector", label: "标准矢量", desc: "中文道路、地名与行政标注" },
-  { id: "satellite", label: "卫星影像", desc: "高德卫星遥感底图" },
+  { id: "satellite", label: "卫星影像", desc: "高德卫星遥感底图（z16）" },
   { id: "sentinel", label: "哨兵真彩", desc: "Sentinel-2 全球真彩影像" },
 ];
 

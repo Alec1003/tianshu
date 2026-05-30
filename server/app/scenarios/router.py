@@ -12,9 +12,10 @@ from __future__ import annotations
 
 import asyncio
 import json
+from datetime import datetime, timezone
 from typing import Any, NoReturn, Sequence
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.aicc_runtime.persistence import save_runtime_state
@@ -39,6 +40,8 @@ from app.scenarios.models import AarRecord, Scenario
 from app.scenarios.schemas import (
     AarRecordCreate,
     AarRecordRead,
+    ScenarioBranchCreate,
+    ScenarioCompareResponse,
     ScenarioCreate,
     ScenarioDetail,
     ScenarioListItem,
@@ -46,34 +49,8 @@ from app.scenarios.schemas import (
     TrainingScoreRecordRead,
     TrainingScoreResponse,
 )
-from app.scenarios.training_score import build_training_score
 
 router = APIRouter(prefix="/api/scenarios", tags=["scenarios"])
-
-
-async def _build_training_score_for_scenario(
-    session: AsyncSession,
-    user: User,
-    sc: Scenario,
-    scenario_id: str,
-) -> TrainingScoreResponse:
-    inner_id = runtime_scenario_id(sc.data)
-    scenario_ids = [scenario_id]
-    if inner_id and inner_id != scenario_id:
-        scenario_ids.append(inner_id)
-    events = await list_runtime_events(
-        session,
-        user,
-        scenario_id=scenario_ids,
-        limit=500,
-    )
-    aar_records = await scenario_service.list_aar_records(
-        session,
-        user,
-        scenario_id,
-        limit=50,
-    )
-    return build_training_score(sc, events, aar_records)
 
 
 def _bridge_for_user(
@@ -118,6 +95,54 @@ async def list_scenarios(
     )
 
 
+@router.get("/compare", response_model=ScenarioCompareResponse)
+async def compare_scenarios(
+    scenario_id: list[str] = Query(...),
+    baseline_id: str | None = None,
+    user: User = Depends(current_active_user),
+    session: AsyncSession = Depends(get_async_session),
+) -> ScenarioCompareResponse:
+    ordered_ids = list(dict.fromkeys(scenario_id))
+    if len(ordered_ids) < 2:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={
+                "code": "scenario_compare_invalid",
+                "message": "comparison requires at least two distinct scenarios",
+            },
+        )
+    if len(ordered_ids) > 4:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={
+                "code": "scenario_compare_invalid",
+                "message": "comparison supports up to four scenarios at a time",
+            },
+        )
+    effective_baseline = baseline_id or ordered_ids[0]
+    if effective_baseline not in ordered_ids:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={
+                "code": "scenario_compare_invalid",
+                "message": "baseline must be included in scenario_id",
+            },
+        )
+    try:
+        items = await scenario_service.build_scenario_compare_items(
+            session,
+            user,
+            ordered_ids,
+        )
+    except ScenarioServiceError as exc:
+        _raise_scenario_http(exc)
+    return ScenarioCompareResponse(
+        baseline_id=effective_baseline,
+        generated_at=datetime.now(timezone.utc),
+        items=items,
+    )
+
+
 @router.get("/{scenario_id}", response_model=ScenarioDetail)
 async def get_scenario(
     scenario_id: str,
@@ -145,6 +170,32 @@ async def create_scenario(
             description=payload.description,
             data=payload.data,
             status=payload.status,
+        )
+    except ScenarioServiceError as exc:
+        _raise_scenario_http(exc)
+
+
+@router.post(
+    "/{scenario_id}/branch",
+    response_model=ScenarioDetail,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_scenario_branch(
+    scenario_id: str,
+    payload: ScenarioBranchCreate,
+    user: User = Depends(current_active_user),
+    session: AsyncSession = Depends(get_async_session),
+) -> Scenario:
+    try:
+        return await scenario_service.create_branch_scenario(
+            session,
+            user,
+            scenario_id,
+            name=payload.name,
+            description=payload.description,
+            branch_label=payload.branch_label,
+            status=payload.status,
+            data=payload.data,
         )
     except ScenarioServiceError as exc:
         _raise_scenario_http(exc)
@@ -246,7 +297,12 @@ async def create_aar_record(
         aar_record_id=rec.id,
     )
     if sc is not None:
-        score = await _build_training_score_for_scenario(session, user, sc, scenario_id)
+        score = await scenario_service.build_training_score_for_scenario(
+            session,
+            user,
+            sc,
+            scenario_id,
+        )
         await scenario_service.create_training_score_record(
             session,
             user,
@@ -295,7 +351,12 @@ async def get_scenario_training_score(
         sc = await scenario_service.get_scenario(session, user, scenario_id)
     except ScenarioServiceError as exc:
         _raise_scenario_http(exc)
-    return await _build_training_score_for_scenario(session, user, sc, scenario_id)
+    return await scenario_service.build_training_score_for_scenario(
+        session,
+        user,
+        sc,
+        scenario_id,
+    )
 
 
 @router.get(
@@ -331,7 +392,12 @@ async def create_scenario_training_score_record(
 ):
     try:
         sc = await scenario_service.get_scenario(session, user, scenario_id)
-        score = await _build_training_score_for_scenario(session, user, sc, scenario_id)
+        score = await scenario_service.build_training_score_for_scenario(
+            session,
+            user,
+            sc,
+            scenario_id,
+        )
         return await scenario_service.create_training_score_record(
             session,
             user,

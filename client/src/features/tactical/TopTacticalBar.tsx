@@ -6,14 +6,15 @@ import {
   BrainCircuit,
   Copy,
   Cpu,
+  GitBranch,
   History,
   LogOut,
   Save,
   Settings,
-  Shield,
   Signal,
   UserCircle,
 } from "lucide-react";
+import BrandLogo from "@/components/brand/BrandLogo";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/features/auth/useAuth";
 import type { SimulationSnapshot } from "./SimulationSidebar";
@@ -33,6 +34,7 @@ interface TopTacticalBarProps {
   onExit?: () => void;
   onSave?: () => void;
   onRequestSaveAs?: () => void;
+  onCreateBranch?: () => void;
   savingState?: "idle" | "saving" | "saved" | "error";
   timelineOpen?: boolean;
   onToggleTimeline?: () => void;
@@ -50,6 +52,7 @@ export default function TopTacticalBar({
   onExit,
   onSave,
   onRequestSaveAs,
+  onCreateBranch,
   savingState,
   timelineOpen,
   onToggleTimeline,
@@ -127,8 +130,11 @@ export default function TopTacticalBar({
         )}
 
         <div className="flex items-center gap-3">
-          <div className="relative grid size-8 place-items-center rounded-lg border border-cyan-400/30 bg-cyan-950/40 text-cyan-300 shadow-[0_0_12px_rgba(34,211,238,0.2)]">
-            <Shield className="size-4" />
+          <div className="relative">
+            <BrandLogo
+              frameClassName="size-8 rounded-lg border-cyan-400/30 bg-cyan-950/40 shadow-[0_0_12px_rgba(34,211,238,0.2)]"
+              imageClassName="scale-[1.04]"
+            />
             <div className="absolute -bottom-1 -right-1 size-2.5 rounded-full border border-[#01040a] bg-emerald-400" />
           </div>
           <div className="hidden sm:block">
@@ -257,7 +263,7 @@ export default function TopTacticalBar({
       {/* 3. RIGHT: Quick Actions & Save */}
       <div className="flex items-center gap-3">
         {/* Router actions (Save / Save As) */}
-        {(onSave || onRequestSaveAs) && (
+        {(onSave || onRequestSaveAs || onCreateBranch) && (
           <div className="flex items-center gap-2 pr-3 border-r border-cyan-400/20">
             {onSave && !scenarioMeta?.isTemplate && (
               <button
@@ -295,6 +301,17 @@ export default function TopTacticalBar({
               >
                 <Copy className="size-3.5" />
                 <span className="hidden sm:inline">另存</span>
+              </button>
+            )}
+            {onCreateBranch && (
+              <button
+                type="button"
+                onClick={onCreateBranch}
+                className="flex items-center gap-1.5 rounded border border-indigo-400/20 bg-indigo-400/10 px-3 py-1 font-mono text-[10px] font-bold uppercase tracking-widest text-indigo-200 transition-all hover:border-indigo-300/40 hover:bg-indigo-300/15 hover:text-indigo-100"
+                title="创建推演分支"
+              >
+                <GitBranch className="size-3.5" />
+                <span className="hidden sm:inline">分支</span>
               </button>
             )}
           </div>

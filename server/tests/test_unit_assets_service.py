@@ -5,6 +5,8 @@ import json
 import pytest
 from sqlalchemy import select
 
+from app.ai import model_endpoint_policy as endpoint_policy
+from app.config import Settings
 from app.unit_assets.errors import (
     UnitAssetConflictError,
     UnitAssetForbiddenError,
@@ -398,7 +400,13 @@ async def test_generate_unit_asset_payload_uses_keyless_ollama(monkeypatch):
     assert data["className"] == "Local Test Jet"
 
 
-async def test_generate_unit_asset_payload_blocks_custom_private_base_url():
+async def test_generate_unit_asset_payload_blocks_custom_private_base_url(monkeypatch):
+    monkeypatch.setattr(
+        endpoint_policy,
+        "get_settings",
+        lambda: Settings(env="production", allow_private_model_base_urls=False),
+    )
+
     data, source, _confidence, warnings = await generate_unit_asset_payload(
         asset_type="aircraft",
         query="Private Test Jet",

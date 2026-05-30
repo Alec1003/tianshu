@@ -10,12 +10,16 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from copy import deepcopy
+from datetime import datetime, timezone
+from uuid import uuid4
 from typing import Any, Sequence
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.aicc_runtime.models import RuntimeEvent
+from app.aicc_runtime.timeline import list_runtime_events, runtime_scenario_id
 from app.auth.models import User
 from app.scenarios.errors import (
     ScenarioForbiddenError,
@@ -23,8 +27,19 @@ from app.scenarios.errors import (
     ScenarioNotFoundError,
     ScenarioTemplateReadOnlyError,
 )
-from app.scenarios.models import AarRecord, Scenario, TrainingScoreRecord
-from app.scenarios.schemas import VALID_STATUSES, TrainingScoreResponse
+from app.scenarios.models import (
+    BRANCH_META_KEY,
+    AarRecord,
+    Scenario,
+    TrainingScoreRecord,
+    extract_branch_meta,
+)
+from app.scenarios.schemas import (
+    VALID_STATUSES,
+    ScenarioCompareItem,
+    TrainingScoreResponse,
+)
+from app.scenarios.training_score import build_training_score
 
 
 # ---------- helpers ----------------------------------------------------------
@@ -117,6 +132,83 @@ async def create_scenario(
     await session.commit()
     await session.refresh(sc)
     return sc
+
+
+def _scenario_name_default(source: Scenario, *, branch_depth: int) -> str:
+    return f"{source.name} / 分支 {branch_depth}"
+
+
+def _branch_payload(
+    source: Scenario,
+    *,
+    branch_name: str,
+    branch_label: str,
+    data: dict[str, Any],
+) -> dict[str, Any]:
+    payload = deepcopy(data)
+    current = payload.get("currentScenario")
+    if isinstance(current, dict):
+        current["id"] = str(uuid4())
+        current["name"] = branch_name
+
+    source_meta = extract_branch_meta(source.data) or {}
+    root_scenario_id = source_meta.get("root_scenario_id") or source.id
+    root_scenario_name = source_meta.get("root_scenario_name") or source.name
+    branch_depth = int(source_meta.get("branch_depth") or 0) + 1
+
+    payload[BRANCH_META_KEY] = {
+        "parent_scenario_id": source.id,
+        "parent_scenario_name": source.name,
+        "root_scenario_id": root_scenario_id,
+        "root_scenario_name": root_scenario_name,
+        "branch_label": branch_label,
+        "branch_depth": branch_depth,
+        "created_from_version": source.version,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    return payload
+
+
+async def create_branch_scenario(
+    session: AsyncSession,
+    user: User,
+    source_scenario_id: str,
+    *,
+    name: str | None = None,
+    description: str | None = None,
+    branch_label: str | None = None,
+    status: str = "draft",
+    data: dict[str, Any] | None = None,
+) -> Scenario:
+    source = await get_scenario(session, user, source_scenario_id)
+    payload = deepcopy(data if data is not None else source.data)
+    if not isinstance(payload, dict):
+        raise ScenarioInvalidError("data", "must be a JSON object")
+
+    source_meta = extract_branch_meta(source.data) or {}
+    next_branch_depth = int(source_meta.get("branch_depth") or 0) + 1
+    safe_name = (name or "").strip() or _scenario_name_default(
+        source,
+        branch_depth=next_branch_depth,
+    )
+    safe_label = (branch_label or "").strip() or f"分支 {next_branch_depth}"
+    safe_description = (
+        description if description is not None else source.description or ""
+    )
+    branched_payload = _branch_payload(
+        source,
+        branch_name=safe_name,
+        branch_label=safe_label,
+        data=payload,
+    )
+    return await create_scenario(
+        session,
+        user,
+        name=safe_name,
+        description=safe_description,
+        data=branched_payload,
+        status=status,
+    )
 
 
 async def update_scenario(
@@ -287,3 +379,86 @@ async def create_training_score_record(
     await session.commit()
     await session.refresh(record)
     return record
+
+
+async def build_training_score_for_scenario(
+    session: AsyncSession,
+    user: User,
+    sc: Scenario,
+    scenario_id: str,
+) -> TrainingScoreResponse:
+    inner_id = runtime_scenario_id(sc.data)
+    scenario_ids = [scenario_id]
+    if inner_id and inner_id != scenario_id:
+        scenario_ids.append(inner_id)
+    events = await list_runtime_events(
+        session,
+        user,
+        scenario_id=scenario_ids,
+        limit=500,
+    )
+    aar_records = await list_aar_records(
+        session,
+        user,
+        scenario_id,
+        limit=50,
+    )
+    return build_training_score(sc, events, aar_records)
+
+
+async def build_scenario_compare_items(
+    session: AsyncSession,
+    user: User,
+    scenario_ids: Sequence[str],
+) -> list[ScenarioCompareItem]:
+    items: list[ScenarioCompareItem] = []
+    for scenario_id in scenario_ids:
+        sc = await get_scenario(session, user, scenario_id)
+        score = await build_training_score_for_scenario(session, user, sc, scenario_id)
+        inner_id = runtime_scenario_id(sc.data)
+        timeline_ids = [scenario_id]
+        if inner_id and inner_id != scenario_id:
+            timeline_ids.append(inner_id)
+
+        timeline_stmt = (
+            select(
+                func.count(RuntimeEvent.id),
+                func.max(RuntimeEvent.created_at),
+            )
+            .where(RuntimeEvent.owner_id == user.id)
+            .where(RuntimeEvent.scenario_id.in_(timeline_ids))
+        )
+        aar_stmt = (
+            select(
+                func.count(AarRecord.id),
+                func.max(AarRecord.created_at),
+            )
+            .where(AarRecord.owner_id == user.id)
+            .where(AarRecord.scenario_id == sc.id)
+        )
+        timeline_count, latest_event_at = (await session.execute(timeline_stmt)).one()
+        aar_count, latest_aar_at = (await session.execute(aar_stmt)).one()
+
+        items.append(
+            ScenarioCompareItem(
+                id=sc.id,
+                name=sc.name,
+                description=sc.description,
+                is_template=sc.is_template,
+                owner_id=sc.owner_id,
+                version=sc.version,
+                status=sc.status,
+                branch_meta=sc.branch_meta,
+                mission_count=sc.mission_count,
+                unit_count=sc.unit_count,
+                side_count=sc.side_count,
+                created_at=sc.created_at,
+                updated_at=sc.updated_at,
+                training_score=score,
+                timeline_event_count=int(timeline_count or 0),
+                latest_event_at=latest_event_at,
+                aar_count=int(aar_count or 0),
+                latest_aar_at=latest_aar_at,
+            )
+        )
+    return items

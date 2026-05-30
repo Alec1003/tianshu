@@ -149,3 +149,103 @@ class ScenarioCompareResponse(BaseModel):
     baseline_id: str
     generated_at: datetime
     items: list[ScenarioCompareItem]
+
+
+class ScenarioCompareSnapshotSource(BaseModel):
+    id: str
+    label: str
+    archived_record_id: str | None = None
+
+
+class ScenarioCompareSnapshotScore(BaseModel):
+    overall_score: int = Field(..., ge=0, le=100)
+    grade: str
+    confidence: str
+    generated_at: datetime
+
+
+class ScenarioCompareSnapshotDeltas(BaseModel):
+    versus_baseline: int | None = None
+    versus_latest_archived: int | None = None
+    versus_live: int | None = None
+
+
+class ScenarioCompareSnapshotSummary(BaseModel):
+    mission_count: int = Field(default=0, ge=0)
+    unit_count: int = Field(default=0, ge=0)
+    timeline_event_count: int = Field(default=0, ge=0)
+    aar_count: int = Field(default=0, ge=0)
+
+
+class ScenarioCompareSnapshotItem(BaseModel):
+    id: str
+    name: str
+    baseline: bool = False
+    source: ScenarioCompareSnapshotSource
+    score: ScenarioCompareSnapshotScore
+    score_deltas: ScenarioCompareSnapshotDeltas
+    summary: ScenarioCompareSnapshotSummary
+
+
+class ScenarioCompareSnapshot(BaseModel):
+    generated_at: datetime
+    baseline_id: str
+    baseline_name: str
+    items: list[ScenarioCompareSnapshotItem]
+
+
+class ScenarioCompareReportCreate(BaseModel):
+    title: str = Field(default="", max_length=120)
+    baseline_id: str
+    scenario_ids: list[str] = Field(default_factory=list)
+    snapshot: ScenarioCompareSnapshot
+
+
+class ScenarioCompareReportRead(BaseModel):
+    id: str
+    owner_id: uuid.UUID | None
+    title: str
+    baseline_scenario_id: str
+    scenario_ids: list[str]
+    snapshot: ScenarioCompareSnapshot
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class ScenarioCompareSessionState(BaseModel):
+    baseline_id: str
+    selected_sources: dict[str, str] = Field(default_factory=dict)
+
+
+class ScenarioCompareSessionCreate(BaseModel):
+    title: str = Field(default="", max_length=120)
+    source_scenario_id: str | None = None
+    baseline_id: str
+    scenario_ids: list[str] = Field(default_factory=list)
+    state: ScenarioCompareSessionState
+
+
+class ScenarioCompareSessionUpdate(BaseModel):
+    title: str | None = Field(default=None, max_length=120)
+    baseline_id: str | None = None
+    scenario_ids: list[str] | None = None
+    state: ScenarioCompareSessionState | None = None
+
+
+class ScenarioCompareSessionRead(BaseModel):
+    id: str
+    owner_id: uuid.UUID | None
+    title: str
+    source_scenario_id: str | None
+    baseline_scenario_id: str
+    scenario_ids: list[str]
+    state: ScenarioCompareSessionState
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class ScenarioCompareForkCreate(BaseModel):
+    branch_count: int = Field(default=3, ge=2, le=3)

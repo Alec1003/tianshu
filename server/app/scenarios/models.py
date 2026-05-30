@@ -1,9 +1,11 @@
 """Scenario + AarRecord SQLAlchemy models.
 
 v1 schema (flat, single-user-owned):
-    Scenario       -- player-saved or system-template scenario JSON
-    AarRecord      -- post-game After-Action-Review record per played session
-    TrainingScoreRecord -- immutable score snapshot for a played session
+    Scenario              -- player-saved or system-template scenario JSON
+    AarRecord             -- post-game After-Action-Review record per played session
+    TrainingScoreRecord   -- immutable score snapshot for a played session
+    ScenarioCompareReport -- persisted scenario comparison snapshot
+    ScenarioCompareSession -- persisted compare workspace session
 
 Workspace / WorkspaceMember tables are intentionally deferred to S4 when we
 introduce multi-user collaboration. Adding them now would only inflate the
@@ -290,4 +292,79 @@ class TrainingScoreRecord(Base):
 
     scenario: Mapped["Scenario | None"] = relationship(
         back_populates="training_score_records"
+    )
+
+
+class ScenarioCompareReport(Base):
+    """Persisted scenario comparison snapshot for later review/export."""
+
+    __tablename__ = "scenario_compare_report"
+
+    id: Mapped[str] = _uuid_pk()
+
+    owner_id: Mapped[uuid.UUID | None] = mapped_column(
+        GUID(),
+        ForeignKey("user.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
+    title: Mapped[str] = mapped_column(String(120), nullable=False)
+    baseline_scenario_id: Mapped[str] = mapped_column(
+        String(36),
+        nullable=False,
+        index=True,
+    )
+    scenario_ids: Mapped[list[str]] = mapped_column(
+        SCENARIO_JSON,
+        default=list,
+        nullable=False,
+    )
+    snapshot: Mapped[dict] = mapped_column(SCENARIO_JSON, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class ScenarioCompareSession(Base):
+    """Persisted compare workspace session for multi-branch evaluation."""
+
+    __tablename__ = "scenario_compare_session"
+
+    id: Mapped[str] = _uuid_pk()
+
+    owner_id: Mapped[uuid.UUID | None] = mapped_column(
+        GUID(),
+        ForeignKey("user.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
+    title: Mapped[str] = mapped_column(String(120), nullable=False)
+    source_scenario_id: Mapped[str | None] = mapped_column(
+        String(36),
+        nullable=True,
+        index=True,
+    )
+    baseline_scenario_id: Mapped[str] = mapped_column(
+        String(36),
+        nullable=False,
+        index=True,
+    )
+    scenario_ids: Mapped[list[str]] = mapped_column(
+        SCENARIO_JSON,
+        default=list,
+        nullable=False,
+    )
+    state: Mapped[dict] = mapped_column(
+        SCENARIO_JSON,
+        default=dict,
+        nullable=False,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
     )

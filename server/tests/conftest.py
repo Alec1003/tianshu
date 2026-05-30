@@ -49,6 +49,8 @@ async def db_engine() -> AsyncIterator:
     from app.scenarios.models import (  # noqa: F401
         AarRecord,
         Scenario,
+        ScenarioCompareReport,
+        ScenarioCompareSession,
         TrainingScoreRecord,
     )
     from app.unit_assets.models import UnitAsset  # noqa: F401

@@ -79,6 +79,8 @@ async def create_db_and_tables() -> None:
     from app.scenarios.models import (  # noqa: F401
         AarRecord,
         Scenario,
+        ScenarioCompareReport,
+        ScenarioCompareSession,
         TrainingScoreRecord,
     )
     from app.unit_assets.models import UnitAsset  # noqa: F401

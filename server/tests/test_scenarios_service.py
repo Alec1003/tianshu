@@ -19,7 +19,21 @@ from app.scenarios.errors import (
     ScenarioTemplateReadOnlyError,
 )
 from app.scenarios.models import Scenario
-from app.scenarios.schemas import TrainingScoreDimension, TrainingScoreResponse
+from app.scenarios.schemas import (
+    ScenarioCompareForkCreate,
+    ScenarioCompareReportCreate,
+    ScenarioCompareSessionCreate,
+    ScenarioCompareSessionState,
+    ScenarioCompareSessionUpdate,
+    ScenarioCompareSnapshot,
+    ScenarioCompareSnapshotDeltas,
+    ScenarioCompareSnapshotItem,
+    ScenarioCompareSnapshotScore,
+    ScenarioCompareSnapshotSource,
+    ScenarioCompareSnapshotSummary,
+    TrainingScoreDimension,
+    TrainingScoreResponse,
+)
 
 
 pytestmark = pytest.mark.asyncio
@@ -434,3 +448,210 @@ async def test_create_and_list_training_score_records(db_session, user):
     assert record.score["overall_score"] == 86
     assert record.metrics == {"event_count": 5}
     assert [item.id for item in records] == [record.id]
+
+
+def compare_snapshot(
+    scenario_ids: list[str],
+    baseline_id: str,
+) -> ScenarioCompareSnapshot:
+    return ScenarioCompareSnapshot(
+        generated_at=datetime.now(tz=timezone.utc),
+        baseline_id=baseline_id,
+        baseline_name="Baseline",
+        items=[
+            ScenarioCompareSnapshotItem(
+                id=scenario_id,
+                name=f"Scenario {index + 1}",
+                baseline=scenario_id == baseline_id,
+                source=ScenarioCompareSnapshotSource(
+                    id="live",
+                    label="实时评分",
+                    archived_record_id=None,
+                ),
+                score=ScenarioCompareSnapshotScore(
+                    overall_score=80 + index,
+                    grade="A-",
+                    confidence="high",
+                    generated_at=datetime.now(tz=timezone.utc),
+                ),
+                score_deltas=ScenarioCompareSnapshotDeltas(
+                    versus_baseline=None if scenario_id == baseline_id else index,
+                    versus_latest_archived=None,
+                    versus_live=None,
+                ),
+                summary=ScenarioCompareSnapshotSummary(
+                    mission_count=4 + index,
+                    unit_count=10 + index,
+                    timeline_event_count=20 + index,
+                    aar_count=index,
+                ),
+            )
+            for index, scenario_id in enumerate(scenario_ids)
+        ],
+    )
+
+
+async def test_create_list_and_delete_compare_report(db_session, user):
+    base = await svc.create_scenario(db_session, user, name="Base", data={})
+    branch = await svc.create_scenario(db_session, user, name="Branch", data={})
+    snapshot = compare_snapshot([base.id, branch.id], base.id)
+
+    report = await svc.create_compare_report(
+        db_session,
+        user,
+        payload=ScenarioCompareReportCreate(
+            title="Base 对比报告",
+            baseline_id=base.id,
+            scenario_ids=[base.id, branch.id],
+            snapshot=snapshot,
+        ),
+    )
+    listed = await svc.list_compare_reports(db_session, user)
+
+    assert report.id
+    assert report.baseline_scenario_id == base.id
+    assert report.scenario_ids == [base.id, branch.id]
+    assert report.snapshot["baseline_name"] == "Baseline"
+    assert [item.id for item in listed] == [report.id]
+
+    await svc.delete_compare_report(db_session, user, report.id)
+    assert await svc.list_compare_reports(db_session, user) == []
+
+
+async def test_create_compare_report_rejects_snapshot_mismatch(db_session, user):
+    base = await svc.create_scenario(db_session, user, name="Base", data={})
+    branch = await svc.create_scenario(db_session, user, name="Branch", data={})
+    snapshot = compare_snapshot([base.id], base.id)
+
+    with pytest.raises(ScenarioInvalidError) as exc_info:
+        await svc.create_compare_report(
+            db_session,
+            user,
+            payload=ScenarioCompareReportCreate(
+                title="Mismatch",
+                baseline_id=base.id,
+                scenario_ids=[base.id, branch.id],
+                snapshot=snapshot,
+            ),
+        )
+
+    assert exc_info.value.details.get("field") == "snapshot.items"
+
+
+async def test_create_update_list_and_delete_compare_session(db_session, user):
+    base = await svc.create_scenario(db_session, user, name="Base", data={})
+    branch = await svc.create_scenario(db_session, user, name="Branch", data={})
+
+    compare_session = await svc.create_compare_session(
+        db_session,
+        user,
+        payload=ScenarioCompareSessionCreate(
+            title="Base 对比会话",
+            source_scenario_id=base.id,
+            baseline_id=base.id,
+            scenario_ids=[base.id, branch.id],
+            state=ScenarioCompareSessionState(
+                baseline_id=base.id,
+                selected_sources={base.id: "live", branch.id: "archived-1"},
+            ),
+        ),
+    )
+
+    listed = await svc.list_compare_sessions(db_session, user)
+    fetched = await svc.get_compare_session(db_session, user, compare_session.id)
+
+    assert compare_session.id
+    assert compare_session.source_scenario_id == base.id
+    assert compare_session.baseline_scenario_id == base.id
+    assert compare_session.state["selected_sources"][branch.id] == "archived-1"
+    assert [item.id for item in listed] == [compare_session.id]
+    assert fetched.id == compare_session.id
+
+    updated = await svc.update_compare_session(
+        db_session,
+        user,
+        compare_session.id,
+        payload=ScenarioCompareSessionUpdate(
+            baseline_id=branch.id,
+            state=ScenarioCompareSessionState(
+                baseline_id=branch.id,
+                selected_sources={base.id: "live", branch.id: "live"},
+            ),
+        ),
+    )
+    assert updated.baseline_scenario_id == branch.id
+    assert updated.state["baseline_id"] == branch.id
+    assert updated.state["selected_sources"][branch.id] == "live"
+
+    await svc.delete_compare_session(db_session, user, compare_session.id)
+    assert await svc.list_compare_sessions(db_session, user) == []
+
+
+async def test_create_compare_session_rejects_state_mismatch(db_session, user):
+    base = await svc.create_scenario(db_session, user, name="Base", data={})
+    branch = await svc.create_scenario(db_session, user, name="Branch", data={})
+
+    with pytest.raises(ScenarioInvalidError) as exc_info:
+        await svc.create_compare_session(
+            db_session,
+            user,
+            payload=ScenarioCompareSessionCreate(
+                title="Mismatch",
+                source_scenario_id=base.id,
+                baseline_id=base.id,
+                scenario_ids=[base.id, branch.id],
+                state=ScenarioCompareSessionState(
+                    baseline_id=branch.id,
+                    selected_sources={base.id: "live", branch.id: "live"},
+                ),
+            ),
+        )
+
+    assert exc_info.value.details.get("field") == "state.baseline_id"
+
+
+async def test_fork_compare_session_creates_source_and_three_branches(
+    db_session,
+    user,
+):
+    source = await svc.create_scenario(
+        db_session,
+        user,
+        name="Base Plan",
+        description="baseline",
+        data={
+            "currentScenario": {
+                "id": "runtime-base",
+                "name": "Base Plan",
+                "sides": [],
+                "missions": [],
+                "aircraft": [],
+                "ships": [],
+                "facilities": [],
+                "airbases": [],
+            }
+        },
+    )
+
+    compare_session = await svc.fork_compare_session(
+        db_session,
+        user,
+        source.id,
+        payload=ScenarioCompareForkCreate(branch_count=3),
+    )
+
+    assert compare_session.source_scenario_id == source.id
+    assert compare_session.baseline_scenario_id == source.id
+    assert len(compare_session.scenario_ids) == 4
+    assert compare_session.scenario_ids[0] == source.id
+
+    branches = [
+        await svc.get_scenario(db_session, user, scenario_id)
+        for scenario_id in compare_session.scenario_ids[1:]
+    ]
+    assert [branch.branch_meta["branch_label"] for branch in branches] == [
+        "方案 1",
+        "方案 2",
+        "方案 3",
+    ]
+    assert all(branch.branch_meta["parent_scenario_id"] == source.id for branch in branches)

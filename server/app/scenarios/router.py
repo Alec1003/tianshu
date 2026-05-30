@@ -41,7 +41,13 @@ from app.scenarios.schemas import (
     AarRecordCreate,
     AarRecordRead,
     ScenarioBranchCreate,
+    ScenarioCompareForkCreate,
     ScenarioCompareResponse,
+    ScenarioCompareReportCreate,
+    ScenarioCompareReportRead,
+    ScenarioCompareSessionCreate,
+    ScenarioCompareSessionRead,
+    ScenarioCompareSessionUpdate,
     ScenarioCreate,
     ScenarioDetail,
     ScenarioListItem,
@@ -143,6 +149,160 @@ async def compare_scenarios(
     )
 
 
+@router.get("/compare/reports", response_model=list[ScenarioCompareReportRead])
+async def list_compare_reports(
+    limit: int = 50,
+    user: User = Depends(current_active_user),
+    session: AsyncSession = Depends(get_async_session),
+):
+    try:
+        return await scenario_service.list_compare_reports(
+            session,
+            user,
+            limit=limit,
+        )
+    except ScenarioServiceError as exc:
+        _raise_scenario_http(exc)
+
+
+@router.post(
+    "/compare/reports",
+    response_model=ScenarioCompareReportRead,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_compare_report(
+    payload: ScenarioCompareReportCreate,
+    user: User = Depends(current_active_user),
+    session: AsyncSession = Depends(get_async_session),
+):
+    try:
+        return await scenario_service.create_compare_report(
+            session,
+            user,
+            payload=payload,
+        )
+    except ScenarioServiceError as exc:
+        _raise_scenario_http(exc)
+
+
+@router.get("/compare/sessions", response_model=list[ScenarioCompareSessionRead])
+async def list_compare_sessions(
+    limit: int = 50,
+    user: User = Depends(current_active_user),
+    session: AsyncSession = Depends(get_async_session),
+):
+    try:
+        return await scenario_service.list_compare_sessions(
+            session,
+            user,
+            limit=limit,
+        )
+    except ScenarioServiceError as exc:
+        _raise_scenario_http(exc)
+
+
+@router.post(
+    "/compare/sessions",
+    response_model=ScenarioCompareSessionRead,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_compare_session(
+    payload: ScenarioCompareSessionCreate,
+    user: User = Depends(current_active_user),
+    session: AsyncSession = Depends(get_async_session),
+):
+    try:
+        return await scenario_service.create_compare_session(
+            session,
+            user,
+            payload=payload,
+        )
+    except ScenarioServiceError as exc:
+        _raise_scenario_http(exc)
+
+
+@router.get(
+    "/compare/sessions/{compare_session_id}",
+    response_model=ScenarioCompareSessionRead,
+)
+async def get_compare_session(
+    compare_session_id: str,
+    user: User = Depends(current_active_user),
+    session: AsyncSession = Depends(get_async_session),
+):
+    try:
+        return await scenario_service.get_compare_session(
+            session,
+            user,
+            compare_session_id,
+        )
+    except ScenarioServiceError as exc:
+        _raise_scenario_http(exc)
+
+
+@router.patch(
+    "/compare/sessions/{compare_session_id}",
+    response_model=ScenarioCompareSessionRead,
+)
+async def update_compare_session(
+    compare_session_id: str,
+    payload: ScenarioCompareSessionUpdate,
+    user: User = Depends(current_active_user),
+    session: AsyncSession = Depends(get_async_session),
+):
+    try:
+        return await scenario_service.update_compare_session(
+            session,
+            user,
+            compare_session_id,
+            payload=payload,
+        )
+    except ScenarioServiceError as exc:
+        _raise_scenario_http(exc)
+
+
+@router.delete(
+    "/compare/sessions/{compare_session_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_class=Response,
+)
+async def delete_compare_session(
+    compare_session_id: str,
+    user: User = Depends(current_active_user),
+    session: AsyncSession = Depends(get_async_session),
+) -> Response:
+    try:
+        await scenario_service.delete_compare_session(
+            session,
+            user,
+            compare_session_id,
+        )
+    except ScenarioServiceError as exc:
+        _raise_scenario_http(exc)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.delete(
+    "/compare/reports/{report_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_class=Response,
+)
+async def delete_compare_report(
+    report_id: str,
+    user: User = Depends(current_active_user),
+    session: AsyncSession = Depends(get_async_session),
+) -> Response:
+    try:
+        await scenario_service.delete_compare_report(
+            session,
+            user,
+            report_id,
+        )
+    except ScenarioServiceError as exc:
+        _raise_scenario_http(exc)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
 @router.get("/{scenario_id}", response_model=ScenarioDetail)
 async def get_scenario(
     scenario_id: str,
@@ -196,6 +356,28 @@ async def create_scenario_branch(
             branch_label=payload.branch_label,
             status=payload.status,
             data=payload.data,
+        )
+    except ScenarioServiceError as exc:
+        _raise_scenario_http(exc)
+
+
+@router.post(
+    "/{scenario_id}/compare-session/fork",
+    response_model=ScenarioCompareSessionRead,
+    status_code=status.HTTP_201_CREATED,
+)
+async def fork_compare_session(
+    scenario_id: str,
+    payload: ScenarioCompareForkCreate,
+    user: User = Depends(current_active_user),
+    session: AsyncSession = Depends(get_async_session),
+) -> ScenarioCompareSessionRead:
+    try:
+        return await scenario_service.fork_compare_session(
+            session,
+            user,
+            scenario_id,
+            payload=payload,
         )
     except ScenarioServiceError as exc:
         _raise_scenario_http(exc)

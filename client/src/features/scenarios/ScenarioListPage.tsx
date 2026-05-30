@@ -27,6 +27,7 @@ import {
   Edit3,
   Eye,
   FileInput,
+  FileText,
   FolderKanban,
   GitBranch,
   LayoutGrid,
@@ -51,9 +52,10 @@ import {
 import { ApiError } from "@/api/client";
 import BrandLogo from "@/components/brand/BrandLogo";
 import {
+  createScenarioBranch,
   createScenario,
   deleteScenario,
-  getScenario,
+  forkScenarioCompareSession,
   listScenarios,
 } from "@/api/scenarios";
 import {
@@ -66,6 +68,8 @@ import {
   updateUnitAsset,
 } from "@/api/unitAssets";
 import type {
+  ScenarioCompareReport,
+  ScenarioCompareSession,
   ScenarioListItem,
   ScenarioStatus,
   UnitAsset as ApiUnitAsset,
@@ -75,6 +79,8 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useAuth } from "@/features/auth/useAuth";
 import ScenarioCompareDialog from "@/features/scenarios/ScenarioCompareDialog";
+import ScenarioCompareReportsDialog from "@/features/scenarios/ScenarioCompareReportsDialog";
+import ScenarioCompareSessionsDialog from "@/features/scenarios/ScenarioCompareSessionsDialog";
 import Dba from "@/game/db/Dba";
 import type { IAircraftModel } from "@/game/db/models/Aircraft";
 import type { IAirbaseModel } from "@/game/db/models/Airbase";
@@ -89,6 +95,10 @@ import {
 import { localizeUnitAssetName } from "@/i18n/entityNames";
 import { cn } from "@/lib/utils";
 import blankScenarioJson from "@/scenarios/blank_scenario.json";
+import {
+  buildScenarioCompareRestoreState,
+  buildScenarioCompareRestoreStateFromSession,
+} from "./scenarioCompare";
 import { projectMetrics } from "./scenarioMetrics";
 
 const EMPTY_SCENARIO_DATA = blankScenarioJson as Record<string, unknown>;
@@ -372,7 +382,14 @@ export default function ScenarioListPage() {
   const [activeModule, setActiveModule] = useState<WorkspaceModule>("projects");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [compareOpen, setCompareOpen] = useState(false);
+  const [compareReportsOpen, setCompareReportsOpen] = useState(false);
+  const [compareSessionsOpen, setCompareSessionsOpen] = useState(false);
   const [compareIds, setCompareIds] = useState<string[]>([]);
+  const [compareRestoreState, setCompareRestoreState] = useState<ReturnType<
+    typeof buildScenarioCompareRestoreState
+  > | null>(null);
+  const [compareSession, setCompareSession] =
+    useState<ScenarioCompareSession | null>(null);
   const [accountOpen, setAccountOpen] = useState(false);
   const accountRef = useRef<HTMLDivElement | null>(null);
 
@@ -456,23 +473,10 @@ export default function ScenarioListPage() {
 
   const handleDuplicate = async (item: ScenarioListItem) => {
     try {
-      const detail = await getScenario(item.id);
       const branchDepth = (item.branch_meta?.branch_depth ?? 0) + 1;
-      const payload = JSON.parse(JSON.stringify(detail.data)) as Record<
-        string,
-        unknown
-      >;
-      const currentScenario = payload.currentScenario as
-        | Record<string, unknown>
-        | undefined;
-      if (currentScenario) {
-        currentScenario.id = crypto.randomUUID();
-        currentScenario.name = `${item.name} / 分支 ${branchDepth}`;
-      }
-      const created = await createScenario({
+      const created = await createScenarioBranch(item.id, {
         name: `${item.name} / 分支 ${branchDepth}`,
         description: item.description,
-        data: payload,
         status: "draft",
       });
       navigate(`/play/${created.id}`);
@@ -493,6 +497,51 @@ export default function ScenarioListPage() {
       return [...prev, item.id];
     });
   }, []);
+
+  const handleOpenCompareReport = useCallback(
+    (report: ScenarioCompareReport) => {
+      setCompareReportsOpen(false);
+      setCompareSession(null);
+      setCompareIds(report.scenario_ids);
+      setCompareRestoreState(buildScenarioCompareRestoreState(report));
+      setCompareOpen(true);
+    },
+    []
+  );
+
+  const handleOpenCompareSession = useCallback(
+    (session: ScenarioCompareSession) => {
+      setCompareSessionsOpen(false);
+      setCompareSession(session);
+      setCompareIds(session.scenario_ids);
+      setCompareRestoreState(
+        buildScenarioCompareRestoreStateFromSession(session)
+      );
+      setCompareOpen(true);
+    },
+    []
+  );
+
+  const handleForkCompareSession = useCallback(
+    async (item: ScenarioListItem) => {
+      try {
+        const session = await forkScenarioCompareSession(item.id, {
+          branch_count: 3,
+        });
+        setCompareSession(session);
+        setCompareIds(session.scenario_ids);
+        setCompareRestoreState(
+          buildScenarioCompareRestoreStateFromSession(session)
+        );
+        setCompareOpen(true);
+      } catch (err) {
+        window.alert(
+          err instanceof ApiError ? err.message : "创建对比会话失败"
+        );
+      }
+    },
+    []
+  );
 
   return (
     <div className="dark relative min-h-screen overflow-hidden bg-[#020612] text-slate-100">
@@ -594,7 +643,45 @@ export default function ScenarioListPage() {
                     type="button"
                     variant="ghost"
                     className="h-12 rounded-xl border border-cyan-200/15 bg-slate-950/45 px-5 text-slate-200 hover:bg-white/[0.06]"
-                    onClick={() => setCompareOpen(true)}
+                    onClick={() => setCompareSessionsOpen(true)}
+                  >
+                    <GitBranch className="size-4" />
+                    对比会话
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="h-12 rounded-xl border border-cyan-200/15 bg-slate-950/45 px-5 text-slate-200 hover:bg-white/[0.06]"
+                    onClick={() => setCompareReportsOpen(true)}
+                  >
+                    <FileText className="size-4" />
+                    对比报告
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="h-12 rounded-xl border border-cyan-200/15 bg-slate-950/45 px-5 text-slate-200 hover:bg-white/[0.06]"
+                    onClick={() => {
+                      const sourceId = compareIds[0];
+                      const source = myScenarios.find(
+                        (item) => item.id === sourceId
+                      );
+                      if (source) void handleForkCompareSession(source);
+                    }}
+                    disabled={compareIds.length !== 1}
+                  >
+                    <GitBranch className="size-4" />
+                    三方案对比
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="h-12 rounded-xl border border-cyan-200/15 bg-slate-950/45 px-5 text-slate-200 hover:bg-white/[0.06]"
+                    onClick={() => {
+                      setCompareSession(null);
+                      setCompareRestoreState(null);
+                      setCompareOpen(true);
+                    }}
                     disabled={compareIds.length < 2}
                   >
                     <ArrowRightLeft className="size-4" />
@@ -707,6 +794,9 @@ export default function ScenarioListPage() {
                 onToggleCompare={
                   isTemplateWorkspace ? undefined : handleToggleCompare
                 }
+                onForkCompareSession={
+                  isTemplateWorkspace ? undefined : handleForkCompareSession
+                }
                 onDelete={isTemplateWorkspace ? undefined : handleDelete}
               />
             ) : (
@@ -716,6 +806,12 @@ export default function ScenarioListPage() {
                 onOpen={handleOpen}
                 compareIds={compareIds}
                 onDuplicate={isTemplateWorkspace ? undefined : handleDuplicate}
+                onToggleCompare={
+                  isTemplateWorkspace ? undefined : handleToggleCompare
+                }
+                onForkCompareSession={
+                  isTemplateWorkspace ? undefined : handleForkCompareSession
+                }
                 onDelete={isTemplateWorkspace ? undefined : handleDelete}
               />
             )}
@@ -736,8 +832,28 @@ export default function ScenarioListPage() {
       <ScenarioCompareDialog
         open={compareOpen}
         scenarioIds={compareIds}
-        onClose={() => setCompareOpen(false)}
+        onClose={() => {
+          setCompareOpen(false);
+          setCompareSession(null);
+          setCompareRestoreState(null);
+        }}
         onOpenScenario={(id) => navigate(`/play/${id}`)}
+        initialRestoreState={compareRestoreState}
+        initialSession={compareSession}
+      />
+
+      <ScenarioCompareSessionsDialog
+        open={compareSessionsOpen}
+        onClose={() => setCompareSessionsOpen(false)}
+        onOpenScenario={(id) => navigate(`/play/${id}`)}
+        onOpenCompare={handleOpenCompareSession}
+      />
+
+      <ScenarioCompareReportsDialog
+        open={compareReportsOpen}
+        onClose={() => setCompareReportsOpen(false)}
+        onOpenScenario={(id) => navigate(`/play/${id}`)}
+        onOpenCompare={handleOpenCompareReport}
       />
     </div>
   );
@@ -846,6 +962,7 @@ interface ProjectActions {
   onOpen: (id: string) => void;
   onDuplicate?: (item: ScenarioListItem) => void;
   onToggleCompare?: (item: ScenarioListItem) => void;
+  onForkCompareSession?: (item: ScenarioListItem) => void;
   onDelete?: (id: string, name: string) => void;
   compareIds?: string[];
   isTemplateSection?: boolean;
@@ -856,6 +973,7 @@ function ProjectGrid({
   onOpen,
   onDuplicate,
   onToggleCompare,
+  onForkCompareSession,
   onDelete,
   compareIds = [],
   isTemplateSection,
@@ -873,6 +991,9 @@ function ProjectGrid({
           onToggleCompare={
             onToggleCompare ? () => onToggleCompare(item) : undefined
           }
+          onForkCompareSession={
+            onForkCompareSession ? () => onForkCompareSession(item) : undefined
+          }
           onDelete={onDelete ? () => onDelete(item.id, item.name) : undefined}
           isTemplateSection={isTemplateSection}
         />
@@ -888,6 +1009,7 @@ function ProjectCard({
   selectedForCompare,
   onDuplicate,
   onToggleCompare,
+  onForkCompareSession,
   onDelete,
   isTemplateSection,
 }: {
@@ -897,6 +1019,7 @@ function ProjectCard({
   selectedForCompare?: boolean;
   onDuplicate?: () => void;
   onToggleCompare?: () => void;
+  onForkCompareSession?: () => void;
   onDelete?: () => void;
   isTemplateSection?: boolean;
 }) {
@@ -1011,6 +1134,7 @@ function ProjectCard({
                 onOpen={onOpen}
                 onDuplicate={onDuplicate}
                 onToggleCompare={onToggleCompare}
+                onForkCompareSession={onForkCompareSession}
                 selectedForCompare={selectedForCompare}
                 onDelete={onDelete}
                 close={() => setMenuOpen(false)}
@@ -1027,6 +1151,7 @@ function ProjectMenu({
   onOpen,
   onDuplicate,
   onToggleCompare,
+  onForkCompareSession,
   selectedForCompare,
   onDelete,
   close,
@@ -1034,6 +1159,7 @@ function ProjectMenu({
   onOpen: () => void;
   onDuplicate?: () => void;
   onToggleCompare?: () => void;
+  onForkCompareSession?: () => void;
   selectedForCompare?: boolean;
   onDelete?: () => void;
   close: () => void;
@@ -1075,6 +1201,19 @@ function ProjectMenu({
         >
           <ArrowRightLeft className="size-3.5 text-cyan-200" />
           {selectedForCompare ? "移出对比" : "加入对比"}
+        </button>
+      )}
+      {onForkCompareSession && (
+        <button
+          type="button"
+          onClick={() => {
+            close();
+            onForkCompareSession();
+          }}
+          className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-slate-200 hover:bg-white/[0.05]"
+        >
+          <GitBranch className="size-3.5 text-cyan-200" />
+          三方案对比
         </button>
       )}
       {onDelete && (
@@ -1151,6 +1290,8 @@ function ProjectList({
   items,
   onOpen,
   onDuplicate,
+  onToggleCompare,
+  onForkCompareSession,
   onDelete,
   compareIds = [],
   isTemplateSection,
@@ -1226,6 +1367,26 @@ function ProjectList({
                       >
                         <CopyIcon className="size-3.5" />
                         复制
+                      </button>
+                    )}
+                    {onToggleCompare && (
+                      <button
+                        type="button"
+                        onClick={() => onToggleCompare(item)}
+                        className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs text-cyan-200 hover:bg-cyan-300/10"
+                      >
+                        <ArrowRightLeft className="size-3.5" />
+                        {compareIds.includes(item.id) ? "移出对比" : "加入对比"}
+                      </button>
+                    )}
+                    {onForkCompareSession && (
+                      <button
+                        type="button"
+                        onClick={() => onForkCompareSession(item)}
+                        className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs text-slate-300 hover:bg-white/5"
+                      >
+                        <GitBranch className="size-3.5" />
+                        三方案
                       </button>
                     )}
                     {onDelete && (

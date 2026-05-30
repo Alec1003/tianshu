@@ -31,12 +31,20 @@ from app.scenarios.models import (
     BRANCH_META_KEY,
     AarRecord,
     Scenario,
+    ScenarioCompareReport,
+    ScenarioCompareSession,
     TrainingScoreRecord,
     extract_branch_meta,
 )
 from app.scenarios.schemas import (
     VALID_STATUSES,
     ScenarioCompareItem,
+    ScenarioCompareForkCreate,
+    ScenarioCompareReportCreate,
+    ScenarioCompareSessionCreate,
+    ScenarioCompareSessionState,
+    ScenarioCompareSessionUpdate,
+    ScenarioCompareSnapshot,
     TrainingScoreResponse,
 )
 from app.scenarios.training_score import build_training_score
@@ -462,3 +470,338 @@ async def build_scenario_compare_items(
             )
         )
     return items
+
+
+def _normalize_compare_ids(scenario_ids: Sequence[str]) -> list[str]:
+    ordered_ids = [str(item).strip() for item in scenario_ids if str(item).strip()]
+    deduped = list(dict.fromkeys(ordered_ids))
+    if len(deduped) < 2:
+        raise ScenarioInvalidError(
+            "scenario_ids", "comparison requires at least two scenarios"
+        )
+    if len(deduped) > 4:
+        raise ScenarioInvalidError(
+            "scenario_ids", "comparison supports up to four scenarios"
+        )
+    return deduped
+
+
+def _normalize_compare_session_state(
+    *,
+    baseline_id: str,
+    scenario_ids: list[str],
+    state: ScenarioCompareSessionState,
+) -> ScenarioCompareSessionState:
+    if state.baseline_id != baseline_id:
+        raise ScenarioInvalidError(
+            "state.baseline_id", "state baseline_id must match request baseline_id"
+        )
+    if baseline_id not in scenario_ids:
+        raise ScenarioInvalidError(
+            "baseline_id", "baseline must be included in scenario_ids"
+        )
+
+    normalized_sources: dict[str, str] = {}
+    for scenario_id, source_id in state.selected_sources.items():
+        normalized_scenario_id = str(scenario_id).strip()
+        normalized_source_id = str(source_id).strip() or "live"
+        if normalized_scenario_id not in scenario_ids:
+            raise ScenarioInvalidError(
+                "state.selected_sources",
+                "state references scenario ids outside scenario_ids",
+            )
+        normalized_sources[normalized_scenario_id] = normalized_source_id
+
+    for scenario_id in scenario_ids:
+        normalized_sources.setdefault(scenario_id, "live")
+
+    return ScenarioCompareSessionState(
+        baseline_id=baseline_id,
+        selected_sources=normalized_sources,
+    )
+
+
+def _default_compare_session_title(baseline: Scenario) -> str:
+    return f"{baseline.name} 多方案对比"
+
+
+def _validate_compare_snapshot(
+    payload: ScenarioCompareReportCreate,
+    scenario_ids: list[str],
+) -> ScenarioCompareSnapshot:
+    snapshot = payload.snapshot
+    if snapshot.baseline_id != payload.baseline_id:
+        raise ScenarioInvalidError(
+            "baseline_id", "snapshot baseline_id must match request baseline_id"
+        )
+    snapshot_ids = [item.id for item in snapshot.items]
+    if list(dict.fromkeys(snapshot_ids)) != snapshot_ids:
+        raise ScenarioInvalidError(
+            "snapshot.items", "snapshot scenario ids must be unique"
+        )
+    if set(snapshot_ids) != set(scenario_ids):
+        raise ScenarioInvalidError(
+            "snapshot.items", "snapshot scenario ids must match scenario_ids"
+        )
+    if payload.baseline_id not in snapshot_ids:
+        raise ScenarioInvalidError(
+            "baseline_id", "baseline must be included in scenario_ids"
+        )
+    return snapshot
+
+
+async def create_compare_report(
+    session: AsyncSession,
+    user: User,
+    *,
+    payload: ScenarioCompareReportCreate,
+) -> ScenarioCompareReport:
+    scenario_ids = _normalize_compare_ids(payload.scenario_ids)
+    _validate_compare_snapshot(payload, scenario_ids)
+
+    scenarios_by_id: dict[str, Scenario] = {}
+    for scenario_id in scenario_ids:
+        scenarios_by_id[scenario_id] = await get_scenario(session, user, scenario_id)
+
+    baseline = scenarios_by_id.get(payload.baseline_id)
+    if baseline is None:
+        raise ScenarioInvalidError(
+            "baseline_id", "baseline must be included in scenario_ids"
+        )
+
+    title = (payload.title or "").strip() or f"{baseline.name} 对比报告"
+    if len(title) > 120:
+        raise ScenarioInvalidError("title", "exceeds 120 chars")
+
+    report = ScenarioCompareReport(
+        owner_id=user.id,
+        title=title,
+        baseline_scenario_id=payload.baseline_id,
+        scenario_ids=scenario_ids,
+        snapshot=payload.snapshot.model_dump(mode="json"),
+    )
+    session.add(report)
+    await session.commit()
+    await session.refresh(report)
+    return report
+
+
+async def create_compare_session(
+    session: AsyncSession,
+    user: User,
+    *,
+    payload: ScenarioCompareSessionCreate,
+) -> ScenarioCompareSession:
+    scenario_ids = _normalize_compare_ids(payload.scenario_ids)
+    baseline_id = payload.baseline_id
+    normalized_state = _normalize_compare_session_state(
+        baseline_id=baseline_id,
+        scenario_ids=scenario_ids,
+        state=payload.state,
+    )
+
+    scenarios_by_id: dict[str, Scenario] = {}
+    for scenario_id in scenario_ids:
+        scenarios_by_id[scenario_id] = await get_scenario(session, user, scenario_id)
+
+    baseline = scenarios_by_id.get(baseline_id)
+    if baseline is None:
+        raise ScenarioInvalidError(
+            "baseline_id", "baseline must be included in scenario_ids"
+        )
+
+    source_scenario_id = None
+    if payload.source_scenario_id:
+        source_scenario_id = str(payload.source_scenario_id).strip()
+        if not source_scenario_id:
+            source_scenario_id = None
+        else:
+            await get_scenario(session, user, source_scenario_id)
+
+    title = (payload.title or "").strip() or _default_compare_session_title(baseline)
+    if len(title) > 120:
+        raise ScenarioInvalidError("title", "exceeds 120 chars")
+
+    compare_session = ScenarioCompareSession(
+        owner_id=user.id,
+        title=title,
+        source_scenario_id=source_scenario_id,
+        baseline_scenario_id=baseline_id,
+        scenario_ids=scenario_ids,
+        state=normalized_state.model_dump(mode="json"),
+    )
+    session.add(compare_session)
+    await session.commit()
+    await session.refresh(compare_session)
+    return compare_session
+
+
+async def list_compare_sessions(
+    session: AsyncSession,
+    user: User,
+    *,
+    limit: int = 50,
+) -> Sequence[ScenarioCompareSession]:
+    limit = max(1, min(int(limit), 100))
+    stmt = (
+        select(ScenarioCompareSession)
+        .where(ScenarioCompareSession.owner_id == user.id)
+        .order_by(ScenarioCompareSession.updated_at.desc())
+        .limit(limit)
+    )
+    rows = await session.execute(stmt)
+    return rows.scalars().all()
+
+
+async def get_compare_session(
+    session: AsyncSession,
+    user: User,
+    compare_session_id: str,
+) -> ScenarioCompareSession:
+    compare_session = await session.get(ScenarioCompareSession, compare_session_id)
+    if compare_session is None:
+        raise ScenarioNotFoundError(compare_session_id)
+    if str(compare_session.owner_id) != str(user.id):
+        raise ScenarioForbiddenError(compare_session.id, "not the owner")
+
+    for scenario_id in compare_session.scenario_ids:
+        await get_scenario(session, user, scenario_id)
+    if compare_session.source_scenario_id:
+        await get_scenario(session, user, compare_session.source_scenario_id)
+
+    return compare_session
+
+
+async def update_compare_session(
+    session: AsyncSession,
+    user: User,
+    compare_session_id: str,
+    *,
+    payload: ScenarioCompareSessionUpdate,
+) -> ScenarioCompareSession:
+    compare_session = await get_compare_session(session, user, compare_session_id)
+
+    next_scenario_ids = (
+        _normalize_compare_ids(payload.scenario_ids)
+        if payload.scenario_ids is not None
+        else list(compare_session.scenario_ids)
+    )
+    next_baseline_id = payload.baseline_id or compare_session.baseline_scenario_id
+    raw_state = payload.state or ScenarioCompareSessionState.model_validate(
+        compare_session.state
+    )
+    normalized_state = _normalize_compare_session_state(
+        baseline_id=next_baseline_id,
+        scenario_ids=next_scenario_ids,
+        state=raw_state,
+    )
+
+    scenarios_by_id: dict[str, Scenario] = {}
+    for scenario_id in next_scenario_ids:
+        scenarios_by_id[scenario_id] = await get_scenario(session, user, scenario_id)
+
+    baseline = scenarios_by_id.get(next_baseline_id)
+    if baseline is None:
+        raise ScenarioInvalidError(
+            "baseline_id", "baseline must be included in scenario_ids"
+        )
+
+    if payload.title is not None:
+        title = payload.title.strip() or _default_compare_session_title(baseline)
+        if len(title) > 120:
+            raise ScenarioInvalidError("title", "exceeds 120 chars")
+        compare_session.title = title
+
+    compare_session.baseline_scenario_id = next_baseline_id
+    compare_session.scenario_ids = next_scenario_ids
+    compare_session.state = normalized_state.model_dump(mode="json")
+
+    await session.commit()
+    await session.refresh(compare_session)
+    return compare_session
+
+
+async def delete_compare_session(
+    session: AsyncSession,
+    user: User,
+    compare_session_id: str,
+) -> None:
+    compare_session = await session.get(ScenarioCompareSession, compare_session_id)
+    if compare_session is None:
+        raise ScenarioNotFoundError(compare_session_id)
+    if str(compare_session.owner_id) != str(user.id):
+        raise ScenarioForbiddenError(compare_session.id, "not the owner")
+    await session.delete(compare_session)
+    await session.commit()
+
+
+async def fork_compare_session(
+    session: AsyncSession,
+    user: User,
+    source_scenario_id: str,
+    *,
+    payload: ScenarioCompareForkCreate,
+) -> ScenarioCompareSession:
+    source = await get_scenario(session, user, source_scenario_id)
+
+    branch_count = int(payload.branch_count)
+    branches: list[Scenario] = []
+    for index in range(branch_count):
+        branch = await create_branch_scenario(
+            session,
+            user,
+            source.id,
+            name=f"{source.name} / 分支 {index + 1}",
+            branch_label=f"方案 {index + 1}",
+            description=source.description,
+            status="draft",
+        )
+        branches.append(branch)
+
+    scenario_ids = [source.id, *[branch.id for branch in branches]]
+    compare_session = await create_compare_session(
+        session,
+        user,
+        payload=ScenarioCompareSessionCreate(
+            title=f"{source.name} {branch_count}方案对比",
+            source_scenario_id=source.id,
+            baseline_id=source.id,
+            scenario_ids=scenario_ids,
+            state=ScenarioCompareSessionState(
+                baseline_id=source.id,
+                selected_sources={scenario_id: "live" for scenario_id in scenario_ids},
+            ),
+        ),
+    )
+    return compare_session
+
+
+async def list_compare_reports(
+    session: AsyncSession,
+    user: User,
+    *,
+    limit: int = 50,
+) -> Sequence[ScenarioCompareReport]:
+    limit = max(1, min(int(limit), 100))
+    stmt = (
+        select(ScenarioCompareReport)
+        .where(ScenarioCompareReport.owner_id == user.id)
+        .order_by(ScenarioCompareReport.created_at.desc())
+        .limit(limit)
+    )
+    rows = await session.execute(stmt)
+    return rows.scalars().all()
+
+
+async def delete_compare_report(
+    session: AsyncSession,
+    user: User,
+    report_id: str,
+) -> None:
+    report = await session.get(ScenarioCompareReport, report_id)
+    if report is None:
+        raise ScenarioNotFoundError(report_id)
+    if str(report.owner_id) != str(user.id):
+        raise ScenarioForbiddenError(report.id, "not the owner")
+    await session.delete(report)
+    await session.commit()

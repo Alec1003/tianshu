@@ -186,6 +186,102 @@ export interface ScenarioCompareResponse {
   items: ScenarioCompareItem[];
 }
 
+export interface ScenarioCompareSnapshotSource {
+  id: string;
+  label: string;
+  archived_record_id: string | null;
+}
+
+export interface ScenarioCompareSnapshotScore {
+  overall_score: number;
+  grade: string;
+  confidence: string;
+  generated_at: string;
+}
+
+export interface ScenarioCompareSnapshotDeltas {
+  versus_baseline: number | null;
+  versus_latest_archived: number | null;
+  versus_live: number | null;
+}
+
+export interface ScenarioCompareSnapshotSummary {
+  mission_count: number;
+  unit_count: number;
+  timeline_event_count: number;
+  aar_count: number;
+}
+
+export interface ScenarioCompareSnapshotItem {
+  id: string;
+  name: string;
+  baseline: boolean;
+  source: ScenarioCompareSnapshotSource;
+  score: ScenarioCompareSnapshotScore;
+  score_deltas: ScenarioCompareSnapshotDeltas;
+  summary: ScenarioCompareSnapshotSummary;
+}
+
+export interface ScenarioCompareSnapshot {
+  generated_at: string;
+  baseline_id: string;
+  baseline_name: string;
+  items: ScenarioCompareSnapshotItem[];
+}
+
+export interface ScenarioCompareReportCreatePayload {
+  title?: string;
+  baseline_id: string;
+  scenario_ids: string[];
+  snapshot: ScenarioCompareSnapshot;
+}
+
+export interface ScenarioCompareReport {
+  id: string;
+  owner_id: string | null;
+  title: string;
+  baseline_scenario_id: string;
+  scenario_ids: string[];
+  snapshot: ScenarioCompareSnapshot;
+  created_at: string;
+}
+
+export interface ScenarioCompareSessionState {
+  baseline_id: string;
+  selected_sources: Record<string, string>;
+}
+
+export interface ScenarioCompareSessionCreatePayload {
+  title?: string;
+  source_scenario_id?: string | null;
+  baseline_id: string;
+  scenario_ids: string[];
+  state: ScenarioCompareSessionState;
+}
+
+export interface ScenarioCompareSessionUpdatePayload {
+  title?: string;
+  baseline_id?: string;
+  scenario_ids?: string[];
+  state?: ScenarioCompareSessionState;
+}
+
+export interface ScenarioCompareSession {
+  id: string;
+  owner_id: string | null;
+  title: string;
+  source_scenario_id: string | null;
+  baseline_scenario_id: string;
+  scenario_ids: string[];
+  state: ScenarioCompareSessionState;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ScenarioCompareForkCreatePayload {
+  branch_count?: number;
+}
+
 export interface SkillExecutionResult {
   skill: string;
   status: "ok" | "error";

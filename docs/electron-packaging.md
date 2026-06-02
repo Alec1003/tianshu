@@ -67,7 +67,9 @@ and download updates.
 ## Notes
 
 - The app is unsigned by default. Windows SmartScreen may warn until a signing
-  certificate is configured.
+  certificate is configured. The current unsigned CI build explicitly excludes
+  `.exe` files from electron-builder signing via `win.signExts: ["!.exe"]`;
+  remove that exclusion when a real Windows code-signing certificate is wired.
 - The backend is bound to loopback only; do not change it to `0.0.0.0` for
   desktop packaging.
 - Do not store custom skills in renderer `localStorage`; keep them in the

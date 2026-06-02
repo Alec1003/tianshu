@@ -58,12 +58,32 @@ jobs:
       - name: Build unpacked app
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
+          DEBUG: electron-builder
         run: npx electron-builder --win --dir
 
       - name: Build NSIS installer
+        shell: pwsh
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
-        run: npx electron-builder --win nsis
+          DEBUG: electron-builder
+        run: |
+          New-Item -ItemType Directory -Force dist-electron | Out-Null
+          npx electron-builder --win nsis *>&1 | Tee-Object -FilePath dist-electron\electron-builder-nsis.log
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
+      - name: Upload Electron diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: electron-release-diagnostics
+          path: |
+            dist-electron/electron-builder-nsis.log
+            dist-electron/builder-debug.yml
+            dist-electron/latest.yml
+            dist-electron/*.blockmap
+          if-no-files-found: ignore
 
       - name: Publish GitHub Release assets
         if: startsWith(github.ref, 'refs/tags/')

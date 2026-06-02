@@ -225,6 +225,15 @@ function installMenu() {
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
 
+function isTrustedExternalUrl(rawUrl) {
+  try {
+    const url = new URL(rawUrl);
+    return url.protocol === "https:" || url.protocol === "http:";
+  } catch {
+    return false;
+  }
+}
+
 function sendUpdateStatus(payload) {
   mainWindow?.webContents.send("desktop:update-status", payload);
 }
@@ -298,14 +307,26 @@ async function createMainWindow() {
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false,
+      sandbox: true,
       preload: path.join(__dirname, "preload.cjs")
     }
   });
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url);
+    if (isTrustedExternalUrl(url)) {
+      shell.openExternal(url);
+    }
     return { action: "deny" };
+  });
+
+  mainWindow.webContents.on("will-navigate", (event, url) => {
+    if (url.startsWith(desktopServer.url)) {
+      return;
+    }
+    event.preventDefault();
+    if (isTrustedExternalUrl(url)) {
+      shell.openExternal(url);
+    }
   });
 
   await mainWindow.loadURL(`${desktopServer.url}/scenarios`);

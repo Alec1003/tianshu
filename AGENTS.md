@@ -79,9 +79,11 @@ The MCP server and `/api/ai/command` operate on the **same** `AICCRuntime` insta
 
 - Root `package.json` owns desktop packaging. `electron-builder` publishes to GitHub repo `Alec1003/tianshu`; `electron-updater` checks that GitHub Releases feed in packaged builds.
 - `electron/main.cjs` starts the bundled FastAPI backend on `127.0.0.1:<random>` and a local Node static server on `127.0.0.1:<random>`. The static server serves `client/dist`, proxies `/api/*` to FastAPI, and loads `/scenarios`, so React keeps using the same relative API paths as Docker production.
+- Electron windows should keep `contextIsolation: true`, `nodeIntegration: false`, and `sandbox: true`; expose desktop capabilities only through named preload APIs, and keep external navigation default-deny with an http/https allowlist.
 - Packaged read-only resources are copied via `extraResources`: `server/`, `gym/`, `client/dist/`, `client/src/scenarios/`, and `.python312/`.
 - Mutable desktop data must stay outside `app.asar`: Electron sets `AICC_USER_DATA_DIR`, `AICC_SKILLS_DIR`, SQLite `AICC_DATABASE_URL`, generated JWT/model secrets, and backend logs under `app.getPath("userData")`.
 - Release/update flow: bump root `package.json` version, commit, tag `vX.Y.Z`, then push the branch and tag to `tianshu`. The `.github/workflows/electron-release.yml` workflow publishes the installer and `latest.yml` update metadata.
+- Current unsigned Windows CI builds deliberately set `win.signExts: ["!.exe"]` so NSIS installer/uninstaller signing is skipped. Remove that exclusion only after a real Windows code-signing certificate is configured.
 - Do not bind the desktop backend to `0.0.0.0`; it is an internal loopback service.
 
 ## Environment variables

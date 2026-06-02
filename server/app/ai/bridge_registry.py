@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 from pathlib import Path
 from threading import RLock
 from typing import Protocol
@@ -8,6 +7,7 @@ from typing import Protocol
 from app.ai.bridge import AICCOpenClawBridge, DEFAULT_SCENARIO_PATH
 from app.aicc_runtime.runtime import AICCRuntime
 from app.aicc_runtime.persistence import runtime_context_id
+from app.platform.paths import default_scenario_path
 
 
 class UserRef(Protocol):
@@ -43,10 +43,8 @@ class AICCBridgeRegistry:
         from app.config import get_settings  # noqa: PLC0415
 
         settings = get_settings()
-        scenario_env = os.environ.get("AICC_MCP_RUNTIME_SCENARIO")
-        scenario_path = Path(scenario_env) if scenario_env else DEFAULT_SCENARIO_PATH
         return cls(
-            scenario_path=scenario_path,
+            scenario_path=default_scenario_path(),
             llm_model=settings.llm_model,
             llm_api_key=settings.llm_api_key,
             llm_base_url=settings.llm_base_url,

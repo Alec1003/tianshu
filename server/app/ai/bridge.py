@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-import os
 from pathlib import Path
 from typing import Any
 
@@ -17,11 +16,12 @@ from app.ai.models import (
 from app.ai.openclaw_sdk_adapter import OpenClawSDKAdapter
 from app.ai.pydantic_agent import build_agent
 from app.ai.skill_registry import AICCSkillRegistry
-from app.aicc_runtime.runtime import ROOT_DIR, AICCRuntime
+from app.aicc_runtime.runtime import AICCRuntime
+from app.platform.paths import default_scenario_path
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_SCENARIO_PATH = ROOT_DIR / "client" / "src" / "scenarios" / "SCS.json"
+DEFAULT_SCENARIO_PATH = default_scenario_path()
 
 
 class AICCOpenClawBridge:
@@ -72,10 +72,8 @@ class AICCOpenClawBridge:
         from app.config import get_settings  # noqa: PLC0415
 
         settings = get_settings()
-        scenario_env = os.environ.get("AICC_MCP_RUNTIME_SCENARIO")
-        scenario_path = Path(scenario_env) if scenario_env else DEFAULT_SCENARIO_PATH
         return cls(
-            scenario_path=scenario_path,
+            scenario_path=default_scenario_path(),
             llm_model=settings.llm_model,
             llm_api_key=settings.llm_api_key,
             llm_base_url=settings.llm_base_url,

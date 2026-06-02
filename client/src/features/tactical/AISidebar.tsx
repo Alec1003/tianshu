@@ -10,8 +10,8 @@
  *   /api/ai/runtime/scenario 刷新地图。
  * - 设置：MCP Servers（增删改 + enable toggle）/ Skills（后端已注册 + 用户
  *   自定义）/ 系统操作三段。模型配置已拆到独立 AI 模型配置中心。
- * - 持久化：modelConfig / mcpServers / customSkills / projectMcpEnabled
- *   使用 aicc.ai.* keys；chat 消息由于类型从
+ * - 持久化：modelConfig / mcpServers / projectMcpEnabled
+ *   使用 aicc.ai.* keys；customSkills 改由后端 skills folder 存储；chat 消息由于类型从
  *   ChatMessage 迁移到 UIMessage，另存为 aicc.ai.messages.v2。
  * - 主题：cyan/slate tactical，复用 shadcn Card/Button，TailwindCSS。
  *
@@ -52,12 +52,31 @@ import {
 
 import {
   approveCommandProposal,
+  createCustomSkill,
+  deleteCustomSkill,
   getRuntimeScenario,
+  listBackendSkills,
   listCommandProposals,
+  listCustomSkills,
   rejectCommandProposal,
+  updateCustomSkill,
 } from "@/api/ai";
+import {
+  getScenarioCompareSession,
+  simulateScenarioCompareSession,
+} from "@/api/scenarios";
 import { Button } from "@/components/ui/button";
-import type { CommandProposal } from "@/api/types";
+import type {
+  CommandProposal,
+  CustomSkill,
+  CustomSkillCreatePayload,
+  CustomSkillUpdatePayload,
+  RegisteredSkill,
+  SkillSchemaField,
+  ScenarioBatchSimulationResponse,
+  ScenarioCompareSession,
+  ScenarioPlanOption,
+} from "@/api/types";
 import type { CesiumBaseLayerKey } from "@/gui/map/CesiumMapTypes";
 import { cn } from "@/lib/utils";
 import { apiCall, getStoredToken } from "@/api/client";
@@ -72,6 +91,7 @@ import {
 } from "@/features/ai/modelProfiles";
 import ModelSwitcher from "@/features/ai/ModelSwitcher";
 import { useModelConfigStore } from "@/features/ai/modelStore";
+import ScenarioCompareDialog from "@/features/scenarios/ScenarioCompareDialog";
 import TacticalSettingsModal from "./TacticalSettingsModal";
 
 export type AISidebarTab = "chat" | "settings";
@@ -85,17 +105,23 @@ interface MCPServerConfig {
   enabled: boolean;
 }
 
-interface CustomSkillConfig {
-  id: string;
-  name: string;
-  description: string;
-  enabled: boolean;
+type CustomSkillConfig = CustomSkill;
+
+export interface AddCustomSkillOptions {
+  description?: string;
+  prompt?: string;
+  inputSchema?: SkillSchemaField[];
+  outputSchema?: SkillSchemaField[];
+  enabled?: boolean;
 }
 
-export interface RegisteredSkill {
-  name: string;
-  description: string;
-  parameters?: Record<string, unknown>;
+export interface UpdateCustomSkillOptions {
+  name?: string;
+  description?: string;
+  prompt?: string;
+  inputSchema?: SkillSchemaField[];
+  outputSchema?: SkillSchemaField[];
+  enabled?: boolean;
 }
 
 export interface ModelCheckResponse {
@@ -122,6 +148,28 @@ interface ChatRunSummary {
   detail: string;
   tone: "idle" | "running" | "done" | "error";
   tools: ToolRunSnapshot[];
+}
+
+interface PlanSetToolOutput {
+  ok: boolean;
+  kind: "plan_set";
+  compareSession: ScenarioCompareSession;
+  sourceScenarioId: string;
+  sourceScenarioName: string;
+  branchCount: number;
+  plans: ScenarioPlanOption[];
+}
+
+interface PlanSimulationToolOutput {
+  ok: boolean;
+  kind: "plan_simulation_batch";
+  compareSession: ScenarioCompareSession;
+  steps: number;
+  includeBaseline: boolean;
+  simulatedAt: string;
+  results: ScenarioBatchSimulationResponse["results"];
+  recommendedScenarioId: string | null;
+  recommendedReason: string;
 }
 
 interface AISidebarProps {
@@ -226,11 +274,63 @@ function safeSave<T>(key: string, value: T): void {
   }
 }
 
+function safeRemove(key: string): void {
+  try {
+    if (typeof window === "undefined") return;
+    window.localStorage.removeItem(key);
+  } catch {
+    // ignore privacy errors
+  }
+}
+
 function newId(): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
     return crypto.randomUUID();
   }
   return `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+interface LegacyCustomSkillConfig {
+  id?: string;
+  name?: string;
+  description?: string;
+  prompt?: string;
+  enabled?: boolean;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function isScenarioCompareSession(
+  value: unknown
+): value is ScenarioCompareSession {
+  return (
+    isRecord(value) &&
+    typeof value.id === "string" &&
+    Array.isArray(value.scenario_ids) &&
+    isRecord(value.state)
+  );
+}
+
+function isPlanSetToolOutput(value: unknown): value is PlanSetToolOutput {
+  return (
+    isRecord(value) &&
+    value.kind === "plan_set" &&
+    isScenarioCompareSession(value.compareSession) &&
+    Array.isArray(value.plans)
+  );
+}
+
+function isPlanSimulationToolOutput(
+  value: unknown
+): value is PlanSimulationToolOutput {
+  return (
+    isRecord(value) &&
+    value.kind === "plan_simulation_batch" &&
+    isScenarioCompareSession(value.compareSession) &&
+    Array.isArray(value.results)
+  );
 }
 
 /**
@@ -256,9 +356,16 @@ function messagesKeyFor(scenarioId: string | undefined): string {
 
 function buildCustomSkillPrompt(skills: CustomSkillConfig[]): string {
   if (skills.length === 0) return "";
-  const skillLines = skills.map(
-    (skill, index) => `${index + 1}. ${skill.name}: ${skill.description}`
-  );
+  const skillLines = skills.map((skill, index) => {
+    const prompt = (skill.prompt || skill.description).trim();
+    return [
+      `${index + 1}. ${skill.name}`,
+      skill.description ? `Description: ${skill.description}` : "",
+      prompt ? `Prompt: ${prompt}` : "",
+    ]
+      .filter(Boolean)
+      .join("\n");
+  });
   return [
     "User-enabled custom skill guidance:",
     ...skillLines,
@@ -403,14 +510,16 @@ export default function AISidebar({
   const markProviderChecked = useModelConfigStore(
     (state) => state.markProviderChecked
   );
+  const legacyCustomSkillsRef = useRef<LegacyCustomSkillConfig[]>(
+    safeLoad<LegacyCustomSkillConfig[]>(STORAGE_KEY.customSkills, [])
+  );
+  const customSkillMigrationAttemptedRef = useRef(false);
 
   // —— 持久化状态 ——
   const [mcpServers, setMcpServers] = useState<MCPServerConfig[]>(() =>
     safeLoad<MCPServerConfig[]>(STORAGE_KEY.mcpServers, DEFAULT_MCP_SERVERS)
   );
-  const [customSkills, setCustomSkills] = useState<CustomSkillConfig[]>(() =>
-    safeLoad<CustomSkillConfig[]>(STORAGE_KEY.customSkills, [])
-  );
+  const [customSkills, setCustomSkills] = useState<CustomSkillConfig[]>([]);
   const [projectMcpEnabled, setProjectMcpEnabled] = useState<boolean>(() =>
     safeLoad<boolean>(STORAGE_KEY.projectMcpEnabled, true)
   );
@@ -430,6 +539,15 @@ export default function AISidebar({
   );
   const [proposalBusyId, setProposalBusyId] = useState<string | null>(null);
   const [proposalError, setProposalError] = useState<string | null>(null);
+  const [compareDialogOpen, setCompareDialogOpen] = useState(false);
+  const [activeCompareSession, setActiveCompareSession] =
+    useState<ScenarioCompareSession | null>(null);
+  const [planSimulationBusyId, setPlanSimulationBusyId] = useState<
+    string | null
+  >(null);
+  const [planSimulationResults, setPlanSimulationResults] = useState<
+    Record<string, ScenarioBatchSimulationResponse>
+  >({});
   const chatLogRef = useRef<HTMLDivElement | null>(null);
 
   // headers 函数需要读最新 modelConfig，但 transport 有状态不能重建；
@@ -656,10 +774,6 @@ export default function AISidebar({
   // 持久化副作用
   useEffect(() => safeSave(STORAGE_KEY.mcpServers, mcpServers), [mcpServers]);
   useEffect(
-    () => safeSave(STORAGE_KEY.customSkills, customSkills),
-    [customSkills]
-  );
-  useEffect(
     () => safeSave(STORAGE_KEY.projectMcpEnabled, projectMcpEnabled),
     [projectMcpEnabled]
   );
@@ -735,31 +849,65 @@ export default function AISidebar({
     [deleteModelProfile]
   );
 
+  const migrateLegacyCustomSkills = useCallback(async (): Promise<
+    CustomSkillConfig[]
+  > => {
+    if (customSkillMigrationAttemptedRef.current) return [];
+    customSkillMigrationAttemptedRef.current = true;
+    const legacySkills = legacyCustomSkillsRef.current.filter(
+      (skill) => skill.name?.trim() && skill.description?.trim()
+    );
+    if (legacySkills.length === 0) return [];
+
+    const migrated: CustomSkillConfig[] = [];
+    for (const legacySkill of legacySkills) {
+      const payload: CustomSkillCreatePayload = {
+        name: legacySkill.name!.trim(),
+        description: legacySkill.description!.trim(),
+        prompt: (legacySkill.prompt || legacySkill.description || "").trim(),
+        enabled: legacySkill.enabled ?? true,
+      };
+      migrated.push(await createCustomSkill(payload));
+    }
+    legacyCustomSkillsRef.current = [];
+    safeRemove(STORAGE_KEY.customSkills);
+    return migrated;
+  }, []);
+
   // ─── 后端技能拉取 ──────────────────────────────────────────────────────────
-  const refreshRegisteredSkills = useCallback(async (): Promise<void> => {
+  const refreshSkills = useCallback(async (): Promise<void> => {
     setSkillsLoading(true);
     setSkillsError(null);
     try {
-      const payload = await apiCall<{ skills?: RegisteredSkill[] }>(
-        "/api/ai/skills"
-      );
-      setRegisteredSkills(payload.skills ?? []);
+      const [backendSkills, customPayload] = await Promise.all([
+        listBackendSkills(),
+        listCustomSkills(),
+      ]);
+      let nextCustomSkills = customPayload.skills;
+      if (nextCustomSkills.length === 0) {
+        const migratedSkills = await migrateLegacyCustomSkills();
+        if (migratedSkills.length > 0) {
+          nextCustomSkills = migratedSkills;
+        }
+      }
+      setRegisteredSkills(backendSkills);
+      setCustomSkills(nextCustomSkills);
     } catch (error) {
       setSkillsError(error instanceof Error ? error.message : "Unknown error");
     } finally {
       setSkillsLoading(false);
     }
-  }, []);
+  }, [migrateLegacyCustomSkills]);
 
   // 首次挂载就拉一次；后续切到 settings tab 时也刷新一次。
   useEffect(() => {
-    void refreshRegisteredSkills();
-  }, [refreshRegisteredSkills]);
+    void refreshSkills();
+  }, [refreshSkills]);
   useEffect(() => {
     if (settingsOpen) {
-      void refreshRegisteredSkills();
+      void refreshSkills();
     }
-  }, [settingsOpen, refreshRegisteredSkills]);
+  }, [settingsOpen, refreshSkills]);
 
   // ─── 聊天提交 ──────────────────────────────────────────────────────────────
   // sendMessage / status / stop / setMessages 都由 useChat 提供，
@@ -831,6 +979,48 @@ export default function AISidebar({
     [refreshCommandProposals]
   );
 
+  const handleOpenCompareSession = useCallback(
+    async (compareSession: ScenarioCompareSession): Promise<void> => {
+      try {
+        const fresh = await getScenarioCompareSession(compareSession.id);
+        setActiveCompareSession(fresh);
+      } catch {
+        setActiveCompareSession(compareSession);
+      }
+      setCompareDialogOpen(true);
+    },
+    []
+  );
+
+  const handleRunPlanSimulation = useCallback(
+    async (compareSession: ScenarioCompareSession): Promise<void> => {
+      setPlanSimulationBusyId(compareSession.id);
+      try {
+        const result = await simulateScenarioCompareSession(compareSession.id, {
+          steps: 600,
+          include_baseline: true,
+        });
+        setPlanSimulationResults((current) => ({
+          ...current,
+          [compareSession.id]: result,
+        }));
+        setActiveCompareSession(result.compare_session);
+        setCompareDialogOpen(true);
+      } finally {
+        setPlanSimulationBusyId(null);
+      }
+    },
+    []
+  );
+
+  const handleOpenScenario = useCallback(
+    (nextScenarioId: string): void => {
+      if (!nextScenarioId) return;
+      navigate(`/play/${nextScenarioId}`);
+    },
+    [navigate]
+  );
+
   // activeMcpServers are still managed in settings; external MCP runtime
   // connections are configured server-side through AICC_EXTERNAL_MCP_SERVERS.
   void activeMcpServers;
@@ -855,17 +1045,81 @@ export default function AISidebar({
     setNewServerTransport("stdio");
   }, [newServerName, newServerEndpoint, newServerTransport]);
 
-  const handleAddSkill = useCallback(() => {
-    const name = newSkillName.trim();
-    const description = newSkillDescription.trim();
-    if (!name || !description) return;
-    setCustomSkills((prev) => [
-      ...prev,
-      { id: newId(), name, description, enabled: true },
-    ]);
-    setNewSkillName("");
-    setNewSkillDescription("");
-  }, [newSkillName, newSkillDescription]);
+  const handleAddSkill = useCallback(
+    async (options?: AddCustomSkillOptions): Promise<void> => {
+      const name = newSkillName.trim();
+      const description = (options?.description ?? newSkillDescription).trim();
+      const prompt = (options?.prompt ?? description).trim();
+      const enabled = options?.enabled ?? true;
+      if (!name || !description || !prompt) return;
+      try {
+        const skill = await createCustomSkill({
+          name,
+          description,
+          prompt,
+          inputSchema: options?.inputSchema,
+          outputSchema: options?.outputSchema,
+          enabled,
+        });
+        setCustomSkills((prev) => [...prev, skill]);
+        setSkillsError(null);
+        setNewSkillName("");
+        setNewSkillDescription("");
+      } catch (error) {
+        setSkillsError(
+          error instanceof Error ? error.message : "Custom skill save failed"
+        );
+      }
+    },
+    [newSkillName, newSkillDescription]
+  );
+
+  const handleRemoveCustomSkill = useCallback(async (id: string) => {
+    try {
+      await deleteCustomSkill(id);
+      setCustomSkills((prev) => prev.filter((skill) => skill.id !== id));
+      setSkillsError(null);
+    } catch (error) {
+      setSkillsError(
+        error instanceof Error ? error.message : "Custom skill delete failed"
+      );
+    }
+  }, []);
+
+  const handleToggleCustomSkill = useCallback(
+    async (id: string, enabled: boolean) => {
+      try {
+        const skill = await updateCustomSkill(id, { enabled });
+        setCustomSkills((prev) =>
+          prev.map((item) => (item.id === id ? skill : item))
+        );
+        setSkillsError(null);
+      } catch (error) {
+        setSkillsError(
+          error instanceof Error ? error.message : "Custom skill update failed"
+        );
+      }
+    },
+    []
+  );
+
+  const handleUpdateCustomSkill = useCallback(
+    async (id: string, next: UpdateCustomSkillOptions) => {
+      try {
+        const payload: CustomSkillUpdatePayload = next;
+        const skill = await updateCustomSkill(id, payload);
+        setCustomSkills((prev) =>
+          prev.map((item) => (item.id === id ? skill : item))
+        );
+        setSkillsError(null);
+      } catch (error) {
+        setSkillsError(
+          error instanceof Error ? error.message : "Custom skill update failed"
+        );
+      }
+    },
+    []
+  );
 
   // ─── 模型连接测试 ────────────────────────────────────────────────────────
   const checkModelConnection = useCallback(async (): Promise<void> => {
@@ -944,17 +1198,16 @@ export default function AISidebar({
         onNewSkillNameChange={setNewSkillName}
         onOpenChange={onSettingsOpenChange ?? (() => undefined)}
         onProjectMcpEnabledChange={setProjectMcpEnabled}
-        onRefreshSkills={() => void refreshRegisteredSkills()}
-        onRemoveCustomSkill={(id) =>
-          setCustomSkills((prev) => prev.filter((s) => s.id !== id))
-        }
+        onRefreshSkills={() => void refreshSkills()}
+        onRemoveCustomSkill={(id) => void handleRemoveCustomSkill(id)}
         onRemoveServer={(id) =>
           setMcpServers((prev) => prev.filter((s) => s.id !== id))
         }
         onToggleCustomSkill={(id, enabled) =>
-          setCustomSkills((prev) =>
-            prev.map((s) => (s.id === id ? { ...s, enabled } : s))
-          )
+          void handleToggleCustomSkill(id, enabled)
+        }
+        onUpdateCustomSkill={(id, next) =>
+          void handleUpdateCustomSkill(id, next)
         }
         onToggleServer={(id, enabled) =>
           setMcpServers((prev) =>
@@ -1050,17 +1303,33 @@ export default function AISidebar({
                 onApproveProposal={(id) => void handleApproveProposal(id)}
                 onChatModeChange={handleChatModeChange}
                 onCommandInputChange={setCommandInput}
+                onOpenCompareSession={(session) =>
+                  void handleOpenCompareSession(session)
+                }
                 onOpenModelSettings={() => navigate("/ai-models")}
+                onOpenScenario={handleOpenScenario}
                 onQuickCommand={sendChat}
                 onRejectProposal={(id) => void handleRejectProposal(id)}
+                onRunPlanSimulation={(session) =>
+                  void handleRunPlanSimulation(session)
+                }
                 onSubmit={onSubmitChat}
                 busy={busy}
+                planSimulationBusyId={planSimulationBusyId}
+                planSimulationResults={planSimulationResults}
                 stop={stop}
               />
             )}
           </div>
         </aside>
       )}
+      <ScenarioCompareDialog
+        scenarioIds={activeCompareSession?.scenario_ids ?? []}
+        open={compareDialogOpen}
+        onClose={() => setCompareDialogOpen(false)}
+        onOpenScenario={handleOpenScenario}
+        initialSession={activeCompareSession}
+      />
     </>
   );
 }
@@ -1111,14 +1380,19 @@ interface ChatPanelProps {
   commandProposals: CommandProposal[];
   proposalBusyId: string | null;
   proposalError: string | null;
+  planSimulationBusyId: string | null;
+  planSimulationResults: Record<string, ScenarioBatchSimulationResponse>;
   busy: boolean;
   stop: () => void;
   onApproveProposal: (proposalId: string) => void;
   onChatModeChange: (mode: AIChatMode) => void;
   onCommandInputChange: (next: string) => void;
+  onOpenCompareSession: (compareSession: ScenarioCompareSession) => void;
   onOpenModelSettings: () => void;
+  onOpenScenario: (scenarioId: string) => void;
   onQuickCommand: (cmd: string) => void;
   onRejectProposal: (proposalId: string) => void;
+  onRunPlanSimulation: (compareSession: ScenarioCompareSession) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }
 
@@ -1132,14 +1406,19 @@ function ChatPanel({
   commandProposals,
   proposalBusyId,
   proposalError,
+  planSimulationBusyId,
+  planSimulationResults,
   busy,
   stop,
   onApproveProposal,
   onChatModeChange,
   onCommandInputChange,
+  onOpenCompareSession,
   onOpenModelSettings,
+  onOpenScenario,
   onQuickCommand,
   onRejectProposal,
+  onRunPlanSimulation,
   onSubmit,
 }: ChatPanelProps) {
   const chatErrorMessage = chatError ? formatChatError(chatError) : "";
@@ -1175,7 +1454,17 @@ function ChatPanel({
             </div>
           </div>
         ) : (
-          messages.map((m) => <MessageBlock key={m.id} message={m} />)
+          messages.map((m) => (
+            <MessageBlock
+              key={m.id}
+              message={m}
+              onOpenCompareSession={onOpenCompareSession}
+              onOpenScenario={onOpenScenario}
+              onRunPlanSimulation={onRunPlanSimulation}
+              planSimulationBusyId={planSimulationBusyId}
+              planSimulationResults={planSimulationResults}
+            />
+          ))
         )}
       </div>
 
@@ -1471,7 +1760,21 @@ function RunStatusCard({ summary }: { summary: ChatRunSummary }) {
   );
 }
 
-function MessageBlock({ message }: { message: UIMessage }) {
+function MessageBlock({
+  message,
+  onOpenCompareSession,
+  onOpenScenario,
+  onRunPlanSimulation,
+  planSimulationBusyId,
+  planSimulationResults,
+}: {
+  message: UIMessage;
+  onOpenCompareSession: (compareSession: ScenarioCompareSession) => void;
+  onOpenScenario: (scenarioId: string) => void;
+  onRunPlanSimulation: (compareSession: ScenarioCompareSession) => void;
+  planSimulationBusyId: string | null;
+  planSimulationResults: Record<string, ScenarioBatchSimulationResponse>;
+}) {
   const isUser = message.role === "user";
   const text = previewText(message);
   const hasContent = text || message.parts.length > 0;
@@ -1540,6 +1843,36 @@ function MessageBlock({ message }: { message: UIMessage }) {
               : typeof p.type === "string" && p.type.startsWith("tool-")
                 ? p.type.slice("tool-".length)
                 : "tool";
+            if (
+              p.state === "output-available" &&
+              isPlanSetToolOutput(p.output)
+            ) {
+              return (
+                <PlanSetCard
+                  key={idx}
+                  output={p.output}
+                  onOpenCompareSession={onOpenCompareSession}
+                  onRunPlanSimulation={onRunPlanSimulation}
+                  planSimulationBusyId={planSimulationBusyId}
+                  planSimulationResult={
+                    planSimulationResults[p.output.compareSession.id]
+                  }
+                />
+              );
+            }
+            if (
+              p.state === "output-available" &&
+              isPlanSimulationToolOutput(p.output)
+            ) {
+              return (
+                <PlanSimulationCard
+                  key={idx}
+                  output={p.output}
+                  onOpenCompareSession={onOpenCompareSession}
+                  onOpenScenario={onOpenScenario}
+                />
+              );
+            }
             return (
               <details
                 key={idx}
@@ -1576,6 +1909,174 @@ function MessageBlock({ message }: { message: UIMessage }) {
           }
           return null;
         })}
+      </div>
+    </div>
+  );
+}
+
+function PlanSetCard({
+  output,
+  onOpenCompareSession,
+  onRunPlanSimulation,
+  planSimulationBusyId,
+  planSimulationResult,
+}: {
+  output: PlanSetToolOutput;
+  onOpenCompareSession: (compareSession: ScenarioCompareSession) => void;
+  onRunPlanSimulation: (compareSession: ScenarioCompareSession) => void;
+  planSimulationBusyId: string | null;
+  planSimulationResult?: ScenarioBatchSimulationResponse;
+}) {
+  const compareSession = output.compareSession;
+  const simBusy = planSimulationBusyId === compareSession.id;
+
+  return (
+    <div className="mt-2 rounded-xl border border-cyan-300/15 bg-cyan-300/[0.04] p-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-[11px] font-medium text-cyan-100">
+            已生成 {output.branchCount} 个候选方案
+          </div>
+          <div className="mt-1 text-[10px] text-slate-400">
+            来源场景：{output.sourceScenarioName}
+          </div>
+        </div>
+        <span className="rounded border border-cyan-300/20 px-1.5 py-0.5 text-[9px] uppercase text-cyan-200/80">
+          Plan Set
+        </span>
+      </div>
+      <div className="mt-3 space-y-2">
+        {output.plans.map((plan, index) => (
+          <div
+            className="rounded-lg border border-slate-700/50 bg-slate-950/40 px-2.5 py-2"
+            key={`${plan.title}-${index}`}
+          >
+            <div className="text-[11px] font-medium text-slate-100">
+              方案 {index + 1} · {plan.title}
+            </div>
+            {plan.concept && (
+              <div className="mt-1 text-[10px] leading-relaxed text-slate-400">
+                {plan.concept}
+              </div>
+            )}
+            {plan.key_actions.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-1">
+                {plan.key_actions.slice(0, 4).map((item) => (
+                  <span
+                    className="rounded border border-slate-700/50 bg-slate-900/60 px-1.5 py-0.5 text-[9px] text-slate-300"
+                    key={item}
+                  >
+                    {item}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+      {planSimulationResult && (
+        <div className="mt-3 rounded-lg border border-emerald-300/15 bg-emerald-300/[0.04] px-2.5 py-2 text-[10px] text-emerald-100">
+          最近一次批量推演已完成，共 {planSimulationResult.results.length}{" "}
+          个结果。
+        </div>
+      )}
+      <div className="mt-3 flex flex-wrap gap-2">
+        <Button
+          className="h-7 px-2 text-[10px]"
+          size="sm"
+          type="button"
+          onClick={() => onOpenCompareSession(compareSession)}
+        >
+          打开对比台
+        </Button>
+        <Button
+          className="h-7 px-2 text-[10px]"
+          size="sm"
+          type="button"
+          variant="ghost"
+          disabled={simBusy}
+          onClick={() => onRunPlanSimulation(compareSession)}
+        >
+          {simBusy ? "推演中..." : "一键并行推演"}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function PlanSimulationCard({
+  output,
+  onOpenCompareSession,
+  onOpenScenario,
+}: {
+  output: PlanSimulationToolOutput;
+  onOpenCompareSession: (compareSession: ScenarioCompareSession) => void;
+  onOpenScenario: (scenarioId: string) => void;
+}) {
+  const topResults = output.results.slice(0, 3);
+  return (
+    <div className="mt-2 rounded-xl border border-emerald-300/15 bg-emerald-300/[0.04] p-3">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="text-[11px] font-medium text-emerald-100">
+            批量推演完成
+          </div>
+          <div className="mt-1 text-[10px] text-slate-400">
+            推演步数：{output.steps}
+          </div>
+        </div>
+        <span className="rounded border border-emerald-300/20 px-1.5 py-0.5 text-[9px] uppercase text-emerald-200/80">
+          Results
+        </span>
+      </div>
+      <div className="mt-3 space-y-2">
+        {topResults.map((result, index) => (
+          <div
+            className="flex items-center justify-between gap-3 rounded-lg border border-slate-700/50 bg-slate-950/40 px-2.5 py-2"
+            key={result.scenario_id}
+          >
+            <div className="min-w-0">
+              <div className="truncate text-[11px] font-medium text-slate-100">
+                #{index + 1} {result.scenario_name}
+              </div>
+              <div className="mt-1 text-[10px] text-slate-400">
+                {result.grade} · {result.confidence}
+              </div>
+            </div>
+            <div className="text-right">
+              <div className="text-sm font-semibold text-emerald-200">
+                {result.overall_score}
+              </div>
+              <div className="text-[10px] text-slate-500">score</div>
+            </div>
+          </div>
+        ))}
+      </div>
+      {output.recommendedReason && (
+        <div className="mt-3 text-[10px] leading-relaxed text-emerald-100">
+          {output.recommendedReason}
+        </div>
+      )}
+      <div className="mt-3 flex flex-wrap gap-2">
+        <Button
+          className="h-7 px-2 text-[10px]"
+          size="sm"
+          type="button"
+          onClick={() => onOpenCompareSession(output.compareSession)}
+        >
+          打开对比台
+        </Button>
+        {output.recommendedScenarioId && (
+          <Button
+            className="h-7 px-2 text-[10px]"
+            size="sm"
+            type="button"
+            variant="ghost"
+            onClick={() => onOpenScenario(output.recommendedScenarioId!)}
+          >
+            载入最优方案
+          </Button>
+        )}
       </div>
     </div>
   );
@@ -1624,9 +2125,13 @@ export interface TacticalSettingsProps {
   onNewServerNameChange: (v: string) => void;
   onNewServerEndpointChange: (v: string) => void;
   onNewServerTransportChange: (t: "stdio" | "sse" | "http") => void;
-  onAddSkill: () => void;
-  onRemoveCustomSkill: (id: string) => void;
-  onToggleCustomSkill: (id: string, enabled: boolean) => void;
+  onAddSkill: (options?: AddCustomSkillOptions) => void | Promise<void>;
+  onRemoveCustomSkill: (id: string) => void | Promise<void>;
+  onToggleCustomSkill: (id: string, enabled: boolean) => void | Promise<void>;
+  onUpdateCustomSkill: (
+    id: string,
+    next: UpdateCustomSkillOptions
+  ) => void | Promise<void>;
   onNewSkillNameChange: (v: string) => void;
   onNewSkillDescriptionChange: (v: string) => void;
   onRefreshSkills: () => void;

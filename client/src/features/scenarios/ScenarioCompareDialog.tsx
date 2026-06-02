@@ -116,6 +116,7 @@ export default function ScenarioCompareDialog({
       baseline_id: initialSession?.state.baseline_id ?? "",
       scenario_ids: initialSession?.scenario_ids ?? [],
       selected_sources: initialSession?.state.selected_sources ?? {},
+      plan_summaries: initialSession?.state.plan_summaries ?? {},
     });
     setSessionSaveState("idle");
   }, [initialSession]);
@@ -248,6 +249,7 @@ export default function ScenarioCompareDialog({
         selected_sources: Object.fromEntries(
           resolvedItems.map((item) => [item.id, item.scoreSourceId])
         ),
+        plan_summaries: initialSession.state.plan_summaries ?? {},
       },
     };
     const encoded = JSON.stringify(payload);

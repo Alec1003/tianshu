@@ -14,15 +14,20 @@ class FakeScenario:
         self.aircraft = [
             SimpleNamespace(
                 id="air-1",
+                side_id="blue",
                 latitude=0.0,
                 longitude=0.0,
                 range=500.0,
             )
         ]
         self.ships = []
-        self.facilities = []
+        self.facilities = [SimpleNamespace(id="target-1", side_id="red")]
         self.airbases = []
-        self.reference_points = []
+        self.reference_points = [
+            SimpleNamespace(id="rp-1", side_id="blue"),
+            SimpleNamespace(id="rp-2", side_id="blue"),
+            SimpleNamespace(id="rp-3", side_id="blue"),
+        ]
         self.obstacles = [SimpleNamespace(id="obstacle-1", latitude=0.0, longitude=0.0)]
 
     def get_aircraft(self, unit_id: str):
@@ -60,6 +65,8 @@ class FakeRegistry:
             "deploy_aircraft",
             "deploy_obstacle",
             "update_unit_state",
+            "create_patrol_mission",
+            "create_strike_mission",
             "load_scenario_file",
         }
 
@@ -196,3 +203,43 @@ def test_pydantic_tool_proposal_recorder_receives_created_proposal() -> None:
 
     assert output["proposalId"] == recorded[0].id
     assert recorded[0].source == "llm_tool"
+
+
+def test_internal_skill_draft_becomes_reviewed_mission_proposal() -> None:
+    from app.ai.internal_skills import build_internal_skill_steps
+    from app.ai.models import InternalSkillDraft, InternalSkillMissionDraft
+
+    runtime = FakeRuntime()
+    queue = CommandApprovalQueue(runtime, FakeRegistry())  # type: ignore[arg-type]
+    draft = InternalSkillDraft(
+        name="CAP package",
+        side_id="blue",
+        missions=[
+            InternalSkillMissionDraft(
+                type="patrol",
+                name="CAP Alpha",
+                assigned_unit_ids=["air-1"],
+                reference_point_ids=["rp-1", "rp-2", "rp-3"],
+            ),
+            InternalSkillMissionDraft(
+                type="strike",
+                name="Strike Red Facility",
+                assigned_unit_ids=["air-1"],
+                assigned_target_ids=["target-1"],
+            ),
+        ],
+        allow_duplicate_assignments=True,
+    )
+
+    steps = build_internal_skill_steps(runtime, draft)  # type: ignore[arg-type]
+    proposal = queue.create_proposal(
+        command=draft.name,
+        source="internal_skill",
+        steps=steps,
+    )
+
+    assert proposal.status == "pending"
+    assert [step.skill for step in proposal.steps] == [
+        "create_patrol_mission",
+        "create_strike_mission",
+    ]

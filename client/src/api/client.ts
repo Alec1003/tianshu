@@ -74,6 +74,7 @@ export async function apiCall<T = unknown>(
     runtimeScenarioContext &&
     (path.startsWith("/api/ai/runtime") ||
       path.startsWith("/api/ai/command") ||
+      path.startsWith("/api/ai/internal-skills") ||
       path.startsWith("/api/ai/chat") ||
       path.startsWith("/api/ai/skills"))
   ) {

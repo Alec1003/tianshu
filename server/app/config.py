@@ -15,6 +15,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 DEFAULT_CORS_ORIGINS = "http://localhost:3000,http://127.0.0.1:3000"
 DEFAULT_DATABASE_URL = "sqlite+aiosqlite:///./data/aicc.db"
+DEFAULT_SKILLS_DIR = "./data/skills"
 DEFAULT_JWT_SECRET = "aicc-dev-secret-change-me-in-production"
 MIN_PRODUCTION_JWT_SECRET_LENGTH = 32
 MIN_PRODUCTION_MODEL_CONFIG_SECRET_LENGTH = 32
@@ -63,6 +64,13 @@ class Settings(BaseSettings):
     database_max_overflow: int = Field(default=10, ge=0)
     database_pool_timeout_seconds: int = Field(default=30, ge=1)
     database_pool_recycle_seconds: int = Field(default=1800, ge=1)
+    skills_dir: str = Field(
+        default=DEFAULT_SKILLS_DIR,
+        description=(
+            "Folder-backed custom AI skills store. Keep this writable for "
+            "desktop/exe packaging and Docker volume deployments."
+        ),
+    )
 
     # JWT signing secret. MUST be overridden in production via env var.
     jwt_secret: str = Field(

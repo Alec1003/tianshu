@@ -8,6 +8,18 @@ import {
 } from "react";
 import { getStoredToken } from "@/api/client";
 import {
+  createCustomSkill,
+  deleteCustomSkill,
+  listBackendSkills,
+  listCustomSkills,
+  updateCustomSkill,
+} from "@/api/ai";
+import type {
+  CustomSkill,
+  CustomSkillCreatePayload,
+  RegisteredSkill,
+} from "@/api/types";
+import {
   MODEL_PRESETS,
   MODEL_PROVIDER_OPTIONS,
   MODEL_STORAGE_KEY,
@@ -41,17 +53,15 @@ interface MCPServerConfig {
   enabled: boolean;
 }
 
-interface CustomSkillConfig {
-  id: string;
-  name: string;
-  description: string;
-  enabled: boolean;
-}
+type CustomSkillConfig = CustomSkill;
+type OpenClawSkillDefinition = RegisteredSkill;
 
-interface OpenClawSkillDefinition {
-  name: string;
-  description: string;
-  parameters?: Record<string, unknown>;
+interface LegacyCustomSkillConfig {
+  id?: string;
+  name?: string;
+  description?: string;
+  prompt?: string;
+  enabled?: boolean;
 }
 
 interface SkillExecution {
@@ -135,6 +145,14 @@ function safeSave<T>(key: string, value: T): void {
   }
 }
 
+function safeRemove(key: string): void {
+  try {
+    window.localStorage.removeItem(key);
+  } catch (_error) {
+    // Ignore local persistence failures.
+  }
+}
+
 function authHeaders(
   extra: Record<string, string> = {}
 ): Record<string, string> {
@@ -194,9 +212,11 @@ export default function OpenClawAssistantPanel({
   const [mcpServers, setMcpServers] = useState<MCPServerConfig[]>(() =>
     safeLoad<MCPServerConfig[]>(STORAGE_KEY.mcpServers, DEFAULT_MCP_SERVERS)
   );
-  const [customSkills, setCustomSkills] = useState<CustomSkillConfig[]>(() =>
-    safeLoad<CustomSkillConfig[]>(STORAGE_KEY.customSkills, [])
+  const legacyCustomSkillsRef = useRef<LegacyCustomSkillConfig[]>(
+    safeLoad<LegacyCustomSkillConfig[]>(STORAGE_KEY.customSkills, [])
   );
+  const customSkillMigrationAttemptedRef = useRef(false);
+  const [customSkills, setCustomSkills] = useState<CustomSkillConfig[]>([]);
   const [registeredSkills, setRegisteredSkills] = useState<
     OpenClawSkillDefinition[]
   >([]);
@@ -244,26 +264,54 @@ export default function OpenClawAssistantPanel({
     setModelProfileNameDraft(activeModelProfile?.name ?? "");
   }, [activeModelProfile?.id, activeModelProfile?.name]);
 
-  const refreshRegisteredSkills = useCallback(async (): Promise<void> => {
+  const migrateLegacyCustomSkills = useCallback(async (): Promise<
+    CustomSkillConfig[]
+  > => {
+    if (customSkillMigrationAttemptedRef.current) return [];
+    customSkillMigrationAttemptedRef.current = true;
+    const legacySkills = legacyCustomSkillsRef.current.filter(
+      (skill) => skill.name?.trim() && skill.description?.trim()
+    );
+    if (legacySkills.length === 0) return [];
+
+    const migrated: CustomSkillConfig[] = [];
+    for (const legacySkill of legacySkills) {
+      const payload: CustomSkillCreatePayload = {
+        name: legacySkill.name!.trim(),
+        description: legacySkill.description!.trim(),
+        prompt: (legacySkill.prompt || legacySkill.description || "").trim(),
+        enabled: legacySkill.enabled ?? true,
+      };
+      migrated.push(await createCustomSkill(payload));
+    }
+    legacyCustomSkillsRef.current = [];
+    safeRemove(STORAGE_KEY.customSkills);
+    return migrated;
+  }, []);
+
+  const refreshSkills = useCallback(async (): Promise<void> => {
     setSkillsLoading(true);
     setSkillsError(null);
     try {
-      const response = await fetch(`${aiBaseUrl}/api/ai/skills`, {
-        headers: authHeaders(),
-      });
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
+      const [backendSkills, customPayload] = await Promise.all([
+        listBackendSkills(),
+        listCustomSkills(),
+      ]);
+      let nextCustomSkills = customPayload.skills;
+      if (nextCustomSkills.length === 0) {
+        const migratedSkills = await migrateLegacyCustomSkills();
+        if (migratedSkills.length > 0) {
+          nextCustomSkills = migratedSkills;
+        }
       }
-      const payload = (await response.json()) as {
-        skills?: OpenClawSkillDefinition[];
-      };
-      setRegisteredSkills(payload.skills ?? []);
+      setRegisteredSkills(backendSkills);
+      setCustomSkills(nextCustomSkills);
     } catch (error) {
       setSkillsError(error instanceof Error ? error.message : "Unknown error");
     } finally {
       setSkillsLoading(false);
     }
-  }, [aiBaseUrl]);
+  }, [migrateLegacyCustomSkills]);
 
   useEffect(() => {
     setPanelOpen(!mobileView);
@@ -278,10 +326,6 @@ export default function OpenClawAssistantPanel({
   }, [mcpServers]);
 
   useEffect(() => {
-    safeSave(STORAGE_KEY.customSkills, customSkills);
-  }, [customSkills]);
-
-  useEffect(() => {
     safeSave(STORAGE_KEY.projectMcpEnabled, projectMcpEnabled);
   }, [projectMcpEnabled]);
 
@@ -293,8 +337,8 @@ export default function OpenClawAssistantPanel({
   }, [messages, panelOpen, activeTab]);
 
   useEffect(() => {
-    void refreshRegisteredSkills();
-  }, [refreshRegisteredSkills]);
+    void refreshSkills();
+  }, [refreshSkills]);
 
   function appendMessage(role: MessageRole, text: string, state: MessageState) {
     const nextMessage: ChatMessage = {
@@ -438,23 +482,57 @@ export default function OpenClawAssistantPanel({
     setNewServerTransport("stdio");
   }
 
-  function handleAddSkill(): void {
+  async function handleAddSkill(): Promise<void> {
     const name = newSkillName.trim();
     const description = newSkillDescription.trim();
     if (!name || !description) {
       return;
     }
-    setCustomSkills((prev) => [
-      ...prev,
-      {
-        id: crypto.randomUUID(),
+    try {
+      const skill = await createCustomSkill({
         name,
         description,
+        prompt: description,
         enabled: true,
-      },
-    ]);
-    setNewSkillName("");
-    setNewSkillDescription("");
+      });
+      setCustomSkills((prev) => [...prev, skill]);
+      setSkillsError(null);
+      setNewSkillName("");
+      setNewSkillDescription("");
+    } catch (error) {
+      setSkillsError(
+        error instanceof Error ? error.message : "Custom skill save failed"
+      );
+    }
+  }
+
+  async function handleToggleCustomSkill(
+    id: string,
+    enabled: boolean
+  ): Promise<void> {
+    try {
+      const skill = await updateCustomSkill(id, { enabled });
+      setCustomSkills((prev) =>
+        prev.map((item) => (item.id === id ? skill : item))
+      );
+      setSkillsError(null);
+    } catch (error) {
+      setSkillsError(
+        error instanceof Error ? error.message : "Custom skill update failed"
+      );
+    }
+  }
+
+  async function handleRemoveCustomSkill(id: string): Promise<void> {
+    try {
+      await deleteCustomSkill(id);
+      setCustomSkills((prev) => prev.filter((item) => item.id !== id));
+      setSkillsError(null);
+    } catch (error) {
+      setSkillsError(
+        error instanceof Error ? error.message : "Custom skill delete failed"
+      );
+    }
   }
 
   async function checkModelConnection(): Promise<void> {
@@ -673,7 +751,7 @@ export default function OpenClawAssistantPanel({
             <h4>Skills</h4>
             <button
               type="button"
-              onClick={() => void refreshRegisteredSkills()}
+              onClick={() => void refreshSkills()}
               disabled={skillsLoading}
             >
               Refresh
@@ -713,22 +791,14 @@ export default function OpenClawAssistantPanel({
                       checked={skill.enabled}
                       onChange={(event) => {
                         const enabled = event.target.checked;
-                        setCustomSkills((prev) =>
-                          prev.map((item) =>
-                            item.id === skill.id ? { ...item, enabled } : item
-                          )
-                        );
+                        void handleToggleCustomSkill(skill.id, enabled);
                       }}
                     />
                     Enabled
                   </label>
                   <button
                     type="button"
-                    onClick={() =>
-                      setCustomSkills((prev) =>
-                        prev.filter((item) => item.id !== skill.id)
-                      )
-                    }
+                    onClick={() => void handleRemoveCustomSkill(skill.id)}
                   >
                     Remove
                   </button>
@@ -748,7 +818,11 @@ export default function OpenClawAssistantPanel({
               onChange={(event) => setNewSkillDescription(event.target.value)}
               placeholder="Skill description"
             />
-            <button type="button" className="span-2" onClick={handleAddSkill}>
+            <button
+              type="button"
+              className="span-2"
+              onClick={() => void handleAddSkill()}
+            >
               Add Custom Skill
             </button>
           </div>

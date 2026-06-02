@@ -7,9 +7,15 @@ from threading import RLock
 from typing import Any
 from uuid import uuid4
 
+from app.platform.paths import (
+    gym_dir,
+    resolve_resource_path,
+    resource_root,
+    unit_assets_file,
+)
 
-ROOT_DIR = Path(__file__).resolve().parents[3]
-GYM_DIR = ROOT_DIR / "gym"
+ROOT_DIR = resource_root()
+GYM_DIR = gym_dir()
 
 if str(GYM_DIR) not in sys.path:
     sys.path.insert(0, str(GYM_DIR))
@@ -117,7 +123,7 @@ FALLBACK_WEAPON_TEMPLATES = {
 
 def _load_weapon_templates() -> dict[str, dict[str, float]]:
     templates = dict(FALLBACK_WEAPON_TEMPLATES)
-    source = ROOT_DIR / "server" / "app" / "unit_assets" / "default_unit_assets.json"
+    source = unit_assets_file()
     try:
         data = json.loads(source.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
@@ -519,7 +525,7 @@ class AICCRuntime:
         with self._lock:
             path = Path(scenario_path)
             if not path.is_absolute():
-                path = ROOT_DIR / path
+                path = resolve_resource_path(path)
             scenario_text = self._normalize_scenario_payload(
                 path.read_text(encoding="utf-8")
             )

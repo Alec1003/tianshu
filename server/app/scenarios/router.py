@@ -40,6 +40,8 @@ from app.scenarios.models import AarRecord, Scenario
 from app.scenarios.schemas import (
     AarRecordCreate,
     AarRecordRead,
+    ScenarioBatchSimulationRequest,
+    ScenarioBatchSimulationResponse,
     ScenarioBranchCreate,
     ScenarioCompareForkCreate,
     ScenarioCompareResponse,
@@ -51,6 +53,8 @@ from app.scenarios.schemas import (
     ScenarioCreate,
     ScenarioDetail,
     ScenarioListItem,
+    ScenarioPlanSetCreate,
+    ScenarioPlanSetRead,
     ScenarioUpdate,
     TrainingScoreRecordRead,
     TrainingScoreResponse,
@@ -117,12 +121,12 @@ async def compare_scenarios(
                 "message": "comparison requires at least two distinct scenarios",
             },
         )
-    if len(ordered_ids) > 4:
+    if len(ordered_ids) > 6:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail={
                 "code": "scenario_compare_invalid",
-                "message": "comparison supports up to four scenarios at a time",
+                "message": "comparison supports up to six scenarios at a time",
             },
         )
     effective_baseline = baseline_id or ordered_ids[0]
@@ -378,6 +382,55 @@ async def fork_compare_session(
             user,
             scenario_id,
             payload=payload,
+        )
+    except ScenarioServiceError as exc:
+        _raise_scenario_http(exc)
+
+
+@router.post(
+    "/{scenario_id}/plan-set",
+    response_model=ScenarioPlanSetRead,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_plan_set(
+    scenario_id: str,
+    payload: ScenarioPlanSetCreate,
+    user: User = Depends(current_active_user),
+    session: AsyncSession = Depends(get_async_session),
+) -> ScenarioPlanSetRead:
+    try:
+        return await scenario_service.create_plan_set_compare_session(
+            session,
+            user,
+            scenario_id,
+            payload=payload,
+        )
+    except ScenarioServiceError as exc:
+        _raise_scenario_http(exc)
+
+
+@router.post(
+    "/compare/sessions/{compare_session_id}/simulate",
+    response_model=ScenarioBatchSimulationResponse,
+)
+async def simulate_compare_session(
+    compare_session_id: str,
+    payload: ScenarioBatchSimulationRequest,
+    request: Request,
+    user: User = Depends(current_active_user),
+    session: AsyncSession = Depends(get_async_session),
+) -> ScenarioBatchSimulationResponse:
+    try:
+        return await scenario_service.simulate_compare_session_batch(
+            session,
+            user,
+            compare_session_id,
+            payload=payload,
+            bridge_provider=lambda owner, scenario_ctx=None: _bridge_for_user(
+                request,
+                owner,
+                scenario_ctx,
+            ),
         )
     except ScenarioServiceError as exc:
         _raise_scenario_http(exc)

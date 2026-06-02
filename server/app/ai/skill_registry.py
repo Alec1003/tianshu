@@ -1,13 +1,38 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Callable
 
 from app.ai.models import SkillDefinition
 from app.aicc_runtime.runtime import AICCRuntime
+from app.harness import (
+    HarnessAccess,
+    HarnessCapability,
+    HarnessInvocationSource,
+    RuntimeHarness,
+)
 
 
-SkillFunc = Callable[..., dict[str, Any]]
+SkillFunc = Callable[..., Any]
+
+
+CONTROL_SKILLS = {
+    "simulation_start",
+    "simulation_pause",
+    "simulation_stop",
+    "simulation_reset",
+    "simulation_step",
+    "load_script",
+    "execute_script_step",
+    "control_script_flow",
+    "load_scenario_snapshot",
+    "load_scenario_file",
+    "load_scenario_json",
+}
+
+
+def _infer_access(name: str) -> HarnessAccess:
+    return "control" if name in CONTROL_SKILLS else "write"
 
 
 @dataclass
@@ -16,6 +41,11 @@ class RegisteredSkill:
     description: str
     parameters: dict[str, Any]
     func: SkillFunc
+    access: HarnessAccess | None = None
+    source: str = "backend"
+    version: str = "1.0.0"
+    enabled: bool = True
+    tags: tuple[str, ...] = field(default_factory=tuple)
 
     def as_definition(self) -> SkillDefinition:
         return SkillDefinition(
@@ -24,16 +54,37 @@ class RegisteredSkill:
             parameters=self.parameters,
         )
 
+    def as_capability(self) -> HarnessCapability:
+        return HarnessCapability(
+            name=self.name,
+            description=self.description,
+            parameters=self.parameters,
+            handler=self.func,
+            access=self.access or _infer_access(self.name),
+            source=self.source,
+            version=self.version,
+            enabled=self.enabled,
+            tags=self.tags,
+        )
+
 
 class AICCSkillRegistry:
     """Skill registry for mapping AI tool calls to native 天枢平台 runtime APIs."""
 
     def __init__(self, runtime: AICCRuntime) -> None:
         self.runtime = runtime
+        self.harness = RuntimeHarness(
+            runtime=runtime,
+            name="aicc-skill-runtime",
+            version="1.0.0",
+        )
         self._skills: dict[str, RegisteredSkill] = {}
         self._register_all()
 
     def _register(self, skill: RegisteredSkill) -> None:
+        if skill.name in self._skills:
+            raise ValueError(f"Skill already registered: {skill.name}")
+        self.harness.register(skill.as_capability())
         self._skills[skill.name] = skill
 
     def _register_all(self) -> None:
@@ -204,6 +255,30 @@ class AICCSkillRegistry:
                 func=self.runtime.update_unit_state,
             )
         )
+        self._register(
+            RegisteredSkill(
+                name="create_patrol_mission",
+                description="Create a patrol mission with assigned units and reference-point patrol area.",
+                parameters={
+                    "name": {"type": "string"},
+                    "assigned_unit_ids": {"type": "array"},
+                    "reference_point_ids": {"type": "array"},
+                },
+                func=self.runtime.create_patrol_mission,
+            )
+        )
+        self._register(
+            RegisteredSkill(
+                name="create_strike_mission",
+                description="Create a strike mission with assigned attackers and target units.",
+                parameters={
+                    "name": {"type": "string"},
+                    "assigned_unit_ids": {"type": "array"},
+                    "assigned_target_ids": {"type": "array"},
+                },
+                func=self.runtime.create_strike_mission,
+            )
+        )
 
         # --------------------------- situation and event skills ---------------------------
         self._register(
@@ -295,7 +370,10 @@ class AICCSkillRegistry:
         return [skill.as_definition() for skill in self._skills.values()]
 
     def has_skill(self, skill_name: str) -> bool:
-        return skill_name in self._skills
+        return self.harness.has_capability(skill_name)
+
+    def capabilities(self) -> list[HarnessCapability]:
+        return self.harness.capabilities()
 
     def _load_scenario_snapshot(
         self,
@@ -310,8 +388,23 @@ class AICCSkillRegistry:
             "name": name,
         }
 
-    def execute(self, skill_name: str, parameters: dict[str, Any]) -> dict[str, Any]:
-        if skill_name not in self._skills:
+    def execute(
+        self,
+        skill_name: str,
+        parameters: dict[str, Any],
+        *,
+        source: HarnessInvocationSource = "agent",
+        actor_id: str = "",
+        scenario_id: str = "",
+        request_id: str = "",
+    ) -> dict[str, Any]:
+        if not self.harness.has_capability(skill_name):
             raise ValueError(f"Skill not registered: {skill_name}")
-        skill = self._skills[skill_name]
-        return skill.func(**parameters)
+        return self.harness.execute(
+            skill_name,
+            parameters,
+            source=source,
+            actor_id=actor_id,
+            scenario_id=scenario_id,
+            request_id=request_id,
+        )

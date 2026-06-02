@@ -230,6 +230,7 @@ describe("scenarioCompare", () => {
           "scenario-1": "live",
           "scenario-2": "record-9",
         },
+        plan_summaries: {},
       },
       created_at: "2026-05-30T10:15:00Z",
       updated_at: "2026-05-30T10:20:00Z",

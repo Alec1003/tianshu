@@ -314,10 +314,23 @@ def test_ai_routes_reject_unauthenticated_requests() -> None:
             },
         ),
         ("get", "/api/ai/skills", None),
+        ("get", "/api/ai/custom-skills", None),
+        (
+            "post",
+            "/api/ai/custom-skills",
+            {"name": "Skill", "description": "desc", "prompt": "prompt"},
+        ),
+        ("patch", "/api/ai/custom-skills/skill-1", {"enabled": False}),
+        ("delete", "/api/ai/custom-skills/skill-1", None),
         ("post", "/api/ai/command", {"command": "pause"}),
         ("get", "/api/ai/command/proposals", None),
         ("post", "/api/ai/command/proposals/proposal-1/approve", None),
         ("post", "/api/ai/command/proposals/proposal-1/reject", None),
+        (
+            "post",
+            "/api/ai/internal-skills/proposals",
+            {"draft": {"name": "CAP", "missions": []}},
+        ),
         (
             "post",
             "/api/ai/model/check",

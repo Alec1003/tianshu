@@ -128,6 +128,14 @@ function scenarioSignature(scenario: Record<string, unknown>): string {
   }
 }
 
+function cloneScenarioRecord(raw: unknown): Record<string, unknown> {
+  const cloned = JSON.parse(JSON.stringify(raw)) as Record<string, unknown>;
+  if (!cloned || typeof cloned !== "object") {
+    throw new Error("Scenario payload must be an object");
+  }
+  return cloned;
+}
+
 function createAiccGameFromJson(scenarioJson: object | null | undefined): Game {
   const now = Math.floor(Date.now() / 1000);
   const currentScenario = new Scenario({
@@ -311,6 +319,14 @@ export default function AITacticalCommandPlatform({
   const [game] = useState<Game>(() =>
     createAiccGameFromJson(initialScenarioData ?? null)
   );
+  const initialRuntimeScenarioRef = useRef<Record<string, unknown>>(
+    cloneScenarioRecord(
+      initialScenarioData ?? cloneDefaultScenarioWithNow(SCSScenarioJson)
+    )
+  );
+  const latestRuntimeScenarioRef = useRef<Record<string, unknown>>(
+    initialRuntimeScenarioRef.current
+  );
   const runtimeControllerRef = useRef<RuntimeController | null>(null);
   if (runtimeControllerRef.current === null) {
     runtimeControllerRef.current = new RuntimeController(
@@ -389,6 +405,7 @@ export default function AITacticalCommandPlatform({
       runtimeVisibilityRef.current = runtimeSnapshot.visibility ?? null;
       game.scenarioPaused = runtimeSnapshot.paused;
       game.gameOutcome = runtimeOutcomeToGameOutcome(runtimeSnapshot.outcome);
+      latestRuntimeScenarioRef.current = runtimeSnapshot.scenario;
       runtimeScenarioSignatureRef.current = scenarioSignature(
         runtimeSnapshot.scenario
       );
@@ -483,15 +500,14 @@ export default function AITacticalCommandPlatform({
       });
   }, [applyRuntimeSnapshot, game, refreshSnapshot]);
 
-  // Tracks the most recently activated scenario source so 重置 can reload
-  // whatever the user is currently sandboxing in (SCS / Demo / 自建 / 导入)
-  // instead of always falling back to SCS. Initialized to SCS to match the
-  // `createAiccGame()` boot scenario.
-  const lastLoadedScenarioRef = useRef<unknown>(SCSScenarioJson);
+  // Tracks the latest backend-accepted scenario so reset can reload the same
+  // source without treating the browser render adapter as authoritative.
+  const lastLoadedScenarioRef = useRef<unknown>(
+    initialRuntimeScenarioRef.current
+  );
 
-  // Shared loader: applies a parsed scenario object to the live Game while
-  // resetting transient UI (placement / mission dialogs) so stale ids from the
-  // previous scenario can't leak into the editor flow.
+  // Shared loader: sends the parsed scenario to the backend runtime first, then
+  // applies the canonical snapshot returned by that runtime.
   const loadScenarioFromObject = useCallback(
     async (raw: unknown) => {
       let cloned: { currentScenario?: { id?: string } };
@@ -505,37 +521,26 @@ export default function AITacticalCommandPlatform({
       if (cloned?.currentScenario && cloned.currentScenario.id) {
         cloned.currentScenario.id = randomUUID();
       }
-      try {
-        game.scenarioPaused = true;
-        game.loadScenario(JSON.stringify(cloned));
-        runtimeVisibilityRef.current = null;
-      } catch (err) {
-        console.error("[AICC] loadScenario failed:", err);
-        window.alert("场景加载失败：文件可能不是合法的天枢平台场景。");
-        return;
-      }
-      // Remember the (cloned) source so 重置 can re-apply the same scenario
-      // again without reusing the stale ids that loadScenario consumed.
-      lastLoadedScenarioRef.current = cloned;
+      runtimeVisibilityRef.current = null;
       setPlacement(null);
       setMissionCreatorOpen(false);
       setMissionEditorMissionId(null);
-      refreshSnapshot("idle");
       try {
         const runtimeSnapshot =
           await runtimeControllerRef.current?.loadScenario(
             cloned as Record<string, unknown>
           );
         if (runtimeSnapshot) {
+          lastLoadedScenarioRef.current = runtimeSnapshot.scenario;
           applyRuntimeSnapshot(runtimeSnapshot, "idle");
           runtimeReadyRef.current = true;
         }
       } catch (err) {
         console.error("[AICC] runtime scenario load failed:", err);
-        window.alert("场景已在前端打开，但同步到后端推演引擎失败。");
+        window.alert("后端推演引擎加载场景失败，请检查场景数据后重试。");
       }
     },
-    [applyRuntimeSnapshot, game, refreshSnapshot]
+    [applyRuntimeSnapshot]
   );
 
   const resetSimulation = useCallback(() => {
@@ -555,16 +560,7 @@ export default function AITacticalCommandPlatform({
     if (runtimeBootstrappedRef.current) return;
     runtimeBootstrappedRef.current = true;
 
-    let currentScenario: Record<string, unknown>;
-    try {
-      currentScenario = JSON.parse(game.exportCurrentScenario()) as Record<
-        string,
-        unknown
-      >;
-    } catch (err) {
-      console.error("[AICC] initial scenario export failed:", err);
-      return;
-    }
+    const currentScenario = initialRuntimeScenarioRef.current;
 
     lastLoadedScenarioRef.current = currentScenario;
     void runtimeControllerRef.current
@@ -577,7 +573,7 @@ export default function AITacticalCommandPlatform({
         console.error("[AICC] initial runtime sync failed:", err);
         window.alert("当前场景同步到后端推演引擎失败，推演控制暂不可用。");
       });
-  }, [applyRuntimeSnapshot, game]);
+  }, [applyRuntimeSnapshot]);
 
   const handleNewScenario = useCallback(() => {
     if (
@@ -632,14 +628,18 @@ export default function AITacticalCommandPlatform({
 
   const handleExportScenario = useCallback(() => {
     try {
-      const json = game.exportCurrentScenario();
+      const scenario = latestRuntimeScenarioRef.current;
+      const json = JSON.stringify(scenario, null, 2);
       const blob = new Blob([json], {
         type: "application/json;charset=utf-8",
       });
       const url = URL.createObjectURL(blob);
       const ts = new Date().toISOString().replace(/[:.]/g, "_");
+      const currentScenario = scenario.currentScenario as
+        | { name?: unknown }
+        | undefined;
       const safeName =
-        (game.currentScenario.name || "tianshu_scenario")
+        String(currentScenario?.name || "tianshu_scenario")
           .trim()
           .replace(/[^A-Za-z0-9_-]+/g, "_")
           .slice(0, 60) || "tianshu_scenario";
@@ -654,47 +654,14 @@ export default function AITacticalCommandPlatform({
       console.error("[AICC] export failed:", err);
       window.alert("场景导出失败，请稍后重试。");
     }
-  }, [game]);
+  }, []);
 
   const exportCurrentScenarioObject = useCallback((): Record<
     string,
     unknown
   > | null => {
-    try {
-      return JSON.parse(game.exportCurrentScenario()) as Record<
-        string,
-        unknown
-      >;
-    } catch (err) {
-      console.error("[AICC] export scenario JSON parse failed", err);
-      return null;
-    }
-  }, [game]);
-
-  const syncCurrentScenarioToRuntime = useCallback(
-    async (runState: SimulationRunState = runStateRef.current) => {
-      const currentScenario = exportCurrentScenarioObject();
-      if (!currentScenario) return;
-
-      lastLoadedScenarioRef.current = currentScenario;
-      const runtimeSnapshot =
-        await runtimeControllerRef.current?.loadScenario(currentScenario);
-      if (runtimeSnapshot) {
-        applyRuntimeSnapshot(runtimeSnapshot, runState, {
-          preserveTimeCompression: true,
-        });
-        runtimeReadyRef.current = true;
-      }
-    },
-    [applyRuntimeSnapshot, exportCurrentScenarioObject]
-  );
-
-  const handleLocalScenarioMutation = useCallback(() => {
-    refreshSnapshot();
-    void syncCurrentScenarioToRuntime().catch((err) =>
-      console.error("[AICC] runtime mutation sync failed:", err)
-    );
-  }, [refreshSnapshot, syncCurrentScenarioToRuntime]);
+    return latestRuntimeScenarioRef.current;
+  }, []);
 
   const applyRuntimeMutation = useCallback(
     async (
@@ -1104,19 +1071,13 @@ export default function AITacticalCommandPlatform({
         )
         .catch((err) => {
           console.error("[AICC] AI runtime refresh failed", err);
-          try {
-            game.loadScenario(JSON.stringify(data));
-            refreshSnapshot();
-          } catch (loadErr) {
-            console.error("[AICC] AI scenario apply failed", loadErr);
-          }
+          latestRuntimeScenarioRef.current = data;
         });
     },
-    [applyRuntimeSnapshot, game, refreshSnapshot]
+    [applyRuntimeSnapshot]
   );
 
-  // 当前 game JSON 快照，供保存/另存为按钮提取。
-  // game.exportCurrentScenario() 返回字符串，这里再 parse 成 object 与后端契约对齐。
+  // Save / Save As use the authoritative backend runtime snapshot.
   const captureCurrentScenarioData = useCallback((): Record<
     string,
     unknown
@@ -1339,7 +1300,7 @@ export default function AITacticalCommandPlatform({
       </div>
 
       <main
-        className="relative flex min-h-0 min-w-0 flex-col overflow-hidden bg-[#050914]"
+        className="relative isolate z-0 flex min-h-0 min-w-0 flex-col overflow-hidden bg-[#050914]"
         style={{ gridColumn: "3 / 4", gridRow: "2 / 3" }}
       >
         {/*
@@ -1363,7 +1324,6 @@ export default function AITacticalCommandPlatform({
             onPause={pauseSimulation}
             onStep={stepSimulation}
             onReset={resetSimulation}
-            onScenarioMutation={handleLocalScenarioMutation}
             onDeployUnit={deployRuntimeUnit}
             onDeleteUnit={deleteRuntimeUnit}
             onMoveUnit={moveRuntimeUnit}

@@ -13,6 +13,7 @@ Run from `client/` unless noted.
 | Command | Purpose |
 | --- | --- |
 | `docker compose up --build` (repo root) | Build + run frontend (`:3000`) and backend (`:8000`). |
+| `docker compose up --build -d client` (repo root) | Rebuild the Nginx-served frontend bundle after client source/UI changes, then restart the client container. |
 | `.\server\start-ai-server.ps1` / `.\server\stop-ai-server.ps1` | Launch / kill backend via in-repo `.python312\python.exe`. PID + logs land under `server\.ai_server.*`. |
 | `npm run dev` | Vite dev server on port 3000. Copy `.env.example` to `.env.local` first. |
 | `npm run build` | TS check (`tsc -b`) + production Vite build. |
@@ -20,6 +21,10 @@ Run from `client/` unless noted.
 | `npm run test` | Vitest (single run); `npm run test:watch` for watch mode. |
 | `npm run test src/path/to/file.test.ts` | Run a single Vitest file. Also: `npm run test:game`, `test:units`, `test:utils`. |
 | `npm run preview` | Preview the production build. |
+| `npm run electron:dev` (repo root) | Build the client and run the Electron shell against bundled local resources. |
+| `npm run electron:pack` (repo root) | Build the unpacked Windows Electron app under `dist-electron/win-unpacked`. |
+| `npm run electron:dist` (repo root) | Build the Windows NSIS installer. Requires `.python312` and `client/dist`. |
+| `npm run electron:publish` (repo root) | Build + publish installer/update metadata to GitHub Releases via electron-builder. Requires `GH_TOKEN`. |
 | `& "...\.python312\python.exe" -m pytest tests/ -v` (from `server/`) | Backend pytest. `asyncio_mode = auto`. |
 | `& "...\.python312\python.exe" -m pytest tests/test_mcp_runtime.py::test_x -v` | Single backend test. |
 | `& "...\.python312\python.exe" -m app.mcp` (from `server/`) | Run MCP server in stdio mode. Requires `AICC_MCP_TOKEN` (JWT) or `AICC_MCP_USER_ID` (dev). |
@@ -34,7 +39,8 @@ The Python interpreter lives at `.python312\python.exe` in the repo root — `st
 - `ai/bridge.py` — `AICCOpenClawBridge` is the composition root: runtime + skill registry + agent + MCP client skeleton + SDK adapter. `from_env()` is the only constructor callers use.
 - `ai/agent.py` — `AICCCommanderAgent` parses natural-language commands (regex-driven; see `UUID_RE`, `NUMBER_RE`, etc.) and dispatches to skills. Hooks `_plan_with_sdk()` for future OpenClaw SDK integration.
 - `ai/skill_registry.py` — Concrete skill implementations bound to the runtime.
-- `aicc/runtime.py` — `AICCRuntime` wraps `gym/blade`'s `Game`/`Scenario`. It mutates `sys.path` at import time to put `<repo>/gym` on the path, then imports `blade.*` modules. Holds an `RLock` and a script-step cursor for staged playback. `ROOT_DIR` is `repo` root computed via `parents[3]`.
+- `aicc_runtime/runtime.py` — `AICCRuntime` wraps `gym/blade`'s `Game`/`Scenario`. It mutates `sys.path` at import time to put `AICC_GYM_DIR` or `<resource-root>/gym` on the path, then imports `blade.*` modules. Holds an `RLock` and a script-step cursor for staged playback.
+- `platform/paths.py` — packaging-aware path resolver. Source/Docker default to the repository-shaped root; Electron/exe launchers should set `AICC_RESOURCE_DIR` to bundled read-only resources and `AICC_USER_DATA_DIR` / `AICC_SKILLS_DIR` to writable app data.
 - `api/ai.py` — three endpoints:
   - `POST /api/ai/command` — main NL command surface; returns execution summary + freshly exported scenario JSON.
   - `GET /api/ai/runtime/scenario` — read-only snapshot of the live runtime (the front-end polls this to see MCP-side mutations).
@@ -66,18 +72,31 @@ The MCP server and `/api/ai/command` operate on the **same** `AICCRuntime` insta
 
 ### Frontend ↔ backend URL plumbing
 
-- Dev: Vite serves on `:3000`, frontend reads `VITE_AI_SERVER_URL=http://127.0.0.1:8000` from `.env.local`, hits the backend cross-origin (backend has `allow_origins=["*"]`).
+- Dev: Vite serves on `:3000`, frontend reads `VITE_AI_SERVER_URL=http://127.0.0.1:8000` from `.env.local`, and hits the backend cross-origin. Backend CORS is explicit and comes from `AICC_CORS_ORIGINS`; wildcard origins are rejected.
 - Prod (docker-compose): `VITE_AI_SERVER_URL=""` in the build args; nginx in the client container reverse-proxies `/api/*` to the server.
+
+### Electron desktop package
+
+- Root `package.json` owns desktop packaging. `electron-builder` publishes to GitHub repo `Alec1003/tianshu`; `electron-updater` checks that GitHub Releases feed in packaged builds.
+- `electron/main.cjs` starts the bundled FastAPI backend on `127.0.0.1:<random>` and a local Node static server on `127.0.0.1:<random>`. The static server serves `client/dist`, proxies `/api/*` to FastAPI, and loads `/scenarios`, so React keeps using the same relative API paths as Docker production.
+- Packaged read-only resources are copied via `extraResources`: `server/`, `gym/`, `client/dist/`, `client/src/scenarios/`, and `.python312/`.
+- Mutable desktop data must stay outside `app.asar`: Electron sets `AICC_USER_DATA_DIR`, `AICC_SKILLS_DIR`, SQLite `AICC_DATABASE_URL`, generated JWT/model secrets, and backend logs under `app.getPath("userData")`.
+- Release/update flow: bump root `package.json` version, commit, tag `vX.Y.Z`, then push the branch and tag to `tianshu`. The `.github/workflows/electron-release.yml` workflow publishes the installer and `latest.yml` update metadata.
+- Do not bind the desktop backend to `0.0.0.0`; it is an internal loopback service.
 
 ## Environment variables
 
 Backend (prefix `AICC_`, see `server/app/config.py`):
 
 - `AICC_DATABASE_URL` — async SQLAlchemy DSN. Defaults to SQLite under `./data/`. Compose mounts a named volume here.
+- `AICC_SKILLS_DIR` — folder-backed custom AI skills store. Defaults to `./data/skills`; Docker mounts this under the server data volume. For exe packaging, point this at the app's writable skills folder and do not reintroduce frontend `localStorage` as the durable skills source.
+- `AICC_RESOURCE_DIR` — read-only bundled resource root for packaged runs. Defaults to the source/Docker repo-shaped root. Electron should point this at `extraResources`.
+- `AICC_USER_DATA_DIR` — writable desktop/server data root. Electron should point this at `app.getPath("userData")`; keep DB, skills, logs, and mutable app data outside `app.asar`.
+- `AICC_GYM_DIR` / `AICC_SCENARIOS_DIR` / `AICC_UNIT_ASSETS_FILE` — optional resource overrides when the packaged layout does not mirror the source tree.
 - `AICC_JWT_SECRET` — JWT signing secret. **Must be overridden in production.**
 - `AICC_MCP_TOKEN` / `AICC_MCP_USER_ID` — stdio MCP auth.
 - `AICC_MCP_HTTP_DEV_USER_ID` — local-only HTTP MCP auth bypass.
-- `AICC_MCP_RUNTIME_SCENARIO` — override the default `SCS.json` boot scenario.
+- `AICC_MCP_RUNTIME_SCENARIO` — override the default `SCS.json` boot scenario. Relative paths resolve from `AICC_RESOURCE_DIR`.
 
 Frontend (see `client/.env.example`): `VITE_AI_SERVER_URL`, `VITE_API_SERVER_URL`, `VITE_CESIUM_ION_TOKEN`, `VITE_AUTH0_*`, `VITE_ENV`.
 
@@ -86,6 +105,7 @@ Frontend (see `client/.env.example`): `VITE_AI_SERVER_URL`, `VITE_API_SERVER_URL
 - Platform entry point is `http://localhost:3000/` — no `?map=ol` query param needed; default map is `CesiumScenarioMap`.
 - Cesium can double-initialize under React `StrictMode` (WebGL); the current entry deliberately omits StrictMode.
 - On Windows + Docker bind mounts, file watching can be flaky; Vite is configured with polling for HMR.
+- When the user is viewing the Docker-served frontend, client source/UI changes are not visible after `docker compose restart client` alone. The client container serves static Nginx assets built into the image, so run `npm.cmd run build` from `client/` when useful, then `docker compose up --build -d client`, and verify `docker compose ps`, `http://localhost:3000/`, and `http://localhost:8000/health`.
 - `runtime_step(steps=N)` is capped at 7200 (= 2 simulation hours) per call. Loop for longer runs.
 - Single-process / single-runtime: each `python -m app.mcp` invocation owns its own runtime; HTTP MCP shares the FastAPI bridge runtime. There is no multi-tenant runtime registry yet.
 - Coding style is enforced by ESLint + Prettier (client) and pytest's `filterwarnings = ignore::DeprecationWarning` (server, to silence fastapi-users 14 + SQLAlchemy 2 noise). Match underscore-prefix conventions for private members and follow the existing camelCase / snake_case split (TS vs Python).

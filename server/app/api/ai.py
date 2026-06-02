@@ -5,16 +5,28 @@ import json
 import logging
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai.model_checker import check_model_connectivity
+from app.ai.custom_skill_store import (
+    CustomSkillNotFoundError,
+    CustomSkillStore,
+    CustomSkillStoreError,
+)
+from app.ai.internal_skills import build_internal_skill_steps
 from app.ai.models import (
     AICommandRequest,
     AICommandResponse,
     CommandApprovalResponse,
     CommandProposalListResponse,
+    CustomSkillCreateRequest,
+    CustomSkillListResponse,
+    CustomSkillRead,
+    CustomSkillUpdateRequest,
+    InternalSkillProposalRequest,
+    InternalSkillProposalResponse,
     ModelCheckRequest,
     ModelCheckResponse,
     RuntimeAddWeaponRequest,
@@ -87,6 +99,17 @@ def _bridge_for_user(request: Request, user: User) -> Any:
             scenario_id=_runtime_context_from_request(request),
         )
     return request.app.state.bridge
+
+
+def _custom_skill_store(request: Request) -> CustomSkillStore:
+    store = getattr(request.app.state, "custom_skill_store", None)
+    if store is not None:
+        return store
+    return CustomSkillStore.from_settings()
+
+
+def _custom_skill_created_by(user: User) -> str:
+    return str(getattr(user, "email", None) or getattr(user, "id", "operator"))
 
 
 async def _bridge_for_user_loaded(
@@ -505,6 +528,54 @@ async def reject_command_proposal(
         proposal_id=proposal.id,
     )
     return CommandApprovalResponse(proposal=proposal, snapshot=None)
+
+
+@router.post(
+    "/internal-skills/proposals",
+    response_model=InternalSkillProposalResponse,
+)
+async def create_internal_skill_proposal(
+    request: Request,
+    payload: InternalSkillProposalRequest,
+    session: AsyncSession = Depends(get_async_session),
+    user: User = Depends(current_active_user),
+) -> InternalSkillProposalResponse:
+    bridge = await _bridge_for_user_loaded(request, user, session)
+    queue = getattr(bridge, "command_approvals", None)
+    if queue is None:
+        raise RuntimeError("AI bridge does not expose command approvals")
+    try:
+        steps = build_internal_skill_steps(bridge.runtime, payload.draft)
+        proposal = queue.create_proposal(
+            command=payload.command or payload.draft.name,
+            steps=steps,
+            source="internal_skill",
+        )
+        saved = await save_command_proposal(
+            session,
+            user,
+            proposal,
+            scenario_id=_runtime_context_from_request(request),
+        )
+        queue.hydrate(saved)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
+
+    await record_runtime_event(
+        session,
+        user,
+        event_type="command.proposed",
+        action="internal_skill_proposal_created",
+        actor=saved.source,
+        summary=f"内部战术技能提案：{payload.draft.name}",
+        payload={"draft": payload.draft.model_dump(mode="json"), "proposal": saved.model_dump(mode="json")},
+        runtime=getattr(bridge, "runtime", None),
+        proposal_id=saved.id,
+    )
+    return InternalSkillProposalResponse(draft=payload.draft, proposal=saved)
 
 
 @router.get("/runtime/scenario")
@@ -1278,6 +1349,87 @@ def list_skills(
     return {"skills": [definition.model_dump() for definition in bridge.skill_registry.definitions()]}
 
 
+@router.get("/custom-skills", response_model=CustomSkillListResponse)
+def list_custom_skills(
+    request: Request,
+    user: User = Depends(current_active_user),
+) -> CustomSkillListResponse:
+    store = _custom_skill_store(request)
+    return CustomSkillListResponse(
+        skills=store.list(str(user.id)),
+        skillsDir=str(store.root_dir),
+    )
+
+
+@router.post(
+    "/custom-skills",
+    response_model=CustomSkillRead,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_custom_skill(
+    request: Request,
+    payload: CustomSkillCreateRequest,
+    user: User = Depends(current_active_user),
+) -> CustomSkillRead:
+    try:
+        return _custom_skill_store(request).create(
+            str(user.id),
+            payload,
+            created_by=_custom_skill_created_by(user),
+        )
+    except CustomSkillStoreError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
+
+
+@router.patch("/custom-skills/{skill_id}", response_model=CustomSkillRead)
+def update_custom_skill(
+    request: Request,
+    skill_id: str,
+    payload: CustomSkillUpdateRequest,
+    user: User = Depends(current_active_user),
+) -> CustomSkillRead:
+    try:
+        return _custom_skill_store(request).update(str(user.id), skill_id, payload)
+    except CustomSkillNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Custom skill not found.",
+        ) from exc
+    except CustomSkillStoreError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
+
+
+@router.delete(
+    "/custom-skills/{skill_id}",
+    response_class=Response,
+    response_model=None,
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def delete_custom_skill(
+    request: Request,
+    skill_id: str,
+    user: User = Depends(current_active_user),
+) -> None:
+    try:
+        _custom_skill_store(request).delete(str(user.id), skill_id)
+    except CustomSkillNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Custom skill not found.",
+        ) from exc
+    except CustomSkillStoreError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
+
+
 @router.post("/model/check", response_model=ModelCheckResponse)
 async def check_model(
     payload: ModelCheckRequest,
@@ -1475,6 +1627,14 @@ async def chat(
         approval_queue=approval_queue,
         proposal_recorder=_record_proposal if approval_queue is not None else None,
         mcp_client=bridge.mcp_client,
+        session=session,
+        user=user,
+        scenario_id=_runtime_context_from_request(request),
+        bridge_provider=lambda owner, scenario_ctx=None: _bridge_for_user(
+            request,
+            owner,
+            scenario_ctx,
+        ),
     )
     return await VercelAIAdapter.dispatch_request(
         request,

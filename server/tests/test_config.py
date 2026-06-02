@@ -6,6 +6,7 @@ from app.config import (
     DEFAULT_CORS_ORIGINS,
     DEFAULT_DATABASE_URL,
     DEFAULT_JWT_SECRET,
+    DEFAULT_SKILLS_DIR,
     MIN_PRODUCTION_MODEL_CONFIG_SECRET_LENGTH,
     MIN_PRODUCTION_JWT_SECRET_LENGTH,
     Settings,
@@ -19,6 +20,11 @@ def test_default_cors_origins_are_explicit_local_frontends() -> None:
 
     assert settings.cors_origin_list == parse_cors_origins(DEFAULT_CORS_ORIGINS)
     assert "*" not in settings.cors_origin_list
+
+
+def test_default_skills_dir_points_to_server_data_folder() -> None:
+    assert Settings().skills_dir == DEFAULT_SKILLS_DIR
+    assert DEFAULT_SKILLS_DIR == "./data/skills"
 
 
 def test_parse_cors_origins_trims_deduplicates_and_strips_trailing_slash() -> None:

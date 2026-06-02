@@ -2,6 +2,13 @@ import { apiCall } from "./client";
 import type {
   CommandApprovalResponse,
   CommandProposalListResponse,
+  CustomSkill,
+  CustomSkillCreatePayload,
+  CustomSkillListResponse,
+  CustomSkillUpdatePayload,
+  InternalSkillProposalRequest,
+  InternalSkillProposalResponse,
+  RegisteredSkill,
   RuntimeAttackRequest,
   RuntimeAddWeaponRequest,
   RuntimeCreateSideRequest,
@@ -69,6 +76,54 @@ export async function rejectCommandProposal(
     `/api/ai/command/proposals/${encodeURIComponent(proposalId)}/reject`,
     { method: "POST" }
   );
+}
+
+export async function createInternalSkillProposal(
+  payload: InternalSkillProposalRequest
+): Promise<InternalSkillProposalResponse> {
+  return apiCall<InternalSkillProposalResponse>(
+    "/api/ai/internal-skills/proposals",
+    { method: "POST", json: payload }
+  );
+}
+
+export async function listBackendSkills(): Promise<RegisteredSkill[]> {
+  const payload = await apiCall<{ skills?: RegisteredSkill[] }>(
+    "/api/ai/skills"
+  );
+  return payload.skills ?? [];
+}
+
+export async function listCustomSkills(): Promise<CustomSkillListResponse> {
+  return apiCall<CustomSkillListResponse>("/api/ai/custom-skills");
+}
+
+export async function createCustomSkill(
+  payload: CustomSkillCreatePayload
+): Promise<CustomSkill> {
+  return apiCall<CustomSkill>("/api/ai/custom-skills", {
+    method: "POST",
+    json: payload,
+  });
+}
+
+export async function updateCustomSkill(
+  skillId: string,
+  payload: CustomSkillUpdatePayload
+): Promise<CustomSkill> {
+  return apiCall<CustomSkill>(
+    `/api/ai/custom-skills/${encodeURIComponent(skillId)}`,
+    {
+      method: "PATCH",
+      json: payload,
+    }
+  );
+}
+
+export async function deleteCustomSkill(skillId: string): Promise<void> {
+  await apiCall<void>(`/api/ai/custom-skills/${encodeURIComponent(skillId)}`, {
+    method: "DELETE",
+  });
 }
 
 export async function loadRuntimeScenario(

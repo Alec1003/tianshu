@@ -249,6 +249,7 @@ export interface ScenarioCompareReport {
 export interface ScenarioCompareSessionState {
   baseline_id: string;
   selected_sources: Record<string, string>;
+  plan_summaries: Record<string, Record<string, unknown>>;
 }
 
 export interface ScenarioCompareSessionCreatePayload {
@@ -282,12 +283,116 @@ export interface ScenarioCompareForkCreatePayload {
   branch_count?: number;
 }
 
+export interface ScenarioPlanOption {
+  title: string;
+  concept: string;
+  objective: string;
+  key_actions: string[];
+  advantages: string[];
+  risks: string[];
+}
+
+export interface ScenarioPlanSetCreatePayload {
+  title?: string;
+  include_source_baseline?: boolean;
+  plans: ScenarioPlanOption[];
+}
+
+export interface ScenarioPlanSet {
+  compare_session: ScenarioCompareSession;
+  source_scenario_id: string;
+  source_scenario_name: string;
+  branch_count: number;
+  plans: ScenarioPlanOption[];
+}
+
+export interface ScenarioBatchSimulationPayload {
+  steps?: number;
+  include_baseline?: boolean;
+}
+
+export interface ScenarioBatchSimulationResult {
+  scenario_id: string;
+  scenario_name: string;
+  training_score_record_id: string | null;
+  overall_score: number;
+  grade: string;
+  confidence: string;
+  outcome_reason: string;
+  winner_side_id: string;
+  elapsed_seconds: number;
+  source: string;
+}
+
+export interface ScenarioBatchSimulationResponse {
+  compare_session: ScenarioCompareSession;
+  simulated_at: string;
+  steps: number;
+  include_baseline: boolean;
+  results: ScenarioBatchSimulationResult[];
+  recommended_scenario_id: string | null;
+  recommended_reason: string;
+}
+
 export interface SkillExecutionResult {
   skill: string;
   status: "ok" | "error";
   parameters: Record<string, unknown>;
   output?: Record<string, unknown>;
   error?: string | null;
+}
+
+export interface RegisteredSkill {
+  name: string;
+  description: string;
+  parameters?: Record<string, unknown>;
+}
+
+export interface SkillSchemaField {
+  name: string;
+  type: string;
+  required: boolean;
+  description: string;
+}
+
+export interface CustomSkill {
+  id: string;
+  name: string;
+  description: string;
+  prompt: string;
+  source: "custom";
+  version: string;
+  enabled: boolean;
+  readonly: boolean;
+  inputSchema: SkillSchemaField[];
+  outputSchema: SkillSchemaField[];
+  usageCount: number;
+  lastUsedAt: string | null;
+  createdBy: string;
+  updatedAt: string;
+}
+
+export interface CustomSkillCreatePayload {
+  name: string;
+  description?: string;
+  prompt?: string;
+  inputSchema?: SkillSchemaField[];
+  outputSchema?: SkillSchemaField[];
+  enabled?: boolean;
+}
+
+export interface CustomSkillUpdatePayload {
+  name?: string;
+  description?: string;
+  prompt?: string;
+  inputSchema?: SkillSchemaField[];
+  outputSchema?: SkillSchemaField[];
+  enabled?: boolean;
+}
+
+export interface CustomSkillListResponse {
+  skills: CustomSkill[];
+  skillsDir: string;
 }
 
 export interface StructuredCommandStep {
@@ -298,6 +403,33 @@ export interface StructuredCommandStep {
   summary: string;
   risk: "low" | "medium" | "high";
   writes_runtime: boolean;
+}
+
+export interface InternalSkillMissionDraft {
+  type: "patrol" | "strike" | "move";
+  name: string;
+  assigned_unit_ids: string[];
+  reference_point_ids?: string[];
+  assigned_target_ids?: string[];
+  route?: number[][];
+  notes?: string;
+}
+
+export interface InternalSkillDraft {
+  name: string;
+  description?: string;
+  side_id?: string;
+  trigger_phrases?: string[];
+  constraints?: string[];
+  allowed_runtime_skills?: string[];
+  missions: InternalSkillMissionDraft[];
+  expires_at?: string | null;
+  allow_duplicate_assignments?: boolean;
+}
+
+export interface InternalSkillProposalRequest {
+  draft: InternalSkillDraft;
+  command?: string;
 }
 
 export interface CommandAdjudicationIssue {
@@ -318,7 +450,7 @@ export interface CommandAdjudicationResult {
 export interface CommandProposal {
   id: string;
   command: string;
-  source: "regex" | "llm_tool" | "api" | "mcp";
+  source: "regex" | "llm_tool" | "api" | "mcp" | "internal_skill";
   status:
     | "pending"
     | "blocked"
@@ -337,6 +469,11 @@ export interface CommandProposal {
 
 export interface CommandProposalListResponse {
   proposals: CommandProposal[];
+}
+
+export interface InternalSkillProposalResponse {
+  draft: InternalSkillDraft;
+  proposal: CommandProposal;
 }
 
 export interface CommandApprovalResponse {

@@ -6,10 +6,13 @@ MCP tools 是 service 的薄壳；service 过这套测试 ≈ tools 业务正确
 
 from __future__ import annotations
 
+import json
 from datetime import datetime, timezone
+from pathlib import Path
 
 import pytest
 
+from app.ai.bridge import AICCOpenClawBridge
 from app.aicc_runtime.models import RuntimeEvent
 from app.scenarios import service as svc
 from app.scenarios.errors import (
@@ -20,6 +23,7 @@ from app.scenarios.errors import (
 )
 from app.scenarios.models import Scenario
 from app.scenarios.schemas import (
+    ScenarioBatchSimulationRequest,
     ScenarioCompareForkCreate,
     ScenarioCompareReportCreate,
     ScenarioCompareSessionCreate,
@@ -31,6 +35,8 @@ from app.scenarios.schemas import (
     ScenarioCompareSnapshotScore,
     ScenarioCompareSnapshotSource,
     ScenarioCompareSnapshotSummary,
+    ScenarioPlanOption,
+    ScenarioPlanSetCreate,
     TrainingScoreDimension,
     TrainingScoreResponse,
 )
@@ -655,3 +661,127 @@ async def test_fork_compare_session_creates_source_and_three_branches(
         "方案 3",
     ]
     assert all(branch.branch_meta["parent_scenario_id"] == source.id for branch in branches)
+
+
+async def test_create_plan_set_compare_session_persists_plan_summaries(
+    db_session,
+    user,
+):
+    source = await svc.create_scenario(
+        db_session,
+        user,
+        name="Operational Base",
+        data={
+            "currentSideId": "BLUE",
+            "currentScenario": {
+                "id": "runtime-plan-base",
+                "name": "Operational Base",
+                "currentTime": 1000,
+                "startTime": 1000,
+                "duration": 3600,
+                "currentSideId": "BLUE",
+                "sides": [{"id": "BLUE", "name": "Blue"}],
+                "missions": [],
+                "aircraft": [],
+                "ships": [],
+                "facilities": [],
+                "airbases": [],
+                "obstacles": [],
+            }
+        },
+    )
+
+    plan_set = await svc.create_plan_set_compare_session(
+        db_session,
+        user,
+        source.id,
+        payload=ScenarioPlanSetCreate(
+            title="Blue COAs",
+            plans=[
+                ScenarioPlanOption(
+                    title="Stand-off strike",
+                    concept="Use long-range assets first.",
+                    key_actions=["EW opening", "long-range strike"],
+                ),
+                ScenarioPlanOption(
+                    title="Escort penetration",
+                    concept="Escort the strike package through contested airspace.",
+                    key_actions=["fighter sweep", "escort strike"],
+                ),
+                ScenarioPlanOption(
+                    title="Decoy and flank",
+                    concept="Use a decoy axis and attack from a second bearing.",
+                    key_actions=["decoy package", "flanking attack"],
+                ),
+            ],
+        ),
+    )
+
+    assert plan_set.branch_count == 3
+    assert plan_set.compare_session.source_scenario_id == source.id
+    assert len(plan_set.compare_session.scenario_ids) == 4
+    branch_ids = plan_set.compare_session.scenario_ids[1:]
+    assert set(branch_ids) == set(plan_set.compare_session.state.plan_summaries)
+    first_summary = plan_set.compare_session.state.plan_summaries[branch_ids[0]]
+    assert first_summary["title"] == "Stand-off strike"
+
+
+async def test_simulate_compare_session_batch_creates_score_records(
+    db_session,
+    user,
+):
+    source_data = json.loads(
+        (
+            Path(__file__).resolve().parents[2]
+            / "client"
+            / "src"
+            / "scenarios"
+            / "SCS.json"
+        ).read_text(encoding="utf-8")
+    )
+    source_data["currentScenario"]["id"] = "runtime-batch-base"
+    source_data["currentScenario"]["name"] = "Batch Base"
+    source = await svc.create_scenario(
+        db_session,
+        user,
+        name="Batch Base",
+        data=source_data,
+    )
+    plan_set = await svc.create_plan_set_compare_session(
+        db_session,
+        user,
+        source.id,
+        payload=ScenarioPlanSetCreate(
+            plans=[
+                ScenarioPlanOption(title="COA-1", concept="First option"),
+                ScenarioPlanOption(title="COA-2", concept="Second option"),
+            ],
+        ),
+    )
+
+    bridges: dict[str, AICCOpenClawBridge] = {}
+
+    def bridge_provider(owner, scenario_id):
+        assert owner == user
+        key = str(scenario_id or "")
+        if key not in bridges:
+            bridges[key] = AICCOpenClawBridge()
+        return bridges[key]
+
+    result = await svc.simulate_compare_session_batch(
+        db_session,
+        user,
+        plan_set.compare_session.id,
+        payload=ScenarioBatchSimulationRequest(steps=5, include_baseline=False),
+        bridge_provider=bridge_provider,
+    )
+
+    assert result.steps == 5
+    assert result.include_baseline is False
+    assert len(result.results) == 2
+    assert all(item.training_score_record_id for item in result.results)
+
+    updated = await svc.get_compare_session(db_session, user, plan_set.compare_session.id)
+    state = ScenarioCompareSessionState.model_validate(updated.state)
+    for item in result.results:
+        assert state.selected_sources[item.scenario_id] == item.training_score_record_id

@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import sys
-from pathlib import Path
 from typing import Any
 
+from app.platform.paths import gym_dir, resource_root
 
-ROOT_DIR = Path(__file__).resolve().parents[3]
-GYM_DIR = ROOT_DIR / "gym"
+ROOT_DIR = resource_root()
+GYM_DIR = gym_dir()
 
 if str(GYM_DIR) not in sys.path:
     sys.path.insert(0, str(GYM_DIR))

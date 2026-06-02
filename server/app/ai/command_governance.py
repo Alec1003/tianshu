@@ -32,6 +32,8 @@ ALLOWED_SKILLS = {
     "delete_unit",
     "move_unit",
     "update_unit_state",
+    "create_patrol_mission",
+    "create_strike_mission",
     "trigger_tactical_event",
     "update_situation_layer",
     "load_script",
@@ -187,6 +189,9 @@ class CommandRuleEngine:
 
         if skill in {"delete_unit", "move_unit", "update_unit_state"}:
             issues.extend(self._validate_unit_target(step))
+
+        if skill in {"create_patrol_mission", "create_strike_mission"}:
+            issues.extend(self._validate_mission(step))
 
         if skill == "move_unit":
             issues.extend(self._validate_route(step))
@@ -419,6 +424,112 @@ class CommandRuleEngine:
                     )
                 )
         return issues
+
+    def _validate_mission(
+        self, step: StructuredCommandStep
+    ) -> list[CommandAdjudicationIssue]:
+        issues: list[CommandAdjudicationIssue] = []
+        params = step.parameters
+        name = str(params.get("name") or "").strip()
+        assigned_unit_ids = params.get("assigned_unit_ids")
+        if not name:
+            issues.append(
+                self._issue(
+                    "blocking",
+                    "missing_mission_name",
+                    "Mission proposal must include a mission name.",
+                    step.id,
+                    "name",
+                )
+            )
+        if not isinstance(assigned_unit_ids, list) or not assigned_unit_ids:
+            issues.append(
+                self._issue(
+                    "blocking",
+                    "missing_assigned_units",
+                    "Mission proposal must assign at least one unit.",
+                    step.id,
+                    "assigned_unit_ids",
+                )
+            )
+        else:
+            for index, unit_id in enumerate(assigned_unit_ids):
+                if self._find_any_unit(str(unit_id)) is None:
+                    issues.append(
+                        self._issue(
+                            "blocking",
+                            "assigned_unit_not_found",
+                            f"Assigned unit not found: {unit_id}",
+                            step.id,
+                            f"assigned_unit_ids[{index}]",
+                        )
+                    )
+
+        if step.skill == "create_patrol_mission":
+            reference_point_ids = params.get("reference_point_ids")
+            if not isinstance(reference_point_ids, list) or len(reference_point_ids) < 3:
+                issues.append(
+                    self._issue(
+                        "blocking",
+                        "missing_patrol_area",
+                        "Patrol mission requires at least three reference points.",
+                        step.id,
+                        "reference_point_ids",
+                    )
+                )
+            else:
+                scenario = self.runtime.game.current_scenario
+                for index, point_id in enumerate(reference_point_ids):
+                    if scenario.get_reference_point(str(point_id)) is None:
+                        issues.append(
+                            self._issue(
+                                "blocking",
+                                "reference_point_not_found",
+                                f"Reference point not found: {point_id}",
+                                step.id,
+                                f"reference_point_ids[{index}]",
+                            )
+                        )
+
+        if step.skill == "create_strike_mission":
+            target_ids = params.get("assigned_target_ids")
+            if not isinstance(target_ids, list) or not target_ids:
+                issues.append(
+                    self._issue(
+                        "blocking",
+                        "missing_strike_targets",
+                        "Strike mission requires at least one target.",
+                        step.id,
+                        "assigned_target_ids",
+                    )
+                )
+            else:
+                for index, target_id in enumerate(target_ids):
+                    if self._find_any_unit(str(target_id)) is None:
+                        issues.append(
+                            self._issue(
+                                "blocking",
+                                "strike_target_not_found",
+                                f"Strike target not found: {target_id}",
+                                step.id,
+                                f"assigned_target_ids[{index}]",
+                            )
+                        )
+        return issues
+
+    def _find_any_unit(self, unit_id: str) -> Any | None:
+        scenario = self.runtime.game.current_scenario
+        for getter_name in (
+            "get_aircraft",
+            "get_ship",
+            "get_facility",
+            "get_airbase",
+        ):
+            getter = getattr(scenario, getter_name, None)
+            unit = getter(unit_id) if callable(getter) else None
+            if unit is not None:
+                return unit
+        return None
 
     def _validate_coordinates(
         self,
@@ -656,4 +767,6 @@ class CommandApprovalQueue:
             return f"推进仿真 {parameters.get('steps', 1)} 秒"
         if skill == "load_scenario_snapshot":
             return f"Load scenario {parameters.get('name') or parameters.get('scenario_id') or ''}".strip()
+        if skill in {"create_patrol_mission", "create_strike_mission"}:
+            return f"Create mission {parameters.get('name') or ''}".strip()
         return skill.replace("_", " ")

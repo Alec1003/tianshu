@@ -4,6 +4,8 @@ import { apiCall } from "./client";
 import type {
   AarRecord,
   AarRecordCreatePayload,
+  ScenarioBatchSimulationPayload,
+  ScenarioBatchSimulationResponse,
   ScenarioBranchCreatePayload,
   ScenarioCompareForkCreatePayload,
   ScenarioCompareResponse,
@@ -15,6 +17,8 @@ import type {
   ScenarioCreatePayload,
   ScenarioDetail,
   ScenarioListItem,
+  ScenarioPlanSet,
+  ScenarioPlanSetCreatePayload,
   RuntimeTimelineResponse,
   ScenarioUpdatePayload,
   TrainingScoreRecord,
@@ -167,6 +171,32 @@ export async function forkScenarioCompareSession(
 ): Promise<ScenarioCompareSession> {
   return apiCall<ScenarioCompareSession>(
     `/api/scenarios/${encodeURIComponent(scenarioId)}/compare-session/fork`,
+    {
+      method: "POST",
+      json: payload,
+    }
+  );
+}
+
+export async function createScenarioPlanSet(
+  scenarioId: string,
+  payload: ScenarioPlanSetCreatePayload
+): Promise<ScenarioPlanSet> {
+  return apiCall<ScenarioPlanSet>(
+    `/api/scenarios/${encodeURIComponent(scenarioId)}/plan-set`,
+    {
+      method: "POST",
+      json: payload,
+    }
+  );
+}
+
+export async function simulateScenarioCompareSession(
+  compareSessionId: string,
+  payload: ScenarioBatchSimulationPayload = {}
+): Promise<ScenarioBatchSimulationResponse> {
+  return apiCall<ScenarioBatchSimulationResponse>(
+    `/api/scenarios/compare/sessions/${encodeURIComponent(compareSessionId)}/simulate`,
     {
       method: "POST",
       json: payload,

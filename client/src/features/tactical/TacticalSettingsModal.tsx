@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -13,6 +13,25 @@ import {
   CheckCircle2,
   AlertCircle,
   AlertTriangle,
+  Activity,
+  CalendarClock,
+  Clock,
+  Code2,
+  Database,
+  FileText,
+  History,
+  Lock,
+  MoreHorizontal,
+  Pencil,
+  PlayCircle,
+  Plus,
+  Power,
+  ScrollText,
+  Search,
+  SlidersHorizontal,
+  Terminal,
+  User,
+  Zap,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -29,9 +48,9 @@ const SETTINGS_TABS = [
   },
   {
     id: "skills",
-    label: "技能阵列",
+    label: "AI 工具",
     icon: Wrench,
-    desc: "管理后端技能与自定义提示词",
+    desc: "查看后端工具与自定义提示词",
   },
   {
     id: "system",
@@ -112,7 +131,7 @@ export default function TacticalSettingsModal(
             exit={{ opacity: 0, scale: 0.95, y: 10 }}
             role="dialog"
             transition={{ type: "spring", stiffness: 400, damping: 30 }}
-            className="relative flex h-[80vh] w-[90vw] max-w-5xl overflow-hidden rounded-xl border border-cyan-400/30 bg-[#030914] shadow-[0_0_50px_rgba(8,145,178,0.15)] ring-1 ring-white/5"
+            className="relative flex h-[86vh] w-[94vw] max-w-7xl overflow-hidden rounded-xl border border-cyan-400/30 bg-[#030914] shadow-[0_0_50px_rgba(8,145,178,0.15)] ring-1 ring-white/5"
           >
             {/* Header / Sidebar (Left) */}
             <div className="flex w-64 shrink-0 flex-col border-r border-cyan-400/20 bg-[#02050c]">
@@ -197,7 +216,7 @@ export default function TacticalSettingsModal(
                 <X className="size-4" />
               </button>
 
-              <div className="flex-1 overflow-y-auto p-8 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-cyan-900/50">
+              <div className="flex-1 overflow-y-auto p-6 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-cyan-900/50">
                 {activeTab === "mcp" && <McpConfigSection {...props} />}
                 {activeTab === "skills" && <SkillsConfigSection {...props} />}
                 {activeTab === "system" && <SystemConfigSection {...props} />}
@@ -255,7 +274,7 @@ function McpConfigSection({
   onNewServerTransportChange,
 }: TacticalSettingsProps) {
   return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
+    <div className="flex flex-col min-h-full gap-5 animate-in fade-in slide-in-from-bottom-2 duration-300">
       <div>
         <h2 className="font-mono text-lg text-cyan-50">MCP 工具节点阵列</h2>
         <p className="mt-1 text-xs text-slate-400">
@@ -293,115 +312,479 @@ function McpConfigSection({
         </div>
       </div>
 
-      <McpSection title="外部 MCP 节点" count={activeMcpServersCount}>
-        <div className="space-y-3">
-          {mcpServers.length === 0 ? (
-            <div className="flex h-24 items-center justify-center rounded-lg border border-dashed border-cyan-400/20 bg-cyan-950/5 font-mono text-[10px] text-cyan-600/50">
-              尚未接入外部节点
-            </div>
-          ) : (
-            <div className="grid gap-3 md:grid-cols-2">
-              {mcpServers.map((server) => (
-                <div
-                  className={cn(
-                    "group relative overflow-hidden rounded-lg border p-3 transition-colors",
-                    server.enabled
-                      ? "border-cyan-400/30 bg-cyan-950/20"
-                      : "border-white/5 bg-white/[0.02]"
-                  )}
-                  key={server.id}
-                >
-                  {server.enabled && (
-                    <div className="absolute inset-0 bg-gradient-to-r from-cyan-400/0 via-cyan-400/5 to-cyan-400/0 opacity-0 transition-opacity duration-1000 group-hover:opacity-100 group-hover:animate-pulse" />
-                  )}
-                  <div className="relative flex items-start justify-between gap-2">
-                    <div className="min-w-0">
+      {/* External nodes + Add form share the remaining vertical space */}
+      <div className="flex flex-col flex-1 gap-4">
+        <McpSection title="外部 MCP 节点" count={activeMcpServersCount}>
+          <div className="space-y-3">
+            {mcpServers.length === 0 ? (
+              <div className="flex h-24 items-center justify-center rounded-lg border border-dashed border-cyan-400/20 bg-cyan-950/5 font-mono text-[10px] text-cyan-600/50">
+                尚未接入外部节点
+              </div>
+            ) : (
+              <div className="grid gap-3 md:grid-cols-2">
+                {mcpServers.map((server) => (
+                  <div
+                    className={cn(
+                      "group relative overflow-hidden rounded-lg border p-3 transition-colors",
+                      server.enabled
+                        ? "border-cyan-400/30 bg-cyan-950/20"
+                        : "border-white/5 bg-white/[0.02]"
+                    )}
+                    key={server.id}
+                  >
+                    {server.enabled && (
+                      <div className="absolute inset-0 bg-gradient-to-r from-cyan-400/0 via-cyan-400/5 to-cyan-400/0 opacity-0 transition-opacity duration-1000 group-hover:opacity-100 group-hover:animate-pulse" />
+                    )}
+                    <div className="relative flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={cn(
+                              "font-mono text-xs font-bold",
+                              server.enabled
+                                ? "text-cyan-100"
+                                : "text-slate-400"
+                            )}
+                          >
+                            {server.name}
+                          </span>
+                          <span className="rounded bg-cyan-400/10 px-1.5 py-0.5 font-mono text-[9px] uppercase text-cyan-300">
+                            {server.transport}
+                          </span>
+                        </div>
+                        <div className="mt-1 truncate font-mono text-[10px] text-slate-500">
+                          {server.endpoint}
+                        </div>
+                      </div>
                       <div className="flex items-center gap-2">
-                        <span
-                          className={cn(
-                            "font-mono text-xs font-bold",
-                            server.enabled ? "text-cyan-100" : "text-slate-400"
-                          )}
+                        <label className="relative inline-flex cursor-pointer items-center">
+                          <input
+                            type="checkbox"
+                            className="peer sr-only"
+                            checked={server.enabled}
+                            onChange={(e) =>
+                              onToggleServer(server.id, e.target.checked)
+                            }
+                          />
+                          <div className="peer h-4 w-7 rounded-full bg-slate-800 after:absolute after:left-[2px] after:top-[2px] after:h-3 after:w-3 after:rounded-full after:bg-slate-300 after:transition-all after:content-[''] peer-checked:bg-cyan-500 peer-checked:after:translate-x-full peer-checked:after:bg-white peer-focus:outline-none"></div>
+                        </label>
+                        <button
+                          className="rounded p-1 text-slate-500 hover:bg-red-500/20 hover:text-red-400 transition-colors"
+                          onClick={() => onRemoveServer(server.id)}
+                          title="移除 MCP 节点"
+                          type="button"
                         >
-                          {server.name}
-                        </span>
-                        <span className="rounded bg-cyan-400/10 px-1.5 py-0.5 font-mono text-[9px] uppercase text-cyan-300">
-                          {server.transport}
-                        </span>
+                          <Trash2 className="size-3.5" />
+                        </button>
                       </div>
-                      <div className="mt-1 truncate font-mono text-[10px] text-slate-500">
-                        {server.endpoint}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <label className="relative inline-flex cursor-pointer items-center">
-                        <input
-                          type="checkbox"
-                          className="peer sr-only"
-                          checked={server.enabled}
-                          onChange={(e) =>
-                            onToggleServer(server.id, e.target.checked)
-                          }
-                        />
-                        <div className="peer h-4 w-7 rounded-full bg-slate-800 after:absolute after:left-[2px] after:top-[2px] after:h-3 after:w-3 after:rounded-full after:bg-slate-300 after:transition-all after:content-[''] peer-checked:bg-cyan-500 peer-checked:after:translate-x-full peer-checked:after:bg-white peer-focus:outline-none"></div>
-                      </label>
-                      <button
-                        className="rounded p-1 text-slate-500 hover:bg-red-500/20 hover:text-red-400 transition-colors"
-                        onClick={() => onRemoveServer(server.id)}
-                        title="移除 MCP 节点"
-                        type="button"
-                      >
-                        <Trash2 className="size-3.5" />
-                      </button>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </McpSection>
+                ))}
+              </div>
+            )}
+          </div>
+        </McpSection>
 
-      <div className="rounded-xl border border-cyan-400/10 bg-cyan-950/5 p-5 shadow-inner">
-        <h3 className="mb-4 font-mono text-[11px] font-bold uppercase tracking-widest text-slate-300">
-          添加 MCP 节点
-        </h3>
-        <div className="grid gap-4 md:grid-cols-[1fr_2fr_100px_auto]">
-          <input
-            className={INPUT_CLASS}
-            onChange={(e) => onNewServerNameChange(e.target.value)}
-            placeholder="节点名称，例如 weather"
-            value={newServerName}
-          />
-          <input
-            className={INPUT_CLASS}
-            onChange={(e) => onNewServerEndpointChange(e.target.value)}
-            placeholder="端点地址或启动命令"
-            value={newServerEndpoint}
-          />
-          <select
-            className={SELECT_CLASS}
-            onChange={(e) =>
-              onNewServerTransportChange(
-                e.target.value as "stdio" | "sse" | "http"
-              )
-            }
-            value={newServerTransport}
-          >
-            <option value="stdio">STDIO</option>
-            <option value="sse">SSE</option>
-            <option value="http">HTTP</option>
-          </select>
-          <Button
-            className="w-full font-mono font-bold tracking-wider"
-            onClick={onAddServer}
-            disabled={!newServerName || !newServerEndpoint}
-            variant="tactical"
-          >
-            接入
-          </Button>
+        {/* Add form docked to the bottom of this flex column */}
+        <div className="mt-auto rounded-xl border border-cyan-400/10 bg-cyan-950/5 p-5 shadow-inner">
+          <h3 className="mb-4 font-mono text-[11px] font-bold uppercase tracking-widest text-slate-300">
+            添加 MCP 节点
+          </h3>
+          <div className="grid gap-3 md:grid-cols-[1fr_2fr_100px_auto]">
+            <input
+              className={INPUT_CLASS}
+              onChange={(e) => onNewServerNameChange(e.target.value)}
+              placeholder="节点名称，例如 weather"
+              value={newServerName}
+            />
+            <input
+              className={INPUT_CLASS}
+              onChange={(e) => onNewServerEndpointChange(e.target.value)}
+              placeholder="端点地址或启动命令"
+              value={newServerEndpoint}
+            />
+            <select
+              className={SELECT_CLASS}
+              onChange={(e) =>
+                onNewServerTransportChange(
+                  e.target.value as "stdio" | "sse" | "http"
+                )
+              }
+              value={newServerTransport}
+            >
+              <option value="stdio">STDIO</option>
+              <option value="sse">SSE</option>
+              <option value="http">HTTP</option>
+            </select>
+            <Button
+              className="w-full font-mono font-bold tracking-wider"
+              onClick={onAddServer}
+              disabled={!newServerName || !newServerEndpoint}
+              variant="tactical"
+            >
+              接入
+            </Button>
+          </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+type SkillLibraryView = "all" | "backend" | "custom" | "disabled";
+type SkillSource = "backend" | "custom";
+type SkillDetailPanel = "schema" | "output" | "activity";
+
+const SKILL_LIBRARY_VIEWS: Array<{
+  id: SkillLibraryView;
+  label: string;
+}> = [
+  { id: "all", label: "全部" },
+  { id: "backend", label: "后端注册" },
+  { id: "custom", label: "自定义" },
+  { id: "disabled", label: "已停用" },
+];
+
+interface SkillSchemaField {
+  name: string;
+  type: string;
+  required: boolean;
+  description: string;
+}
+
+interface SkillCallRecord {
+  id: string;
+  at: string;
+  status: "success" | "warning";
+  latencyMs: number;
+  input: string;
+}
+
+interface SkillCatalogItem {
+  id: string;
+  name: string;
+  description: string;
+  source: SkillSource;
+  version: string;
+  enabled: boolean;
+  readonly: boolean;
+  inputSchema: SkillSchemaField[];
+  outputSchema: SkillSchemaField[];
+  usageCount: number;
+  lastUsedAt: string;
+  createdBy: string;
+  updatedAt: string;
+  responseTimeMs: number;
+  rawCustomId?: string;
+  callRecords: SkillCallRecord[];
+}
+
+function getParameterRows(parameters?: Record<string, unknown>) {
+  if (!parameters) return [];
+  return Object.entries(parameters).map(([name, value]) => {
+    const meta =
+      typeof value === "object" && value !== null
+        ? (value as Record<string, unknown>)
+        : {};
+    const type = typeof meta.type === "string" ? meta.type : "unknown";
+    const required = meta.required !== false;
+    const description =
+      typeof meta.description === "string" ? meta.description : "";
+    return { name, type, required, description };
+  });
+}
+
+function hashSkillText(value: string): number {
+  let hash = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    hash = (hash * 31 + value.charCodeAt(index)) >>> 0;
+  }
+  return hash;
+}
+
+function toMockDate(seed: number, offset = 0): string {
+  const hoursAgo = (seed % 180) + offset + 2;
+  return new Date(Date.now() - hoursAgo * 60 * 60 * 1000).toISOString();
+}
+
+function formatRelativeDate(value: string): string {
+  const timestamp = Date.parse(value);
+  if (Number.isNaN(timestamp)) return "未知";
+  const diffMs = Date.now() - timestamp;
+  const minutes = Math.max(1, Math.floor(diffMs / 60000));
+  if (minutes < 60) return `${minutes} 分钟前`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} 小时前`;
+  return `${Math.floor(hours / 24)} 天前`;
+}
+
+function formatExactDate(value: string): string {
+  const timestamp = Date.parse(value);
+  if (Number.isNaN(timestamp)) return "未知";
+  return new Intl.DateTimeFormat("zh-CN", {
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(timestamp);
+}
+
+function getMockOutputSchema(source: SkillSource): SkillSchemaField[] {
+  if (source === "custom") {
+    return [
+      {
+        name: "guidance",
+        type: "string",
+        required: true,
+        description: "注入到 AI 会话的用户自定义行为说明",
+      },
+      {
+        name: "applied",
+        type: "boolean",
+        required: true,
+        description: "是否参与当前 AI 请求上下文",
+      },
+    ];
+  }
+  return [
+    {
+      name: "ok",
+      type: "boolean",
+      required: true,
+      description: "技能执行是否成功",
+    },
+    {
+      name: "summary",
+      type: "string",
+      required: false,
+      description: "后端运行态返回的执行摘要",
+    },
+    {
+      name: "scenario",
+      type: "object",
+      required: false,
+      description: "可能变更后的 runtime scenario snapshot",
+    },
+  ];
+}
+
+function schemaFromSpec(spec: string, name: string): SkillSchemaField[] {
+  const description = spec.trim();
+  if (!description) return [];
+  return [
+    {
+      name,
+      type: "string",
+      required: false,
+      description,
+    },
+  ];
+}
+
+function schemaToSpec(fields: SkillSchemaField[] | undefined): string {
+  if (!fields || fields.length === 0) return "";
+  return fields
+    .map((field) => {
+      const required = field.required ? "required" : "optional";
+      return `${field.name} (${field.type}, ${required}): ${field.description}`;
+    })
+    .join("\n");
+}
+
+function getMockCallRecords(
+  id: string,
+  name: string,
+  seed: number,
+  usageCount: number,
+  responseTimeMs: number
+): SkillCallRecord[] {
+  if (usageCount === 0) return [];
+  return Array.from({ length: Math.min(3, usageCount) }).map((_, index) => ({
+    id: `${id}:call:${index}`,
+    at: toMockDate(seed + index * 17, index * 8),
+    status: index === 2 && seed % 5 === 0 ? "warning" : "success",
+    latencyMs: responseTimeMs + index * 13,
+    input:
+      index === 0 ? `${name} latest invocation` : `sample payload ${index}`,
+  }));
+}
+
+function createSkillCatalog(
+  registeredSkills: TacticalSettingsProps["registeredSkills"],
+  customSkills: TacticalSettingsProps["customSkills"]
+): SkillCatalogItem[] {
+  return [
+    ...registeredSkills.map((skill, index) => {
+      const seed = hashSkillText(skill.name);
+      const usageCount = 24 + (seed % 180);
+      const responseTimeMs = 120 + (seed % 420);
+      const id = `backend:${skill.name}`;
+      const inputSchema = getParameterRows(skill.parameters);
+      return {
+        id,
+        name: skill.name,
+        description: skill.description,
+        source: "backend" as const,
+        version: `v${1 + (seed % 3)}.${(seed >> 3) % 10}.${index}`,
+        enabled: true,
+        readonly: true,
+        inputSchema,
+        outputSchema: getMockOutputSchema("backend"),
+        usageCount,
+        lastUsedAt: toMockDate(seed, index),
+        createdBy: "AICC Runtime",
+        updatedAt: toMockDate(seed, index + 18),
+        responseTimeMs,
+        callRecords: getMockCallRecords(
+          id,
+          skill.name,
+          seed,
+          usageCount,
+          responseTimeMs
+        ),
+      };
+    }),
+    ...customSkills.map((skill, index) => {
+      const seed = hashSkillText(skill.id + skill.name);
+      const usageCount =
+        typeof skill.usageCount === "number"
+          ? skill.usageCount
+          : skill.enabled
+            ? seed % 38
+            : seed % 5;
+      const responseTimeMs = 90 + (seed % 260);
+      const id = `custom:${skill.id}`;
+      return {
+        id,
+        name: skill.name,
+        description: skill.description,
+        source: "custom" as const,
+        version: skill.version || "custom-1",
+        enabled: skill.enabled,
+        readonly: false,
+        inputSchema:
+          skill.inputSchema && skill.inputSchema.length > 0
+            ? skill.inputSchema
+            : [
+                {
+                  name: "context",
+                  type: "string",
+                  required: true,
+                  description: "当前对话与战术场景上下文",
+                },
+                {
+                  name: "operator_intent",
+                  type: "string",
+                  required: false,
+                  description: "操作者输入的自然语言目标",
+                },
+              ],
+        outputSchema:
+          skill.outputSchema && skill.outputSchema.length > 0
+            ? skill.outputSchema
+            : getMockOutputSchema("custom"),
+        usageCount,
+        lastUsedAt:
+          skill.lastUsedAt ??
+          (usageCount > 0 ? toMockDate(seed, index + 4) : "never"),
+        createdBy: skill.createdBy || "Operator",
+        updatedAt: skill.updatedAt || toMockDate(seed, index + 12),
+        responseTimeMs,
+        rawCustomId: skill.id,
+        callRecords: getMockCallRecords(
+          id,
+          skill.name,
+          seed,
+          usageCount,
+          responseTimeMs
+        ),
+      };
+    }),
+  ];
+}
+
+function SkillMetricCard({
+  icon: Icon,
+  label,
+  value,
+  hint,
+  tone = "cyan",
+}: {
+  icon: typeof Wrench;
+  label: string;
+  value: string | number;
+  hint: string;
+  tone?: "cyan" | "emerald" | "amber";
+}) {
+  return (
+    <div className="rounded-lg border border-white/10 bg-[#07111d] px-3.5 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+      <div className="flex items-center justify-between gap-3">
+        <div className="text-[11px] text-slate-400">{label}</div>
+        <div
+          className={cn(
+            "grid size-7 place-items-center rounded-md border",
+            tone === "emerald"
+              ? "border-emerald-300/20 bg-emerald-300/10 text-emerald-200"
+              : tone === "amber"
+                ? "border-amber-300/20 bg-amber-300/10 text-amber-200"
+                : "border-cyan-300/20 bg-cyan-300/10 text-cyan-200"
+          )}
+        >
+          <Icon className="size-3.5" />
+        </div>
+      </div>
+      <div className="mt-2 font-mono text-xl font-semibold text-slate-50">
+        {value}
+      </div>
+      <div className="mt-1 text-[10px] text-slate-500">{hint}</div>
+    </div>
+  );
+}
+
+function SkillSchemaList({
+  fields,
+  emptyText,
+}: {
+  fields: SkillSchemaField[];
+  emptyText: string;
+}) {
+  if (fields.length === 0) {
+    return (
+      <div className="flex h-24 items-center justify-center rounded-md border border-dashed border-slate-700/70 bg-black/20 text-[11px] text-slate-500">
+        {emptyText}
+      </div>
+    );
+  }
+  return (
+    <div className="space-y-2">
+      {fields.map((field) => (
+        <div
+          className="rounded-md border border-slate-700/60 bg-slate-950/40 px-3 py-2"
+          key={field.name}
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="break-all font-mono text-[11px] text-slate-100">
+                {field.name}
+              </div>
+              <div className="mt-1 text-[10px] leading-relaxed text-slate-500">
+                {field.description || "暂无说明"}
+              </div>
+            </div>
+            <div className="flex shrink-0 items-center gap-1.5">
+              <Badge className="font-mono text-[9px]" variant="muted">
+                {field.type}
+              </Badge>
+              <Badge
+                className="font-mono text-[9px]"
+                variant={field.required ? "warning" : "muted"}
+              >
+                {field.required ? "必填" : "可选"}
+              </Badge>
+            </div>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
@@ -418,29 +801,196 @@ function SkillsConfigSection({
   onAddSkill,
   onRemoveCustomSkill,
   onToggleCustomSkill,
+  onUpdateCustomSkill,
   onNewSkillNameChange,
   onNewSkillDescriptionChange,
 }: TacticalSettingsProps) {
+  const [skillQuery, setSkillQuery] = useState("");
+  const [skillView, setSkillView] = useState<SkillLibraryView>("all");
+  const [selectedSkillId, setSelectedSkillId] = useState<string | null>(null);
+  const [detailPanel, setDetailPanel] = useState<SkillDetailPanel>("schema");
+  const [createPanelOpen, setCreatePanelOpen] = useState(false);
+  const [newSkillSummary, setNewSkillSummary] = useState("");
+  const [newSkillPrompt, setNewSkillPrompt] = useState("");
+  const [newSkillInputSpec, setNewSkillInputSpec] = useState("");
+  const [newSkillOutputSpec, setNewSkillOutputSpec] = useState("");
+  const [newSkillEnabled, setNewSkillEnabled] = useState(true);
+  const [editingSkillId, setEditingSkillId] = useState<string | null>(null);
+
+  const skillCatalog = useMemo(
+    () => createSkillCatalog(registeredSkills, customSkills),
+    [customSkills, registeredSkills]
+  );
+
+  const filteredSkillCatalog = useMemo(() => {
+    const normalizedQuery = skillQuery.trim().toLowerCase();
+    return skillCatalog.filter((item) => {
+      const matchesView =
+        skillView === "all" ||
+        (skillView === "backend" && item.source === "backend") ||
+        (skillView === "custom" && item.source === "custom") ||
+        (skillView === "disabled" && !item.enabled);
+      if (!matchesView) return false;
+      if (!normalizedQuery) return true;
+      return (
+        item.name.toLowerCase().includes(normalizedQuery) ||
+        item.description.toLowerCase().includes(normalizedQuery) ||
+        item.version.toLowerCase().includes(normalizedQuery) ||
+        item.createdBy.toLowerCase().includes(normalizedQuery)
+      );
+    });
+  }, [skillCatalog, skillQuery, skillView]);
+
+  useEffect(() => {
+    if (filteredSkillCatalog.length === 0) {
+      setSelectedSkillId(null);
+      return;
+    }
+    if (!filteredSkillCatalog.some((item) => item.id === selectedSkillId)) {
+      setSelectedSkillId(filteredSkillCatalog[0].id);
+    }
+  }, [filteredSkillCatalog, selectedSkillId]);
+
+  useEffect(() => {
+    if (!newSkillName && !newSkillDescription) {
+      setNewSkillSummary("");
+      setNewSkillPrompt("");
+      setNewSkillInputSpec("");
+      setNewSkillOutputSpec("");
+      setNewSkillEnabled(true);
+    }
+  }, [newSkillDescription, newSkillName]);
+
+  const selectedSkill =
+    filteredSkillCatalog.find((item) => item.id === selectedSkillId) ??
+    filteredSkillCatalog[0] ??
+    null;
+  const backendCount = skillCatalog.filter(
+    (skill) => skill.source === "backend"
+  ).length;
+  const customCount = skillCatalog.filter(
+    (skill) => skill.source === "custom"
+  ).length;
+  const totalUsageCount = skillCatalog.reduce(
+    (total, skill) => total + skill.usageCount,
+    0
+  );
+  const averageResponseMs =
+    skillCatalog.length === 0
+      ? 0
+      : Math.round(
+          skillCatalog.reduce(
+            (total, skill) => total + skill.responseTimeMs,
+            0
+          ) / skillCatalog.length
+        );
+  const disabledCount = skillCatalog.filter((skill) => !skill.enabled).length;
+
+  const resetSkillForm = () => {
+    onNewSkillNameChange("");
+    onNewSkillDescriptionChange("");
+    setNewSkillSummary("");
+    setNewSkillPrompt("");
+    setNewSkillInputSpec("");
+    setNewSkillOutputSpec("");
+    setNewSkillEnabled(true);
+    setEditingSkillId(null);
+  };
+
+  const handleOpenCreateSkill = () => {
+    resetSkillForm();
+    setCreatePanelOpen(true);
+  };
+
+  const handleEditSelectedSkill = () => {
+    if (!selectedSkill?.rawCustomId) return;
+    const rawSkill = customSkills.find(
+      (skill) => skill.id === selectedSkill.rawCustomId
+    );
+    setEditingSkillId(selectedSkill.rawCustomId);
+    setCreatePanelOpen(true);
+    onNewSkillNameChange(rawSkill?.name ?? selectedSkill.name);
+    setNewSkillSummary(rawSkill?.description ?? selectedSkill.description);
+    setNewSkillPrompt(
+      rawSkill?.prompt || rawSkill?.description || selectedSkill.description
+    );
+    setNewSkillInputSpec(schemaToSpec(rawSkill?.inputSchema));
+    setNewSkillOutputSpec(schemaToSpec(rawSkill?.outputSchema));
+    setNewSkillEnabled(rawSkill?.enabled ?? selectedSkill.enabled);
+  };
+
+  const handleCreateCustomSkill = async () => {
+    const name = newSkillName.trim();
+    const summary = newSkillSummary.trim();
+    const prompt = newSkillPrompt.trim();
+    if (!name || !summary || !prompt) return;
+
+    if (editingSkillId) {
+      await onUpdateCustomSkill(editingSkillId, {
+        name,
+        description: summary,
+        prompt,
+        inputSchema: schemaFromSpec(newSkillInputSpec, "input"),
+        outputSchema: schemaFromSpec(newSkillOutputSpec, "output"),
+        enabled: newSkillEnabled,
+      });
+    } else {
+      await onAddSkill({
+        description: summary,
+        prompt,
+        inputSchema: schemaFromSpec(newSkillInputSpec, "input"),
+        outputSchema: schemaFromSpec(newSkillOutputSpec, "output"),
+        enabled: newSkillEnabled,
+      });
+    }
+    resetSkillForm();
+    setCreatePanelOpen(false);
+  };
+
   return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
-      <div className="flex items-start justify-between">
+    <div className="flex min-h-full flex-col gap-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
+      <div className="flex flex-col gap-4 rounded-xl border border-slate-700/60 bg-[#07111d] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <h2 className="font-mono text-lg text-cyan-50">技能阵列管理</h2>
-          <p className="mt-1 text-xs text-slate-400">
-            同步后端注册技能，并管理本地自定义提示词与战术行为。
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="font-mono text-lg font-semibold text-cyan-50">
+              技能库管理
+            </h2>
+            <Badge className="font-mono text-[9px]" variant="muted">
+              Agent Skills
+            </Badge>
+          </div>
+          <p className="mt-1 max-w-3xl text-xs leading-relaxed text-slate-400">
+            统一管理后端注册技能和文件夹自定义提示词，展示
+            schema、版本、调用记录和启用状态。
           </p>
         </div>
-        <Button
-          onClick={onRefreshSkills}
-          disabled={skillsLoading}
-          variant="ghost"
-          className="gap-2 border border-cyan-400/30 text-cyan-300 font-mono text-xs"
-        >
-          <RefreshCw
-            className={cn("size-3.5", skillsLoading && "animate-spin")}
-          />
-          同步后端
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            onClick={onRefreshSkills}
+            disabled={skillsLoading}
+            variant="ghost"
+            size="sm"
+            className="gap-2 border border-cyan-400/30 font-mono text-xs text-cyan-200"
+          >
+            <RefreshCw
+              className={cn("size-3.5", skillsLoading && "animate-spin")}
+            />
+            同步后端
+          </Button>
+          <Button
+            onClick={() =>
+              createPanelOpen
+                ? setCreatePanelOpen(false)
+                : handleOpenCreateSkill()
+            }
+            size="sm"
+            variant="tactical"
+            className="font-mono text-xs"
+          >
+            <Plus className="size-3.5" />
+            新建自定义技能
+          </Button>
+        </div>
       </div>
 
       {skillsError && (
@@ -450,130 +1000,524 @@ function SkillsConfigSection({
         </div>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Backend Skills */}
-        <div className="space-y-4">
-          <McpSection title="后端注册技能" count={registeredSkills.length}>
-            <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-cyan-900/50">
-              {registeredSkills.length === 0 ? (
-                <div className="flex h-20 items-center justify-center rounded-lg border border-dashed border-cyan-400/20 bg-cyan-950/5 font-mono text-[10px] text-cyan-600/50">
-                  {skillsLoading ? "正在同步..." : "未发现后端技能"}
-                </div>
-              ) : (
-                registeredSkills.map((skill) => (
-                  <div
-                    key={skill.name}
-                    className="rounded-lg border border-white/5 bg-white/[0.02] p-3 transition-colors hover:border-cyan-400/20 hover:bg-cyan-950/20"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="font-mono text-xs font-bold text-slate-200">
-                        {skill.name}
-                      </span>
-                      <span className="rounded border border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0.5 font-mono text-[9px] text-emerald-400">
-                        只读
-                      </span>
-                    </div>
-                    <p className="mt-1.5 text-[10px] text-slate-400 leading-relaxed line-clamp-2">
-                      {skill.description}
-                    </p>
-                  </div>
-                ))
-              )}
+      {createPanelOpen && (
+        <div className="rounded-xl border border-cyan-400/15 bg-[#07111d] p-4 shadow-[inset_0_1px_0_rgba(103,232,249,0.06)]">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div>
+              <h3 className="font-mono text-xs font-semibold text-cyan-50">
+                {editingSkillId ? "编辑自定义技能" : "注入新技能提示词"}
+              </h3>
+              <p className="mt-1 text-[10px] text-slate-500">
+                字段会保存到后端 skills
+                文件夹，并在对话提交时作为用户定义提示词注入。
+              </p>
             </div>
-          </McpSection>
-        </div>
-
-        {/* Custom Skills */}
-        <div className="space-y-4">
-          <McpSection title="自定义技能注入" count={activeCustomSkillsCount}>
-            <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-cyan-900/50">
-              {customSkills.length === 0 ? (
-                <div className="flex h-20 items-center justify-center rounded-lg border border-dashed border-cyan-400/20 bg-cyan-950/5 font-mono text-[10px] text-cyan-600/50">
-                  暂无自定义技能
-                </div>
-              ) : (
-                customSkills.map((skill) => (
-                  <div
-                    key={skill.id}
-                    className={cn(
-                      "rounded-lg border p-3 transition-colors",
-                      skill.enabled
-                        ? "border-cyan-400/30 bg-cyan-950/20 shadow-[0_0_15px_rgba(34,211,238,0.05)]"
-                        : "border-white/5 bg-white/[0.02]"
-                    )}
-                  >
-                    <div className="flex flex-col gap-2">
-                      <div className="flex items-start justify-between gap-2">
-                        <span
-                          className={cn(
-                            "font-mono text-xs font-bold break-all",
-                            skill.enabled ? "text-cyan-100" : "text-slate-400"
-                          )}
-                        >
-                          {skill.name}
-                        </span>
-                        <div className="flex shrink-0 items-center gap-2">
-                          <label className="relative inline-flex cursor-pointer items-center">
-                            <input
-                              type="checkbox"
-                              className="peer sr-only"
-                              checked={skill.enabled}
-                              onChange={(e) =>
-                                onToggleCustomSkill(skill.id, e.target.checked)
-                              }
-                            />
-                            <div className="peer h-4 w-7 rounded-full bg-slate-800 after:absolute after:left-[2px] after:top-[2px] after:h-3 after:w-3 after:rounded-full after:bg-slate-300 after:transition-all after:content-[''] peer-checked:bg-cyan-500 peer-checked:after:translate-x-full peer-checked:after:bg-white peer-focus:outline-none"></div>
-                          </label>
-                          <button
-                            className="rounded p-1 text-slate-500 hover:bg-red-500/20 hover:text-red-400 transition-colors"
-                            onClick={() => onRemoveCustomSkill(skill.id)}
-                            title="移除自定义技能"
-                            type="button"
-                          >
-                            <Trash2 className="size-3.5" />
-                          </button>
-                        </div>
-                      </div>
-                      <p className="text-[10px] text-slate-400 leading-relaxed whitespace-pre-wrap font-mono bg-black/20 p-2 rounded">
-                        {skill.description}
-                      </p>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </McpSection>
-        </div>
-      </div>
-
-      <div className="rounded-xl border border-cyan-400/10 bg-cyan-950/5 p-5 shadow-inner">
-        <h3 className="mb-4 font-mono text-[11px] font-bold uppercase tracking-widest text-slate-300">
-          注入自定义技能提示词
-        </h3>
-        <div className="space-y-4">
-          <input
-            className={INPUT_CLASS}
-            onChange={(e) => onNewSkillNameChange(e.target.value)}
-            placeholder="技能触发 ID，例如 format_response"
-            value={newSkillName}
-          />
-          <textarea
-            className={cn(INPUT_CLASS, "min-h-[80px] resize-y")}
-            onChange={(e) => onNewSkillDescriptionChange(e.target.value)}
-            placeholder="描述系统提示词或需要注入的 AI 行为..."
-            value={newSkillDescription}
-          />
-          <div className="flex justify-end">
+            <label className="flex shrink-0 items-center gap-2 text-[10px] text-slate-400">
+              <input
+                checked={newSkillEnabled}
+                className="size-3.5 accent-cyan-400"
+                onChange={(event) => setNewSkillEnabled(event.target.checked)}
+                type="checkbox"
+              />
+              创建后启用
+            </label>
+          </div>
+          <div className="grid gap-3 lg:grid-cols-[220px_minmax(0,1fr)_minmax(0,1fr)]">
+            <input
+              className={INPUT_CLASS}
+              onChange={(event) => onNewSkillNameChange(event.target.value)}
+              placeholder="技能名称，例如 refine_brief"
+              value={newSkillName}
+            />
+            <input
+              className={INPUT_CLASS}
+              onChange={(event) => setNewSkillSummary(event.target.value)}
+              placeholder="描述，例如 将口语需求整理成执行 brief"
+              value={newSkillSummary}
+            />
+            <textarea
+              className={cn(INPUT_CLASS, "min-h-[72px] resize-y lg:row-span-2")}
+              onChange={(event) => setNewSkillPrompt(event.target.value)}
+              placeholder="提示词内容"
+              value={newSkillPrompt}
+            />
+            <input
+              className={INPUT_CLASS}
+              onChange={(event) => setNewSkillInputSpec(event.target.value)}
+              placeholder="输入参数说明，例如 user_goal/context"
+              value={newSkillInputSpec}
+            />
+            <input
+              className={INPUT_CLASS}
+              onChange={(event) => setNewSkillOutputSpec(event.target.value)}
+              placeholder="输出格式，例如 JSON 或 Markdown checklist"
+              value={newSkillOutputSpec}
+            />
+          </div>
+          <div className="mt-3 flex justify-end gap-2">
             <Button
-              className="font-mono font-bold tracking-wider w-32"
-              onClick={onAddSkill}
-              disabled={!newSkillName || !newSkillDescription}
+              className="font-mono text-xs"
+              onClick={() => {
+                resetSkillForm();
+                setCreatePanelOpen(false);
+              }}
+              size="sm"
+              variant="ghost"
+            >
+              取消
+            </Button>
+            <Button
+              className="font-mono text-xs"
+              disabled={
+                !newSkillName.trim() ||
+                !newSkillSummary.trim() ||
+                !newSkillPrompt.trim()
+              }
+              onClick={handleCreateCustomSkill}
+              size="sm"
               variant="tactical"
             >
-              注入
+              <Plus className="size-3.5" />
+              {editingSkillId ? "保存技能" : "注入技能"}
             </Button>
           </div>
         </div>
+      )}
+
+      <div className="grid gap-3 md:grid-cols-4">
+        <SkillMetricCard
+          hint="服务端 registry 只读同步"
+          icon={Database}
+          label="后端注册技能总数"
+          value={backendCount}
+        />
+        <SkillMetricCard
+          hint={`${activeCustomSkillsCount} 个当前启用，后端文件夹持久化`}
+          icon={SlidersHorizontal}
+          label="自定义技能"
+          tone="emerald"
+          value={customCount}
+        />
+        <SkillMetricCard
+          hint="后端统计接入前使用 mock telemetry"
+          icon={Activity}
+          label="技能调用次数"
+          value={totalUsageCount}
+        />
+        <SkillMetricCard
+          hint={`${disabledCount} 个停用项`}
+          icon={Clock}
+          label="平均响应时间"
+          tone="amber"
+          value={`${averageResponseMs}ms`}
+        />
+      </div>
+
+      <div className="grid min-h-[510px] flex-1 gap-4 xl:grid-cols-[minmax(0,1fr)_410px]">
+        <div className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-slate-700/70 bg-[#07111d]">
+          <div className="border-b border-slate-700/60 p-3">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div className="relative min-w-0 flex-1">
+                <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-slate-500" />
+                <input
+                  className={cn(INPUT_CLASS, "h-8 pl-9")}
+                  onChange={(event) => setSkillQuery(event.target.value)}
+                  placeholder="搜索技能名称、描述、版本或创建者"
+                  value={skillQuery}
+                />
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {SKILL_LIBRARY_VIEWS.map((view) => {
+                  const active = skillView === view.id;
+                  return (
+                    <button
+                      className={cn(
+                        "rounded-md border px-2.5 py-1.5 font-mono text-[10px] transition-colors",
+                        active
+                          ? "border-cyan-400/45 bg-cyan-400/12 text-cyan-100"
+                          : "border-slate-700 bg-slate-950/40 text-slate-400 hover:border-cyan-400/25 hover:text-slate-200"
+                      )}
+                      key={view.id}
+                      onClick={() => setSkillView(view.id)}
+                      type="button"
+                    >
+                      {view.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <div className="mt-3 hidden grid-cols-[minmax(240px,1.45fr)_110px_80px_92px_120px_44px] gap-3 border-t border-slate-800 pt-2 px-2 font-mono text-[9px] text-slate-500 lg:grid">
+              <span>技能</span>
+              <span>来源</span>
+              <span>版本</span>
+              <span>状态</span>
+              <span>调用</span>
+              <span>操作</span>
+            </div>
+          </div>
+
+          <div className="min-h-0 flex-1 overflow-y-auto scrollbar-thin scrollbar-track-transparent scrollbar-thumb-cyan-900/50">
+            {skillsLoading ? (
+              Array.from({ length: 4 }).map((_, index) => (
+                <div
+                  className="m-3 h-16 animate-pulse rounded-lg border border-white/5 bg-white/[0.03]"
+                  key={index}
+                />
+              ))
+            ) : filteredSkillCatalog.length === 0 ? (
+              <div className="m-3 flex h-40 flex-col items-center justify-center rounded-lg border border-dashed border-cyan-400/20 bg-cyan-950/5 text-center">
+                <Wrench className="mb-2 size-5 text-cyan-600/50" />
+                <div className="font-mono text-[11px] text-cyan-500/70">
+                  未匹配到技能
+                </div>
+                <div className="mt-1 text-[10px] text-slate-500">
+                  调整搜索词或筛选范围
+                </div>
+              </div>
+            ) : (
+              filteredSkillCatalog.map((skill) => {
+                const selected = selectedSkill?.id === skill.id;
+                return (
+                  <div
+                    className={cn(
+                      "grid cursor-pointer gap-3 border-b border-slate-800/80 px-3 py-3 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/50 lg:grid-cols-[minmax(240px,1.45fr)_110px_80px_92px_120px_44px]",
+                      selected ? "bg-cyan-400/10" : "hover:bg-slate-950/45"
+                    )}
+                    key={skill.id}
+                    onClick={() => setSelectedSkillId(skill.id)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        setSelectedSkillId(skill.id);
+                      }
+                    }}
+                    role="button"
+                    tabIndex={0}
+                  >
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="truncate font-mono text-xs font-semibold text-slate-100">
+                          {skill.name}
+                        </span>
+                        {skill.readonly && (
+                          <Lock className="size-3 text-slate-500" />
+                        )}
+                      </div>
+                      <p className="mt-1 line-clamp-2 text-[10px] leading-relaxed text-slate-400">
+                        {skill.description}
+                      </p>
+                    </div>
+                    <div className="flex items-center lg:block">
+                      <Badge
+                        className="font-mono text-[9px]"
+                        variant={
+                          skill.source === "backend" ? "muted" : "default"
+                        }
+                      >
+                        {skill.source === "backend" ? "后端注册" : "自定义"}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center font-mono text-[10px] text-slate-400">
+                      {skill.version}
+                    </div>
+                    <div className="flex items-center">
+                      <Badge
+                        className="font-mono text-[9px]"
+                        variant={skill.enabled ? "success" : "muted"}
+                      >
+                        {skill.enabled ? "启用" : "停用"}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center gap-2 text-[10px] text-slate-500">
+                      <Activity className="size-3.5 text-cyan-300/75" />
+                      <div>
+                        <div className="font-mono text-slate-300">
+                          {skill.usageCount} 次
+                        </div>
+                        <div>{formatRelativeDate(skill.lastUsedAt)}</div>
+                      </div>
+                    </div>
+                    <button
+                      className="grid size-8 place-items-center rounded-md text-slate-500 transition-colors hover:bg-slate-800 hover:text-cyan-200"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        setSelectedSkillId(skill.id);
+                        setDetailPanel("activity");
+                      }}
+                      title="打开操作菜单"
+                      type="button"
+                    >
+                      <MoreHorizontal className="size-4" />
+                    </button>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+
+        <aside className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-slate-700/70 bg-[#07111d]">
+          <div className="flex min-h-0 flex-1 flex-col p-4">
+            {selectedSkill ? (
+              <>
+                <div className="border-b border-slate-700/70 pb-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="break-all font-mono text-sm font-semibold text-cyan-50">
+                          {selectedSkill.name}
+                        </h3>
+                        <Badge
+                          className="font-mono text-[9px]"
+                          variant={selectedSkill.enabled ? "success" : "muted"}
+                        >
+                          {selectedSkill.enabled ? "已启用" : "已停用"}
+                        </Badge>
+                        {selectedSkill.readonly && (
+                          <Badge
+                            className="font-mono text-[9px]"
+                            variant="muted"
+                          >
+                            只读
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="mt-2 text-xs leading-relaxed text-slate-400">
+                        {selectedSkill.description}
+                      </p>
+                    </div>
+                    <label
+                      className={cn(
+                        "relative inline-flex shrink-0 items-center",
+                        selectedSkill.readonly
+                          ? "cursor-not-allowed opacity-45"
+                          : "cursor-pointer"
+                      )}
+                      title={
+                        selectedSkill.readonly
+                          ? "后端注册技能只读，不能在前端停用"
+                          : "切换自定义技能启用状态"
+                      }
+                    >
+                      <input
+                        checked={selectedSkill.enabled}
+                        className="peer sr-only"
+                        disabled={selectedSkill.readonly}
+                        onChange={(event) => {
+                          if (selectedSkill.rawCustomId) {
+                            onToggleCustomSkill(
+                              selectedSkill.rawCustomId,
+                              event.target.checked
+                            );
+                          }
+                        }}
+                        type="checkbox"
+                      />
+                      <div className="peer h-5 w-9 rounded-full bg-slate-800 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:bg-slate-300 after:transition-all after:content-[''] peer-checked:bg-cyan-500 peer-checked:after:translate-x-full peer-checked:after:bg-white peer-focus-visible:ring-2 peer-focus-visible:ring-cyan-400/60" />
+                    </label>
+                  </div>
+
+                  <div className="mt-3 grid grid-cols-2 gap-2 text-[10px]">
+                    <div className="rounded-md border border-slate-700/60 bg-slate-950/40 p-2">
+                      <div className="flex items-center gap-1.5 text-slate-500">
+                        <Database className="size-3.5" />
+                        来源
+                      </div>
+                      <div className="mt-1 font-mono text-slate-200">
+                        {selectedSkill.source === "backend"
+                          ? "后端注册"
+                          : "文件夹自定义"}
+                      </div>
+                    </div>
+                    <div className="rounded-md border border-slate-700/60 bg-slate-950/40 p-2">
+                      <div className="flex items-center gap-1.5 text-slate-500">
+                        <Zap className="size-3.5" />
+                        版本
+                      </div>
+                      <div className="mt-1 font-mono text-slate-200">
+                        {selectedSkill.version}
+                      </div>
+                    </div>
+                    <div className="rounded-md border border-slate-700/60 bg-slate-950/40 p-2">
+                      <div className="flex items-center gap-1.5 text-slate-500">
+                        <User className="size-3.5" />
+                        创建者
+                      </div>
+                      <div className="mt-1 font-mono text-slate-200">
+                        {selectedSkill.createdBy}
+                      </div>
+                    </div>
+                    <div className="rounded-md border border-slate-700/60 bg-slate-950/40 p-2">
+                      <div className="flex items-center gap-1.5 text-slate-500">
+                        <CalendarClock className="size-3.5" />
+                        更新时间
+                      </div>
+                      <div className="mt-1 font-mono text-slate-200">
+                        {formatExactDate(selectedSkill.updatedAt)}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 grid grid-cols-2 gap-2">
+                    <Button
+                      className="justify-start font-mono text-[11px]"
+                      onClick={() => setDetailPanel("activity")}
+                      size="sm"
+                      variant="tactical"
+                    >
+                      <PlayCircle className="size-3.5" />
+                      测试技能
+                    </Button>
+                    <Button
+                      className="justify-start font-mono text-[11px]"
+                      onClick={() => setDetailPanel("activity")}
+                      size="sm"
+                      variant="ghost"
+                    >
+                      <ScrollText className="size-3.5" />
+                      查看日志
+                    </Button>
+                    <Button
+                      className="justify-start font-mono text-[11px]"
+                      disabled={selectedSkill.readonly}
+                      onClick={handleEditSelectedSkill}
+                      size="sm"
+                      variant="ghost"
+                    >
+                      <Pencil className="size-3.5" />
+                      编辑
+                    </Button>
+                    <Button
+                      className="justify-start font-mono text-[11px]"
+                      disabled={
+                        selectedSkill.readonly || !selectedSkill.rawCustomId
+                      }
+                      onClick={() => {
+                        if (selectedSkill.rawCustomId) {
+                          onToggleCustomSkill(
+                            selectedSkill.rawCustomId,
+                            !selectedSkill.enabled
+                          );
+                        }
+                      }}
+                      size="sm"
+                      variant={selectedSkill.enabled ? "ghost" : "tactical"}
+                    >
+                      <Power className="size-3.5" />
+                      {selectedSkill.enabled ? "停用" : "启用"}
+                    </Button>
+                    <Button
+                      className="justify-start font-mono text-[11px] text-red-200 hover:text-red-100"
+                      disabled={
+                        selectedSkill.readonly || !selectedSkill.rawCustomId
+                      }
+                      onClick={() => {
+                        if (selectedSkill.rawCustomId) {
+                          onRemoveCustomSkill(selectedSkill.rawCustomId);
+                        }
+                      }}
+                      size="sm"
+                      variant="ghost"
+                    >
+                      <Trash2 className="size-3.5" />
+                      删除
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="mt-3 flex gap-1 rounded-md border border-slate-700/60 bg-slate-950/40 p-1">
+                  {[
+                    { id: "schema", label: "输入 Schema", icon: Code2 },
+                    { id: "output", label: "输出 Schema", icon: FileText },
+                    { id: "activity", label: "调用记录", icon: History },
+                  ].map((tab) => {
+                    const Icon = tab.icon;
+                    const active = detailPanel === tab.id;
+                    return (
+                      <button
+                        className={cn(
+                          "flex flex-1 items-center justify-center gap-1.5 rounded px-2 py-1.5 font-mono text-[10px] transition-colors",
+                          active
+                            ? "bg-cyan-400/12 text-cyan-100"
+                            : "text-slate-500 hover:bg-slate-800/80 hover:text-slate-200"
+                        )}
+                        key={tab.id}
+                        onClick={() =>
+                          setDetailPanel(tab.id as SkillDetailPanel)
+                        }
+                        type="button"
+                      >
+                        <Icon className="size-3.5" />
+                        {tab.label}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="mt-3 min-h-0 flex-1 overflow-y-auto rounded-lg border border-slate-700/60 bg-black/20 p-3 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-cyan-900/50">
+                  {detailPanel === "schema" && (
+                    <SkillSchemaList
+                      emptyText="该技能未声明输入参数 Schema"
+                      fields={selectedSkill.inputSchema}
+                    />
+                  )}
+                  {detailPanel === "output" && (
+                    <SkillSchemaList
+                      emptyText="该技能未声明输出结果 Schema"
+                      fields={selectedSkill.outputSchema}
+                    />
+                  )}
+                  {detailPanel === "activity" && (
+                    <div className="space-y-2">
+                      {selectedSkill.callRecords.length === 0 ? (
+                        <div className="flex h-24 items-center justify-center rounded-md border border-dashed border-slate-700/70 bg-black/20 text-[11px] text-slate-500">
+                          暂无调用记录
+                        </div>
+                      ) : (
+                        selectedSkill.callRecords.map((record) => (
+                          <div
+                            className="rounded-md border border-slate-700/60 bg-slate-950/40 px-3 py-2"
+                            key={record.id}
+                          >
+                            <div className="flex items-center justify-between gap-3">
+                              <div className="flex min-w-0 items-center gap-2">
+                                <Terminal className="size-3.5 shrink-0 text-cyan-300/80" />
+                                <span className="truncate font-mono text-[10px] text-slate-200">
+                                  {record.input}
+                                </span>
+                              </div>
+                              <Badge
+                                className="shrink-0 font-mono text-[9px]"
+                                variant={
+                                  record.status === "success"
+                                    ? "success"
+                                    : "warning"
+                                }
+                              >
+                                {record.status === "success" ? "成功" : "告警"}
+                              </Badge>
+                            </div>
+                            <div className="mt-1 flex items-center justify-between font-mono text-[9px] text-slate-500">
+                              <span>{formatExactDate(record.at)}</span>
+                              <span>{record.latencyMs}ms</span>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </div>
+              </>
+            ) : (
+              <div className="flex h-full flex-col items-center justify-center text-center">
+                <Search className="mb-3 size-6 text-cyan-600/50" />
+                <div className="font-mono text-xs text-cyan-500/70">
+                  选择一个技能查看详情
+                </div>
+              </div>
+            )}
+          </div>
+        </aside>
       </div>
     </div>
   );

@@ -216,6 +216,7 @@ class ScenarioCompareReportRead(BaseModel):
 class ScenarioCompareSessionState(BaseModel):
     baseline_id: str
     selected_sources: dict[str, str] = Field(default_factory=dict)
+    plan_summaries: dict[str, dict[str, Any]] = Field(default_factory=dict)
 
 
 class ScenarioCompareSessionCreate(BaseModel):
@@ -248,4 +249,55 @@ class ScenarioCompareSessionRead(BaseModel):
 
 
 class ScenarioCompareForkCreate(BaseModel):
-    branch_count: int = Field(default=3, ge=2, le=3)
+    branch_count: int = Field(default=3, ge=2, le=5)
+
+
+class ScenarioPlanOption(BaseModel):
+    title: str = Field(..., min_length=1, max_length=120)
+    concept: str = Field(default="", max_length=1200)
+    objective: str = Field(default="", max_length=400)
+    key_actions: list[str] = Field(default_factory=list)
+    advantages: list[str] = Field(default_factory=list)
+    risks: list[str] = Field(default_factory=list)
+
+
+class ScenarioPlanSetCreate(BaseModel):
+    title: str = Field(default="", max_length=120)
+    include_source_baseline: bool = True
+    plans: list[ScenarioPlanOption] = Field(default_factory=list, min_length=2, max_length=5)
+
+
+class ScenarioPlanSetRead(BaseModel):
+    compare_session: ScenarioCompareSessionRead
+    source_scenario_id: str
+    source_scenario_name: str
+    branch_count: int = Field(..., ge=2, le=5)
+    plans: list[ScenarioPlanOption]
+
+
+class ScenarioBatchSimulationRequest(BaseModel):
+    steps: int = Field(default=600, ge=1, le=7200)
+    include_baseline: bool = True
+
+
+class ScenarioBatchSimulationResult(BaseModel):
+    scenario_id: str
+    scenario_name: str
+    training_score_record_id: str | None = None
+    overall_score: int = Field(..., ge=0, le=100)
+    grade: str
+    confidence: str
+    outcome_reason: str = ""
+    winner_side_id: str = ""
+    elapsed_seconds: int = Field(default=0, ge=0)
+    source: str = "live"
+
+
+class ScenarioBatchSimulationResponse(BaseModel):
+    compare_session: ScenarioCompareSessionRead
+    simulated_at: datetime
+    steps: int = Field(..., ge=1, le=7200)
+    include_baseline: bool = True
+    results: list[ScenarioBatchSimulationResult]
+    recommended_scenario_id: str | None = None
+    recommended_reason: str = ""

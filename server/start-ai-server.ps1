@@ -1,5 +1,6 @@
 param(
-  [int]$Port = 8000
+  [int]$Port = 8000,
+  [string]$Host = "127.0.0.1"
 )
 
 $ErrorActionPreference = "Stop"
@@ -27,7 +28,7 @@ if (Test-Path $errLog) { Remove-Item -LiteralPath $errLog -Force }
 
 $proc = Start-Process `
   -FilePath $pythonExe `
-  -ArgumentList "-m","uvicorn","app.main:app","--host","0.0.0.0","--port",$Port `
+  -ArgumentList "-m","uvicorn","app.main:app","--host",$Host,"--port",$Port `
   -WorkingDirectory $PSScriptRoot `
   -RedirectStandardOutput $outLog `
   -RedirectStandardError $errLog `
@@ -37,7 +38,7 @@ $proc.Id | Set-Content -Path $pidFile
 
 Start-Sleep -Seconds 2
 
-Write-Output "AI backend started. PID=$($proc.Id), PORT=$Port"
+Write-Output "AI backend started. PID=$($proc.Id), HOST=$Host, PORT=$Port"
 Write-Output "PID file: $pidFile"
 Write-Output "Logs:"
 Write-Output "  OUT: $outLog"

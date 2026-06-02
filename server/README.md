@@ -232,7 +232,7 @@ HTTP 模式核心特性：
 - **per-request JWT**：复用 fastapi-users 签发的 JWT（`/api/auth/jwt/login`
   的返回值）；每个 HTTP 请求独立校验，无 token / 过期 token 返回 401 +
   `WWW-Authenticate`。
-- **CORS**：继承 FastAPI 的 `CORSMiddleware`（当前 `allow_origins=["*"]`）。
+- **CORS**：FastAPI `CORSMiddleware` 从 `AICC_CORS_ORIGINS` 读取显式 origin；配置层会拒绝 wildcard origin。
 - **session**：MCP 会话 ID 在 `Mcp-Session-Id` 响应头返回；后续请求需回传。
 - **dev 捷径**：设 `AICC_MCP_HTTP_DEV_USER_ID=<uuid>` 可跳过 token 校验
   （仅限本地调试，日志会 warning）。

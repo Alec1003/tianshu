@@ -13,7 +13,7 @@ export default function BottomInfoDisplay(props: Readonly<IBottomInfoDisplay>) {
         position: "absolute",
         right: "1em",
         bottom: "1em",
-        zIndex: 1000,
+        zIndex: 2,
       }}
     >
       <Stack

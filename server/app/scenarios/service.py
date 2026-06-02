@@ -10,8 +10,11 @@
 
 from __future__ import annotations
 
+import asyncio
+import json
 from copy import deepcopy
 from datetime import datetime, timezone
+from collections.abc import Callable
 from uuid import uuid4
 from typing import Any, Sequence
 
@@ -19,7 +22,12 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.aicc_runtime.models import RuntimeEvent
-from app.aicc_runtime.timeline import list_runtime_events, runtime_scenario_id
+from app.aicc_runtime.persistence import save_runtime_state
+from app.aicc_runtime.timeline import (
+    list_runtime_events,
+    record_runtime_event,
+    runtime_scenario_id,
+)
 from app.auth.models import User
 from app.scenarios.errors import (
     ScenarioForbiddenError,
@@ -42,12 +50,21 @@ from app.scenarios.schemas import (
     ScenarioCompareForkCreate,
     ScenarioCompareReportCreate,
     ScenarioCompareSessionCreate,
+    ScenarioCompareSessionRead,
     ScenarioCompareSessionState,
     ScenarioCompareSessionUpdate,
     ScenarioCompareSnapshot,
+    ScenarioBatchSimulationRequest,
+    ScenarioBatchSimulationResponse,
+    ScenarioBatchSimulationResult,
+    ScenarioPlanOption,
+    ScenarioPlanSetCreate,
+    ScenarioPlanSetRead,
     TrainingScoreResponse,
 )
 from app.scenarios.training_score import build_training_score
+
+PLAN_META_KEY = "_tianshu_plan"
 
 
 # ---------- helpers ----------------------------------------------------------
@@ -479,9 +496,9 @@ def _normalize_compare_ids(scenario_ids: Sequence[str]) -> list[str]:
         raise ScenarioInvalidError(
             "scenario_ids", "comparison requires at least two scenarios"
         )
-    if len(deduped) > 4:
+    if len(deduped) > 6:
         raise ScenarioInvalidError(
-            "scenario_ids", "comparison supports up to four scenarios"
+            "scenario_ids", "comparison supports up to six scenarios"
         )
     return deduped
 
@@ -515,9 +532,25 @@ def _normalize_compare_session_state(
     for scenario_id in scenario_ids:
         normalized_sources.setdefault(scenario_id, "live")
 
+    normalized_plan_summaries: dict[str, dict[str, Any]] = {}
+    for scenario_id, payload in state.plan_summaries.items():
+        normalized_scenario_id = str(scenario_id).strip()
+        if normalized_scenario_id not in scenario_ids:
+            raise ScenarioInvalidError(
+                "state.plan_summaries",
+                "state references scenario ids outside scenario_ids",
+            )
+        if not isinstance(payload, dict):
+            raise ScenarioInvalidError(
+                "state.plan_summaries",
+                "plan summary must be a JSON object",
+            )
+        normalized_plan_summaries[normalized_scenario_id] = payload
+
     return ScenarioCompareSessionState(
         baseline_id=baseline_id,
         selected_sources=normalized_sources,
+        plan_summaries=normalized_plan_summaries,
     )
 
 
@@ -774,6 +807,310 @@ async def fork_compare_session(
         ),
     )
     return compare_session
+
+
+def _normalize_plan_option(plan: ScenarioPlanOption) -> ScenarioPlanOption:
+    title = " ".join(plan.title.split())
+    if not title:
+        raise ScenarioInvalidError("plans.title", "plan title must not be empty")
+
+    def _clean_lines(items: list[str], *, limit: int = 6) -> list[str]:
+        cleaned: list[str] = []
+        for item in items:
+            text = " ".join(str(item).split()).strip()
+            if text:
+                cleaned.append(text[:200])
+        return cleaned[:limit]
+
+    return ScenarioPlanOption(
+        title=title[:120],
+        concept=" ".join(plan.concept.split()).strip()[:1200],
+        objective=" ".join(plan.objective.split()).strip()[:400],
+        key_actions=_clean_lines(plan.key_actions),
+        advantages=_clean_lines(plan.advantages),
+        risks=_clean_lines(plan.risks),
+    )
+
+
+def _plan_summary_payload(
+    plan: ScenarioPlanOption,
+    *,
+    branch_index: int,
+    scenario_id: str = "",
+) -> dict[str, Any]:
+    return {
+        "scenario_id": scenario_id,
+        "branch_index": branch_index,
+        "title": plan.title,
+        "concept": plan.concept,
+        "objective": plan.objective,
+        "key_actions": list(plan.key_actions),
+        "advantages": list(plan.advantages),
+        "risks": list(plan.risks),
+    }
+
+
+async def create_plan_set_compare_session(
+    session: AsyncSession,
+    user: User,
+    source_scenario_id: str,
+    *,
+    payload: ScenarioPlanSetCreate,
+) -> ScenarioPlanSetRead:
+    source = await get_scenario(session, user, source_scenario_id)
+    plans = [_normalize_plan_option(plan) for plan in payload.plans]
+    if len(plans) < 2:
+        raise ScenarioInvalidError("plans", "plan set requires at least two plans")
+    if len(plans) > 5:
+        raise ScenarioInvalidError("plans", "plan set supports up to five plans")
+
+    branches: list[Scenario] = []
+    plan_summaries: dict[str, dict[str, Any]] = {}
+    for index, plan in enumerate(plans, start=1):
+        branch_data = deepcopy(source.data)
+        if not isinstance(branch_data, dict):
+            branch_data = {}
+        branch_data[PLAN_META_KEY] = _plan_summary_payload(plan, branch_index=index)
+        branch = await create_branch_scenario(
+            session,
+            user,
+            source.id,
+            name=f"{source.name} / {plan.title}"[:120],
+            branch_label=plan.title[:120],
+            description=source.description,
+            status="draft",
+            data=branch_data,
+        )
+        branch_data = deepcopy(branch.data)
+        if not isinstance(branch_data, dict):
+            branch_data = {}
+        branch_data[PLAN_META_KEY] = _plan_summary_payload(
+            plan,
+            branch_index=index,
+            scenario_id=branch.id,
+        )
+        branch = await update_scenario(
+            session,
+            user,
+            branch.id,
+            data=branch_data,
+        )
+        branches.append(branch)
+        plan_summaries[branch.id] = _plan_summary_payload(
+            plan,
+            branch_index=index,
+            scenario_id=branch.id,
+        )
+
+    scenario_ids = [branch.id for branch in branches]
+    baseline_id = branches[0].id
+    if payload.include_source_baseline:
+        scenario_ids = [source.id, *scenario_ids]
+        baseline_id = source.id
+
+    compare_session = await create_compare_session(
+        session,
+        user,
+        payload=ScenarioCompareSessionCreate(
+            title=(payload.title or "").strip()[:120] or f"{source.name} 多方案方案集",
+            source_scenario_id=source.id,
+            baseline_id=baseline_id,
+            scenario_ids=scenario_ids,
+            state=ScenarioCompareSessionState(
+                baseline_id=baseline_id,
+                selected_sources={scenario_id: "live" for scenario_id in scenario_ids},
+                plan_summaries=plan_summaries,
+            ),
+        ),
+    )
+    compare_session_read = ScenarioCompareSessionRead.model_validate(compare_session)
+    return ScenarioPlanSetRead(
+        compare_session=compare_session_read,
+        source_scenario_id=source.id,
+        source_scenario_name=source.name,
+        branch_count=len(plans),
+        plans=plans,
+    )
+
+
+def _scenario_elapsed_seconds(scenario_data: dict[str, Any]) -> int:
+    current = scenario_data.get("currentScenario") if isinstance(scenario_data, dict) else None
+    inner = current if isinstance(current, dict) else scenario_data
+    start = int(inner.get("startTime") or 0)
+    now = int(inner.get("currentTime") or start)
+    return max(0, now - start)
+
+
+def _scenario_outcome(runtime: Any) -> tuple[bool, str, str]:
+    raw = getattr(runtime.game, "game_outcome", {}) or {}
+    ended = bool(raw.get("ended", False))
+    winner_side_id = str(raw.get("winner_side_id") or raw.get("winnerSideId") or "")
+    reason = str(raw.get("reason") or "")
+    return ended, reason[:40], winner_side_id[:80]
+
+
+def _aar_summary_from_scenario(
+    scenario_name: str,
+    scenario_data: dict[str, Any],
+) -> dict[str, Any]:
+    inner = scenario_data.get("currentScenario") if isinstance(scenario_data, dict) else None
+    current = inner if isinstance(inner, dict) else scenario_data
+    sides = current.get("sides") if isinstance(current, dict) else []
+    safe_sides = []
+    if isinstance(sides, list):
+        for side in sides:
+            if not isinstance(side, dict):
+                continue
+            safe_sides.append(
+                {
+                    "id": str(side.get("id") or ""),
+                    "name": str(side.get("name") or ""),
+                    "score": side.get("totalScore", 0),
+                }
+            )
+    return {
+        "scenarioName": scenario_name,
+        "elapsedSeconds": _scenario_elapsed_seconds(scenario_data),
+        "endedAt": current.get("currentTime") if isinstance(current, dict) else 0,
+        "sides": safe_sides,
+    }
+
+
+async def simulate_compare_session_batch(
+    session: AsyncSession,
+    user: User,
+    compare_session_id: str,
+    *,
+    payload: ScenarioBatchSimulationRequest,
+    bridge_provider: Callable[[User, str | None], Any],
+) -> ScenarioBatchSimulationResponse:
+    compare_session = await get_compare_session(session, user, compare_session_id)
+    state = ScenarioCompareSessionState.model_validate(compare_session.state)
+    scenario_ids = list(compare_session.scenario_ids)
+    if not payload.include_baseline:
+        scenario_ids = [
+            scenario_id
+            for scenario_id in scenario_ids
+            if scenario_id != compare_session.baseline_scenario_id
+        ]
+    if len(scenario_ids) < 1:
+        raise ScenarioInvalidError(
+            "include_baseline",
+            "simulation requires at least one scenario target",
+        )
+
+    results: list[ScenarioBatchSimulationResult] = []
+    next_selected_sources = dict(state.selected_sources)
+    for scenario_id in scenario_ids:
+        scenario = await get_scenario(session, user, scenario_id)
+        bridge = bridge_provider(user, scenario.id)
+        runtime = getattr(bridge, "runtime", None)
+        if runtime is None:
+            raise ScenarioInvalidError("runtime", "bridge does not expose a runtime")
+
+        before_scenario = deepcopy(scenario.data if isinstance(scenario.data, dict) else {})
+        scenario_json = json.dumps(before_scenario, ensure_ascii=False)
+        await asyncio.to_thread(runtime.load_scenario_from_json, scenario_json)
+        await asyncio.to_thread(runtime.step_simulation, int(payload.steps))
+
+        after_scenario = bridge.exported_scenario()
+        ended, outcome_reason, winner_side_id = _scenario_outcome(runtime)
+        status = "completed" if ended else "running"
+        scenario = await update_scenario(
+            session,
+            user,
+            scenario.id,
+            data=after_scenario,
+            status=status,
+        )
+        await save_runtime_state(session, user, runtime, scenario_id=scenario.id)
+        await record_runtime_event(
+            session,
+            user,
+            event_type="runtime.step",
+            action="compare_session_batch_step",
+            actor="ai_plan_runner",
+            summary=f"批量推演 {scenario.name} {payload.steps} 步",
+            payload={
+                "state": {
+                    "steps": int(payload.steps),
+                    "compareSessionId": compare_session.id,
+                }
+            },
+            scenario_id=scenario.id,
+            before_scenario=before_scenario,
+            after_scenario=after_scenario,
+        )
+
+        aar_record_id: str | None = None
+        if ended:
+            aar = await create_aar_record(
+                session,
+                user,
+                scenario.id,
+                outcome_reason=outcome_reason or "SIM_ENDED",
+                winner_side_id=winner_side_id,
+                summary=_aar_summary_from_scenario(scenario.name, after_scenario),
+                ended_at=datetime.now(timezone.utc),
+            )
+            aar_record_id = aar.id
+
+        score = await build_training_score_for_scenario(session, user, scenario, scenario.id)
+        score_record = await create_training_score_record(
+            session,
+            user,
+            scenario.id,
+            score=score,
+            aar_record_id=aar_record_id,
+        )
+        next_selected_sources[scenario.id] = score_record.id
+        results.append(
+            ScenarioBatchSimulationResult(
+                scenario_id=scenario.id,
+                scenario_name=scenario.name,
+                training_score_record_id=score_record.id,
+                overall_score=score.overall_score,
+                grade=score.grade,
+                confidence=score.confidence,
+                outcome_reason=outcome_reason,
+                winner_side_id=winner_side_id,
+                elapsed_seconds=int(score.metrics.get("elapsed_seconds") or 0),
+                source=score_record.id,
+            )
+        )
+
+    updated_compare_session = await update_compare_session(
+        session,
+        user,
+        compare_session.id,
+        payload=ScenarioCompareSessionUpdate(
+            baseline_id=compare_session.baseline_scenario_id,
+            scenario_ids=compare_session.scenario_ids,
+            state=ScenarioCompareSessionState(
+                baseline_id=compare_session.baseline_scenario_id,
+                selected_sources=next_selected_sources,
+                plan_summaries=state.plan_summaries,
+            ),
+        ),
+    )
+    compare_session_read = ScenarioCompareSessionRead.model_validate(updated_compare_session)
+    ranked_results = sorted(results, key=lambda item: item.overall_score, reverse=True)
+    recommended = ranked_results[0] if ranked_results else None
+    recommended_reason = ""
+    if recommended is not None:
+        recommended_reason = (
+            f"{recommended.scenario_name} 综合评分最高（{recommended.overall_score} / {recommended.grade}）"
+        )
+
+    return ScenarioBatchSimulationResponse(
+        compare_session=compare_session_read,
+        simulated_at=datetime.now(timezone.utc),
+        steps=int(payload.steps),
+        include_baseline=payload.include_baseline,
+        results=ranked_results,
+        recommended_scenario_id=recommended.scenario_id if recommended else None,
+        recommended_reason=recommended_reason,
+    )
 
 
 async def list_compare_reports(

@@ -49,10 +49,21 @@ jobs:
           .\.python312\Scripts\python.exe -m pip install --upgrade pip
           .\.python312\Scripts\python.exe -m pip install -r server\requirements.txt shapely==2.0.6 watchfiles==0.24.0
 
-      - name: Build installer
+      - name: Build client
+        run: npm run build:client
+
+      - name: Check Electron resources
+        run: npm run electron:check
+
+      - name: Build unpacked app
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
-        run: npm run electron:dist
+        run: npx electron-builder --win --dir
+
+      - name: Build NSIS installer
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+        run: npx electron-builder --win nsis
 
       - name: Publish GitHub Release assets
         if: startsWith(github.ref, 'refs/tags/')

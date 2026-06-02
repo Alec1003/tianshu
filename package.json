@@ -88,6 +88,9 @@
     "win": {
       "signAndEditExecutable": false,
       "verifyUpdateCodeSignature": false,
+      "signtoolOptions": {
+        "sign": "electron/noop-sign.cjs"
+      },
       "target": [
         {
           "target": "nsis",

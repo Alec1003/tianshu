@@ -28,6 +28,9 @@ jobs:
             package-lock.json
             client/package-lock.json
 
+      - name: Install pinned npm
+        run: npm i -g npm@10.9.2
+
       - name: Install desktop dependencies
         run: npm ci
 

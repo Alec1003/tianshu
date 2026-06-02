@@ -59,7 +59,7 @@ jobs:
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
           DEBUG: electron-builder
-        run: npx electron-builder --win --dir
+        run: npx electron-builder --win --dir --publish never
 
       - name: Build NSIS installer
         shell: pwsh
@@ -68,7 +68,7 @@ jobs:
           DEBUG: electron-builder
         run: |
           New-Item -ItemType Directory -Force dist-electron | Out-Null
-          & npx.cmd electron-builder --win nsis 2>&1 | Tee-Object -FilePath dist-electron\electron-builder-nsis.log
+          & npx.cmd electron-builder --win nsis --publish never 2>&1 | Tee-Object -FilePath dist-electron\electron-builder-nsis.log
           $exitCode = $LASTEXITCODE
           if ($exitCode -ne 0) {
             if (Test-Path dist-electron\electron-builder-nsis.log) {

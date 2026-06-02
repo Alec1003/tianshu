@@ -12,7 +12,7 @@ permissions:
 jobs:
   windows:
     name: Build Windows installer
-    runs-on: windows-latest
+    runs-on: windows-2022
     timeout-minutes: 60
 
     steps:

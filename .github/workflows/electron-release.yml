@@ -68,9 +68,27 @@ jobs:
           DEBUG: electron-builder
         run: |
           New-Item -ItemType Directory -Force dist-electron | Out-Null
-          npx electron-builder --win nsis *>&1 | Tee-Object -FilePath dist-electron\electron-builder-nsis.log
-          if ($LASTEXITCODE -ne 0) {
-            exit $LASTEXITCODE
+          & npx.cmd electron-builder --win nsis 2>&1 | Tee-Object -FilePath dist-electron\electron-builder-nsis.log
+          $exitCode = $LASTEXITCODE
+          if ($exitCode -ne 0) {
+            if (Test-Path dist-electron\electron-builder-nsis.log) {
+              Write-Host "NSIS electron-builder log tail:"
+              Get-Content dist-electron\electron-builder-nsis.log -Tail 120
+            }
+            exit $exitCode
+          }
+
+      - name: Report Electron diagnostics
+        if: failure()
+        shell: pwsh
+        run: |
+          $logPath = "dist-electron\electron-builder-nsis.log"
+          if (Test-Path $logPath) {
+            $tail = (Get-Content $logPath -Tail 40) -join "`n"
+            $escaped = $tail.Replace("%", "%25").Replace("`r", "%0D").Replace("`n", "%0A")
+            Write-Host "::error title=NSIS electron-builder log tail::$escaped"
+          } else {
+            Write-Host "::error title=NSIS electron-builder log missing::No NSIS diagnostic log was produced."
           }
 
       - name: Upload Electron diagnostics

@@ -46,8 +46,17 @@ jobs:
           .\.python312\Scripts\python.exe -m pip install --upgrade pip
           .\.python312\Scripts\python.exe -m pip install -r server\requirements.txt shapely==2.0.6 watchfiles==0.24.0
 
-      - name: Build and publish installer
+      - name: Build installer
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
-        run: npm run electron:publish
+        run: npm run electron:dist
+
+      - name: Publish GitHub Release assets
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist-electron/TianShu-AICC-Setup-*.exe
+            dist-electron/TianShu-AICC-Setup-*.exe.blockmap
+            dist-electron/latest.yml
+          fail_on_unmatched_files: true

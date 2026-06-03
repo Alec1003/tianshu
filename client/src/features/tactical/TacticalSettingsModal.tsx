@@ -1,4 +1,5 @@
 ﻿import { useEffect, useMemo, useState } from "react";
+import type { MouseEvent } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -13,25 +14,14 @@ import {
   CheckCircle2,
   AlertCircle,
   AlertTriangle,
-  Activity,
-  CalendarClock,
-  Clock,
-  Code2,
-  Database,
-  FileText,
-  History,
+  ChevronLeft,
+  ChevronRight,
   Lock,
   MoreHorizontal,
   Pencil,
-  PlayCircle,
   Plus,
-  Power,
   ScrollText,
   Search,
-  SlidersHorizontal,
-  Terminal,
-  User,
-  Zap,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -219,7 +209,9 @@ export default function TacticalSettingsModal(
 
               <div className="flex-1 overflow-y-auto p-6 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-cyan-900/50">
                 {activeTab === "mcp" && <McpConfigSection {...props} />}
-                {activeTab === "skills" && <SkillsConfigSection {...props} />}
+                {activeTab === "skills" && (
+                  <SkillsConfigSectionCompact {...props} />
+                )}
                 {activeTab === "system" && <SystemConfigSection {...props} />}
               </div>
             </div>
@@ -1029,7 +1021,6 @@ function McpConfigSection({
 
 type SkillLibraryView = "all" | "backend" | "custom" | "disabled";
 type SkillSource = "backend" | "custom";
-type SkillDetailPanel = "schema" | "output" | "activity";
 
 const SKILL_LIBRARY_VIEWS: Array<{
   id: SkillLibraryView;
@@ -1040,6 +1031,8 @@ const SKILL_LIBRARY_VIEWS: Array<{
   { id: "custom", label: "自定义" },
   { id: "disabled", label: "已停用" },
 ];
+
+const SKILL_LIST_PAGE_SIZE = 5;
 
 interface SkillSchemaField {
   name: string;
@@ -1299,93 +1292,7 @@ function createSkillCatalog(
   ];
 }
 
-function SkillMetricCard({
-  icon: Icon,
-  label,
-  value,
-  hint,
-  tone = "cyan",
-}: {
-  icon: typeof Wrench;
-  label: string;
-  value: string | number;
-  hint: string;
-  tone?: "cyan" | "emerald" | "amber";
-}) {
-  return (
-    <div className="rounded-lg border border-white/10 bg-[#07111d] px-3.5 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-      <div className="flex items-center justify-between gap-3">
-        <div className="text-[11px] text-slate-400">{label}</div>
-        <div
-          className={cn(
-            "grid size-7 place-items-center rounded-md border",
-            tone === "emerald"
-              ? "border-emerald-300/20 bg-emerald-300/10 text-emerald-200"
-              : tone === "amber"
-                ? "border-amber-300/20 bg-amber-300/10 text-amber-200"
-                : "border-cyan-300/20 bg-cyan-300/10 text-cyan-200"
-          )}
-        >
-          <Icon className="size-3.5" />
-        </div>
-      </div>
-      <div className="mt-2 font-mono text-xl font-semibold text-slate-50">
-        {value}
-      </div>
-      <div className="mt-1 text-[10px] text-slate-500">{hint}</div>
-    </div>
-  );
-}
-
-function SkillSchemaList({
-  fields,
-  emptyText,
-}: {
-  fields: SkillSchemaField[];
-  emptyText: string;
-}) {
-  if (fields.length === 0) {
-    return (
-      <div className="flex h-24 items-center justify-center rounded-md border border-dashed border-slate-700/70 bg-black/20 text-[11px] text-slate-500">
-        {emptyText}
-      </div>
-    );
-  }
-  return (
-    <div className="space-y-2">
-      {fields.map((field) => (
-        <div
-          className="rounded-md border border-slate-700/60 bg-slate-950/40 px-3 py-2"
-          key={field.name}
-        >
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <div className="break-all font-mono text-[11px] text-slate-100">
-                {field.name}
-              </div>
-              <div className="mt-1 text-[10px] leading-relaxed text-slate-500">
-                {field.description || "暂无说明"}
-              </div>
-            </div>
-            <div className="flex shrink-0 items-center gap-1.5">
-              <Badge className="font-mono text-[9px]" variant="muted">
-                {field.type}
-              </Badge>
-              <Badge
-                className="font-mono text-[9px]"
-                variant={field.required ? "warning" : "muted"}
-              >
-                {field.required ? "必填" : "可选"}
-              </Badge>
-            </div>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function SkillsConfigSection({
+function SkillsConfigSectionCompact({
   customSkills,
   activeCustomSkillsCount,
   registeredSkills,
@@ -1403,8 +1310,7 @@ function SkillsConfigSection({
 }: TacticalSettingsProps) {
   const [skillQuery, setSkillQuery] = useState("");
   const [skillView, setSkillView] = useState<SkillLibraryView>("all");
-  const [selectedSkillId, setSelectedSkillId] = useState<string | null>(null);
-  const [detailPanel, setDetailPanel] = useState<SkillDetailPanel>("schema");
+  const [skillPage, setSkillPage] = useState(1);
   const [createPanelOpen, setCreatePanelOpen] = useState(false);
   const [newSkillSummary, setNewSkillSummary] = useState("");
   const [newSkillPrompt, setNewSkillPrompt] = useState("");
@@ -1412,6 +1318,11 @@ function SkillsConfigSection({
   const [newSkillOutputSpec, setNewSkillOutputSpec] = useState("");
   const [newSkillEnabled, setNewSkillEnabled] = useState(true);
   const [editingSkillId, setEditingSkillId] = useState<string | null>(null);
+  const [skillActionMenu, setSkillActionMenu] = useState<{
+    skillId: string;
+    top: number;
+    left: number;
+  } | null>(null);
 
   const skillCatalog = useMemo(
     () => createSkillCatalog(registeredSkills, customSkills),
@@ -1438,14 +1349,8 @@ function SkillsConfigSection({
   }, [skillCatalog, skillQuery, skillView]);
 
   useEffect(() => {
-    if (filteredSkillCatalog.length === 0) {
-      setSelectedSkillId(null);
-      return;
-    }
-    if (!filteredSkillCatalog.some((item) => item.id === selectedSkillId)) {
-      setSelectedSkillId(filteredSkillCatalog[0].id);
-    }
-  }, [filteredSkillCatalog, selectedSkillId]);
+    setSkillPage(1);
+  }, [skillQuery, skillView, skillCatalog.length]);
 
   useEffect(() => {
     if (!newSkillName && !newSkillDescription) {
@@ -1457,30 +1362,45 @@ function SkillsConfigSection({
     }
   }, [newSkillDescription, newSkillName]);
 
-  const selectedSkill =
-    filteredSkillCatalog.find((item) => item.id === selectedSkillId) ??
-    filteredSkillCatalog[0] ??
-    null;
+  const totalPages = Math.max(
+    1,
+    Math.ceil(filteredSkillCatalog.length / SKILL_LIST_PAGE_SIZE)
+  );
+
+  useEffect(() => {
+    setSkillPage((page) => Math.min(Math.max(page, 1), totalPages));
+  }, [totalPages]);
+
+  const pagedSkillCatalog = useMemo(() => {
+    const start = (skillPage - 1) * SKILL_LIST_PAGE_SIZE;
+    return filteredSkillCatalog.slice(start, start + SKILL_LIST_PAGE_SIZE);
+  }, [filteredSkillCatalog, skillPage]);
+  const menuSkill =
+    skillActionMenu !== null
+      ? (skillCatalog.find((skill) => skill.id === skillActionMenu.skillId) ??
+        null)
+      : null;
+
   const backendCount = skillCatalog.filter(
     (skill) => skill.source === "backend"
   ).length;
   const customCount = skillCatalog.filter(
     (skill) => skill.source === "custom"
   ).length;
-  const totalUsageCount = skillCatalog.reduce(
-    (total, skill) => total + skill.usageCount,
-    0
-  );
-  const averageResponseMs =
-    skillCatalog.length === 0
-      ? 0
-      : Math.round(
-          skillCatalog.reduce(
-            (total, skill) => total + skill.responseTimeMs,
-            0
-          ) / skillCatalog.length
-        );
   const disabledCount = skillCatalog.filter((skill) => !skill.enabled).length;
+  const enabledCount = skillCatalog.length - disabledCount;
+  const pageStart =
+    filteredSkillCatalog.length === 0
+      ? 0
+      : (skillPage - 1) * SKILL_LIST_PAGE_SIZE + 1;
+  const pageEnd = Math.min(
+    skillPage * SKILL_LIST_PAGE_SIZE,
+    filteredSkillCatalog.length
+  );
+  const canSubmitSkill =
+    newSkillName.trim().length > 0 &&
+    newSkillSummary.trim().length > 0 &&
+    newSkillPrompt.trim().length > 0;
 
   const resetSkillForm = () => {
     onNewSkillNameChange("");
@@ -1495,18 +1415,22 @@ function SkillsConfigSection({
 
   const handleOpenCreateSkill = () => {
     resetSkillForm();
+    setSkillActionMenu(null);
     setCreatePanelOpen(true);
   };
 
-  const handleEditSelectedSkill = () => {
-    if (!selectedSkill?.rawCustomId) return;
+  const handleEditSkill = (selectedSkill: SkillCatalogItem) => {
+    if (!selectedSkill.rawCustomId) return;
+    setSkillActionMenu(null);
     const rawSkill = customSkills.find(
       (skill) => skill.id === selectedSkill.rawCustomId
     );
+    const summary = rawSkill?.description ?? selectedSkill.description;
     setEditingSkillId(selectedSkill.rawCustomId);
     setCreatePanelOpen(true);
     onNewSkillNameChange(rawSkill?.name ?? selectedSkill.name);
-    setNewSkillSummary(rawSkill?.description ?? selectedSkill.description);
+    onNewSkillDescriptionChange(summary);
+    setNewSkillSummary(summary);
     setNewSkillPrompt(
       rawSkill?.prompt || rawSkill?.description || selectedSkill.description
     );
@@ -1538,55 +1462,59 @@ function SkillsConfigSection({
         outputSchema: schemaFromSpec(newSkillOutputSpec, "output"),
         enabled: newSkillEnabled,
       });
+      setSkillView("custom");
     }
     resetSkillForm();
     setCreatePanelOpen(false);
   };
 
+  const handleOpenSkillActionMenu = (
+    event: MouseEvent<HTMLButtonElement>,
+    skill: SkillCatalogItem
+  ) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const menuWidth = 144;
+    const menuHeight = 112;
+    const left = Math.max(
+      12,
+      Math.min(rect.right - menuWidth, window.innerWidth - menuWidth - 12)
+    );
+    const belowTop = rect.bottom + 8;
+    const top =
+      belowTop + menuHeight > window.innerHeight
+        ? Math.max(12, rect.top - menuHeight - 8)
+        : belowTop;
+    setSkillActionMenu((current) =>
+      current?.skillId === skill.id ? null : { skillId: skill.id, top, left }
+    );
+  };
+
+  useEffect(() => {
+    setSkillActionMenu(null);
+  }, [createPanelOpen, skillPage, skillQuery, skillView]);
+
   return (
-    <div className="flex min-h-full flex-col gap-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
-      <div className="flex flex-col gap-4 rounded-xl border border-slate-700/60 bg-[#07111d] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] lg:flex-row lg:items-start lg:justify-between">
+    <div className="flex min-h-full flex-col gap-3 animate-in fade-in slide-in-from-bottom-2 duration-300">
+      <div className="flex items-start justify-between gap-3">
         <div>
-          <div className="flex flex-wrap items-center gap-2">
-            <h2 className="font-mono text-lg font-semibold text-cyan-50">
-              技能库管理
-            </h2>
-            <Badge className="font-mono text-[9px]" variant="muted">
-              Agent Skills
-            </Badge>
-          </div>
-          <p className="mt-1 max-w-3xl text-xs leading-relaxed text-slate-400">
-            统一管理后端注册技能和文件夹自定义提示词，展示
-            schema、版本、调用记录和启用状态。
+          <h2 className="font-mono text-lg font-semibold text-cyan-50">技能</h2>
+          <p className="mt-1 text-xs leading-relaxed text-slate-400">
+            管理后端注册技能和本地自定义技能，面向 Agent 上下文注入。
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Button
-            onClick={onRefreshSkills}
-            disabled={skillsLoading}
-            variant="ghost"
-            size="sm"
-            className="gap-2 border border-cyan-400/30 font-mono text-xs text-cyan-200"
-          >
-            <RefreshCw
-              className={cn("size-3.5", skillsLoading && "animate-spin")}
-            />
-            同步后端
-          </Button>
-          <Button
-            onClick={() =>
-              createPanelOpen
-                ? setCreatePanelOpen(false)
-                : handleOpenCreateSkill()
-            }
-            size="sm"
-            variant="tactical"
-            className="font-mono text-xs"
-          >
-            <Plus className="size-3.5" />
-            新建自定义技能
-          </Button>
-        </div>
+        <Button
+          aria-label="同步后端技能"
+          className="size-8 border border-slate-700 bg-slate-950/60 text-slate-300 hover:border-cyan-400/40"
+          disabled={skillsLoading}
+          onClick={onRefreshSkills}
+          size="icon"
+          title="同步后端"
+          variant="ghost"
+        >
+          <RefreshCw
+            className={cn("size-4", skillsLoading && "animate-spin")}
+          />
+        </Button>
       </div>
 
       {skillsError && (
@@ -1596,525 +1524,461 @@ function SkillsConfigSection({
         </div>
       )}
 
-      {createPanelOpen && (
-        <div className="rounded-xl border border-cyan-400/15 bg-[#07111d] p-4 shadow-[inset_0_1px_0_rgba(103,232,249,0.06)]">
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <div>
-              <h3 className="font-mono text-xs font-semibold text-cyan-50">
-                {editingSkillId ? "编辑自定义技能" : "注入新技能提示词"}
+      <section className="min-h-0 flex-1 overflow-hidden rounded-lg border border-slate-700/70 bg-[#070d16] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+        <div className="flex flex-col gap-3 border-b border-slate-800/90 px-4 py-3 lg:flex-row lg:items-start lg:justify-between">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="grid size-8 place-items-center rounded-md border border-cyan-400/20 bg-cyan-400/10 text-cyan-100">
+                <Wrench className="size-4" />
+              </div>
+              <h3 className="font-mono text-sm font-semibold text-slate-50">
+                技能
               </h3>
-              <p className="mt-1 text-[10px] text-slate-500">
-                字段会保存到后端 skills
-                文件夹，并在对话提交时作为用户定义提示词注入。
-              </p>
+              <Badge className="font-mono text-[9px]" variant="muted">
+                {filteredSkillCatalog.length}/{skillCatalog.length}
+              </Badge>
             </div>
-            <label className="flex shrink-0 items-center gap-2 text-[10px] text-slate-400">
-              <input
-                checked={newSkillEnabled}
-                className="size-3.5 accent-cyan-400"
-                onChange={(event) => setNewSkillEnabled(event.target.checked)}
-                type="checkbox"
-              />
-              创建后启用
-            </label>
+            <p className="mt-2 max-w-2xl text-xs leading-relaxed text-slate-400">
+              技能是一组基于上下文触发的指令集，用于稳定地执行任务。
+              后端注册技能保持只读，自定义技能保存在本地 skills 文件夹。
+            </p>
           </div>
-          <div className="grid gap-3 lg:grid-cols-[220px_minmax(0,1fr)_minmax(0,1fr)]">
-            <input
-              className={INPUT_CLASS}
-              onChange={(event) => onNewSkillNameChange(event.target.value)}
-              placeholder="技能名称，例如 refine_brief"
-              value={newSkillName}
-            />
-            <input
-              className={INPUT_CLASS}
-              onChange={(event) => setNewSkillSummary(event.target.value)}
-              placeholder="描述，例如 将口语需求整理成执行 brief"
-              value={newSkillSummary}
-            />
-            <textarea
-              className={cn(INPUT_CLASS, "min-h-[72px] resize-y lg:row-span-2")}
-              onChange={(event) => setNewSkillPrompt(event.target.value)}
-              placeholder="提示词内容"
-              value={newSkillPrompt}
-            />
-            <input
-              className={INPUT_CLASS}
-              onChange={(event) => setNewSkillInputSpec(event.target.value)}
-              placeholder="输入参数说明，例如 user_goal/context"
-              value={newSkillInputSpec}
-            />
-            <input
-              className={INPUT_CLASS}
-              onChange={(event) => setNewSkillOutputSpec(event.target.value)}
-              placeholder="输出格式，例如 JSON 或 Markdown checklist"
-              value={newSkillOutputSpec}
-            />
-          </div>
-          <div className="mt-3 flex justify-end gap-2">
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
+            <div className="hidden items-center gap-2 rounded-md border border-slate-800 bg-slate-950/40 px-2.5 py-1.5 font-mono text-[10px] text-slate-400 md:flex">
+              <span className="text-emerald-200">{enabledCount}</span>
+              启用
+              <span className="text-slate-600">/</span>
+              <span className="text-cyan-200">{activeCustomSkillsCount}</span>
+              自定义生效
+            </div>
             <Button
               className="font-mono text-xs"
-              onClick={() => {
-                resetSkillForm();
-                setCreatePanelOpen(false);
-              }}
-              size="sm"
-              variant="ghost"
-            >
-              取消
-            </Button>
-            <Button
-              className="font-mono text-xs"
-              disabled={
-                !newSkillName.trim() ||
-                !newSkillSummary.trim() ||
-                !newSkillPrompt.trim()
-              }
-              onClick={handleCreateCustomSkill}
+              onClick={handleOpenCreateSkill}
               size="sm"
               variant="tactical"
             >
               <Plus className="size-3.5" />
-              {editingSkillId ? "保存技能" : "注入技能"}
+              创建
             </Button>
           </div>
         </div>
-      )}
 
-      <div className="grid gap-3 md:grid-cols-4">
-        <SkillMetricCard
-          hint="服务端 registry 只读同步"
-          icon={Database}
-          label="后端注册技能总数"
-          value={backendCount}
-        />
-        <SkillMetricCard
-          hint={`${activeCustomSkillsCount} 个当前启用，后端文件夹持久化`}
-          icon={SlidersHorizontal}
-          label="自定义技能"
-          tone="emerald"
-          value={customCount}
-        />
-        <SkillMetricCard
-          hint="后端统计接入前使用 mock telemetry"
-          icon={Activity}
-          label="技能调用次数"
-          value={totalUsageCount}
-        />
-        <SkillMetricCard
-          hint={`${disabledCount} 个停用项`}
-          icon={Clock}
-          label="平均响应时间"
-          tone="amber"
-          value={`${averageResponseMs}ms`}
-        />
-      </div>
-
-      <div className="grid min-h-[510px] flex-1 gap-4 xl:grid-cols-[minmax(0,1fr)_410px]">
-        <div className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-slate-700/70 bg-[#07111d]">
-          <div className="border-b border-slate-700/60 p-3">
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-              <div className="relative min-w-0 flex-1">
-                <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-slate-500" />
-                <input
-                  className={cn(INPUT_CLASS, "h-8 pl-9")}
-                  onChange={(event) => setSkillQuery(event.target.value)}
-                  placeholder="搜索技能名称、描述、版本或创建者"
-                  value={skillQuery}
-                />
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {SKILL_LIBRARY_VIEWS.map((view) => {
-                  const active = skillView === view.id;
-                  return (
-                    <button
-                      className={cn(
-                        "rounded-md border px-2.5 py-1.5 font-mono text-[10px] transition-colors",
-                        active
-                          ? "border-cyan-400/45 bg-cyan-400/12 text-cyan-100"
-                          : "border-slate-700 bg-slate-950/40 text-slate-400 hover:border-cyan-400/25 hover:text-slate-200"
-                      )}
-                      key={view.id}
-                      onClick={() => setSkillView(view.id)}
-                      type="button"
-                    >
-                      {view.label}
-                    </button>
-                  );
-                })}
-              </div>
+        <div className="border-b border-slate-800/90 px-4 py-3">
+          <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+            <div className="relative min-w-0 lg:w-[320px]">
+              <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-slate-500" />
+              <input
+                className={cn(
+                  INPUT_CLASS,
+                  "h-8 border-slate-700/80 bg-slate-950/50 pl-9 text-slate-100 placeholder:text-slate-500 focus:border-cyan-400/45"
+                )}
+                onChange={(event) => setSkillQuery(event.target.value)}
+                placeholder="搜索技能"
+                value={skillQuery}
+              />
             </div>
-            <div className="mt-3 hidden grid-cols-[minmax(240px,1.45fr)_110px_80px_92px_120px_44px] gap-3 border-t border-slate-800 pt-2 px-2 font-mono text-[9px] text-slate-500 lg:grid">
-              <span>技能</span>
-              <span>来源</span>
-              <span>版本</span>
-              <span>状态</span>
-              <span>调用</span>
-              <span>操作</span>
-            </div>
-          </div>
-
-          <div className="min-h-0 flex-1 overflow-y-auto scrollbar-thin scrollbar-track-transparent scrollbar-thumb-cyan-900/50">
-            {skillsLoading ? (
-              Array.from({ length: 4 }).map((_, index) => (
-                <div
-                  className="m-3 h-16 animate-pulse rounded-lg border border-white/5 bg-white/[0.03]"
-                  key={index}
-                />
-              ))
-            ) : filteredSkillCatalog.length === 0 ? (
-              <div className="m-3 flex h-40 flex-col items-center justify-center rounded-lg border border-dashed border-cyan-400/20 bg-cyan-950/5 text-center">
-                <Wrench className="mb-2 size-5 text-cyan-600/50" />
-                <div className="font-mono text-[11px] text-cyan-500/70">
-                  未匹配到技能
-                </div>
-                <div className="mt-1 text-[10px] text-slate-500">
-                  调整搜索词或筛选范围
-                </div>
-              </div>
-            ) : (
-              filteredSkillCatalog.map((skill) => {
-                const selected = selectedSkill?.id === skill.id;
+            <div className="flex flex-wrap gap-1.5">
+              {SKILL_LIBRARY_VIEWS.map((view) => {
+                const active = skillView === view.id;
                 return (
-                  <div
+                  <button
                     className={cn(
-                      "grid cursor-pointer gap-3 border-b border-slate-800/80 px-3 py-3 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/50 lg:grid-cols-[minmax(240px,1.45fr)_110px_80px_92px_120px_44px]",
-                      selected ? "bg-cyan-400/10" : "hover:bg-slate-950/45"
+                      "rounded-md border px-2.5 py-1.5 font-mono text-[10px] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/50",
+                      active
+                        ? "border-cyan-400/45 bg-cyan-400/12 text-cyan-100"
+                        : "border-slate-800 bg-slate-950/40 text-slate-400 hover:border-slate-600 hover:text-slate-200"
                     )}
-                    key={skill.id}
-                    onClick={() => setSelectedSkillId(skill.id)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter" || event.key === " ") {
-                        setSelectedSkillId(skill.id);
-                      }
-                    }}
-                    role="button"
-                    tabIndex={0}
+                    key={view.id}
+                    onClick={() => setSkillView(view.id)}
+                    type="button"
                   >
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="truncate font-mono text-xs font-semibold text-slate-100">
-                          {skill.name}
-                        </span>
-                        {skill.readonly && (
-                          <Lock className="size-3 text-slate-500" />
-                        )}
-                      </div>
-                      <p className="mt-1 line-clamp-2 text-[10px] leading-relaxed text-slate-400">
-                        {skill.description}
-                      </p>
-                    </div>
-                    <div className="flex items-center lg:block">
-                      <Badge
-                        className="font-mono text-[9px]"
-                        variant={
-                          skill.source === "backend" ? "muted" : "default"
-                        }
-                      >
-                        {skill.source === "backend" ? "后端注册" : "自定义"}
-                      </Badge>
-                    </div>
-                    <div className="flex items-center font-mono text-[10px] text-slate-400">
-                      {skill.version}
-                    </div>
-                    <div className="flex items-center">
-                      <Badge
-                        className="font-mono text-[9px]"
-                        variant={skill.enabled ? "success" : "muted"}
-                      >
-                        {skill.enabled ? "启用" : "停用"}
-                      </Badge>
-                    </div>
-                    <div className="flex items-center gap-2 text-[10px] text-slate-500">
-                      <Activity className="size-3.5 text-cyan-300/75" />
-                      <div>
-                        <div className="font-mono text-slate-300">
-                          {skill.usageCount} 次
-                        </div>
-                        <div>{formatRelativeDate(skill.lastUsedAt)}</div>
-                      </div>
-                    </div>
-                    <button
-                      className="grid size-8 place-items-center rounded-md text-slate-500 transition-colors hover:bg-slate-800 hover:text-cyan-200"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        setSelectedSkillId(skill.id);
-                        setDetailPanel("activity");
-                      }}
-                      title="打开操作菜单"
-                      type="button"
-                    >
-                      <MoreHorizontal className="size-4" />
-                    </button>
-                  </div>
+                    {view.label}
+                  </button>
                 );
-              })
-            )}
+              })}
+            </div>
           </div>
         </div>
 
-        <aside className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-slate-700/70 bg-[#07111d]">
-          <div className="flex min-h-0 flex-1 flex-col p-4">
-            {selectedSkill ? (
-              <>
-                <div className="border-b border-slate-700/70 pb-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="break-all font-mono text-sm font-semibold text-cyan-50">
-                          {selectedSkill.name}
-                        </h3>
-                        <Badge
-                          className="font-mono text-[9px]"
-                          variant={selectedSkill.enabled ? "success" : "muted"}
-                        >
-                          {selectedSkill.enabled ? "已启用" : "已停用"}
-                        </Badge>
-                        {selectedSkill.readonly && (
+        {createPanelOpen && (
+          <div className="border-b border-slate-800/90 bg-slate-950/30 px-4 py-4">
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div>
+                <h4 className="font-mono text-sm font-semibold text-slate-50">
+                  {editingSkillId ? "编辑技能" : "创建技能"}
+                </h4>
+                <p className="mt-1 text-xs text-slate-400">
+                  填写技能名称、触发场景和指令内容，确认后进入自定义技能列表。
+                </p>
+              </div>
+              <label className="flex shrink-0 items-center gap-2 text-[11px] text-slate-300">
+                <input
+                  checked={newSkillEnabled}
+                  className="size-3.5 accent-cyan-400"
+                  onChange={(event) => setNewSkillEnabled(event.target.checked)}
+                  type="checkbox"
+                />
+                是否启用
+              </label>
+            </div>
+
+            <div className="grid gap-3 lg:grid-cols-2">
+              <label className="space-y-1.5">
+                <span className="font-mono text-[11px] text-slate-300">
+                  <span className="text-red-300">*</span> 技能名称
+                </span>
+                <input
+                  className={cn(
+                    INPUT_CLASS,
+                    "h-9 border-slate-700 bg-slate-950/60 text-slate-50 placeholder:text-slate-500"
+                  )}
+                  onChange={(event) => onNewSkillNameChange(event.target.value)}
+                  placeholder="为该技能起一个简短、易识别的名称（例如 codemap）"
+                  value={newSkillName}
+                />
+              </label>
+
+              <label className="space-y-1.5">
+                <span className="font-mono text-[11px] text-slate-300">
+                  <span className="text-red-300">*</span> 描述
+                </span>
+                <textarea
+                  className={cn(
+                    INPUT_CLASS,
+                    "min-h-[72px] resize-y border-slate-700 bg-slate-950/60 text-slate-50 placeholder:text-slate-500"
+                  )}
+                  onChange={(event) => {
+                    setNewSkillSummary(event.target.value);
+                    onNewSkillDescriptionChange(event.target.value);
+                  }}
+                  placeholder="该技能应该在何时使用？例如：当用户询问项目结构或文件关系时"
+                  value={newSkillSummary}
+                />
+              </label>
+
+              <label className="space-y-1.5 lg:col-span-2">
+                <span className="font-mono text-[11px] text-slate-300">
+                  <span className="text-red-300">*</span> 指令
+                </span>
+                <textarea
+                  className={cn(
+                    INPUT_CLASS,
+                    "min-h-[150px] resize-y border-slate-700 bg-slate-950/60 text-slate-50 placeholder:text-slate-500"
+                  )}
+                  onChange={(event) => setNewSkillPrompt(event.target.value)}
+                  placeholder={`定义该技能激活时模型应如何行为。例如：
+# codemap
+## Commands
+## When to Use
+## Output Interpretation
+## Examples`}
+                  value={newSkillPrompt}
+                />
+              </label>
+
+              <label className="space-y-1.5">
+                <span className="font-mono text-[11px] text-slate-400">
+                  输入参数说明
+                </span>
+                <input
+                  className={cn(
+                    INPUT_CLASS,
+                    "h-9 border-slate-700 bg-slate-950/60 text-slate-50 placeholder:text-slate-500"
+                  )}
+                  onChange={(event) => setNewSkillInputSpec(event.target.value)}
+                  placeholder="例如 context、operator_intent"
+                  value={newSkillInputSpec}
+                />
+              </label>
+
+              <label className="space-y-1.5">
+                <span className="font-mono text-[11px] text-slate-400">
+                  输出格式
+                </span>
+                <input
+                  className={cn(
+                    INPUT_CLASS,
+                    "h-9 border-slate-700 bg-slate-950/60 text-slate-50 placeholder:text-slate-500"
+                  )}
+                  onChange={(event) =>
+                    setNewSkillOutputSpec(event.target.value)
+                  }
+                  placeholder="例如 Markdown checklist 或 JSON"
+                  value={newSkillOutputSpec}
+                />
+              </label>
+            </div>
+
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
+              {editingSkillId ? (
+                <Button
+                  className="font-mono text-xs text-red-200 hover:text-red-100"
+                  onClick={() => {
+                    onRemoveCustomSkill(editingSkillId);
+                    resetSkillForm();
+                    setCreatePanelOpen(false);
+                  }}
+                  size="sm"
+                  variant="ghost"
+                >
+                  <Trash2 className="size-3.5" />
+                  删除
+                </Button>
+              ) : (
+                <div />
+              )}
+              <div className="flex gap-2">
+                <Button
+                  className="font-mono text-xs"
+                  onClick={() => {
+                    resetSkillForm();
+                    setCreatePanelOpen(false);
+                  }}
+                  size="sm"
+                  variant="ghost"
+                >
+                  取消
+                </Button>
+                <Button
+                  className="font-mono text-xs"
+                  disabled={!canSubmitSkill}
+                  onClick={handleCreateCustomSkill}
+                  size="sm"
+                  variant="tactical"
+                >
+                  {editingSkillId ? "保存" : "确认"}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="min-h-[430px] overflow-y-auto scrollbar-thin scrollbar-track-transparent scrollbar-thumb-cyan-900/50">
+          {skillsLoading ? (
+            <div className="space-y-2 p-3">
+              {Array.from({ length: SKILL_LIST_PAGE_SIZE }).map((_, index) => (
+                <div
+                  className="h-[76px] animate-pulse rounded-lg border border-white/5 bg-white/[0.03]"
+                  key={index}
+                />
+              ))}
+            </div>
+          ) : filteredSkillCatalog.length === 0 ? (
+            <div className="m-4 flex h-44 flex-col items-center justify-center rounded-lg border border-dashed border-slate-700 bg-slate-950/30 text-center">
+              <Wrench className="mb-3 size-6 text-slate-600" />
+              <div className="font-mono text-xs text-slate-300">
+                未匹配到技能
+              </div>
+              <div className="mt-1 text-[11px] text-slate-500">
+                调整搜索词或筛选范围后再试
+              </div>
+            </div>
+          ) : (
+            <div className="divide-y divide-slate-800/90">
+              {pagedSkillCatalog.map((skill) => {
+                const canToggle = Boolean(skill.rawCustomId) && !skill.readonly;
+                return (
+                  <article
+                    className="grid gap-3 px-4 py-3 transition-colors hover:bg-slate-950/40 lg:grid-cols-[minmax(0,1fr)_160px_138px]"
+                    key={skill.id}
+                  >
+                    <div className="flex min-w-0 gap-3">
+                      <div
+                        className={cn(
+                          "grid size-10 shrink-0 place-items-center rounded-lg border",
+                          skill.source === "backend"
+                            ? "border-cyan-400/20 bg-cyan-400/10 text-cyan-100"
+                            : "border-emerald-300/20 bg-emerald-300/10 text-emerald-100"
+                        )}
+                      >
+                        <Wrench className="size-4" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h4 className="truncate font-mono text-sm font-semibold text-slate-50">
+                            {skill.name}
+                          </h4>
+                          {skill.readonly && (
+                            <Lock className="size-3.5 text-slate-500" />
+                          )}
+                          <Badge
+                            className="font-mono text-[9px]"
+                            variant={
+                              skill.source === "backend" ? "muted" : "default"
+                            }
+                          >
+                            {skill.source === "backend" ? "后端" : "自定义"}
+                          </Badge>
                           <Badge
                             className="font-mono text-[9px]"
                             variant="muted"
                           >
-                            只读
+                            {skill.version}
                           </Badge>
-                        )}
+                        </div>
+                        <p className="mt-1 line-clamp-2 max-w-3xl text-[11px] leading-relaxed text-slate-400">
+                          {skill.description || "暂无描述"}
+                        </p>
+                        <div className="mt-2 flex flex-wrap items-center gap-3 font-mono text-[10px] text-slate-500">
+                          <span>{skill.usageCount} 次调用</span>
+                          <span>{formatRelativeDate(skill.lastUsedAt)}</span>
+                          <span>{skill.responseTimeMs}ms</span>
+                        </div>
                       </div>
-                      <p className="mt-2 text-xs leading-relaxed text-slate-400">
-                        {selectedSkill.description}
-                      </p>
                     </div>
-                    <label
-                      className={cn(
-                        "relative inline-flex shrink-0 items-center",
-                        selectedSkill.readonly
-                          ? "cursor-not-allowed opacity-45"
-                          : "cursor-pointer"
-                      )}
-                      title={
-                        selectedSkill.readonly
-                          ? "后端注册技能只读，不能在前端停用"
-                          : "切换自定义技能启用状态"
-                      }
-                    >
-                      <input
-                        checked={selectedSkill.enabled}
-                        className="peer sr-only"
-                        disabled={selectedSkill.readonly}
-                        onChange={(event) => {
-                          if (selectedSkill.rawCustomId) {
-                            onToggleCustomSkill(
-                              selectedSkill.rawCustomId,
-                              event.target.checked
-                            );
-                          }
-                        }}
-                        type="checkbox"
-                      />
-                      <div className="peer h-5 w-9 rounded-full bg-slate-800 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:bg-slate-300 after:transition-all after:content-[''] peer-checked:bg-cyan-500 peer-checked:after:translate-x-full peer-checked:after:bg-white peer-focus-visible:ring-2 peer-focus-visible:ring-cyan-400/60" />
-                    </label>
-                  </div>
 
-                  <div className="mt-3 grid grid-cols-2 gap-2 text-[10px]">
-                    <div className="rounded-md border border-slate-700/60 bg-slate-950/40 p-2">
-                      <div className="flex items-center gap-1.5 text-slate-500">
-                        <Database className="size-3.5" />
-                        来源
-                      </div>
-                      <div className="mt-1 font-mono text-slate-200">
-                        {selectedSkill.source === "backend"
-                          ? "后端注册"
-                          : "文件夹自定义"}
-                      </div>
+                    <div className="flex items-center gap-2 lg:justify-end">
+                      <Badge
+                        className="font-mono text-[9px]"
+                        variant={skill.enabled ? "success" : "muted"}
+                      >
+                        {skill.enabled ? "已启用" : "已停用"}
+                      </Badge>
+                      <span className="hidden font-mono text-[10px] text-slate-500 xl:inline">
+                        {formatExactDate(skill.updatedAt)}
+                      </span>
                     </div>
-                    <div className="rounded-md border border-slate-700/60 bg-slate-950/40 p-2">
-                      <div className="flex items-center gap-1.5 text-slate-500">
-                        <Zap className="size-3.5" />
-                        版本
-                      </div>
-                      <div className="mt-1 font-mono text-slate-200">
-                        {selectedSkill.version}
-                      </div>
-                    </div>
-                    <div className="rounded-md border border-slate-700/60 bg-slate-950/40 p-2">
-                      <div className="flex items-center gap-1.5 text-slate-500">
-                        <User className="size-3.5" />
-                        创建者
-                      </div>
-                      <div className="mt-1 font-mono text-slate-200">
-                        {selectedSkill.createdBy}
-                      </div>
-                    </div>
-                    <div className="rounded-md border border-slate-700/60 bg-slate-950/40 p-2">
-                      <div className="flex items-center gap-1.5 text-slate-500">
-                        <CalendarClock className="size-3.5" />
-                        更新时间
-                      </div>
-                      <div className="mt-1 font-mono text-slate-200">
-                        {formatExactDate(selectedSkill.updatedAt)}
-                      </div>
-                    </div>
-                  </div>
 
-                  <div className="mt-3 grid grid-cols-2 gap-2">
-                    <Button
-                      className="justify-start font-mono text-[11px]"
-                      onClick={() => setDetailPanel("activity")}
-                      size="sm"
-                      variant="tactical"
-                    >
-                      <PlayCircle className="size-3.5" />
-                      测试技能
-                    </Button>
-                    <Button
-                      className="justify-start font-mono text-[11px]"
-                      onClick={() => setDetailPanel("activity")}
-                      size="sm"
-                      variant="ghost"
-                    >
-                      <ScrollText className="size-3.5" />
-                      查看日志
-                    </Button>
-                    <Button
-                      className="justify-start font-mono text-[11px]"
-                      disabled={selectedSkill.readonly}
-                      onClick={handleEditSelectedSkill}
-                      size="sm"
-                      variant="ghost"
-                    >
-                      <Pencil className="size-3.5" />
-                      编辑
-                    </Button>
-                    <Button
-                      className="justify-start font-mono text-[11px]"
-                      disabled={
-                        selectedSkill.readonly || !selectedSkill.rawCustomId
-                      }
-                      onClick={() => {
-                        if (selectedSkill.rawCustomId) {
-                          onToggleCustomSkill(
-                            selectedSkill.rawCustomId,
-                            !selectedSkill.enabled
-                          );
-                        }
-                      }}
-                      size="sm"
-                      variant={selectedSkill.enabled ? "ghost" : "tactical"}
-                    >
-                      <Power className="size-3.5" />
-                      {selectedSkill.enabled ? "停用" : "启用"}
-                    </Button>
-                    <Button
-                      className="justify-start font-mono text-[11px] text-red-200 hover:text-red-100"
-                      disabled={
-                        selectedSkill.readonly || !selectedSkill.rawCustomId
-                      }
-                      onClick={() => {
-                        if (selectedSkill.rawCustomId) {
-                          onRemoveCustomSkill(selectedSkill.rawCustomId);
-                        }
-                      }}
-                      size="sm"
-                      variant="ghost"
-                    >
-                      <Trash2 className="size-3.5" />
-                      删除
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="mt-3 flex gap-1 rounded-md border border-slate-700/60 bg-slate-950/40 p-1">
-                  {[
-                    { id: "schema", label: "输入 Schema", icon: Code2 },
-                    { id: "output", label: "输出 Schema", icon: FileText },
-                    { id: "activity", label: "调用记录", icon: History },
-                  ].map((tab) => {
-                    const Icon = tab.icon;
-                    const active = detailPanel === tab.id;
-                    return (
-                      <button
+                    <div className="flex items-center gap-2 lg:justify-end">
+                      <label
                         className={cn(
-                          "flex flex-1 items-center justify-center gap-1.5 rounded px-2 py-1.5 font-mono text-[10px] transition-colors",
-                          active
-                            ? "bg-cyan-400/12 text-cyan-100"
-                            : "text-slate-500 hover:bg-slate-800/80 hover:text-slate-200"
+                          "relative inline-flex items-center",
+                          canToggle
+                            ? "cursor-pointer"
+                            : "cursor-not-allowed opacity-45"
                         )}
-                        key={tab.id}
-                        onClick={() =>
-                          setDetailPanel(tab.id as SkillDetailPanel)
+                        title={
+                          canToggle
+                            ? "切换自定义技能启用状态"
+                            : "后端注册技能只读"
                         }
+                      >
+                        <input
+                          checked={skill.enabled}
+                          className="peer sr-only"
+                          disabled={!canToggle}
+                          onChange={(event) => {
+                            if (skill.rawCustomId) {
+                              onToggleCustomSkill(
+                                skill.rawCustomId,
+                                event.target.checked
+                              );
+                            }
+                          }}
+                          type="checkbox"
+                        />
+                        <span className="h-5 w-9 rounded-full border border-slate-700 bg-slate-800 transition-colors peer-checked:border-emerald-300/40 peer-checked:bg-emerald-500/70 peer-focus-visible:ring-2 peer-focus-visible:ring-cyan-400/60" />
+                        <span className="absolute left-[3px] top-[3px] size-3.5 rounded-full bg-slate-300 transition-transform peer-checked:translate-x-4 peer-checked:bg-white" />
+                      </label>
+
+                      <button
+                        aria-expanded={skillActionMenu?.skillId === skill.id}
+                        aria-haspopup="menu"
+                        className={cn(
+                          "grid size-8 place-items-center rounded-md border bg-slate-950/40 text-slate-400 transition-colors hover:text-cyan-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/50",
+                          skillActionMenu?.skillId === skill.id
+                            ? "border-cyan-400/40 bg-cyan-400/10 text-cyan-100"
+                            : "border-slate-800 hover:border-cyan-400/30"
+                        )}
+                        onClick={(event) =>
+                          handleOpenSkillActionMenu(event, skill)
+                        }
+                        title="打开操作菜单"
                         type="button"
                       >
-                        <Icon className="size-3.5" />
-                        {tab.label}
+                        <Settings className="size-4" />
                       </button>
-                    );
-                  })}
-                </div>
-
-                <div className="mt-3 min-h-0 flex-1 overflow-y-auto rounded-lg border border-slate-700/60 bg-black/20 p-3 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-cyan-900/50">
-                  {detailPanel === "schema" && (
-                    <SkillSchemaList
-                      emptyText="该技能未声明输入参数 Schema"
-                      fields={selectedSkill.inputSchema}
-                    />
-                  )}
-                  {detailPanel === "output" && (
-                    <SkillSchemaList
-                      emptyText="该技能未声明输出结果 Schema"
-                      fields={selectedSkill.outputSchema}
-                    />
-                  )}
-                  {detailPanel === "activity" && (
-                    <div className="space-y-2">
-                      {selectedSkill.callRecords.length === 0 ? (
-                        <div className="flex h-24 items-center justify-center rounded-md border border-dashed border-slate-700/70 bg-black/20 text-[11px] text-slate-500">
-                          暂无调用记录
-                        </div>
-                      ) : (
-                        selectedSkill.callRecords.map((record) => (
-                          <div
-                            className="rounded-md border border-slate-700/60 bg-slate-950/40 px-3 py-2"
-                            key={record.id}
-                          >
-                            <div className="flex items-center justify-between gap-3">
-                              <div className="flex min-w-0 items-center gap-2">
-                                <Terminal className="size-3.5 shrink-0 text-cyan-300/80" />
-                                <span className="truncate font-mono text-[10px] text-slate-200">
-                                  {record.input}
-                                </span>
-                              </div>
-                              <Badge
-                                className="shrink-0 font-mono text-[9px]"
-                                variant={
-                                  record.status === "success"
-                                    ? "success"
-                                    : "warning"
-                                }
-                              >
-                                {record.status === "success" ? "成功" : "告警"}
-                              </Badge>
-                            </div>
-                            <div className="mt-1 flex items-center justify-between font-mono text-[9px] text-slate-500">
-                              <span>{formatExactDate(record.at)}</span>
-                              <span>{record.latencyMs}ms</span>
-                            </div>
-                          </div>
-                        ))
-                      )}
                     </div>
-                  )}
-                </div>
-              </>
-            ) : (
-              <div className="flex h-full flex-col items-center justify-center text-center">
-                <Search className="mb-3 size-6 text-cyan-600/50" />
-                <div className="font-mono text-xs text-cyan-500/70">
-                  选择一个技能查看详情
-                </div>
-              </div>
-            )}
+                  </article>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        <div className="flex flex-col gap-2 border-t border-slate-800/90 px-4 py-3 text-[11px] text-slate-500 md:flex-row md:items-center md:justify-between">
+          <div className="font-mono">
+            显示 {pageStart}-{pageEnd} / {filteredSkillCatalog.length}
+            <span className="ml-3 text-slate-600">
+              后端 {backendCount} · 自定义 {customCount} · 停用 {disabledCount}
+            </span>
           </div>
-        </aside>
-      </div>
+          <div className="flex items-center gap-2">
+            <Button
+              className="h-7 px-2 font-mono text-[10px]"
+              disabled={skillPage <= 1}
+              onClick={() => setSkillPage((page) => Math.max(1, page - 1))}
+              size="sm"
+              variant="ghost"
+            >
+              <ChevronLeft className="size-3.5" />
+              上一页
+            </Button>
+            <div className="min-w-12 rounded-md border border-slate-800 bg-slate-950/50 px-2 py-1 text-center font-mono text-[10px] text-slate-300">
+              {skillPage}/{totalPages}
+            </div>
+            <Button
+              className="h-7 px-2 font-mono text-[10px]"
+              disabled={skillPage >= totalPages}
+              onClick={() =>
+                setSkillPage((page) => Math.min(totalPages, page + 1))
+              }
+              size="sm"
+              variant="ghost"
+            >
+              下一页
+              <ChevronRight className="size-3.5" />
+            </Button>
+          </div>
+        </div>
+      </section>
+
+      {skillActionMenu &&
+        menuSkill &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-[140]"
+            onMouseDown={() => setSkillActionMenu(null)}
+          >
+            <div
+              className="fixed w-36 rounded-lg border border-slate-700/80 bg-[#111722] p-1.5 shadow-[0_12px_30px_rgba(0,0,0,0.42)]"
+              onMouseDown={(event) => event.stopPropagation()}
+              role="menu"
+              style={{
+                left: skillActionMenu.left,
+                top: skillActionMenu.top,
+              }}
+            >
+              <button
+                className="flex w-full items-center gap-3 rounded-md px-3 py-2 font-mono text-sm font-semibold text-slate-200 transition-colors hover:bg-white/6 hover:text-cyan-100 disabled:cursor-not-allowed disabled:text-slate-600 disabled:hover:bg-transparent"
+                disabled={!menuSkill.rawCustomId}
+                onClick={() => handleEditSkill(menuSkill)}
+                role="menuitem"
+                type="button"
+              >
+                <Pencil className="size-4" />
+                编辑
+              </button>
+              <button
+                className="flex w-full items-center gap-3 rounded-md px-3 py-2 font-mono text-sm font-semibold text-red-300 transition-colors hover:bg-red-500/10 hover:text-red-200 disabled:cursor-not-allowed disabled:text-slate-600 disabled:hover:bg-transparent"
+                disabled={!menuSkill.rawCustomId}
+                onClick={() => {
+                  if (menuSkill.rawCustomId) {
+                    void onRemoveCustomSkill(menuSkill.rawCustomId);
+                  }
+                  setSkillActionMenu(null);
+                }}
+                role="menuitem"
+                type="button"
+              >
+                <Trash2 className="size-4" />
+                删除
+              </button>
+            </div>
+          </div>,
+          document.body
+        )}
     </div>
   );
 }

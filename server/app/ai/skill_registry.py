@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from typing import Any, Callable
 
 from app.ai.models import SkillDefinition
-from app.aicc_runtime.runtime import AICCRuntime
+from app.tianshu_runtime.runtime import TianShuRuntime
 from app.harness import (
     HarnessAccess,
     HarnessCapability,
@@ -68,14 +68,14 @@ class RegisteredSkill:
         )
 
 
-class AICCSkillRegistry:
+class TianShuSkillRegistry:
     """Skill registry for mapping AI tool calls to native 天枢平台 runtime APIs."""
 
-    def __init__(self, runtime: AICCRuntime) -> None:
+    def __init__(self, runtime: TianShuRuntime) -> None:
         self.runtime = runtime
         self.harness = RuntimeHarness(
             runtime=runtime,
-            name="aicc-skill-runtime",
+            name="tianshu-skill-runtime",
             version="1.0.0",
         )
         self._skills: dict[str, RegisteredSkill] = {}

@@ -30,6 +30,11 @@ import {
   type ModelProfile,
 } from "@/features/ai/modelProfiles";
 import { useModelConfigStore } from "@/features/ai/modelStore";
+import {
+  readStorageItem,
+  removeStorageItem,
+  writeStorageItem,
+} from "@/lib/legacyStorage";
 import "@/styles/AIAssistantPanel.css";
 
 type PanelTab = "chat" | "settings";
@@ -100,20 +105,20 @@ interface OpenClawAssistantPanelProps {
 }
 
 const STORAGE_KEY = {
-  messages: "aicc.ai.messages",
-  mcpServers: "aicc.ai.mcpServers",
-  customSkills: "aicc.ai.customSkills",
+  messages: "tianshu.ai.messages",
+  mcpServers: "tianshu.ai.mcpServers",
+  customSkills: "tianshu.ai.customSkills",
   model: MODEL_STORAGE_KEY.model,
   modelProfiles: MODEL_STORAGE_KEY.modelProfiles,
   activeModelProfileId: MODEL_STORAGE_KEY.activeModelProfileId,
-  projectMcpEnabled: "aicc.ai.projectMcpEnabled",
+  projectMcpEnabled: "tianshu.ai.projectMcpEnabled",
 };
 
 const DEFAULT_MCP_SERVERS: MCPServerConfig[] = [
   {
     id: crypto.randomUUID(),
     name: "天枢 MCP",
-    endpoint: "stdio://local-aicc-mcp",
+    endpoint: "stdio://local-tianshu-mcp",
     transport: "stdio",
     enabled: true,
   },
@@ -127,7 +132,7 @@ const QUICK_COMMANDS = [
 
 function safeLoad<T>(key: string, fallback: T): T {
   try {
-    const raw = window.localStorage.getItem(key);
+    const raw = readStorageItem(key);
     if (!raw) {
       return fallback;
     }
@@ -139,7 +144,7 @@ function safeLoad<T>(key: string, fallback: T): T {
 
 function safeSave<T>(key: string, value: T): void {
   try {
-    window.localStorage.setItem(key, JSON.stringify(value));
+    writeStorageItem(key, JSON.stringify(value));
   } catch (_error) {
     // Ignore local persistence failures.
   }
@@ -147,7 +152,7 @@ function safeSave<T>(key: string, value: T): void {
 
 function safeRemove(key: string): void {
   try {
-    window.localStorage.removeItem(key);
+    removeStorageItem(key);
   } catch (_error) {
     // Ignore local persistence failures.
   }

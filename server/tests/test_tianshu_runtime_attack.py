@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from threading import RLock
 
-from app.aicc_runtime.runtime import AICCRuntime
+from app.tianshu_runtime.runtime import TianShuRuntime
 
 from blade.Game import Game
 from blade.Relationships import Relationships
@@ -99,8 +99,8 @@ def _scenario() -> Scenario:
     )
 
 
-def _runtime_for_scenario(scenario: Scenario) -> AICCRuntime:
-    runtime = AICCRuntime.__new__(AICCRuntime)
+def _runtime_for_scenario(scenario: Scenario) -> TianShuRuntime:
+    runtime = TianShuRuntime.__new__(TianShuRuntime)
     runtime._lock = RLock()
     runtime.game = Game(current_scenario=scenario)
     return runtime

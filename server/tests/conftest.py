@@ -37,7 +37,7 @@ async def db_engine() -> AsyncIterator:
     # use a named in-memory DB + URI flag to share across the test's session
     # pool. ``aiosqlite`` honours the same trick.
     engine = create_async_engine(
-        "sqlite+aiosqlite:///file:test_aicc_mem?mode=memory&cache=shared&uri=true",
+        "sqlite+aiosqlite:///file:test_tianshu_mem?mode=memory&cache=shared&uri=true",
         future=True,
     )
     # Make sure tables are imported and registered on Base before create_all.
@@ -45,7 +45,7 @@ async def db_engine() -> AsyncIterator:
         CommandProposalRecord,
         CommandProposalStepRecord,
     )
-    from app.aicc_runtime.models import RuntimeEvent, RuntimeState  # noqa: F401
+    from app.tianshu_runtime.models import RuntimeEvent, RuntimeState  # noqa: F401
     from app.scenarios.models import (  # noqa: F401
         AarRecord,
         Scenario,
@@ -87,7 +87,7 @@ async def user(db_session) -> User:
     """A plain active non-superuser. UUID is stable per test for assertions."""
     u = User(
         id=uuid.uuid4(),
-        email=f"u{uuid.uuid4().hex[:8]}@aicc.test",
+        email=f"u{uuid.uuid4().hex[:8]}@tianshu.test",
         hashed_password="not-a-real-hash",
         is_active=True,
         is_superuser=False,
@@ -105,7 +105,7 @@ async def other_user(db_session) -> User:
     """Another active user, used to assert cross-user 403 paths."""
     u = User(
         id=uuid.uuid4(),
-        email=f"o{uuid.uuid4().hex[:8]}@aicc.test",
+        email=f"o{uuid.uuid4().hex[:8]}@tianshu.test",
         hashed_password="not-a-real-hash",
         is_active=True,
         is_superuser=False,
@@ -122,7 +122,7 @@ async def other_user(db_session) -> User:
 async def superuser(db_session) -> User:
     u = User(
         id=uuid.uuid4(),
-        email=f"s{uuid.uuid4().hex[:8]}@aicc.test",
+        email=f"s{uuid.uuid4().hex[:8]}@tianshu.test",
         hashed_password="not-a-real-hash",
         is_active=True,
         is_superuser=True,

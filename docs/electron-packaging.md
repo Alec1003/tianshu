@@ -17,7 +17,7 @@ electron-builder, and electron-updater.
   - `client/src/scenarios/`
   - `.python312/`
 - Mutable desktop data lives under Electron `app.getPath("userData")`:
-  - SQLite DB: `data/aicc.db`
+  - SQLite DB: `data/tianshu.db`
   - custom skills: `skills/`
   - backend logs: `logs/backend.log`
   - generated local secrets: `jwt.secret`, `model-config.secret`
@@ -73,4 +73,4 @@ and download updates.
 - The backend is bound to loopback only; do not change it to `0.0.0.0` for
   desktop packaging.
 - Do not store custom skills in renderer `localStorage`; keep them in the
-  backend folder store via `AICC_SKILLS_DIR`.
+  backend folder store via `TIANSHU_SKILLS_DIR`.

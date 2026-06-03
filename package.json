@@ -1,8 +1,8 @@
 {
-  "name": "tianshu-aicc-desktop",
+  "name": "tianshu-desktop",
   "version": "0.2.4",
   "private": true,
-  "description": "TianShu AICC desktop package",
+  "description": "TianShu desktop package",
   "main": "electron/main.cjs",
   "author": "Alec1003",
   "license": "Apache-2.0",
@@ -29,9 +29,9 @@
     "electron-builder": "^26.8.1"
   },
   "build": {
-    "appId": "com.alec1003.tianshu.aicc",
-    "productName": "TianShu AICC",
-    "artifactName": "TianShu-AICC-Setup-${version}-${arch}.${ext}",
+    "appId": "com.alec1003.tianshu",
+    "productName": "TianShu",
+    "artifactName": "TianShu-Setup-${version}-${arch}.${ext}",
     "directories": {
       "output": "dist-electron"
     },
@@ -108,7 +108,7 @@
       "deleteAppDataOnUninstall": false,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "TianShu AICC"
+      "shortcutName": "TianShu"
     },
     "electronUpdaterCompatibility": ">=2.16"
   }

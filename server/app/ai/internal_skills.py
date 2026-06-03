@@ -8,7 +8,7 @@ from app.ai.models import (
     InternalSkillMissionDraft,
     StructuredCommandStep,
 )
-from app.aicc_runtime.runtime import AICCRuntime
+from app.tianshu_runtime.runtime import TianShuRuntime
 
 INTERNAL_SKILL_ALLOWED_RUNTIME_SKILLS = {
     "create_patrol_mission",
@@ -18,7 +18,7 @@ INTERNAL_SKILL_ALLOWED_RUNTIME_SKILLS = {
 
 
 def build_internal_skill_steps(
-    runtime: AICCRuntime,
+    runtime: TianShuRuntime,
     draft: InternalSkillDraft,
 ) -> list[StructuredCommandStep]:
     """Validate a constrained tactical skill draft and convert it to proposal steps."""

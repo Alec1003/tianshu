@@ -1,4 +1,4 @@
-"""AICC MCP server package.
+"""TianShu MCP server package.
 
 暴露仿真控制能力为标准 Model Context Protocol，让 Claude Desktop /
 Cursor / 自家 agent runtime / hermes-agent 等任何 MCP 客户端都能通过同

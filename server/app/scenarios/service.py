@@ -21,9 +21,9 @@ from typing import Any, Sequence
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.aicc_runtime.models import RuntimeEvent
-from app.aicc_runtime.persistence import save_runtime_state
-from app.aicc_runtime.timeline import (
+from app.tianshu_runtime.models import RuntimeEvent
+from app.tianshu_runtime.persistence import save_runtime_state
+from app.tianshu_runtime.timeline import (
     list_runtime_events,
     record_runtime_event,
     runtime_scenario_id,

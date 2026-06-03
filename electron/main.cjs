@@ -10,7 +10,7 @@ const { autoUpdater } = require("electron-updater");
 
 const { createDesktopServer } = require("./static-server.cjs");
 
-app.setName("TianShu AICC");
+app.setName("TianShu");
 
 let mainWindow = null;
 let backendProcess = null;
@@ -128,18 +128,18 @@ function backendEnvironment(root, frontendPort) {
 
   return {
     ...process.env,
-    AICC_APP_ROOT: root,
-    AICC_RESOURCE_DIR: root,
-    AICC_USER_DATA_DIR: dataDir,
-    AICC_SKILLS_DIR: skillsDir,
-    AICC_DATABASE_URL: sqliteUrl(path.join(dataDir, "aicc.db")),
-    AICC_JWT_SECRET: jwtSecret,
-    AICC_MODEL_CONFIG_SECRET: modelSecret,
-    AICC_CORS_ORIGINS: [
+    TIANSHU_APP_ROOT: root,
+    TIANSHU_RESOURCE_DIR: root,
+    TIANSHU_USER_DATA_DIR: dataDir,
+    TIANSHU_SKILLS_DIR: skillsDir,
+    TIANSHU_DATABASE_URL: sqliteUrl(path.join(dataDir, "tianshu.db")),
+    TIANSHU_JWT_SECRET: jwtSecret,
+    TIANSHU_MODEL_CONFIG_SECRET: modelSecret,
+    TIANSHU_CORS_ORIGINS: [
       `http://127.0.0.1:${frontendPort}`,
       `http://localhost:${frontendPort}`
     ].join(","),
-    AICC_ENV: "development",
+    TIANSHU_ENV: "development",
     PYTHONUNBUFFERED: "1"
   };
 }
@@ -192,7 +192,7 @@ function stopBackend() {
 function installMenu() {
   const template = [
     {
-      label: "TianShu AICC",
+      label: "TianShu",
       submenu: [
         {
           label: "检查更新",
@@ -302,7 +302,7 @@ async function createMainWindow() {
     height: 920,
     minWidth: 1180,
     minHeight: 760,
-    title: "TianShu AICC",
+    title: "TianShu",
     backgroundColor: "#05070d",
     webPreferences: {
       contextIsolation: true,
@@ -352,7 +352,7 @@ app.whenReady().then(async () => {
     await createMainWindow();
   } catch (error) {
     dialog.showErrorBox(
-      "TianShu AICC failed to start",
+      "TianShu failed to start",
       `${error.message}\n\nLogs: ${path.join(userDataRoot(), "logs", "backend.log")}`
     );
     stopBackend();
@@ -363,7 +363,7 @@ app.whenReady().then(async () => {
 app.on("activate", () => {
   if (BrowserWindow.getAllWindows().length === 0) {
     createMainWindow().catch((error) => {
-      dialog.showErrorBox("TianShu AICC failed to start", error.message);
+      dialog.showErrorBox("TianShu failed to start", error.message);
     });
   }
 });

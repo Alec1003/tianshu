@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { readStorageItem, writeStorageItem } from "@/lib/legacyStorage";
+
 export type ProviderProtocol =
   | "openai-compatible"
   | "openai-responses"
@@ -65,10 +67,10 @@ export interface ModelProfileState {
 }
 
 export const MODEL_STORAGE_KEY = {
-  model: "aicc.ai.model",
-  modelProfiles: "aicc.ai.modelProfiles",
-  activeModelProfileId: "aicc.ai.activeModelProfileId",
-  configCenter: "aicc.ai.configCenter.v1",
+  model: "tianshu.ai.model",
+  modelProfiles: "tianshu.ai.modelProfiles",
+  activeModelProfileId: "tianshu.ai.activeModelProfileId",
+  configCenter: "tianshu.ai.configCenter.v1",
 } as const;
 
 export const modelConfigSchema = z.object({
@@ -352,7 +354,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function readLocalJson(key: string): unknown {
   try {
     if (typeof window === "undefined") return undefined;
-    const raw = window.localStorage.getItem(key);
+    const raw = readStorageItem(key);
     if (!raw) return undefined;
     return JSON.parse(raw) as unknown;
   } catch {
@@ -363,7 +365,7 @@ function readLocalJson(key: string): unknown {
 function writeLocalJson(key: string, value: unknown): void {
   try {
     if (typeof window === "undefined") return;
-    window.localStorage.setItem(key, JSON.stringify(value));
+    writeStorageItem(key, JSON.stringify(value));
   } catch {
     // ignore quota / privacy mode errors
   }

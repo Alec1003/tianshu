@@ -1,6 +1,6 @@
-"""MCP runtime provider for one process and one AICCRuntime.
+"""MCP runtime provider for one process and one TianShuRuntime.
 
-This module keeps the async/sync boundary in one place. AICCRuntime is a
+This module keeps the async/sync boundary in one place. TianShuRuntime is a
 synchronous object protected by an RLock, while FastMCP tools are async. Runtime
 work is therefore dispatched through asyncio.to_thread so tool handlers do not
 block the event loop.
@@ -16,7 +16,7 @@ import logging
 from pathlib import Path
 from typing import Any, Callable, TypeVar
 
-from app.aicc_runtime.runtime import AICCRuntime
+from app.tianshu_runtime.runtime import TianShuRuntime
 from app.platform.paths import default_scenario_path
 
 logger = logging.getLogger(__name__)
@@ -31,11 +31,11 @@ def resolve_default_scenario_path() -> Path:
     return default_scenario_path()
 
 
-async def create_runtime_async() -> AICCRuntime:
+async def create_runtime_async() -> TianShuRuntime:
     """Construct the synchronous runtime without blocking the event loop."""
     path = resolve_default_scenario_path()
     logger.info("mcp.runtime: bootstrapping with scenario %s", path)
-    return await asyncio.to_thread(AICCRuntime, path)
+    return await asyncio.to_thread(TianShuRuntime, path)
 
 
 async def run_in_runtime(

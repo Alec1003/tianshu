@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-import os
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from datetime import timedelta
@@ -13,9 +12,10 @@ from mcp.client.stdio import StdioServerParameters, stdio_client
 from mcp.client.streamable_http import streamablehttp_client
 
 from app.ai.models import MCPCallTrace
+from app.compat import get_env
 from app.security.url_guard import normalize_and_validate_base_url
 
-ENV_EXTERNAL_MCP_SERVERS = "AICC_EXTERNAL_MCP_SERVERS"
+ENV_EXTERNAL_MCP_SERVERS = "TIANSHU_EXTERNAL_MCP_SERVERS"
 SUPPORTED_TRANSPORTS = {"stdio", "streamable_http"}
 
 
@@ -56,7 +56,7 @@ class MCPClientSkeleton:
     @classmethod
     def from_env(cls, raw: str | None = None) -> "MCPClientSkeleton":
         client = cls()
-        raw_config = raw if raw is not None else os.environ.get(ENV_EXTERNAL_MCP_SERVERS, "")
+        raw_config = raw if raw is not None else get_env(ENV_EXTERNAL_MCP_SERVERS)
         raw_config = raw_config.strip()
         if not raw_config:
             return client

@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from app.ai.command_models import CommandProposalRecord, CommandProposalStepRecord  # noqa: F401
 from app.ai.model_config_models import AIModelProviderConfig  # noqa: F401
-from app.aicc_runtime.models import RuntimeEvent, RuntimeState  # noqa: F401
+from app.tianshu_runtime.models import RuntimeEvent, RuntimeState  # noqa: F401
 from app.auth.models import User  # noqa: F401
 from app.config import get_settings
 from app.db.base import Base

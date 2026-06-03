@@ -7,8 +7,8 @@ from collections.abc import Sequence
 from datetime import datetime, timezone
 from typing import Any
 
-from app.aicc_runtime.models import RuntimeEvent
-from app.aicc_runtime.timeline import runtime_scenario_id
+from app.tianshu_runtime.models import RuntimeEvent
+from app.tianshu_runtime.timeline import runtime_scenario_id
 from app.scenarios.models import AarRecord, Scenario
 from app.scenarios.schemas import TrainingScoreDimension, TrainingScoreResponse
 

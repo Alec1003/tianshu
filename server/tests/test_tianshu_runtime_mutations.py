@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from threading import RLock
 
-from app.aicc_runtime.runtime import AICCRuntime
+from app.tianshu_runtime.runtime import TianShuRuntime
 
 from blade.Game import Game
 from blade.Relationships import Relationships
@@ -14,7 +14,7 @@ from blade.units.Airbase import Airbase
 from blade.units.ReferencePoint import ReferencePoint
 
 
-def _runtime() -> AICCRuntime:
+def _runtime() -> TianShuRuntime:
     scenario = Scenario(
         id="runtime-mutations",
         name="Runtime mutations",
@@ -27,7 +27,7 @@ def _runtime() -> AICCRuntime:
         ],
         relationships=Relationships(),
     )
-    runtime = AICCRuntime.__new__(AICCRuntime)
+    runtime = TianShuRuntime.__new__(TianShuRuntime)
     runtime._lock = RLock()
     runtime.game = Game(current_scenario=scenario)
     runtime.game.current_side_id = "blue"

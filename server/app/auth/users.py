@@ -42,7 +42,7 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
         self, user: User, request: Request | None = None
     ) -> None:
         """First-user-as-superuser bootstrap to avoid a chicken-and-egg setup
-        in dev. Disable via ``AICC_FIRST_USER_IS_SUPERUSER=false`` in shared
+        in dev. Disable via ``TIANSHU_FIRST_USER_IS_SUPERUSER=false`` in shared
         environments where you want manual ops to gate it.
 
         We reuse ``self.user_db.session`` because ``user`` is already attached

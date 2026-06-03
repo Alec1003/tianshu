@@ -1,16 +1,17 @@
 from __future__ import annotations
 
-import os
 from pathlib import Path
 from typing import Iterable
 
-ENV_APP_ROOT = "AICC_APP_ROOT"
-ENV_RESOURCE_DIR = "AICC_RESOURCE_DIR"
-ENV_USER_DATA_DIR = "AICC_USER_DATA_DIR"
-ENV_GYM_DIR = "AICC_GYM_DIR"
-ENV_SCENARIOS_DIR = "AICC_SCENARIOS_DIR"
-ENV_UNIT_ASSETS_FILE = "AICC_UNIT_ASSETS_FILE"
-ENV_RUNTIME_SCENARIO = "AICC_MCP_RUNTIME_SCENARIO"
+from app.compat import get_env
+
+ENV_APP_ROOT = "TIANSHU_APP_ROOT"
+ENV_RESOURCE_DIR = "TIANSHU_RESOURCE_DIR"
+ENV_USER_DATA_DIR = "TIANSHU_USER_DATA_DIR"
+ENV_GYM_DIR = "TIANSHU_GYM_DIR"
+ENV_SCENARIOS_DIR = "TIANSHU_SCENARIOS_DIR"
+ENV_UNIT_ASSETS_FILE = "TIANSHU_UNIT_ASSETS_FILE"
+ENV_RUNTIME_SCENARIO = "TIANSHU_MCP_RUNTIME_SCENARIO"
 
 SOURCE_ROOT = Path(__file__).resolve().parents[3]
 
@@ -20,7 +21,7 @@ def _normalize(path: Path) -> Path:
 
 
 def _env_path(name: str, *, base: Path | None = None) -> Path | None:
-    raw = os.environ.get(name, "").strip()
+    raw = get_env(name).strip()
     if not raw:
         return None
     path = Path(raw).expanduser()
@@ -45,7 +46,7 @@ def app_root() -> Path:
     """Return the source-style application root.
 
     In source and Docker runs this is the repository root. Desktop launchers can
-    set ``AICC_APP_ROOT`` when the Python server is extracted elsewhere.
+    set ``TIANSHU_APP_ROOT`` when the Python server is extracted elsewhere.
     """
 
     return _env_path(ENV_APP_ROOT) or SOURCE_ROOT
@@ -54,7 +55,7 @@ def app_root() -> Path:
 def resource_root() -> Path:
     """Return the read-only packaged resources root.
 
-    Electron should point ``AICC_RESOURCE_DIR`` at extraResources; source and
+    Electron should point ``TIANSHU_RESOURCE_DIR`` at extraResources; source and
     Docker keep using the repository-shaped root.
     """
 
@@ -104,7 +105,7 @@ def scenarios_dir() -> Path | None:
 
 
 def default_scenario_path() -> Path:
-    override = os.environ.get(ENV_RUNTIME_SCENARIO, "").strip()
+    override = get_env(ENV_RUNTIME_SCENARIO).strip()
     if override:
         return resolve_resource_path(override)
 

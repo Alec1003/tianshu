@@ -4,15 +4,15 @@
  * 设计要点：
  * - 聊天：用 @ai-sdk/react `useChat` + ai-sdk v5 `DefaultChatTransport`
  *   接 POST /api/ai/chat 流式接口（SSE / UI message stream）。
- *   加密时用户填写的 model 配置通过 X-AICC-Model-* header
+ *   加密时用户填写的 model 配置通过 X-TianShu-Model-* header
  *   传到后端，后端 per-request 构造 pydantic-ai agent，让前端
  *   model 配置在流式路径上也真生效。流结束后拉
  *   /api/ai/runtime/scenario 刷新地图。
  * - 设置：MCP Servers（增删改 + enable toggle）/ Skills（后端已注册 + 用户
  *   自定义）/ 系统操作三段。模型配置已拆到独立 AI 模型配置中心。
  * - 持久化：modelConfig / mcpServers / projectMcpEnabled
- *   使用 aicc.ai.* keys；customSkills 改由后端 skills folder 存储；chat 消息由于类型从
- *   ChatMessage 迁移到 UIMessage，另存为 aicc.ai.messages.v2。
+ *   使用 tianshu.ai.* keys；customSkills 改由后端 skills folder 存储；chat 消息由于类型从
+ *   ChatMessage 迁移到 UIMessage，另存为 tianshu.ai.messages.v2。
  * - 主题：cyan/slate tactical，复用 shadcn Card/Button，TailwindCSS。
  *
  * Props 由 AITacticalCommandPlatform 控制：open / activeTab /
@@ -92,6 +92,11 @@ import {
 import ModelSwitcher from "@/features/ai/ModelSwitcher";
 import { useModelConfigStore } from "@/features/ai/modelStore";
 import ScenarioCompareDialog from "@/features/scenarios/ScenarioCompareDialog";
+import {
+  readStorageItem,
+  removeStorageItem,
+  writeStorageItem,
+} from "@/lib/legacyStorage";
 import TacticalSettingsModal from "./TacticalSettingsModal";
 
 export type AISidebarTab = "chat" | "settings";
@@ -104,6 +109,8 @@ interface MCPServerConfig {
   transport: "stdio" | "sse" | "http";
   enabled: boolean;
 }
+
+export type MCPServerImportPayload = Omit<MCPServerConfig, "id">;
 
 type CustomSkillConfig = CustomSkill;
 
@@ -201,13 +208,13 @@ interface AISidebarProps {
 }
 
 const STORAGE_KEY = {
-  messagesV2: "aicc.ai.messages.v2",
-  mcpServers: "aicc.ai.mcpServers",
-  customSkills: "aicc.ai.customSkills",
+  messagesV2: "tianshu.ai.messages.v2",
+  mcpServers: "tianshu.ai.mcpServers",
+  customSkills: "tianshu.ai.customSkills",
   model: MODEL_STORAGE_KEY.model,
   modelProfiles: MODEL_STORAGE_KEY.modelProfiles,
   activeModelProfileId: MODEL_STORAGE_KEY.activeModelProfileId,
-  projectMcpEnabled: "aicc.ai.projectMcpEnabled",
+  projectMcpEnabled: "tianshu.ai.projectMcpEnabled",
 } as const;
 
 const DEFAULT_MCP_SERVERS: MCPServerConfig[] = [
@@ -217,7 +224,7 @@ const DEFAULT_MCP_SERVERS: MCPServerConfig[] = [
         ? crypto.randomUUID()
         : `mcp-${Date.now()}`,
     name: "天枢 MCP",
-    endpoint: "stdio://local-aicc-mcp",
+    endpoint: "stdio://local-tianshu-mcp",
     transport: "stdio",
     enabled: true,
   },
@@ -257,7 +264,7 @@ function sanitizeLegacyModeGuards(messages: UIMessage[]): UIMessage[] {
 function safeLoad<T>(key: string, fallback: T): T {
   try {
     if (typeof window === "undefined") return fallback;
-    const raw = window.localStorage.getItem(key);
+    const raw = readStorageItem(key);
     if (!raw) return fallback;
     return JSON.parse(raw) as T;
   } catch {
@@ -268,7 +275,7 @@ function safeLoad<T>(key: string, fallback: T): T {
 function safeSave<T>(key: string, value: T): void {
   try {
     if (typeof window === "undefined") return;
-    window.localStorage.setItem(key, JSON.stringify(value));
+    writeStorageItem(key, JSON.stringify(value));
   } catch {
     // ignore quota / privacy errors
   }
@@ -277,7 +284,7 @@ function safeSave<T>(key: string, value: T): void {
 function safeRemove(key: string): void {
   try {
     if (typeof window === "undefined") return;
-    window.localStorage.removeItem(key);
+    removeStorageItem(key);
   } catch {
     // ignore privacy errors
   }
@@ -397,7 +404,7 @@ function formatChatError(error: Error): string {
     message.toLowerCase().includes("service unavailable") ||
     message.includes("No LLM configured")
   ) {
-    return "No LLM is configured. Fill API Key in AI 模型配置中心, or set AICC_LLM_MODEL and AICC_LLM_API_KEY in the server environment.";
+    return "No LLM is configured. Fill API Key in AI 模型配置中心, or set TIANSHU_LLM_MODEL and TIANSHU_LLM_API_KEY in the server environment.";
   }
   return message;
 }
@@ -584,15 +591,15 @@ export default function AISidebar({
           const token = getStoredToken();
           if (token) h.Authorization = `Bearer ${token}`;
           if (modelProviderIdRef.current) {
-            h["X-AICC-Model-Provider-Id"] = modelProviderIdRef.current;
+            h["X-TianShu-Model-Provider-Id"] = modelProviderIdRef.current;
           }
-          if (m.provider) h["X-AICC-Model-Provider"] = m.provider;
-          if (m.model) h["X-AICC-Model-Name"] = m.model;
-          if (m.baseUrl) h["X-AICC-Model-Base-Url"] = m.baseUrl;
+          if (m.provider) h["X-TianShu-Model-Provider"] = m.provider;
+          if (m.model) h["X-TianShu-Model-Name"] = m.model;
+          if (m.baseUrl) h["X-TianShu-Model-Base-Url"] = m.baseUrl;
           if (scenarioIdRef.current) {
-            h["X-AICC-Scenario-Id"] = scenarioIdRef.current;
+            h["X-TianShu-Scenario-Id"] = scenarioIdRef.current;
           }
-          h["X-AICC-Chat-Mode"] = chatModeRef.current;
+          h["X-TianShu-Chat-Mode"] = chatModeRef.current;
           return h;
         },
       }),
@@ -633,7 +640,7 @@ export default function AISidebar({
   }, [open, refreshCommandProposals]);
 
   // ─── 按 scenario 隔离 chat 历史 ─────────────────────────────────────────
-  // 设计：localStorage key = `aicc.ai.messages.v2:<scenarioId>`。
+  // 设计：localStorage key = `tianshu.ai.messages.v2:<scenarioId>`。
   // 首次挂载：直接读当前 scenario 的历史 → setMessages。
   // 之后切换 scenario（id 变化）时：
   //   1) 把当前 messages 落盘到 *旧* scenario 的 key（保留它的会话）
@@ -735,7 +742,7 @@ export default function AISidebar({
         }
       } catch (err) {
         console.error(
-          "[AICC] refresh runtime scenario after AI run failed",
+          "[TianShu] refresh runtime scenario after AI run failed",
           err
         );
       }
@@ -745,7 +752,10 @@ export default function AISidebar({
         try {
           await onResumePlay();
         } catch (err) {
-          console.error("[AICC] auto-resume play after AI start failed", err);
+          console.error(
+            "[TianShu] auto-resume play after AI start failed",
+            err
+          );
         }
       }
       await refreshCommandProposals();
@@ -1022,7 +1032,7 @@ export default function AISidebar({
   );
 
   // activeMcpServers are still managed in settings; external MCP runtime
-  // connections are configured server-side through AICC_EXTERNAL_MCP_SERVERS.
+  // connections are configured server-side through TIANSHU_EXTERNAL_MCP_SERVERS.
   void activeMcpServers;
 
   // ─── MCP / Skill 增删 ─────────────────────────────────────────────────────
@@ -1185,6 +1195,15 @@ export default function AISidebar({
         onAddSkill={handleAddSkill}
         onCheckModel={() => void checkModelConnection()}
         onClearMessages={() => setMessages([])}
+        onImportMcpServers={(servers) =>
+          setMcpServers((prev) => [
+            ...prev,
+            ...servers.map((server) => ({
+              id: newId(),
+              ...server,
+            })),
+          ])
+        }
         onMapBaseLayerChange={onMapBaseLayerChange}
         onModelConfigChange={handleModelConfigChange}
         onModelProfileCreate={handleModelProfileCreate}
@@ -2120,6 +2139,7 @@ export interface TacticalSettingsProps {
   onMapBaseLayerChange: (key: CesiumBaseLayerKey) => void;
   onProjectMcpEnabledChange: (enabled: boolean) => void;
   onAddServer: () => void;
+  onImportMcpServers: (servers: MCPServerImportPayload[]) => void;
   onRemoveServer: (id: string) => void;
   onToggleServer: (id: string, enabled: boolean) => void;
   onNewServerNameChange: (v: string) => void;

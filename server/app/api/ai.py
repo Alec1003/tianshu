@@ -60,17 +60,17 @@ from app.ai.model_config_service import (
     resolve_stored_model_credentials,
     upsert_model_provider_config,
 )
-from app.aicc_runtime.persistence import (
+from app.tianshu_runtime.persistence import (
     ensure_runtime_state_loaded,
     save_runtime_state,
 )
-from app.aicc_runtime.schemas import RuntimeTimelineResponse
-from app.aicc_runtime.timeline import (
+from app.tianshu_runtime.schemas import RuntimeTimelineResponse
+from app.tianshu_runtime.timeline import (
     list_runtime_events,
     record_runtime_event,
     runtime_scenario_id,
 )
-from app.aicc_runtime.visibility import compute_runtime_visibility
+from app.tianshu_runtime.visibility import compute_runtime_visibility
 from app.auth.models import User
 from app.auth.users import current_active_user
 from app.db.session import async_session_maker, get_async_session
@@ -84,11 +84,27 @@ router = APIRouter(
     dependencies=[Depends(current_active_user)],
 )
 
-RUNTIME_SCENARIO_HEADER = "x-aicc-scenario-id"
+RUNTIME_SCENARIO_HEADER = "x-tianshu-scenario-id"
+HEADER_PREFIX = "x-tianshu-"
+LEGACY_HEADER_PREFIX = "x-" + "ai" + "cc" + "-"
+
+
+def _legacy_header_name(name: str) -> str:
+    if name.startswith(HEADER_PREFIX):
+        return LEGACY_HEADER_PREFIX + name[len(HEADER_PREFIX) :]
+    return LEGACY_HEADER_PREFIX + name
+
+
+def _header_value(request: Request, name: str) -> str:
+    return (
+        request.headers.get(name)
+        or request.headers.get(_legacy_header_name(name))
+        or ""
+    )
 
 
 def _runtime_context_from_request(request: Request) -> str | None:
-    return (request.headers.get(RUNTIME_SCENARIO_HEADER) or "").strip() or None
+    return _header_value(request, RUNTIME_SCENARIO_HEADER).strip() or None
 
 
 def _bridge_for_user(request: Request, user: User) -> Any:
@@ -588,7 +604,7 @@ async def runtime_scenario(
 
     This is the **read-only** counterpart to the MCP ``runtime_*`` tools:
     the front-end (or any HTTP client) can poll this endpoint to grab the
-    latest snapshot of the shared ``AICCRuntime`` that MCP / AI
+    latest snapshot of the shared ``TianShuRuntime`` that MCP / AI
     commands are mutating. The returned shape is identical to the
     ``scenario`` field in ``POST /api/ai/command`` responses, so
     ``game.loadScenario(JSON.stringify(response))`` works on the client.
@@ -1484,22 +1500,22 @@ def _read_model_override_from_headers(
 ) -> tuple[str, str, str, str, str]:
     """Pull per-request model override fields from custom headers.
 
-    The AI sidebar sends ``X-AICC-Model-{Provider,Name,Api-Key,Base-Url}``
+    The AI sidebar sends ``X-TianShu-Model-{Provider,Name,Api-Key,Base-Url}``
     whenever the user has filled in a model config. Empty / missing
     headers fall back to "" so the caller can decide between override and
     the env-configured global agent.
     """
     return (
-        (request.headers.get("x-aicc-model-provider-id") or "").strip(),
-        (request.headers.get("x-aicc-model-provider") or "").strip(),
-        (request.headers.get("x-aicc-model-name") or "").strip(),
-        (request.headers.get("x-aicc-model-api-key") or "").strip(),
-        (request.headers.get("x-aicc-model-base-url") or "").strip(),
+        _header_value(request, "x-tianshu-model-provider-id").strip(),
+        _header_value(request, "x-tianshu-model-provider").strip(),
+        _header_value(request, "x-tianshu-model-name").strip(),
+        _header_value(request, "x-tianshu-model-api-key").strip(),
+        _header_value(request, "x-tianshu-model-base-url").strip(),
     )
 
 
 def _read_chat_mode_from_headers(request: Request) -> str:
-    mode = (request.headers.get("x-aicc-chat-mode") or "command").strip().lower()
+    mode = (_header_value(request, "x-tianshu-chat-mode") or "command").strip().lower()
     return "ask" if mode == "ask" else "command"
 
 
@@ -1517,7 +1533,7 @@ async def chat(
     consume out of the box.
 
     Model override: when the request carries
-    ``X-AICC-Model-{Provider,Name,Api-Key,Base-Url}`` headers (i.e. the
+    ``X-TianShu-Model-{Provider,Name,Api-Key,Base-Url}`` headers (i.e. the
     user filled in the sidebar Settings panel) we build a one-off agent
     so the user-supplied credentials/provider actually drive the stream.
     Otherwise we fall back to the env-configured ``bridge.pydantic_agent``.
@@ -1577,8 +1593,8 @@ async def chat(
                     json.dumps(
                         {
                             "error": (
-                                "No LLM configured. Either set AICC_LLM_MODEL + "
-                                "AICC_LLM_API_KEY on the server, or fill the "
+                                "No LLM configured. Either set TIANSHU_LLM_MODEL + "
+                                "TIANSHU_LLM_API_KEY on the server, or fill the "
                                 "model section in the AI sidebar (Settings)."
                             )
                         }

@@ -3,7 +3,7 @@
 // On mount the provider:
 //   1. Reads the persisted JWT (if any) and resolves the current user via
 //      /api/users/me.
-//   2. Listens for the global `aicc:auth:logout` window event the API layer
+//   2. Listens for the global `tianshu:auth:logout` window event the API layer
 //      emits on 401, so token expiry instantly nukes UI state without
 //      every component having to poll.
 
@@ -19,7 +19,10 @@ import {
 import * as authApi from "@/api/auth";
 import { getStoredToken } from "@/api/client";
 import type { AuthUser } from "@/api/types";
+import { legacyEventName } from "@/lib/legacyStorage";
 import { AuthContext, type AuthContextValue } from "./AuthContextCore";
+
+const LOGOUT_EVENT = "tianshu:auth:logout";
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -61,8 +64,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // 401 handler from the API client -> drop user.
   useEffect(() => {
     const onLogoutEvent = () => setUser(null);
-    window.addEventListener("aicc:auth:logout", onLogoutEvent);
-    return () => window.removeEventListener("aicc:auth:logout", onLogoutEvent);
+    const legacyLogoutEvent = legacyEventName(LOGOUT_EVENT);
+    window.addEventListener(LOGOUT_EVENT, onLogoutEvent);
+    window.addEventListener(legacyLogoutEvent, onLogoutEvent);
+    return () => {
+      window.removeEventListener(LOGOUT_EVENT, onLogoutEvent);
+      window.removeEventListener(legacyLogoutEvent, onLogoutEvent);
+    };
   }, []);
 
   const login = useCallback(async (email: string, password: string) => {

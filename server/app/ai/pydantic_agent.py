@@ -28,7 +28,7 @@ from app.ai.models import (
     MCPCallTrace,
     SkillExecutionResult,
 )
-from app.ai.skill_registry import AICCSkillRegistry
+from app.ai.skill_registry import TianShuSkillRegistry
 from app.scenarios import service as scenario_service
 from app.scenarios.schemas import (
     ScenarioBatchSimulationRequest,
@@ -70,7 +70,7 @@ Rules:
 
 @dataclass
 class AgentDeps:
-    registry: AICCSkillRegistry
+    registry: TianShuSkillRegistry
     chat_mode: Literal["ask", "command"] = "command"
     call_log: list[SkillExecutionResult] = field(default_factory=list)
     mcp_traces: list[MCPCallTrace] = field(default_factory=list)
@@ -1001,7 +1001,7 @@ def build_agent(
 async def run_agent(
     agent: Agent[AgentDeps, str],
     command: str,
-    registry: AICCSkillRegistry,
+    registry: TianShuSkillRegistry,
     approval_queue: Any | None = None,
     chat_mode: Literal["ask", "command"] = "command",
     mcp_client: Any | None = None,

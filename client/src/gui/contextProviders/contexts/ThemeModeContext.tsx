@@ -1,10 +1,10 @@
 import { createContext } from "react";
-import type { AiccThemeMode } from "@/gui/theme/aiccTheme";
+import type { TianShuThemeMode } from "@/gui/theme/tianshuTheme";
 
 interface ThemeModeContextValue {
-  mode: AiccThemeMode;
+  mode: TianShuThemeMode;
   toggleMode: () => void;
-  setMode: (mode: AiccThemeMode) => void;
+  setMode: (mode: TianShuThemeMode) => void;
 }
 
 // Default value is intentionally a noop pair so consumers outside the

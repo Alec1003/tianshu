@@ -3,15 +3,19 @@ import { ThemeProvider } from "@mui/material/styles";
 import CssBaseline from "@mui/material/CssBaseline";
 
 import { ThemeModeContext } from "@/gui/contextProviders/contexts/ThemeModeContext";
-import { getAiccTheme, type AiccThemeMode } from "@/gui/theme/aiccTheme";
+import {
+  getTianShuTheme,
+  type TianShuThemeMode,
+} from "@/gui/theme/tianshuTheme";
+import { readStorageItem, writeStorageItem } from "@/lib/legacyStorage";
 
-const STORAGE_KEY = "aicc.themeMode";
+const STORAGE_KEY = "tianshu.themeMode";
 
-function detectInitialMode(): AiccThemeMode {
+function detectInitialMode(): TianShuThemeMode {
   if (typeof window === "undefined") return "dark";
-  const stored = window.localStorage.getItem(STORAGE_KEY);
+  const stored = readStorageItem(STORAGE_KEY);
   if (stored === "dark" || stored === "light") return stored;
-  // Default to dark (operations) regardless of OS preference; AICC is
+  // Default to dark (operations) regardless of OS preference; TianShu is
   // a tactical platform that favors dark mode out of the box.
   return "dark";
 }
@@ -21,15 +25,15 @@ export const ThemeModeProvider = ({
 }: {
   children: React.ReactNode;
 }) => {
-  const [mode, setModeState] = useState<AiccThemeMode>(detectInitialMode);
+  const [mode, setModeState] = useState<TianShuThemeMode>(detectInitialMode);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
-      window.localStorage.setItem(STORAGE_KEY, mode);
+      writeStorageItem(STORAGE_KEY, mode);
     }
   }, [mode]);
 
-  const setMode = useCallback((next: AiccThemeMode) => {
+  const setMode = useCallback((next: TianShuThemeMode) => {
     setModeState(next);
   }, []);
 
@@ -42,7 +46,7 @@ export const ThemeModeProvider = ({
     [mode, setMode, toggleMode]
   );
 
-  const theme = useMemo(() => getAiccTheme(mode), [mode]);
+  const theme = useMemo(() => getTianShuTheme(mode), [mode]);
 
   return (
     <ThemeModeContext.Provider value={ctx}>

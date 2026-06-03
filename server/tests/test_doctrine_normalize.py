@@ -1,18 +1,18 @@
-"""Regression：``app.aicc_runtime._doctrine.normalize_scenario_payload``。
+"""Regression：``app.tianshu_runtime._doctrine.normalize_scenario_payload``。
 
 前史 bug：缺 ``doctrine`` 字段时回填空 ``{}``，导致前端 ``Scenario`` 构造
 ``parameters.doctrine ?? getDefaultDoctrine()`` 不触发（``{}`` truthy），
 ``checkSideDoctrine`` 全 false，红蓝静止不交战。本测试锁定按 sides 生成
 全开默认条令的语义。
 
-只 import 纯函数模块，不引导 AICCRuntime（避免 blade/gymnasium 依赖）。
+只 import 纯函数模块，不引导 TianShuRuntime（避免 blade/gymnasium 依赖）。
 """
 
 from __future__ import annotations
 
 import json
 
-from app.aicc_runtime._doctrine import (
+from app.tianshu_runtime._doctrine import (
     _DEFAULT_SIDE_DOCTRINE,
     default_doctrine_for_sides,
     normalize_scenario_payload,

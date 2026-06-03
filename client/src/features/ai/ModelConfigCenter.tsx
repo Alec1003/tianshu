@@ -522,7 +522,7 @@ export default function ModelConfigCenter({ onSaved }: ModelConfigCenterProps) {
   const providerStatusLabel = selectedProviderVerified ? "已验证" : "未验证";
 
   return (
-    <div className="aicc-model-config-window flex h-[min(670px,calc(100vh-7rem))] w-full flex-col overflow-hidden rounded-xl border border-cyan-300/15 bg-[#050914]/95 shadow-[0_24px_90px_rgba(0,0,0,0.48),0_0_60px_rgba(34,211,238,0.08)] backdrop-blur-2xl md:flex-row">
+    <div className="tianshu-model-config-window flex h-[min(670px,calc(100vh-7rem))] w-full flex-col overflow-hidden rounded-xl border border-cyan-300/15 bg-[#050914]/95 shadow-[0_24px_90px_rgba(0,0,0,0.48),0_0_60px_rgba(34,211,238,0.08)] backdrop-blur-2xl md:flex-row">
       <aside className="flex w-full shrink-0 flex-col border-b border-cyan-300/10 bg-slate-950/45 md:w-[224px] md:border-b-0 md:border-r">
         <div className="relative border-b border-cyan-300/10 p-4">
           <div className="flex items-center gap-3">

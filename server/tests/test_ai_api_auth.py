@@ -499,11 +499,11 @@ def test_ai_runtime_uses_scenario_scoped_bridge_registry() -> None:
 
     alpha_response = client.get(
         "/api/ai/runtime/scenario",
-        headers={"x-test-user": "user-a", "x-aicc-scenario-id": "alpha"},
+        headers={"x-test-user": "user-a", "x-tianshu-scenario-id": "alpha"},
     )
     bravo_response = client.get(
         "/api/ai/runtime/scenario",
-        headers={"x-test-user": "user-a", "x-aicc-scenario-id": "bravo"},
+        headers={"x-test-user": "user-a", "x-tianshu-scenario-id": "bravo"},
     )
 
     assert alpha_response.status_code == 200

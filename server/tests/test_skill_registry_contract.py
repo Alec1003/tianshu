@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from app.ai.skill_registry import AICCSkillRegistry
+from app.ai.skill_registry import TianShuSkillRegistry
 
 
 class FakeRuntime:
@@ -80,7 +80,7 @@ class FakeRuntime:
 
 
 def test_skill_definitions_are_user_readable_and_complete():
-    registry = AICCSkillRegistry(runtime=FakeRuntime())
+    registry = TianShuSkillRegistry(runtime=FakeRuntime())
     definitions = {definition.name: definition for definition in registry.definitions()}
 
     assert "deploy_obstacle" in definitions
@@ -94,7 +94,7 @@ def test_skill_definitions_are_user_readable_and_complete():
 
 
 def test_skill_registry_exposes_harness_capabilities():
-    registry = AICCSkillRegistry(runtime=FakeRuntime())
+    registry = TianShuSkillRegistry(runtime=FakeRuntime())
 
     capability_names = {capability.name for capability in registry.capabilities()}
 
@@ -105,7 +105,7 @@ def test_skill_registry_exposes_harness_capabilities():
 
 
 def test_skill_registry_execute_routes_through_harness():
-    registry = AICCSkillRegistry(runtime=FakeRuntime())
+    registry = TianShuSkillRegistry(runtime=FakeRuntime())
 
     output = registry.execute(
         "simulation_step",
@@ -126,7 +126,7 @@ def test_skill_registry_execute_routes_through_harness():
 
 
 def test_skill_registry_rejects_unknown_skill_before_execution():
-    registry = AICCSkillRegistry(runtime=FakeRuntime())
+    registry = TianShuSkillRegistry(runtime=FakeRuntime())
 
     with pytest.raises(ValueError, match="Skill not registered"):
         registry.execute("missing_skill", {})

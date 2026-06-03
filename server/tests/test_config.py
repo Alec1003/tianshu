@@ -51,19 +51,19 @@ def test_parse_cors_origins_rejects_wildcard_and_non_origin_values(raw: str) -> 
 def test_production_rejects_default_jwt_secret() -> None:
     settings = Settings(
         env="production",
-        database_url="postgresql+asyncpg://aicc:secret@db/aicc",
+        database_url="postgresql+asyncpg://tianshu:secret@db/tianshu",
         jwt_secret=DEFAULT_JWT_SECRET,
         first_user_is_superuser=False,
     )
 
-    with pytest.raises(RuntimeError, match="AICC_JWT_SECRET"):
+    with pytest.raises(RuntimeError, match="TIANSHU_JWT_SECRET"):
         validate_production_settings(settings)
 
 
 def test_production_rejects_short_jwt_secret() -> None:
     settings = Settings(
         env="production",
-        database_url="postgresql+asyncpg://aicc:secret@db/aicc",
+        database_url="postgresql+asyncpg://tianshu:secret@db/tianshu",
         jwt_secret="short-secret",
         first_user_is_superuser=False,
     )
@@ -75,12 +75,12 @@ def test_production_rejects_short_jwt_secret() -> None:
 def test_production_rejects_first_user_superuser_bootstrap() -> None:
     settings = Settings(
         env="production",
-        database_url="postgresql+asyncpg://aicc:secret@db/aicc",
+        database_url="postgresql+asyncpg://tianshu:secret@db/tianshu",
         jwt_secret="x" * MIN_PRODUCTION_JWT_SECRET_LENGTH,
         first_user_is_superuser=True,
     )
 
-    with pytest.raises(RuntimeError, match="AICC_FIRST_USER_IS_SUPERUSER"):
+    with pytest.raises(RuntimeError, match="TIANSHU_FIRST_USER_IS_SUPERUSER"):
         validate_production_settings(settings)
 
 
@@ -92,14 +92,14 @@ def test_production_rejects_sqlite_database() -> None:
         first_user_is_superuser=False,
     )
 
-    with pytest.raises(RuntimeError, match="AICC_DATABASE_URL"):
+    with pytest.raises(RuntimeError, match="TIANSHU_DATABASE_URL"):
         validate_production_settings(settings)
 
 
 def test_production_accepts_hardened_settings() -> None:
     settings = Settings(
         env="production",
-        database_url="postgresql+asyncpg://aicc:secret@db/aicc",
+        database_url="postgresql+asyncpg://tianshu:secret@db/tianshu",
         jwt_secret="x" * MIN_PRODUCTION_JWT_SECRET_LENGTH,
         model_config_secret="m" * MIN_PRODUCTION_MODEL_CONFIG_SECRET_LENGTH,
         first_user_is_superuser=False,

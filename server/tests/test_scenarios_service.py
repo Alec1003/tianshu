@@ -12,8 +12,8 @@ from pathlib import Path
 
 import pytest
 
-from app.ai.bridge import AICCOpenClawBridge
-from app.aicc_runtime.models import RuntimeEvent
+from app.ai.bridge import TianShuOpenClawBridge
+from app.tianshu_runtime.models import RuntimeEvent
 from app.scenarios import service as svc
 from app.scenarios.errors import (
     ScenarioForbiddenError,
@@ -759,13 +759,13 @@ async def test_simulate_compare_session_batch_creates_score_records(
         ),
     )
 
-    bridges: dict[str, AICCOpenClawBridge] = {}
+    bridges: dict[str, TianShuOpenClawBridge] = {}
 
     def bridge_provider(owner, scenario_id):
         assert owner == user
         key = str(scenario_id or "")
         if key not in bridges:
-            bridges[key] = AICCOpenClawBridge()
+            bridges[key] = TianShuOpenClawBridge()
         return bridges[key]
 
     result = await svc.simulate_compare_session_batch(

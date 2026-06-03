@@ -129,7 +129,7 @@ FastAPI 后端默认监听 `8000`：
 ├─ server/                  # FastAPI AI 后端
 │  ├─ app/ai/               # AI bridge、skill registry、模型检查
 │  ├─ app/api/              # HTTP API 路由
-│  └─ app/aicc_runtime/       # 天枢平台 runtime 适配层（内部兼容路径）
+│  └─ app/tianshu_runtime/       # 天枢平台 runtime 适配层（内部兼容路径）
 ├─ gym/                     # Python/Gym 仿真环境
 ├─ docs/                    # 项目文档
 ├─ docker-compose.yml       # 本地容器编排

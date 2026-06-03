@@ -108,7 +108,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            dist-electron/TianShu-AICC-Setup-*.exe
-            dist-electron/TianShu-AICC-Setup-*.exe.blockmap
+            dist-electron/TianShu-Setup-*.exe
+            dist-electron/TianShu-Setup-*.exe.blockmap
             dist-electron/latest.yml
           fail_on_unmatched_files: true

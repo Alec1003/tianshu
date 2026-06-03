@@ -4,7 +4,7 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from app.ai.agent import AICCCommanderAgent
+from app.ai.agent import TianShuCommanderAgent
 from app.ai.command_governance import CommandApprovalQueue
 from app.ai.mcp_client import MCPClientSkeleton
 from app.ai.models import (
@@ -15,8 +15,8 @@ from app.ai.models import (
 )
 from app.ai.openclaw_sdk_adapter import OpenClawSDKAdapter
 from app.ai.pydantic_agent import build_agent
-from app.ai.skill_registry import AICCSkillRegistry
-from app.aicc_runtime.runtime import AICCRuntime
+from app.ai.skill_registry import TianShuSkillRegistry
+from app.tianshu_runtime.runtime import TianShuRuntime
 from app.platform.paths import default_scenario_path
 
 logger = logging.getLogger(__name__)
@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 DEFAULT_SCENARIO_PATH = default_scenario_path()
 
 
-class AICCOpenClawBridge:
+class TianShuOpenClawBridge:
     """Unified bridge for 天枢平台 agent, skill registry, and external MCP client."""
 
     def __init__(
@@ -35,15 +35,15 @@ class AICCOpenClawBridge:
         llm_base_url: str = "",
         external_mcp_servers: str | None = None,
     ) -> None:
-        self.runtime = AICCRuntime(scenario_path=scenario_path)
-        self.skill_registry = AICCSkillRegistry(runtime=self.runtime)
+        self.runtime = TianShuRuntime(scenario_path=scenario_path)
+        self.skill_registry = TianShuSkillRegistry(runtime=self.runtime)
         self.command_approvals = CommandApprovalQueue(
             runtime=self.runtime,
             registry=self.skill_registry,
         )
         self.mcp_client = MCPClientSkeleton.from_env(external_mcp_servers)
         self.sdk_adapter = OpenClawSDKAdapter()
-        self.agent = AICCCommanderAgent(
+        self.agent = TianShuCommanderAgent(
             skill_registry=self.skill_registry,
             mcp_client=self.mcp_client,
             sdk_adapter=self.sdk_adapter,
@@ -68,7 +68,7 @@ class AICCOpenClawBridge:
             logger.info("pydantic-ai agent built: model=%s", llm_model)
 
     @classmethod
-    def from_env(cls) -> "AICCOpenClawBridge":
+    def from_env(cls) -> "TianShuOpenClawBridge":
         from app.config import get_settings  # noqa: PLC0415
 
         settings = get_settings()

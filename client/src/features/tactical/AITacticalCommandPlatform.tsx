@@ -55,6 +55,11 @@ import SCSScenarioJson from "@/scenarios/SCS.json";
 import blankScenarioJson from "@/scenarios/blank_scenario.json";
 import defaultScenarioJson from "@/scenarios/default_scenario.json";
 import { cn } from "@/lib/utils";
+import {
+  readStorageItem,
+  removeStorageItem,
+  writeStorageItem,
+} from "@/lib/legacyStorage";
 import { randomUUID } from "@/utils/generateUUID";
 import AISidebar from "./AISidebar";
 import SimulationInspectorPanel from "./SimulationInspectorPanel";
@@ -136,7 +141,9 @@ function cloneScenarioRecord(raw: unknown): Record<string, unknown> {
   return cloned;
 }
 
-function createAiccGameFromJson(scenarioJson: object | null | undefined): Game {
+function createTianShuGameFromJson(
+  scenarioJson: object | null | undefined
+): Game {
   const now = Math.floor(Date.now() / 1000);
   const currentScenario = new Scenario({
     id: randomUUID(),
@@ -151,7 +158,7 @@ function createAiccGameFromJson(scenarioJson: object | null | undefined): Game {
     game.loadScenario(JSON.stringify(source));
   } catch (err) {
     console.error(
-      "[AICC] createAiccGameFromJson: loadScenario failed, falling back to SCS",
+      "[TianShu] createTianShuGameFromJson: loadScenario failed, falling back to SCS",
       err
     );
     game.loadScenario(
@@ -317,7 +324,7 @@ export default function AITacticalCommandPlatform({
   // game 是引用型，useState 仅初始化一次；实际切换想定走下面 useEffect
   // 调 loadScenario，避免重建 Cesium。
   const [game] = useState<Game>(() =>
-    createAiccGameFromJson(initialScenarioData ?? null)
+    createTianShuGameFromJson(initialScenarioData ?? null)
   );
   const initialRuntimeScenarioRef = useRef<Record<string, unknown>>(
     cloneScenarioRecord(
@@ -425,7 +432,7 @@ export default function AITacticalCommandPlatform({
           preserveTimeCompression: true,
         })
       )
-      .catch((err) => console.error("[AICC] runtime pause failed:", err));
+      .catch((err) => console.error("[TianShu] runtime pause failed:", err));
   }, [applyRuntimeSnapshot, game, refreshSnapshot]);
 
   const playSimulation = useCallback(async () => {
@@ -462,7 +469,7 @@ export default function AITacticalCommandPlatform({
         await new Promise((resolve) => window.setTimeout(resolve, 80));
       }
     } catch (err) {
-      console.error("[AICC] runtime play failed:", err);
+      console.error("[TianShu] runtime play failed:", err);
       window.alert("后端推演启动失败，请稍后重试。");
     } finally {
       playLoopRunning.current = false;
@@ -475,7 +482,7 @@ export default function AITacticalCommandPlatform({
             });
           }
         } catch (err) {
-          console.error("[AICC] runtime pause after play failed:", err);
+          console.error("[TianShu] runtime pause after play failed:", err);
           game.scenarioPaused = true;
           refreshSnapshot("paused");
         }
@@ -495,7 +502,7 @@ export default function AITacticalCommandPlatform({
         })
       )
       .catch((err) => {
-        console.error("[AICC] runtime step failed:", err);
+        console.error("[TianShu] runtime step failed:", err);
         window.alert("后端单步推演失败，请稍后重试。");
       });
   }, [applyRuntimeSnapshot, game, refreshSnapshot]);
@@ -514,7 +521,7 @@ export default function AITacticalCommandPlatform({
       try {
         cloned = JSON.parse(JSON.stringify(raw));
       } catch (err) {
-        console.error("[AICC] scenario clone failed:", err);
+        console.error("[TianShu] scenario clone failed:", err);
         window.alert("场景数据无效，无法加载。");
         return;
       }
@@ -536,7 +543,7 @@ export default function AITacticalCommandPlatform({
           runtimeReadyRef.current = true;
         }
       } catch (err) {
-        console.error("[AICC] runtime scenario load failed:", err);
+        console.error("[TianShu] runtime scenario load failed:", err);
         window.alert("后端推演引擎加载场景失败，请检查场景数据后重试。");
       }
     },
@@ -551,7 +558,7 @@ export default function AITacticalCommandPlatform({
       ?.reset()
       .then((runtimeSnapshot) => applyRuntimeSnapshot(runtimeSnapshot, "idle"))
       .catch((err) => {
-        console.error("[AICC] runtime reset failed:", err);
+        console.error("[TianShu] runtime reset failed:", err);
         void loadScenarioFromObject(lastLoadedScenarioRef.current);
       });
   }, [applyRuntimeSnapshot, game, loadScenarioFromObject, refreshSnapshot]);
@@ -570,7 +577,7 @@ export default function AITacticalCommandPlatform({
         runtimeReadyRef.current = true;
       })
       .catch((err) => {
-        console.error("[AICC] initial runtime sync failed:", err);
+        console.error("[TianShu] initial runtime sync failed:", err);
         window.alert("当前场景同步到后端推演引擎失败，推演控制暂不可用。");
       });
   }, [applyRuntimeSnapshot]);
@@ -612,12 +619,12 @@ export default function AITacticalCommandPlatform({
           const parsed = JSON.parse(txt);
           void loadScenarioFromObject(parsed);
         } catch (err) {
-          console.error("[AICC] import parse failed:", err);
+          console.error("[TianShu] import parse failed:", err);
           window.alert("场景文件解析失败：不是合法的 JSON。");
         }
       };
       reader.onerror = () => {
-        console.error("[AICC] import read failed:", reader.error);
+        console.error("[TianShu] import read failed:", reader.error);
         window.alert("场景文件读取失败，请重试。");
       };
       reader.readAsText(file, "UTF-8");
@@ -651,7 +658,7 @@ export default function AITacticalCommandPlatform({
       a.remove();
       window.setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch (err) {
-      console.error("[AICC] export failed:", err);
+      console.error("[TianShu] export failed:", err);
       window.alert("场景导出失败，请稍后重试。");
     }
   }, []);
@@ -885,7 +892,7 @@ export default function AITacticalCommandPlatform({
         openMissionId === missionId ? null : openMissionId
       );
       void deleteRuntimeMission(missionId).catch((err) => {
-        console.error("[AICC] runtime mission delete failed:", err);
+        console.error("[TianShu] runtime mission delete failed:", err);
         window.alert("后端删除任务失败，请稍后重试。");
       });
     },
@@ -901,7 +908,7 @@ export default function AITacticalCommandPlatform({
       void runtimeControllerRef.current
         ?.pause()
         .catch((err) =>
-          console.error("[AICC] runtime cleanup pause failed", err)
+          console.error("[TianShu] runtime cleanup pause failed", err)
         );
     };
   }, [game, refreshSnapshot]);
@@ -968,7 +975,7 @@ export default function AITacticalCommandPlatform({
             sides: snapshot.sideStats,
           },
         })
-      ).catch((err) => console.warn("[AICC] onPostAar failed", err));
+      ).catch((err) => console.warn("[TianShu] onPostAar failed", err));
     }
   }, [
     snapshot.outcome.ended,
@@ -982,13 +989,13 @@ export default function AITacticalCommandPlatform({
   ]);
 
   const SIDEBAR_MIN = 240;
-  const SIDEBAR_STORAGE_KEY = "aicc.commandSidebarWidth";
+  const SIDEBAR_STORAGE_KEY = "tianshu.commandSidebarWidth";
 
   const [commandSidebarWidth, setCommandSidebarWidth] = useState<number | null>(
     () => {
       if (typeof window === "undefined") return null;
       try {
-        const raw = window.localStorage.getItem(SIDEBAR_STORAGE_KEY);
+        const raw = readStorageItem(SIDEBAR_STORAGE_KEY);
         if (!raw) return null;
         const value = Number(raw);
         return Number.isFinite(value) && value >= SIDEBAR_MIN ? value : null;
@@ -1002,9 +1009,9 @@ export default function AITacticalCommandPlatform({
     if (typeof window === "undefined") return;
     try {
       if (commandSidebarWidth === null) {
-        window.localStorage.removeItem(SIDEBAR_STORAGE_KEY);
+        removeStorageItem(SIDEBAR_STORAGE_KEY);
       } else {
-        window.localStorage.setItem(
+        writeStorageItem(
           SIDEBAR_STORAGE_KEY,
           String(Math.round(commandSidebarWidth))
         );
@@ -1070,7 +1077,7 @@ export default function AITacticalCommandPlatform({
           )
         )
         .catch((err) => {
-          console.error("[AICC] AI runtime refresh failed", err);
+          console.error("[TianShu] AI runtime refresh failed", err);
           latestRuntimeScenarioRef.current = data;
         });
     },

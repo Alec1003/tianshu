@@ -6,11 +6,11 @@ product
 
 ## Users
 
-AICC is used by operators, analysts, and developers working in a tactical scenario workspace. They need dense controls, live scenario state, map context, AI command review, and runtime tools without losing situational awareness.
+TianShu is used by operators, analysts, and developers working in a tactical scenario workspace. They need dense controls, live scenario state, map context, AI command review, and runtime tools without losing situational awareness.
 
 ## Product Purpose
 
-AICC combines a React/Cesium command UI with a FastAPI backend runtime and MCP-accessible tactical tools. Success means users can inspect scenarios, coordinate AI-assisted commands, review runtime state, and manage tool access from one reliable operational surface.
+TianShu combines a React/Cesium command UI with a FastAPI backend runtime and MCP-accessible tactical tools. Success means users can inspect scenarios, coordinate AI-assisted commands, review runtime state, and manage tool access from one reliable operational surface.
 
 ## Brand Personality
 

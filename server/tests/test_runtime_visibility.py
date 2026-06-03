@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from app.aicc_runtime.visibility import compute_runtime_visibility
+from app.tianshu_runtime.visibility import compute_runtime_visibility
 
 from blade.Relationships import Relationships
 from blade.Scenario import Scenario

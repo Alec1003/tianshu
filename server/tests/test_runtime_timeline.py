@@ -4,8 +4,8 @@ import asyncio
 
 import pytest
 
-from app.aicc_runtime.schemas import RuntimeTimelineEventRead
-from app.aicc_runtime.timeline import (
+from app.tianshu_runtime.schemas import RuntimeTimelineEventRead
+from app.tianshu_runtime.timeline import (
     diff_runtime_unit_changes,
     list_runtime_events,
     record_runtime_event,

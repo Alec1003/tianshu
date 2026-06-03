@@ -9,7 +9,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.aicc_runtime.models import RuntimeEvent
+from app.tianshu_runtime.models import RuntimeEvent
 
 UNIT_COLLECTIONS: tuple[tuple[str, str], ...] = (
     ("aircraft", "aircraft"),

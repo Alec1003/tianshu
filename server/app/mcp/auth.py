@@ -1,7 +1,7 @@
 """MCP server authentication.
 
 stdio 模式（Claude Desktop / Cursor 本地接入）：
-    通过环境变量 ``AICC_MCP_TOKEN`` 提供一次 JWT，server 启动时解析并把
+    通过环境变量 ``TIANSHU_MCP_TOKEN`` 提供一次 JWT，server 启动时解析并把
     对应 ``User`` 注入 lifespan context；后续所有 tool 调用都用这个 user
     做权限判断。变量名与 fastapi-users JWTStrategy 兼容（同一份签名密钥）。
 
@@ -16,12 +16,12 @@ stdio 模式（Claude Desktop / Cursor 本地接入）：
 from __future__ import annotations
 
 import logging
-import os
 import uuid
 from typing import TYPE_CHECKING
 
 from fastapi_users.db import SQLAlchemyUserDatabase
 
+from app.compat import get_env
 from app.auth.models import User
 from app.auth.users import UserManager, get_jwt_strategy
 
@@ -30,9 +30,9 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# Env vars (prefix AICC_ aligns with app.config.Settings convention).
-ENV_TOKEN = "AICC_MCP_TOKEN"
-ENV_USER_ID = "AICC_MCP_USER_ID"
+# Env vars (prefix TIANSHU_ aligns with app.config.Settings convention).
+ENV_TOKEN = "TIANSHU_MCP_TOKEN"
+ENV_USER_ID = "TIANSHU_MCP_USER_ID"
 
 
 class McpAuthError(RuntimeError):
@@ -64,9 +64,9 @@ async def resolve_user_from_user_id(
 ) -> User:
     """Dev/test backdoor: directly load a user by UUID.
 
-    Used by the stdio entrypoint when ``AICC_MCP_USER_ID`` is set instead of
+    Used by the stdio entrypoint when ``TIANSHU_MCP_USER_ID`` is set instead of
     a real JWT (handy for `python -m app.mcp` smoke tests). Production
-    deployments should always use ``AICC_MCP_TOKEN``.
+    deployments should always use ``TIANSHU_MCP_TOKEN``.
     """
     try:
         uid = uuid.UUID(user_id)
@@ -83,15 +83,15 @@ async def resolve_user_from_user_id(
 async def resolve_user_from_env(session: "AsyncSession") -> User:
     """Pick the right resolver based on which env var is set.
 
-    Precedence: ``AICC_MCP_TOKEN`` > ``AICC_MCP_USER_ID``. At least one is
+    Precedence: ``TIANSHU_MCP_TOKEN`` > ``TIANSHU_MCP_USER_ID``. At least one is
     required; otherwise we surface a clear error pointing at the README.
     """
-    token = os.environ.get(ENV_TOKEN, "").strip()
+    token = get_env(ENV_TOKEN).strip()
     if token:
         logger.info("mcp.auth: resolving user via %s", ENV_TOKEN)
         return await resolve_user_from_token(session, token)
 
-    user_id = os.environ.get(ENV_USER_ID, "").strip()
+    user_id = get_env(ENV_USER_ID).strip()
     if user_id:
         logger.warning(
             "mcp.auth: using dev-only %s (production should set %s)",

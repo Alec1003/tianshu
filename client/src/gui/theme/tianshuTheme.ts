@@ -1,6 +1,6 @@
 import { createTheme, type Theme } from "@mui/material/styles";
 
-// AICC tactical palette.
+// TianShu tactical palette.
 // Dark = primary (operations) mode. Sand/Light = secondary (briefing) mode.
 // Accent ramps stay on neutral metal grays plus a single mil-green primary
 // to keep the UI legible over satellite / vector base maps.
@@ -51,7 +51,7 @@ const SHARED_TYPOGRAPHY = {
   },
 };
 
-export const aiccDarkTheme: Theme = createTheme({
+export const tianshuDarkTheme: Theme = createTheme({
   palette: {
     mode: "dark",
     primary: { main: TACTICAL_GREEN, dark: TACTICAL_GREEN_DIM },
@@ -96,7 +96,7 @@ export const aiccDarkTheme: Theme = createTheme({
   },
 });
 
-export const aiccLightTheme: Theme = createTheme({
+export const tianshuLightTheme: Theme = createTheme({
   palette: {
     mode: "light",
     primary: { main: "#2f6f3a", dark: "#1f5026" },
@@ -139,8 +139,8 @@ export const aiccLightTheme: Theme = createTheme({
   },
 });
 
-export type AiccThemeMode = "dark" | "light";
+export type TianShuThemeMode = "dark" | "light";
 
-export function getAiccTheme(mode: AiccThemeMode): Theme {
-  return mode === "dark" ? aiccDarkTheme : aiccLightTheme;
+export function getTianShuTheme(mode: TianShuThemeMode): Theme {
+  return mode === "dark" ? tianshuDarkTheme : tianshuLightTheme;
 }

@@ -18,9 +18,9 @@ from typing import Any, NoReturn, Sequence
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.aicc_runtime.persistence import save_runtime_state
-from app.aicc_runtime.schemas import RuntimeTimelineResponse
-from app.aicc_runtime.timeline import (
+from app.tianshu_runtime.persistence import save_runtime_state
+from app.tianshu_runtime.schemas import RuntimeTimelineResponse
+from app.tianshu_runtime.timeline import (
     list_runtime_events,
     record_runtime_event,
     runtime_scenario_id,

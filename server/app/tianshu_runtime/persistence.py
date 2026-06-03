@@ -8,9 +8,9 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.aicc_runtime.models import RuntimeState
+from app.tianshu_runtime.models import RuntimeState
 
-_LOADED_ATTR = "_aicc_runtime_state_loaded"
+_LOADED_ATTR = "_tianshu_runtime_state_loaded"
 DEFAULT_RUNTIME_SCENARIO_ID = "__default__"
 
 

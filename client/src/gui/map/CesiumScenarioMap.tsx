@@ -401,13 +401,13 @@ export default function CesiumScenarioMap({
   }, [onScenarioMutation]);
   const reportRuntimeUnavailable = useCallback((action: RuntimeActionKey) => {
     const label = RUNTIME_ACTION_LABELS[action];
-    console.error(`[AICC] runtime handler missing: ${action}`);
+    console.error(`[TianShu] runtime handler missing: ${action}`);
     window.alert(`后端仿真接口未就绪，无法${label}。请刷新页面后重试。`);
   }, []);
   const reportRuntimeFailure = useCallback(
     (action: RuntimeActionKey, err: unknown) => {
       const label = RUNTIME_ACTION_LABELS[action];
-      console.error(`[AICC] runtime ${action} failed:`, err);
+      console.error(`[TianShu] runtime ${action} failed:`, err);
       window.alert(`${label}失败，请检查后端服务后重试。`);
     },
     []

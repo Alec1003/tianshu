@@ -16,7 +16,7 @@ from app.ai.models import (
     SkillExecutionResult,
     StructuredCommandStep,
 )
-from app.aicc_runtime.persistence import runtime_context_id
+from app.tianshu_runtime.persistence import runtime_context_id
 from app.auth.models import User
 
 

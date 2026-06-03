@@ -1,6 +1,6 @@
 """Runtime MCP tool wrapper-level tests.
 
-We do **not** boot a real AICCRuntime here (blade.Game init is slow
+We do **not** boot a real TianShuRuntime here (blade.Game init is slow
 and tied to the SCS template). Instead we fake a tiny scenario-shaped object
 and call the pure-Python helpers (_runtime_status_payload /
 _runtime_outcome_payload) that every runtime tool eventually funnels into.

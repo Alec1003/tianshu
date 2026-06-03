@@ -14,8 +14,8 @@ from app.ai.models import (
     SkillExecutionResult,
     StructuredCommandStep,
 )
-from app.ai.skill_registry import AICCSkillRegistry
-from app.aicc_runtime.runtime import AICCRuntime
+from app.ai.skill_registry import TianShuSkillRegistry
+from app.tianshu_runtime.runtime import TianShuRuntime
 
 ALLOWED_SKILLS = {
     "simulation_start",
@@ -113,7 +113,7 @@ class CommandRuleEngine:
     proposal can enter the human approval queue. It never mutates runtime state.
     """
 
-    def __init__(self, runtime: AICCRuntime, registry: AICCSkillRegistry) -> None:
+    def __init__(self, runtime: TianShuRuntime, registry: TianShuSkillRegistry) -> None:
         self.runtime = runtime
         self.registry = registry
 
@@ -594,7 +594,7 @@ class CommandRuleEngine:
 class CommandApprovalQueue:
     """In-memory, runtime-local command approval queue."""
 
-    def __init__(self, runtime: AICCRuntime, registry: AICCSkillRegistry) -> None:
+    def __init__(self, runtime: TianShuRuntime, registry: TianShuSkillRegistry) -> None:
         self.runtime = runtime
         self.registry = registry
         self.rules = CommandRuleEngine(runtime, registry)

@@ -106,21 +106,21 @@ async def generate_asset(
     payload: UnitAssetGenerateRequest,
     user: User = Depends(current_active_user),
     session: AsyncSession = Depends(get_async_session),
-    x_aicc_model_provider_id: str = Header(default=""),
-    x_aicc_model_provider: str = Header(default=""),
-    x_aicc_model_name: str = Header(default=""),
-    x_aicc_model_api_key: str = Header(default=""),
-    x_aicc_model_base_url: str = Header(default=""),
+    x_tianshu_model_provider_id: str = Header(default=""),
+    x_tianshu_model_provider: str = Header(default=""),
+    x_tianshu_model_name: str = Header(default=""),
+    x_tianshu_model_api_key: str = Header(default=""),
+    x_tianshu_model_base_url: str = Header(default=""),
 ) -> UnitAssetGenerateResponse:
     _ = user
-    provider = x_aicc_model_provider.strip()
-    api_key = x_aicc_model_api_key.strip()
-    base_url = x_aicc_model_base_url.strip()
+    provider = x_tianshu_model_provider.strip()
+    api_key = x_tianshu_model_api_key.strip()
+    base_url = x_tianshu_model_base_url.strip()
     if provider and not api_key:
         api_key, base_url = await resolve_stored_model_credentials(
             session,
             user,
-            provider_id=x_aicc_model_provider_id.strip(),
+            provider_id=x_tianshu_model_provider_id.strip(),
             provider=provider,
             base_url=base_url,
         )
@@ -130,7 +130,7 @@ async def generate_asset(
             query=payload.query,
             context=payload.context,
             provider=provider,
-            model=x_aicc_model_name.strip(),
+            model=x_tianshu_model_name.strip(),
             api_key=api_key,
             base_url=base_url,
         )

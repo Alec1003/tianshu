@@ -6,8 +6,8 @@ from time import perf_counter
 from typing import Any, Callable, Literal, Mapping, Sequence
 
 
-DEFAULT_PROFILE_NAME = "aicc-runtime"
-DEFAULT_PROFILE_DESCRIPTION = "Authoritative AICC backend runtime harness."
+DEFAULT_PROFILE_NAME = "tianshu-runtime"
+DEFAULT_PROFILE_DESCRIPTION = "Authoritative TianShu backend runtime harness."
 DEFAULT_PROFILE_VERSION = "1.0.0"
 
 HarnessAccess = Literal["read", "write", "control"]
@@ -28,7 +28,7 @@ def _utc_now() -> str:
 
 @dataclass(frozen=True)
 class HarnessProfile:
-    """Runtime-shaping metadata for an AICC harness instance.
+    """Runtime-shaping metadata for an TianShu harness instance.
 
     This mirrors the Deep Agents profile idea without importing deepagents:
     profiles tune visibility and prompt/tool metadata around a stable backend
@@ -90,7 +90,7 @@ class HarnessCapability:
     version: str = "1.0.0"
     enabled: bool = True
     tags: tuple[str, ...] = field(default_factory=tuple)
-    created_by: str = "AICC Runtime"
+    created_by: str = "TianShu Runtime"
     updated_at: str = ""
     input_schema: dict[str, Any] = field(default_factory=dict)
     output_schema: dict[str, Any] = field(default_factory=dict)

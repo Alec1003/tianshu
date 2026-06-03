@@ -66,7 +66,7 @@ def test_runtime_harness_registers_and_executes_capability() -> None:
 
 def test_harness_profile_merge_preserves_base_defaults() -> None:
     base = HarnessProfile(
-        name="aicc-specialized",
+        name="tianshu-specialized",
         description="Specialized runtime.",
         version="2.0.0",
         tool_description_overrides={"alpha": "Alpha."},
@@ -81,7 +81,7 @@ def test_harness_profile_merge_preserves_base_defaults() -> None:
         )
     )
 
-    assert merged.name == "aicc-specialized"
+    assert merged.name == "tianshu-specialized"
     assert merged.description == "Specialized runtime."
     assert merged.version == "2.0.0"
     assert merged.system_prompt_suffix == "Keep runtime writes explicit."

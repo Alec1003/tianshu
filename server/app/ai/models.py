@@ -73,6 +73,36 @@ class MCPCallTrace(BaseModel):
     message: str = ""
 
 
+class ExternalMcpValidateRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    transport: str = Field(default="stdio", max_length=40)
+    endpoint: str = Field(default="", max_length=4096)
+    command: str = Field(default="", max_length=1024)
+    args: list[str] = Field(default_factory=list, max_length=64)
+    url: str = Field(default="", max_length=4096)
+    env: dict[str, str] = Field(default_factory=dict)
+    headers: dict[str, str] = Field(default_factory=dict)
+    allowedTools: list[str] = Field(default_factory=list, max_length=128)
+    enabled: bool = True
+    timeoutSeconds: float = Field(default=10.0, ge=1.0)
+
+
+class ExternalMcpToolRead(BaseModel):
+    server: str
+    name: str
+    description: str = ""
+    inputSchema: dict[str, Any] = Field(default_factory=dict)
+
+
+class ExternalMcpValidateResponse(BaseModel):
+    ok: bool
+    server: str
+    transport: Literal["stdio", "streamable_http"]
+    message: str
+    tools: list[ExternalMcpToolRead] = Field(default_factory=list)
+    trace: list[MCPCallTrace] = Field(default_factory=list)
+
+
 class AgentExecutionSummary(BaseModel):
     command: str
     decomposition: list[str] = Field(default_factory=list)

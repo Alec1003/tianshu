@@ -395,6 +395,45 @@ export interface CustomSkillListResponse {
   skillsDir: string;
 }
 
+export type ExternalMcpTransport = "stdio" | "sse" | "http";
+
+export interface ExternalMcpValidateRequest {
+  name: string;
+  transport: ExternalMcpTransport;
+  endpoint?: string;
+  command?: string;
+  args?: string[];
+  url?: string;
+  env?: Record<string, string>;
+  headers?: Record<string, string>;
+  allowedTools?: string[];
+  enabled?: boolean;
+  timeoutSeconds?: number;
+}
+
+export interface ExternalMcpTool {
+  server: string;
+  name: string;
+  description: string;
+  inputSchema: Record<string, unknown>;
+}
+
+export interface ExternalMcpTrace {
+  action: string;
+  target: string;
+  status: "pending" | "ok" | "error";
+  message: string;
+}
+
+export interface ExternalMcpValidateResponse {
+  ok: boolean;
+  server: string;
+  transport: "stdio" | "streamable_http";
+  message: string;
+  tools: ExternalMcpTool[];
+  trace: ExternalMcpTrace[];
+}
+
 export interface StructuredCommandStep {
   id: string;
   skill: string;

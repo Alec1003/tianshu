@@ -235,76 +235,53 @@ export default function TacticalSettingsModal(
 // Sub-sections
 // ──────────────────────────────────────────────────────────────────────────────
 
-interface McpToolPreview {
-  name: string;
-  description: string;
-}
-
-const MCP_CONFIG_PLACEHOLDER = `// 示例:
-// {
-//   "mcpServers": {
-//     "example-server": {
-//       "command": "npx",
-//       "args": [
-//         "-y",
-//         "mcp-server-example"
-//       ]
-//     }
-//   }
-// }`;
-
-const TIANSHU_MCP_TOOLS: McpToolPreview[] = [
-  { name: "runtime_status", description: "读取后端仿真运行状态" },
-  { name: "runtime_get_scenario", description: "获取当前想定快照" },
-  { name: "runtime_step", description: "推进后端仿真步进" },
-  { name: "runtime_deploy_aircraft", description: "部署航空单位" },
-  { name: "runtime_move_unit", description: "移动指定单位" },
-  { name: "runtime_save_to_db", description: "保存运行时想定到数据库" },
-];
-
-const PUPPETEER_MCP_TOOLS: McpToolPreview[] = [
-  { name: "puppeteer_navigate", description: "Navigate to a URL" },
-  {
-    name: "puppeteer_screenshot",
-    description: "Take a screenshot of the current page or a specific element",
-  },
-  { name: "puppeteer_click", description: "Click an element on the page" },
-  { name: "puppeteer_fill", description: "Fill out an input field" },
-  {
-    name: "puppeteer_select",
-    description: "Select an element on the page with Select tag",
-  },
-  { name: "puppeteer_hover", description: "Hover an element on the page" },
-  {
-    name: "puppeteer_evaluate",
-    description: "Execute JavaScript in the browser console",
-  },
-];
-
-const GENERIC_MCP_TOOLS: McpToolPreview[] = [
-  { name: "list_tools", description: "等待后端同步可用工具清单" },
-  { name: "call_tool", description: "按配置调用外部 MCP 工具" },
-];
-
-function getMcpServerTools(
-  server: TacticalSettingsProps["mcpServers"][number]
-): McpToolPreview[] {
-  const signature = `${server.name} ${server.endpoint}`.toLowerCase();
-  if (signature.includes("puppeteer")) return PUPPETEER_MCP_TOOLS;
-  if (
-    signature.includes("tianshu") ||
-    signature.includes("天枢") ||
-    signature.includes("local-tianshu")
-  ) {
-    return TIANSHU_MCP_TOOLS;
+const MCP_CONFIG_PLACEHOLDER = `{
+  "mcpServers": {
+    "example-server": {
+      "command": "npx",
+      "args": ["-y", "mcp-server-example"]
+    }
   }
-  return GENERIC_MCP_TOOLS;
-}
+}`;
 
 function getMcpInitial(name: string): string {
   const trimmed = name.trim();
   if (!trimmed) return "M";
   return trimmed.slice(0, 1).toUpperCase();
+}
+
+function getStringArray(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => String(item).trim())
+      .filter((item) => item.length > 0);
+  }
+  if (typeof value === "string") {
+    return value
+      .split(",")
+      .map((item) => item.trim())
+      .filter((item) => item.length > 0);
+  }
+  return [];
+}
+
+function getStringRecord(value: unknown): Record<string, string> | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return undefined;
+  }
+  const entries = Object.entries(value as Record<string, unknown>)
+    .map(([key, item]) => [key.trim(), String(item)] as const)
+    .filter(([key]) => key.length > 0);
+  return entries.length > 0 ? Object.fromEntries(entries) : undefined;
+}
+
+function getNumber(value: unknown): number | undefined {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim()) {
+    const next = Number(value);
+    if (Number.isFinite(next)) return next;
+  }
+  return undefined;
 }
 
 function normalizeImportedTransport(
@@ -365,6 +342,21 @@ function parseMcpServerConfigJson(raw: string): MCPServerImportPayload[] {
       endpoint,
       transport,
       enabled: config.enabled !== false,
+      command:
+        typeof config.command === "string" && config.command.trim()
+          ? config.command.trim()
+          : undefined,
+      args: getStringArray(config.args),
+      url:
+        typeof (config.url ?? config.baseUrl) === "string"
+          ? String(config.url ?? config.baseUrl).trim()
+          : undefined,
+      env: getStringRecord(config.env),
+      headers: getStringRecord(config.headers),
+      allowedTools: getStringArray(config.allowedTools ?? config.allowed_tools),
+      timeoutSeconds: getNumber(
+        config.timeoutSeconds ?? config.timeout_seconds
+      ),
     };
   });
 
@@ -373,6 +365,38 @@ function parseMcpServerConfigJson(raw: string): MCPServerImportPayload[] {
   }
 
   return servers;
+}
+
+function buildMcpServerConfigJson(
+  server: TacticalSettingsProps["mcpServers"][number]
+): string {
+  const config: Record<string, unknown> = {
+    transport: server.transport,
+    enabled: server.enabled,
+  };
+  if (server.transport === "stdio") {
+    if (server.command) config.command = server.command;
+    if (server.args?.length) config.args = server.args;
+    if (!server.command && server.endpoint) config.endpoint = server.endpoint;
+  } else {
+    config.url = server.url || server.endpoint;
+  }
+  if (server.env && Object.keys(server.env).length > 0) config.env = server.env;
+  if (server.headers && Object.keys(server.headers).length > 0) {
+    config.headers = server.headers;
+  }
+  if (server.allowedTools?.length) config.allowedTools = server.allowedTools;
+  if (server.timeoutSeconds) config.timeoutSeconds = server.timeoutSeconds;
+
+  return JSON.stringify(
+    {
+      mcpServers: {
+        [server.name]: config,
+      },
+    },
+    null,
+    2
+  );
 }
 
 function McpStatusBadge({ enabled }: { enabled: boolean }) {
@@ -392,6 +416,47 @@ function McpStatusBadge({ enabled }: { enabled: boolean }) {
         )}
       />
       {enabled ? "已启用" : "已停用"}
+    </span>
+  );
+}
+
+function McpConnectionBadge({
+  status,
+}: {
+  status?: TacticalSettingsProps["mcpServers"][number]["status"];
+}) {
+  const current = status ?? "unknown";
+  const label =
+    current === "online"
+      ? "在线"
+      : current === "validating"
+        ? "验证中"
+        : current === "error"
+          ? "错误"
+          : "未验证";
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 font-mono text-[10px]",
+        current === "online" &&
+          "border-emerald-400/24 bg-emerald-400/10 text-emerald-200",
+        current === "validating" &&
+          "border-cyan-400/24 bg-cyan-400/10 text-cyan-100",
+        current === "error" && "border-red-400/30 bg-red-500/10 text-red-200",
+        current === "unknown" &&
+          "border-slate-600/50 bg-slate-800/50 text-slate-400"
+      )}
+    >
+      <span
+        className={cn(
+          "size-1.5 rounded-full",
+          current === "online" && "bg-emerald-300",
+          current === "validating" && "bg-cyan-300",
+          current === "error" && "bg-red-300",
+          current === "unknown" && "bg-slate-500"
+        )}
+      />
+      {label}
     </span>
   );
 }
@@ -421,19 +486,23 @@ function McpToggle({
 }
 
 function ManualMcpConfigDialog({
+  busy,
   error,
   onClose,
   onConfirm,
   onRawChange,
   open,
   raw,
+  title = "手动配置",
 }: {
+  busy: boolean;
   error: string | null;
   onClose: () => void;
-  onConfirm: () => void;
+  onConfirm: () => void | Promise<void>;
   onRawChange: (value: string) => void;
   open: boolean;
   raw: string;
+  title?: string;
 }) {
   if (!open) return null;
 
@@ -450,7 +519,7 @@ function ManualMcpConfigDialog({
         transition={{ duration: 0.18 }}
       >
         <header className="flex items-center justify-between gap-4 border-b border-slate-700/70 px-5 py-4">
-          <h3 className="text-xl font-semibold text-slate-100">手动配置</h3>
+          <h3 className="text-xl font-semibold text-slate-100">{title}</h3>
           <div className="flex items-center gap-3">
             <button
               className="rounded-md bg-slate-700/55 px-4 py-2 text-sm font-semibold text-slate-200 transition-colors hover:bg-slate-700"
@@ -461,6 +530,7 @@ function ManualMcpConfigDialog({
             <button
               aria-label="关闭手动配置"
               className="rounded-md p-1.5 text-slate-400 transition-colors hover:bg-white/8 hover:text-slate-100"
+              disabled={busy}
               onClick={onClose}
               type="button"
             >
@@ -507,6 +577,7 @@ function ManualMcpConfigDialog({
           <div className="flex items-center gap-3">
             <Button
               className="bg-slate-700/70 text-slate-200 hover:bg-slate-700"
+              disabled={busy}
               onClick={onClose}
               type="button"
               variant="ghost"
@@ -515,12 +586,12 @@ function ManualMcpConfigDialog({
             </Button>
             <Button
               className="bg-slate-200 text-slate-950 hover:bg-white"
-              disabled={!raw.trim()}
+              disabled={!raw.trim() || busy}
               onClick={onConfirm}
               type="button"
               variant="ghost"
             >
-              确认
+              {busy ? "验证中" : "确认"}
             </Button>
           </div>
         </footer>
@@ -537,6 +608,8 @@ function McpConfigSection({
   onImportMcpServers,
   onRemoveServer,
   onToggleServer,
+  onUpdateMcpServer,
+  onValidateMcpServer,
 }: TacticalSettingsProps) {
   const [expandedServerIds, setExpandedServerIds] = useState<string[]>(() =>
     mcpServers.length > 0 ? [mcpServers[0].id] : []
@@ -546,6 +619,13 @@ function McpConfigSection({
   const [manualConfigError, setManualConfigError] = useState<string | null>(
     null
   );
+  const [manualConfigBusy, setManualConfigBusy] = useState(false);
+  const [editingServerId, setEditingServerId] = useState<string | null>(null);
+  const [serverMenu, setServerMenu] = useState<{
+    id: string;
+    x: number;
+    y: number;
+  } | null>(null);
   const [lastRefreshLabel, setLastRefreshLabel] = useState("刚刚");
 
   useEffect(() => {
@@ -560,7 +640,7 @@ function McpConfigSection({
   const totalTools = useMemo(
     () =>
       mcpServers.reduce(
-        (total, server) => total + getMcpServerTools(server).length,
+        (total, server) => total + (server.tools?.length ?? 0),
         0
       ),
     [mcpServers]
@@ -572,19 +652,56 @@ function McpConfigSection({
     );
   };
 
-  const handleManualConfigConfirm = () => {
+  const handleManualConfigConfirm = async () => {
+    setManualConfigBusy(true);
     try {
       const imported = parseMcpServerConfigJson(manualConfigRaw);
-      onImportMcpServers(imported);
+      if (editingServerId) {
+        if (imported.length !== 1) {
+          throw new Error("编辑模式一次只能保存一个 MCP Server。");
+        }
+        await onUpdateMcpServer(editingServerId, imported[0]);
+      } else {
+        await onImportMcpServers(imported);
+      }
       setManualConfigOpen(false);
       setManualConfigRaw("");
       setManualConfigError(null);
+      setEditingServerId(null);
     } catch (error) {
       setManualConfigError(
         error instanceof Error ? error.message : "配置解析失败。"
       );
+    } finally {
+      setManualConfigBusy(false);
     }
   };
+
+  const openServerMenu = (
+    event: { currentTarget: HTMLButtonElement },
+    id: string
+  ) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    setServerMenu({
+      id,
+      x: Math.max(12, rect.right - 168),
+      y: rect.bottom + 8,
+    });
+  };
+
+  const openEditConfig = (
+    server: TacticalSettingsProps["mcpServers"][number]
+  ) => {
+    setEditingServerId(server.id);
+    setManualConfigRaw(buildMcpServerConfigJson(server));
+    setManualConfigError(null);
+    setManualConfigOpen(true);
+    setServerMenu(null);
+  };
+
+  const menuServer = serverMenu
+    ? mcpServers.find((server) => server.id === serverMenu.id)
+    : null;
 
   return (
     <div className="flex min-h-full flex-col gap-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
@@ -602,15 +719,25 @@ function McpConfigSection({
             <button
               aria-label="刷新 MCP Servers 列表"
               className="grid size-10 place-items-center rounded-md border border-slate-700/70 bg-slate-800/70 text-slate-300 transition-colors hover:border-slate-600 hover:bg-slate-700/80 hover:text-white"
-              onClick={() => setLastRefreshLabel("刚刚")}
-              title="刷新本地列表"
+              onClick={() => {
+                setLastRefreshLabel("刷新中");
+                void Promise.all(
+                  mcpServers.map((server) => onValidateMcpServer(server.id))
+                ).finally(() => setLastRefreshLabel("刚刚"));
+              }}
+              title="同步后端工具列表"
               type="button"
             >
               <RefreshCw className="size-4" />
             </button>
             <button
               className="inline-flex h-10 items-center gap-2 rounded-md bg-slate-100 px-4 text-sm font-semibold text-slate-950 transition-colors hover:bg-white"
-              onClick={() => setManualConfigOpen(true)}
+              onClick={() => {
+                setEditingServerId(null);
+                setManualConfigRaw("");
+                setManualConfigError(null);
+                setManualConfigOpen(true);
+              }}
               type="button"
             >
               <Plus className="size-4" />
@@ -684,7 +811,7 @@ function McpConfigSection({
           ) : (
             mcpServers.map((server) => {
               const expanded = expandedServerIds.includes(server.id);
-              const tools = getMcpServerTools(server);
+              const tools = server.tools ?? [];
               return (
                 <div key={server.id}>
                   <div className="flex items-center gap-4 px-5 py-4">
@@ -722,6 +849,7 @@ function McpConfigSection({
                         >
                           {server.transport.toUpperCase()}
                         </Badge>
+                        <McpConnectionBadge status={server.status} />
                       </div>
                       <div className="mt-1 truncate font-mono text-xs text-slate-500">
                         {server.endpoint}
@@ -738,36 +866,74 @@ function McpConfigSection({
                         }
                       />
                       <button
-                        aria-label={`移除 ${server.name}`}
-                        className="grid size-9 place-items-center rounded-md text-slate-500 transition-colors hover:bg-red-500/12 hover:text-red-300"
-                        onClick={() => onRemoveServer(server.id)}
-                        title="移除 MCP Server"
+                        aria-label={`打开 ${server.name} 设置菜单`}
+                        className="grid size-9 place-items-center rounded-md border border-slate-700/70 bg-slate-900/70 text-slate-400 transition-colors hover:border-cyan-400/30 hover:bg-cyan-400/10 hover:text-cyan-100"
+                        onClick={(event) => openServerMenu(event, server.id)}
+                        title="MCP Server 设置"
                         type="button"
                       >
-                        <Trash2 className="size-4" />
+                        <Settings className="size-4" />
                       </button>
                     </div>
                   </div>
 
                   {expanded && (
                     <div className="px-5 pb-4">
-                      <div className="overflow-hidden rounded-md border border-slate-700/80 bg-[#24272b]">
-                        {tools.map((tool, index) => (
-                          <div
-                            className={cn(
-                              "grid gap-3 px-5 py-3 text-sm md:grid-cols-[minmax(180px,260px)_1fr]",
-                              index > 0 && "border-t border-slate-700/70"
-                            )}
-                            key={tool.name}
-                          >
-                            <div className="truncate font-semibold text-slate-100">
-                              {tool.name}
-                            </div>
-                            <div className="text-right text-slate-300">
-                              {tool.description}
-                            </div>
+                      <div className="mb-3 grid gap-2 text-[11px] text-slate-400 md:grid-cols-2">
+                        <div className="rounded-md border border-slate-700/70 bg-slate-950/35 px-3 py-2">
+                          <div className="font-mono text-slate-500">
+                            最近校验
                           </div>
-                        ))}
+                          <div className="mt-1 text-slate-200">
+                            {server.lastValidatedAt
+                              ? new Date(
+                                  server.lastValidatedAt
+                                ).toLocaleString()
+                              : "尚未校验"}
+                          </div>
+                        </div>
+                        <div className="rounded-md border border-slate-700/70 bg-slate-950/35 px-3 py-2">
+                          <div className="font-mono text-slate-500">
+                            连接日志
+                          </div>
+                          <div className="mt-1 line-clamp-2 text-slate-200">
+                            {server.statusMessage || "暂无连接日志。"}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="overflow-hidden rounded-md border border-slate-700/80 bg-[#24272b]">
+                        {tools.length === 0 ? (
+                          <div className="flex min-h-24 items-center justify-center px-5 py-6 text-center text-sm text-slate-500">
+                            {server.status === "error"
+                              ? "验证失败，无法读取工具列表。"
+                              : server.status === "online"
+                                ? "该 MCP 已验证，但没有声明可用工具。"
+                                : "验证后会在这里显示该 MCP 暴露的 tools。"}
+                          </div>
+                        ) : (
+                          tools.map((tool, index) => (
+                            <div
+                              className={cn(
+                                "grid gap-3 px-5 py-3 text-sm md:grid-cols-[minmax(180px,260px)_1fr_auto]",
+                                index > 0 && "border-t border-slate-700/70"
+                              )}
+                              key={tool.name}
+                            >
+                              <div className="truncate font-mono font-semibold text-slate-100">
+                                {tool.name}
+                              </div>
+                              <div className="text-slate-300">
+                                {tool.description}
+                              </div>
+                              <Badge
+                                className="justify-self-start font-mono text-[9px] md:justify-self-end"
+                                variant="muted"
+                              >
+                                schema
+                              </Badge>
+                            </div>
+                          ))
+                        )}
                       </div>
                     </div>
                   )}
@@ -778,11 +944,75 @@ function McpConfigSection({
         </div>
       </div>
 
+      {serverMenu &&
+        menuServer &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-[130]"
+            onClick={() => setServerMenu(null)}
+          >
+            <div
+              className="fixed w-40 overflow-hidden rounded-md border border-slate-700/80 bg-[#111821] py-1 shadow-2xl ring-1 ring-cyan-400/10"
+              onClick={(event) => event.stopPropagation()}
+              style={{ left: serverMenu.x, top: serverMenu.y }}
+            >
+              <button
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-200 transition-colors hover:bg-slate-800"
+                onClick={() => openEditConfig(menuServer)}
+                type="button"
+              >
+                <Pencil className="size-4 text-slate-400" />
+                编辑
+              </button>
+              <button
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-200 transition-colors hover:bg-slate-800"
+                onClick={() => {
+                  setServerMenu(null);
+                  void onValidateMcpServer(menuServer.id);
+                }}
+                type="button"
+              >
+                <RefreshCw className="size-4 text-cyan-300" />
+                重启
+              </button>
+              <button
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-200 transition-colors hover:bg-slate-800"
+                onClick={() => {
+                  setExpandedServerIds((prev) =>
+                    prev.includes(menuServer.id)
+                      ? prev
+                      : [...prev, menuServer.id]
+                  );
+                  setServerMenu(null);
+                }}
+                type="button"
+              >
+                <ScrollText className="size-4 text-slate-400" />
+                日志
+              </button>
+              <button
+                className="flex w-full items-center gap-2 border-t border-slate-700/70 px-3 py-2 text-left text-sm text-red-200 transition-colors hover:bg-red-500/10"
+                onClick={() => {
+                  setServerMenu(null);
+                  onRemoveServer(menuServer.id);
+                }}
+                type="button"
+              >
+                <Trash2 className="size-4" />
+                删除
+              </button>
+            </div>
+          </div>,
+          document.body
+        )}
+
       <ManualMcpConfigDialog
+        busy={manualConfigBusy}
         error={manualConfigError}
         onClose={() => {
           setManualConfigOpen(false);
           setManualConfigError(null);
+          setEditingServerId(null);
         }}
         onConfirm={handleManualConfigConfirm}
         onRawChange={(value) => {
@@ -791,6 +1021,7 @@ function McpConfigSection({
         }}
         open={manualConfigOpen}
         raw={manualConfigRaw}
+        title={editingServerId ? "编辑 MCP Server" : "手动配置"}
       />
     </div>
   );

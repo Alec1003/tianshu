@@ -5,7 +5,8 @@ from types import SimpleNamespace
 from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
 
-from app.ai.models import AgentExecutionSummary, SkillDefinition
+from app.ai.mcp_client import MCPClientSkeleton
+from app.ai.models import AgentExecutionSummary, MCPCallTrace, SkillDefinition
 from app.api.ai import router as ai_router
 from app.auth.users import current_active_user
 
@@ -336,6 +337,11 @@ def test_ai_routes_reject_unauthenticated_requests() -> None:
             "/api/ai/model/check",
             {"provider": "openai", "baseUrl": "https://example.test"},
         ),
+        (
+            "post",
+            "/api/ai/mcp/validate",
+            {"name": "planner", "transport": "stdio", "command": "python"},
+        ),
         ("post", "/api/ai/chat", None),
     ]
 
@@ -360,6 +366,58 @@ def test_ai_command_and_runtime_work_for_authenticated_user() -> None:
     runtime_response = client.get("/api/ai/runtime/scenario")
     assert runtime_response.status_code == 200
     assert runtime_response.json() == {"currentScenario": {"id": "demo"}}
+
+
+def test_validate_external_mcp_server_returns_tools_without_secrets(monkeypatch) -> None:
+    client = _build_client(authenticated=True)
+    captured = {}
+
+    async def fake_list_tools(self, server_name=None):
+        server = self.list_servers()[0]
+        captured["server"] = server
+        return (
+            [
+                MCPCallTrace(
+                    action="list_tools",
+                    target=server_name or server.name,
+                    status="ok",
+                    message="1 tools available",
+                )
+            ],
+            [
+                {
+                    "server": server.name,
+                    "name": "plan_route",
+                    "description": "Plan a route.",
+                    "inputSchema": {"type": "object"},
+                }
+            ],
+        )
+
+    monkeypatch.setattr(MCPClientSkeleton, "list_tools", fake_list_tools)
+
+    response = client.post(
+        "/api/ai/mcp/validate",
+        json={
+            "name": "planner",
+            "transport": "stdio",
+            "endpoint": "python -m planner_mcp",
+            "env": {"PLANNER_TOKEN": "secret"},
+            "headers": {"Authorization": "Bearer secret"},
+            "timeoutSeconds": 60,
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["ok"] is True
+    assert payload["transport"] == "stdio"
+    assert payload["tools"][0]["name"] == "plan_route"
+    assert "secret" not in response.text
+    server = captured["server"]
+    assert server.command == "python"
+    assert server.args == ["-m", "planner_mcp"]
+    assert server.timeout_seconds == 15.0
 
 
 def test_ai_runtime_control_endpoints_return_authoritative_snapshot() -> None:

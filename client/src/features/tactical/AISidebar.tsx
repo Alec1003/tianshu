@@ -60,6 +60,7 @@ import {
   listCustomSkills,
   rejectCommandProposal,
   updateCustomSkill,
+  validateExternalMcpServer,
 } from "@/api/ai";
 import {
   getScenarioCompareSession,
@@ -71,6 +72,7 @@ import type {
   CustomSkill,
   CustomSkillCreatePayload,
   CustomSkillUpdatePayload,
+  ExternalMcpTool,
   RegisteredSkill,
   SkillSchemaField,
   ScenarioBatchSimulationResponse,
@@ -101,16 +103,38 @@ import TacticalSettingsModal from "./TacticalSettingsModal";
 
 export type AISidebarTab = "chat" | "settings";
 type AIChatMode = "ask" | "command";
+export type MCPServerTransport = "stdio" | "sse" | "http";
+type MCPServerStatus = "unknown" | "validating" | "online" | "error";
+
+interface MCPToolDefinition {
+  name: string;
+  description: string;
+  inputSchema?: Record<string, unknown>;
+}
 
 interface MCPServerConfig {
   id: string;
   name: string;
   endpoint: string;
-  transport: "stdio" | "sse" | "http";
+  transport: MCPServerTransport;
   enabled: boolean;
+  tools?: MCPToolDefinition[];
+  status?: MCPServerStatus;
+  statusMessage?: string;
+  lastValidatedAt?: string;
+  command?: string;
+  args?: string[];
+  url?: string;
+  env?: Record<string, string>;
+  headers?: Record<string, string>;
+  allowedTools?: string[];
+  timeoutSeconds?: number;
 }
 
-export type MCPServerImportPayload = Omit<MCPServerConfig, "id">;
+export type MCPServerImportPayload = Omit<
+  MCPServerConfig,
+  "id" | "lastValidatedAt" | "status" | "statusMessage" | "tools"
+>;
 
 type CustomSkillConfig = CustomSkill;
 
@@ -227,6 +251,9 @@ const DEFAULT_MCP_SERVERS: MCPServerConfig[] = [
     endpoint: "stdio://local-tianshu-mcp",
     transport: "stdio",
     enabled: true,
+    status: "unknown",
+    statusMessage: "内置 MCP 由后端运行环境管理。",
+    tools: [],
   },
 ];
 
@@ -295,6 +322,57 @@ function newId(): string {
     return crypto.randomUUID();
   }
   return `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+function transportFromValidated(
+  transport: "stdio" | "streamable_http"
+): MCPServerTransport {
+  return transport === "stdio" ? "stdio" : "http";
+}
+
+function toolDefinitionsFromExternal(
+  tools: ExternalMcpTool[]
+): MCPToolDefinition[] {
+  return tools.map((tool) => ({
+    name: tool.name,
+    description: tool.description || "该工具未提供描述。",
+    inputSchema: tool.inputSchema,
+  }));
+}
+
+function validationTraceMessage(
+  response: Awaited<ReturnType<typeof validateExternalMcpServer>>
+): string {
+  const traceText = response.trace
+    .map((trace) => `${trace.action}:${trace.status} ${trace.message}`.trim())
+    .join(" / ");
+  return traceText || response.message;
+}
+
+function buildMcpValidationPayload(
+  server: MCPServerImportPayload | MCPServerConfig
+) {
+  return {
+    name: server.name,
+    transport: server.transport,
+    endpoint: server.endpoint,
+    command: server.command,
+    args: server.args,
+    url: server.url,
+    env: server.env,
+    headers: server.headers,
+    allowedTools: server.allowedTools,
+    enabled: true,
+    timeoutSeconds: server.timeoutSeconds,
+  };
+}
+
+function isManagedRuntimeMcpPlaceholder(server: MCPServerConfig): boolean {
+  return (
+    server.transport === "stdio" &&
+    !server.command &&
+    server.endpoint.startsWith("stdio://")
+  );
 }
 
 interface LegacyCustomSkillConfig {
@@ -1055,6 +1133,140 @@ export default function AISidebar({
     setNewServerTransport("stdio");
   }, [newServerName, newServerEndpoint, newServerTransport]);
 
+  const validateMcpConfig = useCallback(
+    async (
+      server: MCPServerImportPayload | MCPServerConfig
+    ): Promise<Omit<MCPServerConfig, "id">> => {
+      const response = await validateExternalMcpServer(
+        buildMcpValidationPayload(server)
+      );
+      const statusMessage = validationTraceMessage(response);
+      if (!response.ok) {
+        throw new Error(`${server.name}: ${statusMessage}`);
+      }
+      return {
+        ...server,
+        transport: transportFromValidated(response.transport),
+        endpoint: server.endpoint || server.url || "",
+        tools: toolDefinitionsFromExternal(response.tools),
+        status: "online",
+        statusMessage,
+        lastValidatedAt: new Date().toISOString(),
+      };
+    },
+    []
+  );
+
+  const handleImportMcpServers = useCallback(
+    async (servers: MCPServerImportPayload[]): Promise<void> => {
+      const validatedServers: MCPServerConfig[] = [];
+      for (const server of servers) {
+        const validated = await validateMcpConfig(server);
+        validatedServers.push({
+          id: newId(),
+          ...validated,
+        });
+      }
+      setMcpServers((prev) => [...prev, ...validatedServers]);
+    },
+    [validateMcpConfig]
+  );
+
+  const handleUpdateMcpServer = useCallback(
+    async (id: string, server: MCPServerImportPayload): Promise<void> => {
+      setMcpServers((prev) =>
+        prev.map((item) =>
+          item.id === id
+            ? {
+                ...item,
+                ...server,
+                status: "validating",
+                statusMessage: "正在验证 MCP 服务并读取工具列表。",
+              }
+            : item
+        )
+      );
+      try {
+        const validated = await validateMcpConfig(server);
+        setMcpServers((prev) =>
+          prev.map((item) => (item.id === id ? { id, ...validated } : item))
+        );
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "MCP 服务验证失败。";
+        setMcpServers((prev) =>
+          prev.map((item) =>
+            item.id === id
+              ? {
+                  ...item,
+                  ...server,
+                  status: "error",
+                  statusMessage: message,
+                  lastValidatedAt: new Date().toISOString(),
+                }
+              : item
+          )
+        );
+        throw error;
+      }
+    },
+    [validateMcpConfig]
+  );
+
+  const handleValidateMcpServer = useCallback(
+    async (id: string): Promise<void> => {
+      const server = mcpServers.find((item) => item.id === id);
+      if (!server) return;
+      if (isManagedRuntimeMcpPlaceholder(server)) {
+        setMcpServers((prev) =>
+          prev.map((item) =>
+            item.id === id
+              ? {
+                  ...item,
+                  status: "unknown",
+                  statusMessage: "内置 MCP 由后端运行环境管理。",
+                }
+              : item
+          )
+        );
+        return;
+      }
+      setMcpServers((prev) =>
+        prev.map((item) =>
+          item.id === id
+            ? {
+                ...item,
+                status: "validating",
+                statusMessage: "正在重新连接 MCP 服务并刷新工具列表。",
+              }
+            : item
+        )
+      );
+      try {
+        const validated = await validateMcpConfig(server);
+        setMcpServers((prev) =>
+          prev.map((item) => (item.id === id ? { id, ...validated } : item))
+        );
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "MCP 服务验证失败。";
+        setMcpServers((prev) =>
+          prev.map((item) =>
+            item.id === id
+              ? {
+                  ...item,
+                  status: "error",
+                  statusMessage: message,
+                  lastValidatedAt: new Date().toISOString(),
+                }
+              : item
+          )
+        );
+      }
+    },
+    [mcpServers, validateMcpConfig]
+  );
+
   const handleAddSkill = useCallback(
     async (options?: AddCustomSkillOptions): Promise<void> => {
       const name = newSkillName.trim();
@@ -1195,15 +1407,7 @@ export default function AISidebar({
         onAddSkill={handleAddSkill}
         onCheckModel={() => void checkModelConnection()}
         onClearMessages={() => setMessages([])}
-        onImportMcpServers={(servers) =>
-          setMcpServers((prev) => [
-            ...prev,
-            ...servers.map((server) => ({
-              id: newId(),
-              ...server,
-            })),
-          ])
-        }
+        onImportMcpServers={handleImportMcpServers}
         onMapBaseLayerChange={onMapBaseLayerChange}
         onModelConfigChange={handleModelConfigChange}
         onModelProfileCreate={handleModelProfileCreate}
@@ -1233,6 +1437,8 @@ export default function AISidebar({
             prev.map((s) => (s.id === id ? { ...s, enabled } : s))
           )
         }
+        onUpdateMcpServer={handleUpdateMcpServer}
+        onValidateMcpServer={(id) => void handleValidateMcpServer(id)}
         open={settingsOpen}
         projectMcpEnabled={projectMcpEnabled}
         registeredSkills={registeredSkills}
@@ -2121,7 +2327,7 @@ export interface TacticalSettingsProps {
   projectMcpEnabled: boolean;
   newServerName: string;
   newServerEndpoint: string;
-  newServerTransport: "stdio" | "sse" | "http";
+  newServerTransport: MCPServerTransport;
   customSkills: CustomSkillConfig[];
   activeCustomSkillsCount: number;
   registeredSkills: RegisteredSkill[];
@@ -2139,12 +2345,19 @@ export interface TacticalSettingsProps {
   onMapBaseLayerChange: (key: CesiumBaseLayerKey) => void;
   onProjectMcpEnabledChange: (enabled: boolean) => void;
   onAddServer: () => void;
-  onImportMcpServers: (servers: MCPServerImportPayload[]) => void;
+  onImportMcpServers: (
+    servers: MCPServerImportPayload[]
+  ) => void | Promise<void>;
   onRemoveServer: (id: string) => void;
   onToggleServer: (id: string, enabled: boolean) => void;
+  onUpdateMcpServer: (
+    id: string,
+    server: MCPServerImportPayload
+  ) => void | Promise<void>;
+  onValidateMcpServer: (id: string) => void | Promise<void>;
   onNewServerNameChange: (v: string) => void;
   onNewServerEndpointChange: (v: string) => void;
-  onNewServerTransportChange: (t: "stdio" | "sse" | "http") => void;
+  onNewServerTransportChange: (t: MCPServerTransport) => void;
   onAddSkill: (options?: AddCustomSkillOptions) => void | Promise<void>;
   onRemoveCustomSkill: (id: string) => void | Promise<void>;
   onToggleCustomSkill: (id: string, enabled: boolean) => void | Promise<void>;

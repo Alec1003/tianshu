@@ -6,6 +6,8 @@ import type {
   CustomSkillCreatePayload,
   CustomSkillListResponse,
   CustomSkillUpdatePayload,
+  ExternalMcpValidateRequest,
+  ExternalMcpValidateResponse,
   InternalSkillProposalRequest,
   InternalSkillProposalResponse,
   RegisteredSkill,
@@ -123,6 +125,15 @@ export async function updateCustomSkill(
 export async function deleteCustomSkill(skillId: string): Promise<void> {
   await apiCall<void>(`/api/ai/custom-skills/${encodeURIComponent(skillId)}`, {
     method: "DELETE",
+  });
+}
+
+export async function validateExternalMcpServer(
+  payload: ExternalMcpValidateRequest
+): Promise<ExternalMcpValidateResponse> {
+  return apiCall<ExternalMcpValidateResponse>("/api/ai/mcp/validate", {
+    method: "POST",
+    json: payload,
   });
 }
 

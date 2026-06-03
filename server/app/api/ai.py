@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import shlex
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
@@ -25,6 +26,8 @@ from app.ai.models import (
     CustomSkillListResponse,
     CustomSkillRead,
     CustomSkillUpdateRequest,
+    ExternalMcpValidateRequest,
+    ExternalMcpValidateResponse,
     InternalSkillProposalRequest,
     InternalSkillProposalResponse,
     ModelCheckRequest,
@@ -46,6 +49,7 @@ from app.ai.models import (
     RuntimeUpdateUnitRequest,
     RuntimeUpdateWeaponQuantityRequest,
 )
+from app.ai.mcp_client import MCPClientSkeleton, MCPServerConfig
 from app.ai.command_service import (
     CommandProposalNotFoundError,
     get_command_proposal,
@@ -1444,6 +1448,110 @@ def delete_custom_skill(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=str(exc),
         ) from exc
+
+
+def _external_mcp_transport(payload: ExternalMcpValidateRequest) -> str:
+    transport = payload.transport.strip().lower().replace("-", "_")
+    if transport in {"http", "sse", "streamablehttp", "streamable_http"}:
+        return "streamable_http"
+    if transport == "stdio":
+        return "stdio"
+    raise HTTPException(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        detail=f"Unsupported MCP transport: {payload.transport}",
+    )
+
+
+def _split_mcp_command_line(command_line: str) -> tuple[str, list[str]]:
+    if not command_line.strip() or command_line.startswith("stdio://"):
+        return "", []
+    try:
+        parts = shlex.split(command_line, posix=True)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Invalid stdio command line: {exc}",
+        ) from exc
+    if not parts:
+        return "", []
+    return parts[0], parts[1:]
+
+
+def _external_mcp_config_from_payload(
+    payload: ExternalMcpValidateRequest,
+) -> MCPServerConfig:
+    transport = _external_mcp_transport(payload)
+    endpoint = payload.endpoint.strip()
+    command = payload.command.strip()
+    args = [arg for arg in payload.args if arg.strip()]
+    url = (payload.url or "").strip()
+
+    if transport == "stdio":
+        if not command:
+            command, fallback_args = _split_mcp_command_line(endpoint)
+            args = args or fallback_args
+        if not command:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="stdio MCP validation requires command or command-line endpoint.",
+            )
+        url = ""
+    else:
+        url = url or endpoint
+        if not url:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="HTTP MCP validation requires url or endpoint.",
+            )
+        command = ""
+        args = []
+
+    return MCPServerConfig(
+        name=payload.name,
+        transport=transport,
+        command=command,
+        args=args,
+        env=dict(payload.env),
+        url=url,
+        headers=dict(payload.headers),
+        allowed_tools=list(payload.allowedTools),
+        enabled=payload.enabled,
+        timeout_seconds=min(max(float(payload.timeoutSeconds), 1.0), 15.0),
+    )
+
+
+@router.post("/mcp/validate", response_model=ExternalMcpValidateResponse)
+async def validate_external_mcp_server(
+    payload: ExternalMcpValidateRequest,
+    user: User = Depends(current_active_user),
+) -> ExternalMcpValidateResponse:
+    """Validate one operator-provided MCP server and return its tool list.
+
+    The config is intentionally not persisted server-side here. The client uses
+    this as a connection proof before saving its local MCP configuration.
+    """
+    _ = user
+    config = _external_mcp_config_from_payload(payload)
+    client = MCPClientSkeleton()
+    try:
+        client.register_server(config)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
+
+    trace, tools = await client.list_tools(config.name)
+    ok = any(item.status == "ok" for item in trace)
+    message = trace[-1].message if trace else "MCP validation finished."
+    return ExternalMcpValidateResponse(
+        ok=ok,
+        server=config.name,
+        transport=config.normalized_transport(),  # type: ignore[arg-type]
+        message=message,
+        tools=tools,
+        trace=trace,
+    )
 
 
 @router.post("/model/check", response_model=ModelCheckResponse)

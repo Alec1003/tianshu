@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import math
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class SkillDefinition(BaseModel):
@@ -311,7 +312,22 @@ class RuntimeDeployUnitRequest(BaseModel):
 class RuntimeMoveUnitRequest(BaseModel):
     unit_type: Literal["aircraft", "ship"]
     unit_id: str = Field(min_length=1)
-    route: list[list[float]] = Field(default_factory=list)
+    route: list[list[float]] = Field(default_factory=list, max_length=32)
+
+    @field_validator("route")
+    @classmethod
+    def validate_route(cls, route: list[list[float]]) -> list[list[float]]:
+        for index, point in enumerate(route):
+            if len(point) != 2:
+                raise ValueError(f"route[{index}] must be [latitude, longitude]")
+            latitude, longitude = point
+            if not math.isfinite(latitude) or not math.isfinite(longitude):
+                raise ValueError(f"route[{index}] coordinates must be finite")
+            if latitude < -90 or latitude > 90:
+                raise ValueError(f"route[{index}] latitude out of range")
+            if longitude < -180 or longitude > 180:
+                raise ValueError(f"route[{index}] longitude out of range")
+        return route
 
 
 class RuntimeSetUnitPositionRequest(BaseModel):

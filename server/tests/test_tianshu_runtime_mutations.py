@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from threading import RLock
 
+import pytest
+
 from app.tianshu_runtime.runtime import TianShuRuntime
 
 from blade.Game import Game
@@ -53,6 +55,11 @@ def test_deploy_aircraft_uses_backend_weapon_loadout() -> None:
         "AGM-65 Maverick",
     ]
     assert [weapon.current_quantity for weapon in aircraft.weapons] == [4, 2, 2]
+    assert [weapon.target_types for weapon in aircraft.weapons] == [
+        ["aircraft"],
+        ["aircraft"],
+        ["facility", "airbase", "ship"],
+    ]
 
 
 def test_deploy_aircraft_uses_unit_asset_electronic_warfare_template() -> None:
@@ -86,6 +93,20 @@ def test_deploy_aircraft_uses_unit_asset_electronic_warfare_template() -> None:
     assert aircraft.weapons == []
 
 
+def test_deploy_aircraft_rejects_unknown_class_without_template() -> None:
+    runtime = _runtime()
+
+    with pytest.raises(ValueError, match="Unknown aircraft class"):
+        runtime.deploy_aircraft(
+            "Imaginary Airframe",
+            latitude=10.0,
+            longitude=20.0,
+            side="blue",
+        )
+
+    assert runtime.game.current_scenario.aircraft == []
+
+
 def test_runtime_unit_mutations_are_applied_in_backend_scenario() -> None:
     runtime = _runtime()
     runtime.deploy_ship("Destroyer", 11.0, 21.0, side="blue")
@@ -99,6 +120,20 @@ def test_runtime_unit_mutations_are_applied_in_backend_scenario() -> None:
     assert ship.latitude == 14.0
     assert ship.longitude == 24.0
     assert ship.is_objective is True
+
+
+def test_runtime_move_unit_rejects_invalid_route_coordinates() -> None:
+    runtime = _runtime()
+    runtime.deploy_ship("Destroyer", 11.0, 21.0, side="blue")
+    ship = runtime.game.current_scenario.ships[0]
+
+    with pytest.raises(ValueError, match="latitude out of range"):
+        runtime.move_unit("ship", ship.id, [[999.0, 22.0]])
+
+    with pytest.raises(ValueError, match="numeric coordinates"):
+        runtime.move_unit("ship", ship.id, [["bad", 22.0]])  # type: ignore[list-item]
+
+    assert ship.route == []
 
 
 def test_runtime_obstacle_mutations_are_applied_in_backend_scenario() -> None:
@@ -322,3 +357,13 @@ def test_step_simulation_reports_actual_steps_when_time_limit_stops_early() -> N
         "currentTime": 1,
         "refuelingEvents": [],
     }
+
+
+def test_step_simulation_rejects_invalid_step_count() -> None:
+    runtime = _runtime()
+
+    with pytest.raises(ValueError, match="between 1 and 7200"):
+        runtime.step_simulation(0)
+
+    with pytest.raises(ValueError, match="between 1 and 7200"):
+        runtime.step_simulation(7201)

@@ -66,6 +66,7 @@ from app.tianshu_runtime.runtime import TianShuRuntime
 from app.scenarios import service as scenario_service
 from app.scenarios.errors import ScenarioServiceError
 from app.scenarios.models import Scenario
+from app.unit_assets.service import find_accessible_unit_asset_by_name
 
 
 logger = logging.getLogger(__name__)
@@ -1131,23 +1132,53 @@ async def runtime_deploy_aircraft(
     name: str | None = None,
     altitude: float = 10000.0,
 ) -> dict[str, Any]:
-    """在活想定中部署一架飞机。``side`` 可传 side_id 或 side 名（如 "RED"）。
+    """Deploy an aircraft from built-in or user unit-asset data only.
 
-    ``class_name`` 必须命中后端 AircraftDb（默认未命中会回落到首行）；建
-    议先用 DB 工具读 SCS 模板看可选机型，再传入这里。
+    Unknown class names are rejected; this tool never invents aircraft templates
+    or creates map placeholders for missing database rows.
     """
+    try:
+        user = _get_user(ctx)
+    except _UnauthenticatedError as exc:
+        return ToolError(
+            code="unauthenticated",
+            message=str(exc),
+        ).model_dump()
+
+    template: dict[str, Any] | None = None
+    async with async_session_maker() as session:
+        asset = await find_accessible_unit_asset_by_name(
+            session,
+            user,
+            asset_type="aircraft",
+            name=class_name,
+        )
+        if asset is not None:
+            template = dict(asset.data)
+
+    if template is None and not TianShuRuntime.is_known_aircraft_class(class_name):
+        return ToolError(
+            code="unknown_aircraft_class",
+            message="数据库中不存在该飞机型号，禁止由大模型生成占位飞机。请先录入单位资产库。",
+            details={"class_name": class_name},
+        ).model_dump()
+
+    parameters: dict[str, Any] = {
+        "class_name": class_name,
+        "latitude": latitude,
+        "longitude": longitude,
+        "side": side,
+        "name": name,
+        "altitude": altitude,
+    }
+    if template is not None:
+        parameters["template"] = template
+
     return await _create_runtime_proposal(
         ctx,
         command=f"MCP runtime_deploy_aircraft class_name={class_name}",
         skill="deploy_aircraft",
-        parameters={
-            "class_name": class_name,
-            "latitude": latitude,
-            "longitude": longitude,
-            "side": side,
-            "name": name,
-            "altitude": altitude,
-        },
+        parameters=parameters,
     )
 
 

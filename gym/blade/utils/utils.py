@@ -108,9 +108,12 @@ def get_next_coordinates(
     total_distance_km = get_distance_between_two_points(
         origin_latitude, origin_longitude, destination_latitude, destination_longitude
     )
-    total_time_hours = (total_distance_km * KILOMETERS_TO_NAUTICAL_MILES) / (
-        platform_speed if platform_speed >= 0 else -platform_speed
-    )
+    speed = abs(platform_speed)
+    if total_distance_km <= 0:
+        return [destination_latitude, destination_longitude]
+    if speed <= 0:
+        return [origin_latitude, origin_longitude]
+    total_time_hours = (total_distance_km * KILOMETERS_TO_NAUTICAL_MILES) / speed
     total_time_seconds = max(
         math.floor(total_time_hours * 3600), 0.0001
     )  # prevent divide-by-zero

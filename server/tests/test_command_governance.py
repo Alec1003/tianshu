@@ -56,6 +56,9 @@ class FakeRuntime:
     def __init__(self) -> None:
         self.game = SimpleNamespace(current_scenario=FakeScenario())
 
+    def is_known_aircraft_class(self, class_name: str) -> bool:
+        return class_name == "F-35A Lightning II"
+
 
 class FakeRegistry:
     def __init__(self) -> None:
@@ -124,6 +127,36 @@ def test_blocked_proposal_cannot_be_approved() -> None:
     assert proposal.status == "blocked"
     assert proposal.adjudication.issues[0].severity == "blocking"
     with pytest.raises(ValueError, match="不能审批执行"):
+        queue.approve_and_execute(proposal.id)
+
+
+def test_unknown_aircraft_deploy_is_blocked_before_approval() -> None:
+    registry = FakeRegistry()
+    queue = CommandApprovalQueue(FakeRuntime(), registry)  # type: ignore[arg-type]
+
+    proposal = queue.create_proposal(
+        command="deploy imaginary aircraft",
+        source="llm_tool",
+        steps=[
+            StructuredCommandStep(
+                id="s1",
+                skill="deploy_aircraft",
+                parameters={
+                    "class_name": "Imaginary Airframe",
+                    "latitude": 10.0,
+                    "longitude": 20.0,
+                    "side": "blue",
+                },
+            )
+        ],
+    )
+
+    assert proposal.status == "blocked"
+    assert any(
+        issue.code == "unknown_aircraft_class"
+        for issue in proposal.adjudication.issues
+    )
+    with pytest.raises(ValueError):
         queue.approve_and_execute(proposal.id)
     assert registry.calls == []
 

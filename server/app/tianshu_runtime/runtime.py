@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 import sys
 from pathlib import Path
 from threading import RLock
@@ -61,6 +62,7 @@ FALLBACK_WEAPON_TEMPLATES = {
         "fuel_rate": 350.0,
         "range": 86.0,
         "lethality": 0.65,
+        "target_types": ["aircraft"],
     },
     "AIM-9 Sidewinder": {
         "speed": 1500.0,
@@ -68,6 +70,7 @@ FALLBACK_WEAPON_TEMPLATES = {
         "fuel_rate": 80.0,
         "range": 19.0,
         "lethality": 0.60,
+        "target_types": ["aircraft"],
     },
     "AGM-65 Maverick": {
         "speed": 600.0,
@@ -75,6 +78,7 @@ FALLBACK_WEAPON_TEMPLATES = {
         "fuel_rate": 120.0,
         "range": 12.0,
         "lethality": 0.70,
+        "target_types": ["facility", "airbase", "ship"],
     },
     "48N6 (S-400 Triumf)": {
         "speed": 3966.0,
@@ -82,6 +86,7 @@ FALLBACK_WEAPON_TEMPLATES = {
         "fuel_rate": 300.0,
         "range": 135.0,
         "lethality": 0.90,
+        "target_types": ["aircraft", "weapon"],
     },
     "9M96 (S-300V4)": {
         "speed": 2644.0,
@@ -89,6 +94,7 @@ FALLBACK_WEAPON_TEMPLATES = {
         "fuel_rate": 200.0,
         "range": 65.0,
         "lethality": 0.85,
+        "target_types": ["aircraft", "weapon"],
     },
     "57E6E (Pantsir-S1)": {
         "speed": 2313.0,
@@ -96,6 +102,7 @@ FALLBACK_WEAPON_TEMPLATES = {
         "fuel_rate": 80.0,
         "range": 10.8,
         "lethality": 0.70,
+        "target_types": ["aircraft", "weapon"],
     },
     "RIM-174 Standard SM-6": {
         "speed": 2313.0,
@@ -103,6 +110,7 @@ FALLBACK_WEAPON_TEMPLATES = {
         "fuel_rate": 300.0,
         "range": 130.0,
         "lethality": 0.90,
+        "target_types": ["aircraft", "weapon", "ship"],
     },
     "RIM-116 RAM": {
         "speed": 1653.0,
@@ -110,6 +118,7 @@ FALLBACK_WEAPON_TEMPLATES = {
         "fuel_rate": 100.0,
         "range": 5.5,
         "lethality": 0.80,
+        "target_types": ["aircraft", "weapon"],
     },
     "RGM-84 Harpoon": {
         "speed": 475.0,
@@ -117,11 +126,29 @@ FALLBACK_WEAPON_TEMPLATES = {
         "fuel_rate": 150.0,
         "range": 67.0,
         "lethality": 0.80,
+        "target_types": ["ship"],
     },
 }
 
 
-def _load_weapon_templates() -> dict[str, dict[str, float]]:
+def _template_target_types(row: dict[str, Any]) -> list[str]:
+    for key in (
+        "targetTypes",
+        "target_types",
+        "allowedTargetTypes",
+        "allowed_target_types",
+        "targetDomains",
+        "target_domains",
+    ):
+        value = row.get(key)
+        if isinstance(value, list):
+            return [str(item).strip().lower() for item in value if str(item).strip()]
+        if isinstance(value, str):
+            return [item.strip().lower() for item in value.split(",") if item.strip()]
+    return []
+
+
+def _load_weapon_templates() -> dict[str, dict[str, Any]]:
     templates = dict(FALLBACK_WEAPON_TEMPLATES)
     source = unit_assets_file()
     try:
@@ -133,12 +160,17 @@ def _load_weapon_templates() -> dict[str, dict[str, float]]:
         class_name = row.get("className") or row.get("class_name")
         if not class_name:
             continue
+        fallback = templates.get(str(class_name), {})
+        target_types = _template_target_types(row) or list(
+            fallback.get("target_types", [])
+        )
         templates[str(class_name)] = {
             "speed": float(row.get("speed", 0.0) or 0.0),
             "max_fuel": float(row.get("maxFuel", row.get("max_fuel", 0.0)) or 0.0),
             "fuel_rate": float(row.get("fuelRate", row.get("fuel_rate", 1.0)) or 1.0),
             "range": float(row.get("range", 0.0) or 0.0),
             "lethality": float(row.get("lethality", 0.0) or 0.0),
+            "target_types": target_types,
         }
     return templates
 
@@ -184,6 +216,28 @@ class TianShuRuntime:
         except (TypeError, ValueError):
             return default
 
+    @classmethod
+    def _normalize_route(cls, route: list[list[float]]) -> list[list[float]]:
+        if len(route) > 32:
+            raise ValueError("Route supports at most 32 waypoints")
+        normalized_route: list[list[float]] = []
+        for index, point in enumerate(route):
+            if not isinstance(point, list | tuple) or len(point) != 2:
+                raise ValueError(f"Route point {index} must be [latitude, longitude]")
+            try:
+                latitude = float(point[0])
+                longitude = float(point[1])
+            except (TypeError, ValueError):
+                raise ValueError(f"Route point {index} must contain numeric coordinates") from None
+            if not math.isfinite(latitude) or not math.isfinite(longitude):
+                raise ValueError(f"Route point {index} must contain finite coordinates")
+            if latitude < -90 or latitude > 90:
+                raise ValueError(f"Route point {index} latitude out of range")
+            if longitude < -180 or longitude > 180:
+                raise ValueError(f"Route point {index} longitude out of range")
+            normalized_route.append([latitude, longitude])
+        return normalized_route
+
     @staticmethod
     def _normalize_scenario_payload(scenario_json: str) -> str:
         """委托给 ``app.tianshu_runtime._doctrine.normalize_scenario_payload``。
@@ -216,6 +270,20 @@ class TianShuRuntime:
             if str(row.get(key, "")).lower() == value.lower():
                 return row
         return rows[0] if rows else {}
+
+    @staticmethod
+    def _find_exact_db_row(
+        rows: list[dict[str, Any]], key: str, value: str
+    ) -> dict[str, Any] | None:
+        normalized_value = value.strip().lower()
+        for row in rows:
+            if str(row.get(key, "")).strip().lower() == normalized_value:
+                return row
+        return None
+
+    @classmethod
+    def is_known_aircraft_class(cls, class_name: str) -> bool:
+        return cls._find_exact_db_row(AircraftDb, "class_name", class_name) is not None
 
     @staticmethod
     def _row_value(row: dict[str, Any], *keys: str, default: Any = None) -> Any:
@@ -275,6 +343,7 @@ class TianShuRuntime:
             lethality=self._to_float(template.get("lethality"), 0.0),
             max_quantity=quantity,
             current_quantity=quantity,
+            target_types=list(template.get("target_types", [])),
         )
 
     def _default_weapons(
@@ -428,7 +497,9 @@ class TianShuRuntime:
 
     def step_simulation(self, steps: int = 1) -> dict[str, Any]:
         with self._lock:
-            requested_steps = max(1, steps)
+            requested_steps = int(steps)
+            if requested_steps < 1 or requested_steps > 7200:
+                raise ValueError("steps must be between 1 and 7200")
             executed_steps = 0
             refueling_events: list[dict[str, Any]] = []
             for _ in range(requested_steps):
@@ -643,7 +714,15 @@ class TianShuRuntime:
         with self._lock:
             side_id = self._resolve_side_id(side)
             side_color = self._side_color(side_id)
-            row = template or self._find_db_row(AircraftDb, "class_name", class_name)
+            row = (
+                template
+                if template is not None
+                else self._find_exact_db_row(AircraftDb, "class_name", class_name)
+            )
+            if row is None:
+                raise ValueError(
+                    f"Unknown aircraft class: {class_name}. Add it to the unit asset database before deployment."
+                )
             is_tanker = self._row_bool(row, "is_tanker", "isTanker")
             is_electronic_warfare = self._row_bool(
                 row, "is_electronic_warfare", "isElectronicWarfare"
@@ -929,11 +1008,7 @@ class TianShuRuntime:
     ) -> dict[str, Any]:
         with self._lock:
             unit_type = unit_type.lower().strip()
-            normalized_route = [
-                [self._to_float(point[0] if len(point) > 0 else None, 0.0),
-                 self._to_float(point[1] if len(point) > 1 else None, 0.0)]
-                for point in route
-            ]
+            normalized_route = self._normalize_route(route)
             if unit_type == "aircraft":
                 if self.game.current_scenario.get_aircraft(unit_id) is None:
                     raise ValueError("Aircraft not found")

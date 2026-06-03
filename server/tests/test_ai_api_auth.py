@@ -542,8 +542,26 @@ def test_ai_runtime_control_endpoints_return_authoritative_snapshot() -> None:
 def test_ai_runtime_step_rejects_invalid_step_count() -> None:
     client = _build_client(authenticated=True)
 
+    zero = client.post("/api/ai/runtime/step", json={"steps": 0})
+    assert zero.status_code == 422
+
     too_large = client.post("/api/ai/runtime/step", json={"steps": 7201})
     assert too_large.status_code == 422
+
+
+def test_ai_runtime_move_unit_rejects_invalid_route_coordinates() -> None:
+    client = _build_client(authenticated=True)
+
+    response = client.patch(
+        "/api/ai/runtime/units/route",
+        json={
+            "unit_type": "aircraft",
+            "unit_id": "aircraft-1",
+            "route": [[999, -999]],
+        },
+    )
+
+    assert response.status_code == 422
 
 
 def test_ai_runtime_uses_user_scoped_bridge_registry() -> None:

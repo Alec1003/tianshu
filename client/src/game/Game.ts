@@ -185,6 +185,8 @@ export default class Game {
       Math.min(maxQuantity, weapon.currentQuantity ?? maxQuantity)
     );
     const legacySuffix = /^Sample Weapon\s*(#.+)?$/.exec(weapon.name)?.[1];
+    const loadedTargetTypes = (weapon as unknown as { target_types?: string[] })
+      .target_types;
 
     return new Weapon({
       id: weapon.id,
@@ -211,6 +213,7 @@ export default class Game {
       maxQuantity,
       currentQuantity,
       sideColor: weapon.sideColor,
+      targetTypes: template?.targetTypes ?? weapon.targetTypes ?? loadedTargetTypes,
     });
   }
 
@@ -382,6 +385,7 @@ export default class Game {
         lethality: weapon.lethality,
         maxQuantity: weaponQuantity,
         currentQuantity: weaponQuantity,
+        targetTypes: weapon.targetTypes,
       });
       weapons.push(newWeapon);
     });

@@ -354,9 +354,9 @@ export default function AITacticalCommandPlatform({
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
   const [showRoutes, setShowRoutes] = useState(false);
   const [showRanges, setShowRanges] = useState(false);
-  const [mapSceneMode, setMapSceneMode] = useState<CesiumSceneModeKey>("2d");
+  const [mapSceneMode, setMapSceneMode] = useState<CesiumSceneModeKey>("3d");
   const [mapBaseLayer, setMapBaseLayer] =
-    useState<CesiumBaseLayerKey>("satellite");
+    useState<CesiumBaseLayerKey>("arcgisImagery");
   const [placement, setPlacement] = useState<CesiumPlacement | null>(null);
   const runStateRef = useRef<SimulationRunState>("idle");
   const playLoopRunning = useRef(false);

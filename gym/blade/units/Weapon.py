@@ -27,6 +27,7 @@ class Weapon:
         lethality: float = 0.0,
         max_quantity: int = 0,
         current_quantity: int = 0,
+        target_types: Optional[List[str]] = None,
     ):
         self.id = id
         self.name = name
@@ -45,11 +46,16 @@ class Weapon:
         self.lethality = lethality
         self.max_quantity = max_quantity
         self.current_quantity = current_quantity
+        self.target_types = [
+            str(target_type).strip().lower()
+            for target_type in (target_types or [])
+            if str(target_type).strip()
+        ]
         self.route = route if route is not None else []
         self.side_color = convert_color_name_to_side_color(side_color)
 
     def get_engagement_range(self) -> float:
-        return self.speed * (self.current_fuel / self.fuel_rate)
+        return max(float(self.range or 0.0), 0.0)
 
     def to_dict(self):
         return {
@@ -70,6 +76,7 @@ class Weapon:
             "lethality": self.lethality,
             "max_quantity": self.max_quantity,
             "current_quantity": self.current_quantity,
+            "target_types": self.target_types,
             "route": self.route,
             "side_color": (
                 self.side_color.value

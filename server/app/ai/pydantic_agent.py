@@ -641,7 +641,7 @@ def build_agent(
         side: str = "BLUE",
         name: str = "",
     ) -> dict[str, Any]:
-        """Deploy an aircraft unit at the given lat/lon. side: BLUE | RED | ALLY."""
+        """Deploy an existing aircraft class only; never invent missing aircraft."""
         params: dict[str, Any] = {
             "class_name": class_name,
             "latitude": latitude,

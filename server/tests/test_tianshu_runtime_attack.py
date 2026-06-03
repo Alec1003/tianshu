@@ -14,7 +14,9 @@ from blade.units.Ship import Ship
 from blade.units.Weapon import Weapon
 
 
-def _weapon(weapon_id: str, quantity: int = 2) -> Weapon:
+def _weapon(
+    weapon_id: str, quantity: int = 2, target_types: list[str] | None = None
+) -> Weapon:
     return Weapon(
         id=weapon_id,
         name=f"Weapon {weapon_id}",
@@ -31,6 +33,7 @@ def _weapon(weapon_id: str, quantity: int = 2) -> Weapon:
         range=1000.0,
         current_quantity=quantity,
         max_quantity=quantity,
+        target_types=target_types,
     )
 
 
@@ -147,3 +150,61 @@ def test_runtime_attack_unit_supports_ship_auto_attack() -> None:
     ]
     assert len(scenario.weapons) == 1
     assert scenario.ships[0].weapons == []
+
+
+def test_runtime_attack_unit_rejects_target_outside_declared_weapon_range() -> None:
+    scenario = _scenario()
+    aircraft = scenario.aircraft[0]
+    aircraft.weapons[0].range = 10.0
+    scenario.facilities[0].longitude = 0.5
+    runtime = _runtime_for_scenario(scenario)
+
+    state = runtime.attack_unit(
+        attacker_type="aircraft",
+        attacker_id="blue-aircraft",
+        target_id="red-facility",
+        weapon_id="aircraft-weapon",
+        weapon_quantity=1,
+    )
+
+    assert state["attacked"] is False
+    assert state["launched"] == []
+    assert len(scenario.weapons) == 0
+    assert aircraft.weapons[0].current_quantity == 2
+
+
+def test_runtime_attack_unit_rejects_incompatible_weapon_target_domain() -> None:
+    scenario = _scenario()
+    ship = scenario.ships[0]
+    ship.weapons = [_weapon("harpoon", 1, target_types=["ship"])]
+    scenario.aircraft.append(
+        Aircraft(
+            id="red-aircraft",
+            name="Red Aircraft",
+            side_id="red",
+            class_name="Test Aircraft",
+            latitude=0.0,
+            longitude=0.0,
+            altitude=1000.0,
+            heading=0.0,
+            speed=300.0,
+            current_fuel=1000.0,
+            max_fuel=1000.0,
+            fuel_rate=100.0,
+            range=100.0,
+        )
+    )
+    runtime = _runtime_for_scenario(scenario)
+
+    state = runtime.attack_unit(
+        attacker_type="ship",
+        attacker_id="blue-ship",
+        target_id="red-aircraft",
+        weapon_id="harpoon",
+        weapon_quantity=1,
+    )
+
+    assert state["attacked"] is False
+    assert state["launched"] == []
+    assert len(scenario.weapons) == 0
+    assert ship.weapons[0].current_quantity == 1

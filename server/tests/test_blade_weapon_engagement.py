@@ -11,6 +11,7 @@ if str(GYM_DIR) not in sys.path:
 
 from blade.engine.weaponEngagement import (  # noqa: E402
     is_threat_detected,
+    launch_weapon,
     weapon_can_engage_target,
 )
 from blade.Game import Game  # noqa: E402
@@ -23,7 +24,7 @@ from blade.units.Obstacle import Obstacle  # noqa: E402
 from blade.units.Ship import Ship  # noqa: E402
 from blade.units.Weapon import Weapon  # noqa: E402
 from blade.utils.constants import NAUTICAL_MILES_TO_METERS  # noqa: E402
-from blade.utils.utils import get_distance_between_two_points  # noqa: E402
+from blade.utils.utils import get_distance_between_two_points, get_next_coordinates  # noqa: E402
 from blade.mission.StrikeMission import StrikeMission  # noqa: E402
 
 
@@ -60,6 +61,188 @@ def test_weapon_can_engage_target_on_exact_range_boundary() -> None:
     )
 
     assert weapon_can_engage_target(target, weapon) is True
+
+
+def test_weapon_engagement_uses_declared_range_not_fuel_endurance() -> None:
+    target = Facility(
+        id="target",
+        name="Target",
+        side_id="red",
+        class_name="Radar",
+        latitude=0.0,
+        longitude=0.5,
+        range=100.0,
+    )
+    weapon = Weapon(
+        id="weapon",
+        name="Weapon",
+        side_id="blue",
+        class_name="Test Weapon",
+        latitude=0.0,
+        longitude=0.0,
+        altitude=1000.0,
+        heading=0.0,
+        speed=1000.0,
+        current_fuel=1.0,
+        max_fuel=1.0,
+        fuel_rate=1.0,
+        range=10.0,
+    )
+
+    assert weapon_can_engage_target(target, weapon) is False
+
+
+def test_manual_aircraft_attack_rejects_target_outside_declared_weapon_range() -> None:
+    weapon = _surface_weapon(quantity=1)
+    weapon.range = 10.0
+    aircraft = Aircraft(
+        id="blue-aircraft",
+        name="Blue Aircraft",
+        side_id="blue",
+        class_name="Test Aircraft",
+        latitude=0.0,
+        longitude=0.0,
+        altitude=1000.0,
+        heading=0.0,
+        speed=300.0,
+        current_fuel=1000.0,
+        max_fuel=1000.0,
+        fuel_rate=100.0,
+        range=100.0,
+        weapons=[weapon],
+    )
+    target = Facility(
+        id="red-site",
+        name="Red Site",
+        side_id="red",
+        class_name="Radar",
+        latitude=0.0,
+        longitude=0.5,
+        range=100.0,
+        weapons=[],
+    )
+    relationships = Relationships()
+    relationships.add_hostile("blue", "red")
+    scenario = Scenario(
+        id="s1",
+        name="Out of declared weapon range",
+        start_time=0,
+        current_time=0,
+        duration=600,
+        sides=[
+            Side(id="blue", name="BLUE", color="blue"),
+            Side(id="red", name="RED", color="red"),
+        ],
+        aircraft=[aircraft],
+        facilities=[target],
+        relationships=relationships,
+    )
+    game = Game(current_scenario=scenario)
+
+    game.handle_aircraft_attack("blue-aircraft", "red-site", weapon.id, 1)
+
+    assert scenario.weapons == []
+    assert weapon.current_quantity == 1
+
+
+def test_weapon_target_types_reject_incompatible_target_domain() -> None:
+    aircraft = Aircraft(
+        id="red-aircraft",
+        name="Red Aircraft",
+        side_id="red",
+        class_name="Test Aircraft",
+        latitude=0.0,
+        longitude=0.0,
+        altitude=1000.0,
+        heading=0.0,
+        speed=300.0,
+        current_fuel=1000.0,
+        max_fuel=1000.0,
+        fuel_rate=100.0,
+        range=100.0,
+    )
+    ship = Ship(
+        id="red-ship",
+        name="Red Ship",
+        side_id="red",
+        class_name="Destroyer",
+        latitude=0.0,
+        longitude=0.0,
+        altitude=0.0,
+        heading=0.0,
+        speed=20.0,
+        current_fuel=1000.0,
+        max_fuel=1000.0,
+        fuel_rate=100.0,
+        range=100.0,
+    )
+    harpoon = Weapon(
+        id="harpoon",
+        name="Harpoon",
+        side_id="blue",
+        class_name="RGM-84 Harpoon",
+        latitude=0.0,
+        longitude=0.0,
+        altitude=1000.0,
+        heading=0.0,
+        speed=475.0,
+        current_fuel=700.0,
+        max_fuel=700.0,
+        fuel_rate=150.0,
+        range=67.0,
+    )
+
+    assert weapon_can_engage_target(aircraft, harpoon) is False
+    assert weapon_can_engage_target(ship, harpoon) is True
+
+
+def test_zero_speed_weapon_does_not_launch_or_raise() -> None:
+    weapon = _surface_weapon(quantity=1)
+    weapon.speed = 0.0
+    aircraft = Aircraft(
+        id="blue-aircraft",
+        name="Blue Aircraft",
+        side_id="blue",
+        class_name="Test Aircraft",
+        latitude=0.0,
+        longitude=0.0,
+        altitude=1000.0,
+        heading=0.0,
+        speed=300.0,
+        current_fuel=1000.0,
+        max_fuel=1000.0,
+        fuel_rate=100.0,
+        range=100.0,
+        weapons=[weapon],
+    )
+    target = Facility(
+        id="red-site",
+        name="Red Site",
+        side_id="red",
+        class_name="Radar",
+        latitude=0.0,
+        longitude=0.0,
+        range=100.0,
+        weapons=[],
+    )
+    scenario = Scenario(
+        id="s1",
+        name="Zero speed launch guard",
+        start_time=0,
+        current_time=0,
+        duration=600,
+        aircraft=[aircraft],
+        facilities=[target],
+    )
+
+    launch_weapon(scenario, aircraft, target, weapon, 1)
+
+    assert scenario.weapons == []
+    assert weapon.current_quantity == 1
+
+
+def test_get_next_coordinates_returns_origin_for_zero_speed() -> None:
+    assert get_next_coordinates(1.0, 2.0, 3.0, 4.0, 0.0) == [1.0, 2.0]
 
 
 def test_threat_detection_includes_exact_sensor_range_boundary() -> None:

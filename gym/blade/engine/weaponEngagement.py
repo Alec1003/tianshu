@@ -30,6 +30,80 @@ UNIT_SCORE_TABLE = {
 OBJECTIVE_BONUS_SCORE = 200
 
 
+def _target_type(target: Target) -> str:
+    if isinstance(target, Aircraft):
+        return "aircraft"
+    if isinstance(target, Facility):
+        return "facility"
+    if isinstance(target, Airbase):
+        return "airbase"
+    if isinstance(target, Ship):
+        return "ship"
+    return "weapon"
+
+
+def _expand_target_type(target_type: str) -> set[str]:
+    normalized = target_type.strip().lower().replace("-", "_")
+    if normalized in {"*", "any", "all"}:
+        return {"aircraft", "facility", "airbase", "ship", "weapon"}
+    if normalized in {"air", "aircraft"}:
+        return {"aircraft"}
+    if normalized in {"missile", "weapon", "munition"}:
+        return {"weapon"}
+    if normalized in {"surface", "ground", "land"}:
+        return {"facility", "airbase"}
+    if normalized in {"sea", "maritime", "naval", "ship"}:
+        return {"ship"}
+    if normalized in {"fixed", "fixed_site", "base"}:
+        return {"facility", "airbase"}
+    return {normalized}
+
+
+def _infer_weapon_target_types(weapon: Weapon) -> set[str]:
+    explicit_types = getattr(weapon, "target_types", None) or []
+    if explicit_types:
+        expanded: set[str] = set()
+        for target_type in explicit_types:
+            expanded.update(_expand_target_type(str(target_type)))
+        return expanded
+
+    class_name = str(getattr(weapon, "class_name", "") or "").lower()
+
+    if class_name.startswith("aim-") or "sidewinder" in class_name or "amraam" in class_name:
+        return {"aircraft"}
+    if "harpoon" in class_name:
+        return {"ship"}
+    if class_name.startswith("agm-") or "tomahawk" in class_name or "jassm" in class_name or "alcm" in class_name:
+        return {"facility", "airbase", "ship"}
+    if (
+        class_name.startswith("rim-")
+        or class_name.startswith("hq-")
+        or class_name.startswith("48n6")
+        or class_name.startswith("9m")
+        or class_name.startswith("57e6")
+        or "s-300" in class_name
+        or "s-400" in class_name
+        or "s-500" in class_name
+        or "buk" in class_name
+        or "tor-" in class_name
+        or "pantsir" in class_name
+        or "patriot" in class_name
+        or "thaad" in class_name
+        or "aster" in class_name
+        or "barak" in class_name
+        or "nasams" in class_name
+        or "standard" in class_name
+        or "ram" in class_name
+    ):
+        return {"aircraft", "weapon"}
+
+    return {"aircraft", "facility", "airbase", "ship", "weapon"}
+
+
+def weapon_can_target_type(target: Target, weapon: Weapon) -> bool:
+    return _target_type(target) in _infer_weapon_target_types(weapon)
+
+
 def is_threat_detected(
     threat: Target,
     detector: Facility | Ship | Aircraft,
@@ -62,6 +136,9 @@ def _remove_if_present(items: list, item) -> None:
 
 
 def weapon_can_engage_target(target: Target, weapon: Weapon) -> bool:
+    if not weapon_can_target_type(target, weapon):
+        return False
+
     weapon_engagement_range_nm = weapon.get_engagement_range()
 
     distance_to_target_km = get_distance_between_two_points(
@@ -145,8 +222,10 @@ def launch_weapon(
     launched_weapon_quantity: int,
 ) -> None:
     if (
-        len(origin.weapons) == 0
+        launched_weapon_quantity <= 0
+        or len(origin.weapons) == 0
         or launched_weapon.current_quantity < launched_weapon_quantity
+        or launched_weapon.speed <= 0
     ):
         return
 
@@ -185,6 +264,7 @@ def launch_weapon(
             lethality=launched_weapon.lethality,
             current_quantity=1,
             max_quantity=1,
+            target_types=getattr(launched_weapon, "target_types", []),
         )
         current_scenario.weapons.append(new_weapon)
     launched_weapon.current_quantity -= launched_weapon_quantity

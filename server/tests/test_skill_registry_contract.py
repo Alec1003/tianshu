@@ -51,10 +51,31 @@ class FakeRuntime:
     def update_unit_state(self, **kwargs):
         return self._ok(**kwargs)
 
+    def attack_unit(self, **kwargs):
+        return self._ok(**kwargs)
+
+    def update_weapon_quantity(self, **kwargs):
+        return self._ok(**kwargs)
+
+    def add_weapon_to_unit(self, **kwargs):
+        return self._ok(**kwargs)
+
+    def delete_weapon_from_unit(self, **kwargs):
+        return self._ok(**kwargs)
+
     def create_patrol_mission(self, **kwargs):
         return self._ok(**kwargs)
 
+    def update_patrol_mission(self, **kwargs):
+        return self._ok(**kwargs)
+
     def create_strike_mission(self, **kwargs):
+        return self._ok(**kwargs)
+
+    def update_strike_mission(self, **kwargs):
+        return self._ok(**kwargs)
+
+    def delete_mission(self, **kwargs):
         return self._ok(**kwargs)
 
     def trigger_tactical_event(self, **kwargs):

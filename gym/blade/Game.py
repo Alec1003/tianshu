@@ -40,6 +40,7 @@ from blade.engine.weaponEngagement import (
     route_aircraft_to_strike_position,
     weapon_engagement,
     weapon_can_engage_target,
+    weapon_can_target_type,
 )
 
 
@@ -551,6 +552,7 @@ class Game:
     ) -> bool:
         return (
             weapon_quantity > 0
+            and weapon.speed > 0
             and weapon.current_quantity >= weapon_quantity
             and target.id != origin.id
             and self.current_scenario.is_hostile(origin.side_id, target.side_id)
@@ -574,6 +576,7 @@ class Game:
                 weapon.current_quantity <= 0
                 or target.id == origin.id
                 or not self.current_scenario.is_hostile(origin.side_id, target.side_id)
+                or not weapon_can_target_type(target, weapon)
             ):
                 continue
             weapons.append(weapon)
@@ -1368,6 +1371,9 @@ class Game:
                             lethality=weapon["lethality"],
                             max_quantity=weapon["maxQuantity"],
                             current_quantity=weapon["currentQuantity"],
+                            target_types=weapon.get(
+                                "targetTypes", weapon.get("target_types", [])
+                            ),
                         )
                     )
             loaded_scenario.aircraft.append(
@@ -1437,6 +1443,9 @@ class Game:
                                 lethality=weapon["lethality"],
                                 max_quantity=weapon["maxQuantity"],
                                 current_quantity=weapon["currentQuantity"],
+                                target_types=weapon.get(
+                                    "targetTypes", weapon.get("target_types", [])
+                                ),
                             )
                         )
                 new_aircraft = Aircraft(
@@ -1517,6 +1526,9 @@ class Game:
                             lethality=weapon["lethality"],
                             max_quantity=weapon["maxQuantity"],
                             current_quantity=weapon["currentQuantity"],
+                            target_types=weapon.get(
+                                "targetTypes", weapon.get("target_types", [])
+                            ),
                         )
                     )
             loaded_scenario.facilities.append(
@@ -1556,6 +1568,9 @@ class Game:
                     lethality=weapon["lethality"],
                     max_quantity=weapon["maxQuantity"],
                     current_quantity=weapon["currentQuantity"],
+                    target_types=weapon.get(
+                        "targetTypes", weapon.get("target_types", [])
+                    ),
                 )
             )
         for ship in saved_scenario["ships"]:
@@ -1585,6 +1600,9 @@ class Game:
                                 lethality=weapon["lethality"],
                                 max_quantity=weapon["maxQuantity"],
                                 current_quantity=weapon["currentQuantity"],
+                                target_types=weapon.get(
+                                    "targetTypes", weapon.get("target_types", [])
+                                ),
                             )
                         )
                 new_aircraft = Aircraft(
@@ -1648,6 +1666,9 @@ class Game:
                             lethality=weapon["lethality"],
                             max_quantity=weapon["maxQuantity"],
                             current_quantity=weapon["currentQuantity"],
+                            target_types=weapon.get(
+                                "targetTypes", weapon.get("target_types", [])
+                            ),
                         )
                     )
             loaded_scenario.ships.append(

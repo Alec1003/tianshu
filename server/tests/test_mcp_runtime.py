@@ -27,6 +27,7 @@ from app.mcp.server import (
     set_request_user,
     set_shared_bridge_provider,
     set_shared_runtime_provider,
+    runtime_deploy_aircraft,
 )
 from app.mcp.schemas import RuntimeOutcome, RuntimeStatus
 
@@ -327,3 +328,94 @@ async def test_mcp_runtime_write_creates_persisted_proposal(
     assert payload["action"] == "command_proposal_created"
     assert payload["proposal"]["source"] == "mcp"
     assert proposals[0].id == payload["proposal"]["id"]
+
+
+@pytest.mark.asyncio
+async def test_mcp_runtime_deploy_aircraft_rejects_unknown_class(
+    session_maker, user, monkeypatch
+):
+    from app.mcp import server as mcp_server_mod
+
+    monkeypatch.setattr(mcp_server_mod, "async_session_maker", session_maker)
+    ctx = SimpleNamespace(
+        request_context=SimpleNamespace(
+            lifespan_context=SimpleNamespace(user=None, runtime=None)
+        )
+    )
+
+    token = set_request_user(user)
+    try:
+        payload = await runtime_deploy_aircraft(
+            ctx,  # type: ignore[arg-type]
+            class_name="Imaginary Airframe",
+            latitude=10.0,
+            longitude=20.0,
+            side="blue",
+        )
+    finally:
+        reset_request_user(token)
+
+    assert payload["code"] == "unknown_aircraft_class"
+    assert payload["details"] == {"class_name": "Imaginary Airframe"}
+
+
+@pytest.mark.asyncio
+async def test_mcp_runtime_deploy_aircraft_uses_user_asset_template(
+    session_maker, user, monkeypatch
+):
+    from app.ai.command_governance import CommandApprovalQueue
+    from app.mcp import server as mcp_server_mod
+    from app.unit_assets.service import create_unit_asset
+
+    monkeypatch.setattr(mcp_server_mod, "async_session_maker", session_maker)
+    async with session_maker() as session:
+        await create_unit_asset(
+            session,
+            user,
+            asset_type="aircraft",
+            data={
+                "className": "Custom Patrol Aircraft",
+                "speed": 640,
+                "maxFuel": 18000,
+                "fuelRate": 2400,
+                "range": 1200,
+            },
+        )
+
+    class _Registry:
+        def has_skill(self, skill: str) -> bool:
+            return skill == "deploy_aircraft"
+
+        def execute(self, skill: str, parameters: dict) -> dict:
+            return {"skill": skill, "parameters": parameters}
+
+    runtime = _make_runtime(sides=[_make_side("blue", "BLUE")])
+    runtime.is_known_aircraft_class = lambda class_name: False
+    bridge = SimpleNamespace(
+        command_approvals=CommandApprovalQueue(runtime, _Registry())  # type: ignore[arg-type]
+    )
+    ctx = SimpleNamespace(
+        request_context=SimpleNamespace(
+            lifespan_context=SimpleNamespace(user=None, runtime=None)
+        )
+    )
+
+    token = set_request_user(user)
+    set_shared_bridge_provider(lambda current_user: bridge)
+    try:
+        payload = await runtime_deploy_aircraft(
+            ctx,  # type: ignore[arg-type]
+            class_name="Custom Patrol Aircraft",
+            latitude=10.0,
+            longitude=20.0,
+            side="blue",
+        )
+    finally:
+        reset_request_user(token)
+        set_shared_bridge_provider(None)
+
+    assert payload["action"] == "command_proposal_created"
+    parameters = payload["proposal"]["steps"][0]["parameters"]
+    assert parameters["class_name"] == "Custom Patrol Aircraft"
+    assert parameters["template"]["speed"] == 640
+    assert parameters["template"]["range"] == 1200

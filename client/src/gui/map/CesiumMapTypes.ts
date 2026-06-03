@@ -1,6 +1,7 @@
 export type CesiumBaseLayerKey =
   | "lightVector"
   | "darkMatter"
+  | "arcgisImagery"
   | "satellite"
   | "sentinel";
 

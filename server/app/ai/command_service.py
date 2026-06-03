@@ -64,6 +64,7 @@ def _record_to_proposal(record: CommandProposalRecord) -> CommandProposal:
         adjudication=CommandAdjudicationResult.model_validate(
             record.adjudication or {}
         ),
+        plan_metadata=record.plan_metadata or {},
         execution=[
             SkillExecutionResult.model_validate(item)
             for item in (record.execution or [])
@@ -91,6 +92,7 @@ async def save_command_proposal(
             source=proposal.source,
             status=proposal.status,
             adjudication=proposal.adjudication.model_dump(mode="json"),
+            plan_metadata=proposal.plan_metadata or {},
             execution=[
                 item.model_dump(mode="json") for item in proposal.execution
             ],
@@ -109,6 +111,7 @@ async def save_command_proposal(
         record.source = proposal.source
         record.status = proposal.status
         record.adjudication = proposal.adjudication.model_dump(mode="json")
+        record.plan_metadata = proposal.plan_metadata or {}
         record.execution = [
             item.model_dump(mode="json") for item in proposal.execution
         ]

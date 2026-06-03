@@ -315,7 +315,7 @@ export interface CommandAdjudicationResult {
 export interface CommandProposal {
   id: string;
   command: string;
-  source: "regex" | "llm_tool" | "api" | "mcp" | "internal_skill";
+  source: "regex" | "llm_tool" | "llm_plan" | "api" | "mcp" | "internal_skill";
   status:
     | "pending"
     | "blocked"
@@ -328,6 +328,7 @@ export interface CommandProposal {
   updated_at: string;
   steps: StructuredCommandStep[];
   adjudication: CommandAdjudicationResult;
+  plan_metadata?: Record<string, unknown>;
   execution: SkillExecutionResult[];
   error?: string | null;
 }

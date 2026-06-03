@@ -12,6 +12,7 @@ import os
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any, Literal
+from uuid import uuid4
 
 from pydantic_ai import Agent, RunContext
 from pydantic_ai.models.anthropic import AnthropicModel
@@ -27,6 +28,8 @@ from app.ai.models import (
     InternalSkillMissionDraft,
     MCPCallTrace,
     SkillExecutionResult,
+    StructuredCommandStep,
+    TacticalPlanOptionDraft,
 )
 from app.ai.skill_registry import TianShuSkillRegistry
 
@@ -57,6 +60,11 @@ Rules:
 - Tool calls create command proposals for human approval; they do not directly mutate the simulation.
 - For generated operational plans, prefer propose_tactical_plan_skill so unit
   task assignments become a reviewed proposal instead of arbitrary code.
+- When asked to generate multiple operational plans or courses of action,
+  first inspect the current scenario, optionally call advisory MCP tools, then
+  call propose_tactical_plan_options once. Put all executable runtime actions
+  for one plan inside that plan option. Do not scatter one plan across multiple
+  individual write-tool calls.
 - After all tools have been called, respond with a concise single-sentence summary of what was proposed.
 - If a tool fails, note the failure in your summary but continue with remaining operations.
 """.strip()
@@ -178,6 +186,102 @@ def _propose_internal_skill(
             parameters=parameters,
             error=str(exc),
         )
+
+
+def _propose_tactical_plan_options(
+    deps: AgentDeps,
+    options: list[TacticalPlanOptionDraft],
+    command: str = "",
+) -> dict[str, Any]:
+    parameters = {
+        "command": command,
+        "options": [option.model_dump(mode="json") for option in options],
+    }
+    if deps.chat_mode == "ask":
+        return _log_tool_error(
+            deps,
+            skill="propose_tactical_plan_options",
+            parameters=parameters,
+            error="Tactical plan proposals are disabled in Ask mode.",
+        )
+    if deps.approval_queue is None:
+        return _log_tool_error(
+            deps,
+            skill="propose_tactical_plan_options",
+            parameters=parameters,
+            error="Approval queue is unavailable.",
+        )
+    if not options:
+        return _log_tool_error(
+            deps,
+            skill="propose_tactical_plan_options",
+            parameters=parameters,
+            error="At least one tactical plan option is required.",
+        )
+
+    proposals = []
+    try:
+        for option_index, option in enumerate(options):
+            steps = [
+                StructuredCommandStep(
+                    id=f"plan-{option_index + 1}-step-{step_index + 1}-{uuid4()}",
+                    skill=step.skill,
+                    parameters=step.parameters,
+                    source_text=step.rationale or option.description or step.summary,
+                    summary=step.summary or step.skill.replace("_", " "),
+                    risk=step.risk,
+                    writes_runtime=True,
+                )
+                for step_index, step in enumerate(option.steps)
+            ]
+            metadata = {
+                "kind": "tactical_plan_option",
+                "title": option.title,
+                "label": option.label,
+                "description": option.description,
+                "advantages": option.advantages,
+                "risks": option.risks,
+                "optionIndex": option_index + 1,
+                "toolCount": len(steps),
+            }
+            proposal = deps.approval_queue.create_proposal(
+                command=command or option.title,
+                steps=steps,
+                source="llm_plan",
+                plan_metadata=metadata,
+            )
+            if deps.proposal_recorder is not None:
+                deps.proposal_recorder(proposal)
+            proposals.append(
+                {
+                    "proposalId": proposal.id,
+                    "proposalStatus": proposal.status,
+                    "title": option.title,
+                    "label": option.label,
+                    "stepCount": len(steps),
+                    "adjudication": proposal.adjudication.model_dump(mode="json"),
+                }
+            )
+    except Exception as exc:
+        return _log_tool_error(
+            deps,
+            skill="propose_tactical_plan_options",
+            parameters=parameters,
+            error=str(exc),
+        )
+
+    return _log_tool_success(
+        deps,
+        skill="propose_tactical_plan_options",
+        parameters=parameters,
+        output={
+            "ok": True,
+            "kind": "tactical_plan_options",
+            "requiresApproval": True,
+            "proposalCount": len(proposals),
+            "proposals": proposals,
+        },
+    )
 
 
 def _log_tool_success(
@@ -824,6 +928,66 @@ def build_agent(
             allow_duplicate_assignments=allow_duplicate_assignments,
         )
         return _propose_internal_skill(ctx.deps, draft)
+
+    @agent.tool
+    def propose_tactical_plan_options(
+        ctx: RunContext[AgentDeps],
+        options: list[TacticalPlanOptionDraft],
+        command: str = "",
+    ) -> dict[str, Any]:
+        """Create approval cards for multiple tactical plan options.
+
+        Use this when the operator asks for several courses of action. Each
+        option becomes one card and may contain multiple backend runtime steps,
+        such as move_unit, create_patrol_mission, create_strike_mission,
+        attack_unit, update_weapon_quantity, simulation_step, or
+        simulation_start. The steps execute only after human approval.
+        """
+        return _propose_tactical_plan_options(ctx.deps, options, command)
+
+    @agent.tool
+    def attack_unit(
+        ctx: RunContext[AgentDeps],
+        attacker_type: str,
+        attacker_id: str,
+        target_id: str,
+        weapon_id: str = "",
+        weapon_quantity: int = 1,
+        auto: bool = False,
+    ) -> dict[str, Any]:
+        """Create an approval proposal for an aircraft or ship attack."""
+        return _exec(
+            ctx.deps,
+            "attack_unit",
+            {
+                "attacker_type": attacker_type,
+                "attacker_id": attacker_id,
+                "target_id": target_id,
+                "weapon_id": weapon_id,
+                "weapon_quantity": weapon_quantity,
+                "auto": auto,
+            },
+        )
+
+    @agent.tool
+    def update_weapon_quantity(
+        ctx: RunContext[AgentDeps],
+        unit_type: str,
+        unit_id: str,
+        weapon_id: str,
+        increment: int,
+    ) -> dict[str, Any]:
+        """Create an approval proposal to adjust a unit weapon load quantity."""
+        return _exec(
+            ctx.deps,
+            "update_weapon_quantity",
+            {
+                "unit_type": unit_type,
+                "unit_id": unit_id,
+                "weapon_id": weapon_id,
+                "increment": increment,
+            },
+        )
 
     @agent.tool
     async def external_mcp_list_tools(

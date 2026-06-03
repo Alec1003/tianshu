@@ -164,13 +164,22 @@ class TianShuOpenClawBridge:
                 approval_queue=self.command_approvals,
                 mcp_client=self.mcp_client,
             )
-            proposals = [
-                proposal
-                for result in summary.skill_calls
-                if (proposal_id := result.output.get("proposalId"))
-                for proposal in [self.command_approvals.get(str(proposal_id))]
-                if proposal is not None
-            ]
+            proposals: list[CommandProposal] = []
+            for result in summary.skill_calls:
+                proposal_ids = []
+                if proposal_id := result.output.get("proposalId"):
+                    proposal_ids.append(str(proposal_id))
+                proposal_list = result.output.get("proposals")
+                if isinstance(proposal_list, list):
+                    proposal_ids.extend(
+                        str(item.get("proposalId"))
+                        for item in proposal_list
+                        if isinstance(item, dict) and item.get("proposalId")
+                    )
+                for proposal_id in proposal_ids:
+                    proposal = self.command_approvals.get(proposal_id)
+                    if proposal is not None and proposal not in proposals:
+                        proposals.append(proposal)
             return summary, proposals
 
         return self._propose_with_regex(command)

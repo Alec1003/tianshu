@@ -251,6 +251,8 @@ def _proposal_execution_event_type(proposal: Any) -> str:
             "simulation_step": "runtime.step",
             "load_scenario_snapshot": "scenario.loaded",
             "move_unit": "runtime.move_unit",
+            "attack_unit": "runtime.attack_unit",
+            "update_weapon_quantity": "runtime.update_weapon_quantity",
             "delete_unit": "runtime.delete_unit",
             "update_unit_state": "runtime.update_unit",
             "trigger_tactical_event": "runtime.tactical_event",
@@ -1775,7 +1777,6 @@ async def chat(
         bridge_provider=lambda owner, scenario_ctx=None: _bridge_for_user(
             request,
             owner,
-            scenario_ctx,
         ),
     )
     return await VercelAIAdapter.dispatch_request(

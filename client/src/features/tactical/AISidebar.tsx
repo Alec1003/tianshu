@@ -30,9 +30,12 @@ import {
 import { useNavigate } from "react-router-dom";
 import {
   AlertTriangle,
+  ChevronDown,
+  ChevronRight,
   CheckCircle2,
   Loader2,
   MessageSquare,
+  Plus,
   Send,
   ShieldAlert,
   ShieldCheck,
@@ -174,6 +177,8 @@ interface ChatRunSummary {
   tone: "idle" | "running" | "done" | "error";
   tools: ToolRunSnapshot[];
 }
+
+const PLAN_OPTIONS_TOOL_NAME = "propose_tactical_plan_options";
 
 interface AISidebarProps {
   open: boolean;
@@ -428,13 +433,6 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  * messages can render a placeholder (“推理中…”) while the stream is
  * still warming up.
  */
-function previewText(message: UIMessage): string {
-  for (const part of message.parts) {
-    if (isTextUIPart(part) && part.text) return part.text;
-  }
-  return "";
-}
-
 /**
  * Build the localStorage key for the chat history of a given scenario.
  * Falls back to a stable "__none__" namespace when no scenario is bound,
@@ -463,21 +461,101 @@ function buildCustomSkillPrompt(skills: CustomSkillConfig[]): string {
   ].join("\n");
 }
 
-function getToolRunSnapshot(part: unknown): ToolRunSnapshot {
+function getToolName(part: unknown): string {
   const p = part as {
     type?: string;
     toolName?: string;
-    state?: string;
   };
-  const toolName = p.toolName
+  return p.toolName
     ? p.toolName
     : typeof p.type === "string" && p.type.startsWith("tool-")
       ? p.type.slice("tool-".length)
       : "tool";
+}
+
+function getToolRunSnapshot(part: unknown): ToolRunSnapshot {
+  const p = part as {
+    state?: string;
+  };
   return {
-    toolName,
+    toolName: getToolName(part),
     state: p.state ?? "unknown",
   };
+}
+
+function completedPlanToolSignature(messages: UIMessage[]): string | null {
+  for (
+    let messageIndex = messages.length - 1;
+    messageIndex >= 0;
+    messageIndex -= 1
+  ) {
+    const message = messages[messageIndex];
+    if (message.role !== "assistant") continue;
+    for (
+      let partIndex = message.parts.length - 1;
+      partIndex >= 0;
+      partIndex -= 1
+    ) {
+      const part = message.parts[partIndex];
+      if (!isToolOrDynamicToolUIPart(part)) continue;
+      const p = part as { state?: string };
+      if (p.state !== "output-available") continue;
+      if (getToolName(part) !== PLAN_OPTIONS_TOOL_NAME) continue;
+      return `${message.id}:${partIndex}:${p.state}`;
+    }
+  }
+  return null;
+}
+
+function parseToolOutput(value: unknown): unknown {
+  if (typeof value !== "string") return value;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return value;
+  }
+}
+
+function collectProposalIdsFromOutput(value: unknown): string[] {
+  const output = parseToolOutput(value);
+  const ids = new Set<string>();
+
+  if (isRecord(output) && typeof output.proposalId === "string") {
+    ids.add(output.proposalId);
+  }
+
+  if (isRecord(output) && Array.isArray(output.proposals)) {
+    for (const item of output.proposals) {
+      if (isRecord(item) && typeof item.proposalId === "string") {
+        ids.add(item.proposalId);
+      } else if (isRecord(item) && typeof item.id === "string") {
+        ids.add(item.id);
+      }
+    }
+  }
+
+  return [...ids];
+}
+
+function planProposalIdsForMessage(message: UIMessage): string[] {
+  const ids = new Set<string>();
+  for (const part of message.parts) {
+    if (!isToolOrDynamicToolUIPart(part)) continue;
+    if (getToolName(part) !== PLAN_OPTIONS_TOOL_NAME) continue;
+    const p = part as { state?: string; output?: unknown };
+    if (p.state !== "output-available") continue;
+    for (const id of collectProposalIdsFromOutput(p.output)) {
+      ids.add(id);
+    }
+  }
+  return [...ids];
+}
+
+function messageHasVisibleContent(message: UIMessage): boolean {
+  return message.parts.some((part) => {
+    if (isTextUIPart(part)) return Boolean(part.text);
+    return isReasoningUIPart(part);
+  });
 }
 
 function formatChatError(error: Error): string {
@@ -772,6 +850,7 @@ export default function AISidebar({
   //      不触发；``simulation_pause`` / ``simulation_stop`` 自然保持暂停。
   // 只在 “busy → ready” 转换时触发一次，避免初始化 / 错误后乱拉。
   const wasBusyRef = useRef(false);
+  const lastPlanToolSignatureRef = useRef<string | null>(null);
   useEffect(() => {
     if (busy) {
       wasBusyRef.current = true;
@@ -779,8 +858,8 @@ export default function AISidebar({
     }
     if (!wasBusyRef.current) return;
     wasBusyRef.current = false;
-    if (status !== "ready") return;
     if (lastSubmittedModeRef.current !== "command") return;
+    const shouldRefreshRuntime = status === "ready";
     // 找最近一条 assistant 消息，扫它的 tool 调用决定推演意图。
     // ai-sdk v5 的 tool part 有两种形态：
     //   - 静态工具：``{ type: 'tool-<name>', ... }``（pydantic-ai @agent.tool 走这条）
@@ -790,6 +869,7 @@ export default function AISidebar({
       .reverse()
       .find((m) => m.role === "assistant");
     const lastLifecycleTool = (() => {
+      if (!shouldRefreshRuntime) return null;
       if (!lastAssistant) return null;
       const lifecycleTools = new Set([
         "simulation_start",
@@ -801,38 +881,35 @@ export default function AISidebar({
       for (let i = lastAssistant.parts.length - 1; i >= 0; i -= 1) {
         const part = lastAssistant.parts[i];
         if (!isToolOrDynamicToolUIPart(part)) continue;
-        const p = part as { type?: string; toolName?: string };
-        const toolName = p.toolName
-          ? p.toolName
-          : typeof p.type === "string" && p.type.startsWith("tool-")
-            ? p.type.slice("tool-".length)
-            : "";
+        const toolName = getToolName(part);
         if (lifecycleTools.has(toolName)) return toolName;
       }
       return null;
     })();
     void (async () => {
-      try {
-        const data = await getRuntimeScenario();
-        if (data && typeof data === "object") {
-          onApplyScenario?.(data);
-        }
-      } catch (err) {
-        console.error(
-          "[TianShu] refresh runtime scenario after AI run failed",
-          err
-        );
-      }
-      // 等 onApplyScenario 完成（同步路径，loadScenarioFromObject 立刻生效）
-      // 后再触发 play，避免在 reload 过程中开 loop 撞到 stale scenario。
-      if (lastLifecycleTool === "simulation_start" && onResumePlay) {
+      if (shouldRefreshRuntime) {
         try {
-          await onResumePlay();
+          const data = await getRuntimeScenario();
+          if (data && typeof data === "object") {
+            onApplyScenario?.(data);
+          }
         } catch (err) {
           console.error(
-            "[TianShu] auto-resume play after AI start failed",
+            "[TianShu] refresh runtime scenario after AI run failed",
             err
           );
+        }
+        // 等 onApplyScenario 完成（同步路径，loadScenarioFromObject 立刻生效）
+        // 后再触发 play，避免在 reload 过程中开 loop 撞到 stale scenario。
+        if (lastLifecycleTool === "simulation_start" && onResumePlay) {
+          try {
+            await onResumePlay();
+          } catch (err) {
+            console.error(
+              "[TianShu] auto-resume play after AI start failed",
+              err
+            );
+          }
         }
       }
       await refreshCommandProposals();
@@ -847,6 +924,33 @@ export default function AISidebar({
   ]);
 
   // —— 设置表单局部状态 ——
+  useEffect(() => {
+    if (!open || lastSubmittedModeRef.current !== "command") return;
+    const signature = completedPlanToolSignature(messages);
+    if (!signature || signature === lastPlanToolSignatureRef.current) return;
+    lastPlanToolSignatureRef.current = signature;
+    const timer = window.setTimeout(() => {
+      void refreshCommandProposals();
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [messages, open, refreshCommandProposals]);
+
+  const handleNewConversation = useCallback((): void => {
+    if (busy) {
+      try {
+        stop();
+      } catch {
+        // ignore: stop() before any in-flight request is a no-op
+      }
+    }
+    wasBusyRef.current = false;
+    lastPlanToolSignatureRef.current = null;
+    setCommandInput("");
+    setProposalError(null);
+    setMessages([]);
+    removeStorageItem(messagesKeyFor(scenarioId));
+  }, [busy, scenarioId, setMessages, stop]);
+
   const [newServerName, setNewServerName] = useState("");
   const [newServerEndpoint, setNewServerEndpoint] = useState("");
   const [newServerTransport, setNewServerTransport] = useState<
@@ -870,7 +974,7 @@ export default function AISidebar({
   useEffect(() => {
     if (!chatLogRef.current) return;
     chatLogRef.current.scrollTop = chatLogRef.current.scrollHeight;
-  }, [messages, status, open, activeTab]);
+  }, [messages, commandProposals, status, open, activeTab]);
 
   const activeMcpServers = useMemo(
     () => mcpServers.filter((server) => server.enabled),
@@ -1036,6 +1140,14 @@ export default function AISidebar({
         if (response.snapshot?.scenario) {
           onApplyScenario?.(response.snapshot.scenario);
         }
+        if (
+          response.proposal.steps.some(
+            (step) => step.skill === "simulation_start"
+          ) &&
+          onResumePlay
+        ) {
+          await onResumePlay();
+        }
         await refreshCommandProposals();
       } catch (error) {
         setProposalError(
@@ -1045,7 +1157,7 @@ export default function AISidebar({
         setProposalBusyId(null);
       }
     },
-    [onApplyScenario, refreshCommandProposals]
+    [onApplyScenario, onResumePlay, refreshCommandProposals]
   );
 
   const handleRejectProposal = useCallback(
@@ -1387,7 +1499,7 @@ export default function AISidebar({
         onAddServer={handleAddServer}
         onAddSkill={handleAddSkill}
         onCheckModel={() => void checkModelConnection()}
-        onClearMessages={() => setMessages([])}
+        onClearMessages={handleNewConversation}
         onImportMcpServers={handleImportMcpServers}
         onMapBaseLayerChange={onMapBaseLayerChange}
         onModelConfigChange={handleModelConfigChange}
@@ -1459,16 +1571,30 @@ export default function AISidebar({
                 </div>
               </div>
             </div>
-            <Button
-              aria-label="关闭 AI 侧栏"
-              className="size-8 text-slate-400 hover:text-slate-100"
-              onClick={() => onOpenChange(false)}
-              size="icon"
-              variant="ghost"
-              title="收起 AI 侧栏"
-            >
-              <X className="size-4" />
-            </Button>
+            <div className="flex items-center gap-1.5">
+              <Button
+                aria-label="新建对话"
+                className="h-7 gap-1.5 px-2 text-[11px] text-slate-300 hover:text-slate-100"
+                onClick={handleNewConversation}
+                size="sm"
+                type="button"
+                variant="ghost"
+                title="清空当前场景的聊天记录"
+              >
+                <Plus className="size-3.5" />
+                <span>新建对话</span>
+              </Button>
+              <Button
+                aria-label="关闭 AI 侧栏"
+                className="size-8 text-slate-400 hover:text-slate-100"
+                onClick={() => onOpenChange(false)}
+                size="icon"
+                variant="ghost"
+                title="收起 AI 侧栏"
+              >
+                <X className="size-4" />
+              </Button>
+            </div>
           </header>
 
           <div className="flex items-center gap-1 border-b border-slate-700/50 px-3 py-1.5">
@@ -1602,6 +1728,10 @@ function ChatPanel({
   onSubmit,
 }: ChatPanelProps) {
   const chatErrorMessage = chatError ? formatChatError(chatError) : "";
+  const proposalById = useMemo(
+    () => new Map(commandProposals.map((proposal) => [proposal.id, proposal])),
+    [commandProposals]
+  );
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -1623,6 +1753,11 @@ function ChatPanel({
             </div>
           </div>
         )}
+        {proposalError && (
+          <div className="mb-3 rounded-lg border border-red-300/20 bg-red-300/[0.05] px-2.5 py-2 text-[11px] text-red-100">
+            {proposalError}
+          </div>
+        )}
         {messages.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-xs text-slate-500">
             <Sparkles className="size-5 text-slate-600" />
@@ -1634,23 +1769,35 @@ function ChatPanel({
             </div>
           </div>
         ) : (
-          messages.map((m) => (
-            <MessageBlock
-              key={m.id}
-              message={m}
-            />
-          ))
+          messages.map((m) => {
+            const attachedProposals = planProposalIdsForMessage(m)
+              .map((id) => proposalById.get(id))
+              .filter((proposal): proposal is CommandProposal =>
+                Boolean(proposal)
+              );
+            if (
+              !messageHasVisibleContent(m) &&
+              attachedProposals.length === 0
+            ) {
+              return null;
+            }
+            return (
+              <div className="space-y-1" key={m.id}>
+                <MessageBlock message={m} />
+                <ApprovalQueuePanel
+                  busyId={proposalBusyId}
+                  error={null}
+                  onApprove={onApproveProposal}
+                  onReject={onRejectProposal}
+                  proposals={attachedProposals}
+                />
+              </div>
+            );
+          })
         )}
       </div>
 
       <div className="border-t border-slate-700/50 px-3 py-2">
-        <ApprovalQueuePanel
-          busyId={proposalBusyId}
-          error={proposalError}
-          onApprove={onApproveProposal}
-          onReject={onRejectProposal}
-          proposals={commandProposals}
-        />
         <ModeSwitcher
           disabled={busy}
           mode={chatMode}
@@ -1731,6 +1878,67 @@ function ChatPanel({
   );
 }
 
+interface PlanCardMetadata {
+  kind?: string;
+  title?: string;
+  label?: string;
+  description?: string;
+  advantages?: string[];
+  risks?: string[];
+  optionIndex?: number;
+}
+
+function stringList(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string" && !!item)
+    : [];
+}
+
+function planMetadata(proposal: CommandProposal): PlanCardMetadata {
+  const raw = proposal.plan_metadata ?? {};
+  return {
+    kind: typeof raw.kind === "string" ? raw.kind : undefined,
+    title: typeof raw.title === "string" ? raw.title : undefined,
+    label: typeof raw.label === "string" ? raw.label : undefined,
+    description:
+      typeof raw.description === "string" ? raw.description : undefined,
+    advantages: stringList(raw.advantages),
+    risks: stringList(raw.risks),
+    optionIndex:
+      typeof raw.optionIndex === "number" ? raw.optionIndex : undefined,
+  };
+}
+
+function skillLabel(skill: string): string {
+  const labels: Record<string, string> = {
+    move_unit: "路径规划",
+    create_patrol_mission: "巡逻任务",
+    create_strike_mission: "打击任务",
+    attack_unit: "武器打击",
+    update_weapon_quantity: "武器分配",
+    simulation_start: "开始推演",
+    simulation_step: "推进推演",
+    update_unit_state: "状态调整",
+    deploy_reference_point: "航路点",
+  };
+  return labels[skill] ?? skill.replace(/_/g, " ");
+}
+
+function parameterPreview(parameters: Record<string, unknown>): string {
+  const picked = [
+    parameters.unit_id,
+    parameters.attacker_id,
+    parameters.target_id,
+    parameters.weapon_id,
+    parameters.name,
+  ]
+    .filter((value): value is string => typeof value === "string" && !!value)
+    .slice(0, 2);
+  if (picked.length > 0) return picked.join(" -> ");
+  const keys = Object.keys(parameters).slice(0, 3);
+  return keys.length > 0 ? keys.join(", ") : "no parameters";
+}
+
 function ApprovalQueuePanel({
   proposals,
   busyId,
@@ -1744,34 +1952,66 @@ function ApprovalQueuePanel({
   onApprove: (proposalId: string) => void;
   onReject: (proposalId: string) => void;
 }) {
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const visible = proposals
     .filter((proposal) =>
       ["pending", "blocked", "failed"].includes(proposal.status)
     )
-    .slice(0, 3);
+    .slice(0, 4);
 
   if (visible.length === 0 && !error) return null;
 
   return (
-    <div className="mb-2 space-y-1.5">
+    <div className="mb-2 space-y-2">
       {error && (
         <div className="rounded-lg border border-red-300/20 bg-red-300/[0.05] px-2.5 py-2 text-[11px] text-red-100">
           {error}
         </div>
       )}
       {visible.map((proposal) => {
+        const metadata = planMetadata(proposal);
+        const isPlan = metadata.kind === "tactical_plan_option";
         const blocked = proposal.status === "blocked";
         const busy = busyId === proposal.id;
+        const expanded = expandedId === proposal.id;
         const issueCount = proposal.adjudication.issues.length;
+        const title =
+          metadata.title ||
+          proposal.command ||
+          proposal.steps[0]?.summary ||
+          "待审批命令";
+        const description =
+          metadata.description ||
+          proposal.steps
+            .map((step) => step.source_text || step.summary || step.skill)
+            .filter(Boolean)
+            .join(" / ");
+        const badge =
+          metadata.label ||
+          (isPlan && metadata.optionIndex
+            ? `方案 ${metadata.optionIndex}`
+            : proposal.source);
         return (
           <div
             className={cn(
-              "rounded-lg border px-2.5 py-2 text-[11px]",
+              "cursor-pointer rounded-lg border px-2.5 py-2 text-[11px] transition-colors",
               blocked
-                ? "border-red-300/20 bg-red-300/[0.04] text-red-100"
-                : "border-cyan-300/20 bg-cyan-300/[0.04] text-cyan-50"
+                ? "border-red-300/25 bg-red-300/[0.045] text-red-100 hover:bg-red-300/[0.07]"
+                : isPlan
+                  ? "border-cyan-300/25 bg-cyan-300/[0.055] text-cyan-50 hover:bg-cyan-300/[0.08]"
+                  : "border-slate-700/60 bg-slate-900/45 text-slate-200 hover:bg-slate-800/55"
             )}
             key={proposal.id}
+            onClick={() => setExpandedId(expanded ? null : proposal.id)}
+            aria-expanded={expanded}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                setExpandedId(expanded ? null : proposal.id);
+              }
+            }}
           >
             <div className="flex items-start gap-2">
               {blocked ? (
@@ -1780,21 +2020,120 @@ function ApprovalQueuePanel({
                 <ShieldCheck className="mt-0.5 size-3.5 shrink-0" />
               )}
               <div className="min-w-0 flex-1">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="truncate font-medium">
-                    {blocked ? "规则未通过" : "待人工审批"}
-                  </span>
-                  <span className="rounded border border-white/10 px-1.5 py-0.5 font-mono text-[9px] uppercase opacity-70">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="flex min-w-0 items-center gap-1.5">
+                      {expanded ? (
+                        <ChevronDown className="size-3 shrink-0 text-cyan-200/70" />
+                      ) : (
+                        <ChevronRight className="size-3 shrink-0 text-cyan-200/70" />
+                      )}
+                      <span className="truncate font-semibold text-slate-50">
+                        {title}
+                      </span>
+                    </div>
+                    <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                      <span className="rounded border border-white/10 bg-black/15 px-1.5 py-0.5 text-[9px] text-slate-300">
+                        {badge}
+                      </span>
+                      <span className="rounded border border-white/10 bg-black/15 px-1.5 py-0.5 text-[9px] text-slate-400">
+                        {proposal.steps.length} 个动作
+                      </span>
+                      <span
+                        className={cn(
+                          "rounded border px-1.5 py-0.5 text-[9px]",
+                          blocked
+                            ? "border-red-300/25 text-red-200"
+                            : "border-emerald-300/25 text-emerald-200"
+                        )}
+                      >
+                        {blocked ? "规则未通过" : "待人工审批"}
+                      </span>
+                    </div>
+                  </div>
+                  <span className="shrink-0 rounded border border-white/10 px-1.5 py-0.5 font-mono text-[9px] uppercase opacity-65">
                     {proposal.source}
                   </span>
                 </div>
-                <div className="mt-1 line-clamp-2 text-[10px] opacity-75">
-                  {proposal.steps
-                    .map((step) => step.summary || step.skill)
-                    .join(" / ")}
+
+                <div className="mt-2 line-clamp-2 text-[10px] leading-relaxed text-slate-300/85">
+                  {description || proposal.adjudication.summary}
                 </div>
+
+                {expanded && (
+                  <div className="mt-3 space-y-2 border-t border-white/10 pt-2">
+                    {description && (
+                      <p className="text-[10px] leading-relaxed text-slate-200/90">
+                        {description}
+                      </p>
+                    )}
+                    {Boolean(
+                      metadata.advantages?.length || metadata.risks?.length
+                    ) && (
+                      <div className="grid grid-cols-2 gap-2 text-[10px]">
+                        <div className="rounded-md border border-emerald-300/15 bg-emerald-300/[0.035] px-2 py-1.5">
+                          <div className="mb-1 text-[9px] font-medium text-emerald-200">
+                            优势
+                          </div>
+                          <div className="space-y-0.5 text-slate-300">
+                            {(metadata.advantages ?? ["未说明"]).map((item) => (
+                              <div key={item}>{item}</div>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="rounded-md border border-amber-300/15 bg-amber-300/[0.035] px-2 py-1.5">
+                          <div className="mb-1 text-[9px] font-medium text-amber-200">
+                            风险
+                          </div>
+                          <div className="space-y-0.5 text-slate-300">
+                            {(metadata.risks ?? ["未说明"]).map((item) => (
+                              <div key={item}>{item}</div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    <div className="space-y-1">
+                      {proposal.steps.map((step, index) => (
+                        <div
+                          className="rounded-md border border-white/10 bg-black/18 px-2 py-1.5"
+                          key={step.id}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-medium text-slate-100">
+                              {index + 1}.{" "}
+                              {step.summary || skillLabel(step.skill)}
+                            </span>
+                            <span
+                              className={cn(
+                                "rounded border px-1.5 py-0.5 text-[9px]",
+                                step.risk === "high"
+                                  ? "border-red-300/25 text-red-200"
+                                  : step.risk === "low"
+                                    ? "border-emerald-300/25 text-emerald-200"
+                                    : "border-amber-300/25 text-amber-200"
+                              )}
+                            >
+                              {step.risk}
+                            </span>
+                          </div>
+                          <div className="mt-1 text-[10px] text-slate-400">
+                            {skillLabel(step.skill)} ·{" "}
+                            {parameterPreview(step.parameters)}
+                          </div>
+                          {step.source_text && (
+                            <div className="mt-1 text-[10px] leading-relaxed text-slate-300/80">
+                              {step.source_text}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {issueCount > 0 && (
-                  <div className="mt-1 space-y-0.5 text-[10px] opacity-80">
+                  <div className="mt-2 space-y-0.5 text-[10px] opacity-85">
                     {proposal.adjudication.issues.slice(0, 2).map((issue) => (
                       <div key={`${issue.code}-${issue.step_id ?? ""}`}>
                         {issue.severity === "blocking" ? "阻断" : "提示"}：
@@ -1803,7 +2142,10 @@ function ApprovalQueuePanel({
                     ))}
                   </div>
                 )}
-                <div className="mt-2 flex items-center justify-end gap-1.5">
+                <div
+                  className="mt-2 flex items-center justify-end gap-1.5"
+                  onClick={(event) => event.stopPropagation()}
+                >
                   <Button
                     className="h-6 px-2 text-[10px]"
                     disabled={busy}
@@ -1935,12 +2277,12 @@ function RunStatusCard({ summary }: { summary: ChatRunSummary }) {
   );
 }
 
-function MessageBlock({ message }: {
-  message: UIMessage;
-}) {
+function MessageBlock({ message }: { message: UIMessage }) {
   const isUser = message.role === "user";
-  const text = previewText(message);
-  const hasContent = text || message.parts.length > 0;
+  const showInlineToolDetails: boolean = false;
+  const hasVisibleContent = messageHasVisibleContent(message);
+
+  if (!hasVisibleContent) return null;
 
   return (
     <div
@@ -1962,11 +2304,6 @@ function MessageBlock({ message }: {
             : "bg-transparent text-slate-100"
         )}
       >
-        {!hasContent && !isUser && (
-          <span className="inline-flex items-center gap-1 text-slate-500">
-            <Loader2 className="size-3 animate-spin" /> 思考中…
-          </span>
-        )}
         {message.parts.map((part, idx) => {
           if (isTextUIPart(part)) {
             return (
@@ -1990,7 +2327,7 @@ function MessageBlock({ message }: {
               </details>
             );
           }
-          if (isToolOrDynamicToolUIPart(part)) {
+          if (showInlineToolDetails && isToolOrDynamicToolUIPart(part)) {
             const p = part as {
               type?: string;
               toolName?: string;

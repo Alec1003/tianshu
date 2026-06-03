@@ -91,6 +91,7 @@ def test_scenario_json_columns_compile_as_jsonb_for_postgres() -> None:
     assert "metrics JSONB NOT NULL" in training_score_ddl
     assert "scenario_id VARCHAR(120) NOT NULL" in command_proposal_ddl
     assert "adjudication JSONB NOT NULL" in command_proposal_ddl
+    assert "plan_metadata JSONB NOT NULL" in command_proposal_ddl
     assert "execution JSONB NOT NULL" in command_proposal_ddl
     assert "custom_models JSONB NOT NULL" in model_config_ddl
 

@@ -130,6 +130,31 @@ class StructuredCommandStep(BaseModel):
     writes_runtime: bool = True
 
 
+class TacticalPlanStepDraft(BaseModel):
+    skill: str = Field(
+        min_length=1,
+        max_length=80,
+        description="Backend runtime skill to execute after human approval.",
+    )
+    parameters: dict[str, Any] = Field(default_factory=dict)
+    summary: str = Field(default="", max_length=300)
+    rationale: str = Field(default="", max_length=1200)
+    risk: Literal["low", "medium", "high"] = "medium"
+
+
+class TacticalPlanOptionDraft(BaseModel):
+    title: str = Field(min_length=1, max_length=120)
+    label: str = Field(default="", max_length=40)
+    description: str = Field(default="", max_length=2000)
+    advantages: list[str] = Field(default_factory=list, max_length=8)
+    risks: list[str] = Field(default_factory=list, max_length=8)
+    steps: list[TacticalPlanStepDraft] = Field(
+        default_factory=list,
+        min_length=1,
+        max_length=16,
+    )
+
+
 class InternalSkillMissionDraft(BaseModel):
     """One constrained mission/task inside a project-native tactical skill."""
 
@@ -177,7 +202,14 @@ class CommandAdjudicationResult(BaseModel):
 class CommandProposal(BaseModel):
     id: str
     command: str
-    source: Literal["regex", "llm_tool", "api", "mcp", "internal_skill"] = "api"
+    source: Literal[
+        "regex",
+        "llm_tool",
+        "llm_plan",
+        "api",
+        "mcp",
+        "internal_skill",
+    ] = "api"
     status: Literal[
         "pending",
         "blocked",
@@ -191,6 +223,7 @@ class CommandProposal(BaseModel):
     updated_at: str
     steps: list[StructuredCommandStep] = Field(default_factory=list)
     adjudication: CommandAdjudicationResult
+    plan_metadata: dict[str, Any] = Field(default_factory=dict)
     execution: list[SkillExecutionResult] = Field(default_factory=list)
     error: str | None = None
 

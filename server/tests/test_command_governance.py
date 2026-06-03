@@ -48,6 +48,9 @@ class FakeScenario:
     def get_obstacle(self, unit_id: str):
         return next((item for item in self.obstacles if item.id == unit_id), None)
 
+    def get_target(self, unit_id: str):
+        return self.get_aircraft(unit_id) or self.get_ship(unit_id) or self.get_facility(unit_id)
+
 
 class FakeRuntime:
     def __init__(self) -> None:
@@ -65,6 +68,8 @@ class FakeRegistry:
             "deploy_aircraft",
             "deploy_obstacle",
             "update_unit_state",
+            "attack_unit",
+            "update_weapon_quantity",
             "create_patrol_mission",
             "create_strike_mission",
             "load_scenario_file",
@@ -243,3 +248,61 @@ def test_internal_skill_draft_becomes_reviewed_mission_proposal() -> None:
         "create_patrol_mission",
         "create_strike_mission",
     ]
+
+
+def test_tactical_plan_options_become_grouped_approval_cards() -> None:
+    from app.ai.models import TacticalPlanOptionDraft, TacticalPlanStepDraft
+    from app.ai.pydantic_agent import AgentDeps, _propose_tactical_plan_options
+
+    queue = CommandApprovalQueue(FakeRuntime(), FakeRegistry())  # type: ignore[arg-type]
+    recorded = []
+    deps = AgentDeps(
+        registry=FakeRegistry(),  # type: ignore[arg-type]
+        approval_queue=queue,
+        proposal_recorder=recorded.append,
+        source_command="生成三个作战方案",
+    )
+
+    output = _propose_tactical_plan_options(
+        deps,
+        [
+            TacticalPlanOptionDraft(
+                title="快速突击方案",
+                label="快速打击",
+                description="集中优势兵力，快速摧毁关键目标。",
+                advantages=["压缩敌方反应时间"],
+                risks=["对航线暴露敏感"],
+                steps=[
+                    TacticalPlanStepDraft(
+                        skill="move_unit",
+                        parameters={
+                            "unit_type": "aircraft",
+                            "unit_id": "air-1",
+                            "route": [[1, 1]],
+                        },
+                        summary="突击编队前出",
+                        rationale="占据攻击航线。",
+                    ),
+                    TacticalPlanStepDraft(
+                        skill="attack_unit",
+                        parameters={
+                            "attacker_type": "aircraft",
+                            "attacker_id": "air-1",
+                            "target_id": "target-1",
+                            "auto": True,
+                        },
+                        summary="自动分配武器打击目标",
+                        rationale="由后端选择可发射武器。",
+                        risk="high",
+                    ),
+                ],
+            )
+        ],
+    )
+
+    assert output["ok"] is True
+    assert output["proposalCount"] == 1
+    assert len(recorded) == 1
+    assert recorded[0].source == "llm_plan"
+    assert recorded[0].plan_metadata["title"] == "快速突击方案"
+    assert [step.skill for step in recorded[0].steps] == ["move_unit", "attack_unit"]

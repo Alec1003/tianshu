@@ -172,6 +172,13 @@ async def _migrate_command_proposal_scope_postgres(conn) -> None:
     )
     await conn.execute(
         text(
+            "ALTER TABLE command_proposal "
+            "ADD COLUMN IF NOT EXISTS plan_metadata JSONB "
+            "NOT NULL DEFAULT '{}'::jsonb"
+        )
+    )
+    await conn.execute(
+        text(
             "CREATE INDEX IF NOT EXISTS ix_command_proposal_owner_scenario_status "
             "ON command_proposal (owner_id, scenario_id, status)"
         )
@@ -284,6 +291,13 @@ async def _migrate_command_proposal_scope_sqlite(conn) -> None:
             text(
                 "ALTER TABLE command_proposal ADD COLUMN scenario_id VARCHAR(120) "
                 "NOT NULL DEFAULT '__default__'"
+            )
+        )
+    if "plan_metadata" not in existing_cols:
+        await conn.execute(
+            text(
+                "ALTER TABLE command_proposal ADD COLUMN plan_metadata JSON "
+                "NOT NULL DEFAULT '{}'"
             )
         )
     await conn.execute(

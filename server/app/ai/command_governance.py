@@ -32,6 +32,8 @@ ALLOWED_SKILLS = {
     "delete_unit",
     "move_unit",
     "update_unit_state",
+    "attack_unit",
+    "update_weapon_quantity",
     "create_patrol_mission",
     "create_strike_mission",
     "trigger_tactical_event",
@@ -52,6 +54,7 @@ HIGH_RISK_SKILLS = {
     "simulation_reset",
     "delete_unit",
     "update_unit_state",
+    "attack_unit",
     "load_script",
     "control_script_flow",
     "load_scenario_snapshot",
@@ -189,6 +192,12 @@ class CommandRuleEngine:
 
         if skill in {"delete_unit", "move_unit", "update_unit_state"}:
             issues.extend(self._validate_unit_target(step))
+
+        if skill == "attack_unit":
+            issues.extend(self._validate_attack(step))
+
+        if skill == "update_weapon_quantity":
+            issues.extend(self._validate_weapon_quantity(step))
 
         if skill in {"create_patrol_mission", "create_strike_mission"}:
             issues.extend(self._validate_mission(step))
@@ -517,6 +526,101 @@ class CommandRuleEngine:
                         )
         return issues
 
+    def _validate_attack(
+        self, step: StructuredCommandStep
+    ) -> list[CommandAdjudicationIssue]:
+        issues: list[CommandAdjudicationIssue] = []
+        params = step.parameters
+        attacker_type = str(params.get("attacker_type") or "").strip()
+        attacker_id = str(params.get("attacker_id") or "").strip()
+        target_id = str(params.get("target_id") or "").strip()
+        if attacker_type not in {"aircraft", "ship"}:
+            issues.append(
+                self._issue(
+                    "blocking",
+                    "invalid_attacker_type",
+                    "打击命令的 attacker_type 必须是 aircraft 或 ship。",
+                    step.id,
+                    "attacker_type",
+                )
+            )
+        if attacker_type and attacker_id:
+            issues.extend(
+                self._validate_unit_target(
+                    step.model_copy(
+                        update={
+                            "parameters": {
+                                "unit_type": attacker_type,
+                                "unit_id": attacker_id,
+                            }
+                        }
+                    )
+                )
+            )
+        else:
+            issues.append(
+                self._issue(
+                    "blocking",
+                    "missing_attacker",
+                    "打击命令必须包含 attacker_type 和 attacker_id。",
+                    step.id,
+                    "attacker_id",
+                )
+            )
+        scenario = self.runtime.game.current_scenario
+        target_getter = getattr(scenario, "get_target", None)
+        target = target_getter(target_id) if callable(target_getter) else self._find_any_unit(target_id)
+        if not target_id or target is None:
+            issues.append(
+                self._issue(
+                    "blocking",
+                    "target_not_found",
+                    f"当前 runtime 中找不到打击目标：{target_id}",
+                    step.id,
+                    "target_id",
+                )
+            )
+        if not bool(params.get("auto")) and not str(params.get("weapon_id") or "").strip():
+            issues.append(
+                self._issue(
+                    "warning",
+                    "manual_attack_without_weapon",
+                    "未指定 weapon_id 时建议将 auto 设为 true，由后端选择可发射武器。",
+                    step.id,
+                    "weapon_id",
+                )
+            )
+        return issues
+
+    def _validate_weapon_quantity(
+        self, step: StructuredCommandStep
+    ) -> list[CommandAdjudicationIssue]:
+        issues = self._validate_unit_target(step)
+        params = step.parameters
+        weapon_id = str(params.get("weapon_id") or "").strip()
+        if not weapon_id:
+            issues.append(
+                self._issue(
+                    "blocking",
+                    "missing_weapon_id",
+                    "武器数量调整必须包含 weapon_id。",
+                    step.id,
+                    "weapon_id",
+                )
+            )
+        increment = _to_float(params.get("increment"))
+        if increment is None:
+            issues.append(
+                self._issue(
+                    "blocking",
+                    "invalid_weapon_increment",
+                    "武器数量调整必须包含数字 increment。",
+                    step.id,
+                    "increment",
+                )
+            )
+        return issues
+
     def _find_any_unit(self, unit_id: str) -> Any | None:
         scenario = self.runtime.game.current_scenario
         for getter_name in (
@@ -607,6 +711,7 @@ class CommandApprovalQueue:
         command: str,
         steps: list[StructuredCommandStep],
         source: str,
+        plan_metadata: dict[str, Any] | None = None,
     ) -> CommandProposal:
         now = _utc_now()
         adjudication = self.rules.adjudicate(steps)
@@ -619,6 +724,7 @@ class CommandApprovalQueue:
             updated_at=now,
             steps=steps,
             adjudication=adjudication,
+            plan_metadata=plan_metadata or {},
         )
         with self._lock:
             self._proposals[proposal.id] = proposal
@@ -765,6 +871,10 @@ class CommandApprovalQueue:
             return f"删除 {parameters.get('unit_type')} {parameters.get('unit_id')}"
         if skill == "simulation_step":
             return f"推进仿真 {parameters.get('steps', 1)} 秒"
+        if skill == "attack_unit":
+            return f"打击目标 {parameters.get('target_id') or ''}".strip()
+        if skill == "update_weapon_quantity":
+            return f"调整武器 {parameters.get('weapon_id') or ''}".strip()
         if skill == "load_scenario_snapshot":
             return f"Load scenario {parameters.get('name') or parameters.get('scenario_id') or ''}".strip()
         if skill in {"create_patrol_mission", "create_strike_mission"}:

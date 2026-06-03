@@ -257,6 +257,48 @@ class TianShuSkillRegistry:
         )
         self._register(
             RegisteredSkill(
+                name="attack_unit",
+                description="命令飞机或舰艇对目标发起打击，可自动选择可发射武器。",
+                parameters={
+                    "attacker_type": {
+                        "type": "string",
+                        "enum": ["aircraft", "ship"],
+                    },
+                    "attacker_id": {"type": "string"},
+                    "target_id": {"type": "string"},
+                    "weapon_id": {"type": "string", "required": False},
+                    "weapon_quantity": {
+                        "type": "integer",
+                        "default": 1,
+                        "required": False,
+                    },
+                    "auto": {
+                        "type": "boolean",
+                        "default": False,
+                        "required": False,
+                    },
+                },
+                func=self.runtime.attack_unit,
+            )
+        )
+        self._register(
+            RegisteredSkill(
+                name="update_weapon_quantity",
+                description="调整指定单位挂载武器的当前数量。",
+                parameters={
+                    "unit_type": {
+                        "type": "string",
+                        "enum": ["aircraft", "ship", "facility"],
+                    },
+                    "unit_id": {"type": "string"},
+                    "weapon_id": {"type": "string"},
+                    "increment": {"type": "integer"},
+                },
+                func=self.runtime.update_weapon_quantity,
+            )
+        )
+        self._register(
+            RegisteredSkill(
                 name="create_patrol_mission",
                 description="Create a patrol mission with assigned units and reference-point patrol area.",
                 parameters={

@@ -20,6 +20,11 @@ async def test_command_proposal_round_trips_through_database(db_session, user):
     proposal = queue.create_proposal(
         command="advance one second",
         source="mcp",
+        plan_metadata={
+            "kind": "tactical_plan_option",
+            "title": "推进观察方案",
+            "description": "推进一秒后观察态势变化。",
+        },
         steps=[
             StructuredCommandStep(
                 id="s1",
@@ -36,6 +41,7 @@ async def test_command_proposal_round_trips_through_database(db_session, user):
 
     assert loaded.id == proposal.id
     assert loaded.source == "mcp"
+    assert loaded.plan_metadata["title"] == "推进观察方案"
     assert loaded.steps[0].skill == "simulation_step"
     assert [item.id for item in listed] == [proposal.id]
 

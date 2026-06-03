@@ -63,10 +63,6 @@ import {
   updateCustomSkill,
   validateExternalMcpServer,
 } from "@/api/ai";
-import {
-  getScenarioCompareSession,
-  simulateScenarioCompareSession,
-} from "@/api/scenarios";
 import { Button } from "@/components/ui/button";
 import type {
   CommandProposal,
@@ -76,9 +72,6 @@ import type {
   ExternalMcpTool,
   RegisteredSkill,
   SkillSchemaField,
-  ScenarioBatchSimulationResponse,
-  ScenarioCompareSession,
-  ScenarioPlanOption,
 } from "@/api/types";
 import type { CesiumBaseLayerKey } from "@/gui/map/CesiumMapTypes";
 import { cn } from "@/lib/utils";
@@ -94,7 +87,6 @@ import {
 } from "@/features/ai/modelProfiles";
 import ModelSwitcher from "@/features/ai/ModelSwitcher";
 import { useModelConfigStore } from "@/features/ai/modelStore";
-import ScenarioCompareDialog from "@/features/scenarios/ScenarioCompareDialog";
 import {
   readStorageItem,
   removeStorageItem,
@@ -181,28 +173,6 @@ interface ChatRunSummary {
   detail: string;
   tone: "idle" | "running" | "done" | "error";
   tools: ToolRunSnapshot[];
-}
-
-interface PlanSetToolOutput {
-  ok: boolean;
-  kind: "plan_set";
-  compareSession: ScenarioCompareSession;
-  sourceScenarioId: string;
-  sourceScenarioName: string;
-  branchCount: number;
-  plans: ScenarioPlanOption[];
-}
-
-interface PlanSimulationToolOutput {
-  ok: boolean;
-  kind: "plan_simulation_batch";
-  compareSession: ScenarioCompareSession;
-  steps: number;
-  includeBaseline: boolean;
-  simulatedAt: string;
-  results: ScenarioBatchSimulationResponse["results"];
-  recommendedScenarioId: string | null;
-  recommendedReason: string;
 }
 
 interface AISidebarProps {
@@ -453,37 +423,6 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
-function isScenarioCompareSession(
-  value: unknown
-): value is ScenarioCompareSession {
-  return (
-    isRecord(value) &&
-    typeof value.id === "string" &&
-    Array.isArray(value.scenario_ids) &&
-    isRecord(value.state)
-  );
-}
-
-function isPlanSetToolOutput(value: unknown): value is PlanSetToolOutput {
-  return (
-    isRecord(value) &&
-    value.kind === "plan_set" &&
-    isScenarioCompareSession(value.compareSession) &&
-    Array.isArray(value.plans)
-  );
-}
-
-function isPlanSimulationToolOutput(
-  value: unknown
-): value is PlanSimulationToolOutput {
-  return (
-    isRecord(value) &&
-    value.kind === "plan_simulation_batch" &&
-    isScenarioCompareSession(value.compareSession) &&
-    Array.isArray(value.results)
-  );
-}
-
 /**
  * Extract a flat preview string from a UIMessage so empty assistant
  * messages can render a placeholder (“推理中…”) while the stream is
@@ -693,15 +632,6 @@ export default function AISidebar({
   );
   const [proposalBusyId, setProposalBusyId] = useState<string | null>(null);
   const [proposalError, setProposalError] = useState<string | null>(null);
-  const [compareDialogOpen, setCompareDialogOpen] = useState(false);
-  const [activeCompareSession, setActiveCompareSession] =
-    useState<ScenarioCompareSession | null>(null);
-  const [planSimulationBusyId, setPlanSimulationBusyId] = useState<
-    string | null
-  >(null);
-  const [planSimulationResults, setPlanSimulationResults] = useState<
-    Record<string, ScenarioBatchSimulationResponse>
-  >({});
   const chatLogRef = useRef<HTMLDivElement | null>(null);
 
   // headers 函数需要读最新 modelConfig，但 transport 有状态不能重建；
@@ -1134,48 +1064,6 @@ export default function AISidebar({
       }
     },
     [refreshCommandProposals]
-  );
-
-  const handleOpenCompareSession = useCallback(
-    async (compareSession: ScenarioCompareSession): Promise<void> => {
-      try {
-        const fresh = await getScenarioCompareSession(compareSession.id);
-        setActiveCompareSession(fresh);
-      } catch {
-        setActiveCompareSession(compareSession);
-      }
-      setCompareDialogOpen(true);
-    },
-    []
-  );
-
-  const handleRunPlanSimulation = useCallback(
-    async (compareSession: ScenarioCompareSession): Promise<void> => {
-      setPlanSimulationBusyId(compareSession.id);
-      try {
-        const result = await simulateScenarioCompareSession(compareSession.id, {
-          steps: 600,
-          include_baseline: true,
-        });
-        setPlanSimulationResults((current) => ({
-          ...current,
-          [compareSession.id]: result,
-        }));
-        setActiveCompareSession(result.compare_session);
-        setCompareDialogOpen(true);
-      } finally {
-        setPlanSimulationBusyId(null);
-      }
-    },
-    []
-  );
-
-  const handleOpenScenario = useCallback(
-    (nextScenarioId: string): void => {
-      if (!nextScenarioId) return;
-      navigate(`/play/${nextScenarioId}`);
-    },
-    [navigate]
   );
 
   // activeMcpServers are still managed in settings; external MCP runtime
@@ -1621,33 +1509,17 @@ export default function AISidebar({
                 onApproveProposal={(id) => void handleApproveProposal(id)}
                 onChatModeChange={handleChatModeChange}
                 onCommandInputChange={setCommandInput}
-                onOpenCompareSession={(session) =>
-                  void handleOpenCompareSession(session)
-                }
                 onOpenModelSettings={() => navigate("/ai-models")}
-                onOpenScenario={handleOpenScenario}
                 onQuickCommand={sendChat}
                 onRejectProposal={(id) => void handleRejectProposal(id)}
-                onRunPlanSimulation={(session) =>
-                  void handleRunPlanSimulation(session)
-                }
                 onSubmit={onSubmitChat}
                 busy={busy}
-                planSimulationBusyId={planSimulationBusyId}
-                planSimulationResults={planSimulationResults}
                 stop={stop}
               />
             )}
           </div>
         </aside>
       )}
-      <ScenarioCompareDialog
-        scenarioIds={activeCompareSession?.scenario_ids ?? []}
-        open={compareDialogOpen}
-        onClose={() => setCompareDialogOpen(false)}
-        onOpenScenario={handleOpenScenario}
-        initialSession={activeCompareSession}
-      />
     </>
   );
 }
@@ -1698,19 +1570,14 @@ interface ChatPanelProps {
   commandProposals: CommandProposal[];
   proposalBusyId: string | null;
   proposalError: string | null;
-  planSimulationBusyId: string | null;
-  planSimulationResults: Record<string, ScenarioBatchSimulationResponse>;
   busy: boolean;
   stop: () => void;
   onApproveProposal: (proposalId: string) => void;
   onChatModeChange: (mode: AIChatMode) => void;
   onCommandInputChange: (next: string) => void;
-  onOpenCompareSession: (compareSession: ScenarioCompareSession) => void;
   onOpenModelSettings: () => void;
-  onOpenScenario: (scenarioId: string) => void;
   onQuickCommand: (cmd: string) => void;
   onRejectProposal: (proposalId: string) => void;
-  onRunPlanSimulation: (compareSession: ScenarioCompareSession) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }
 
@@ -1724,19 +1591,14 @@ function ChatPanel({
   commandProposals,
   proposalBusyId,
   proposalError,
-  planSimulationBusyId,
-  planSimulationResults,
   busy,
   stop,
   onApproveProposal,
   onChatModeChange,
   onCommandInputChange,
-  onOpenCompareSession,
   onOpenModelSettings,
-  onOpenScenario,
   onQuickCommand,
   onRejectProposal,
-  onRunPlanSimulation,
   onSubmit,
 }: ChatPanelProps) {
   const chatErrorMessage = chatError ? formatChatError(chatError) : "";
@@ -1776,11 +1638,6 @@ function ChatPanel({
             <MessageBlock
               key={m.id}
               message={m}
-              onOpenCompareSession={onOpenCompareSession}
-              onOpenScenario={onOpenScenario}
-              onRunPlanSimulation={onRunPlanSimulation}
-              planSimulationBusyId={planSimulationBusyId}
-              planSimulationResults={planSimulationResults}
             />
           ))
         )}
@@ -2078,20 +1935,8 @@ function RunStatusCard({ summary }: { summary: ChatRunSummary }) {
   );
 }
 
-function MessageBlock({
-  message,
-  onOpenCompareSession,
-  onOpenScenario,
-  onRunPlanSimulation,
-  planSimulationBusyId,
-  planSimulationResults,
-}: {
+function MessageBlock({ message }: {
   message: UIMessage;
-  onOpenCompareSession: (compareSession: ScenarioCompareSession) => void;
-  onOpenScenario: (scenarioId: string) => void;
-  onRunPlanSimulation: (compareSession: ScenarioCompareSession) => void;
-  planSimulationBusyId: string | null;
-  planSimulationResults: Record<string, ScenarioBatchSimulationResponse>;
 }) {
   const isUser = message.role === "user";
   const text = previewText(message);
@@ -2161,36 +2006,6 @@ function MessageBlock({
               : typeof p.type === "string" && p.type.startsWith("tool-")
                 ? p.type.slice("tool-".length)
                 : "tool";
-            if (
-              p.state === "output-available" &&
-              isPlanSetToolOutput(p.output)
-            ) {
-              return (
-                <PlanSetCard
-                  key={idx}
-                  output={p.output}
-                  onOpenCompareSession={onOpenCompareSession}
-                  onRunPlanSimulation={onRunPlanSimulation}
-                  planSimulationBusyId={planSimulationBusyId}
-                  planSimulationResult={
-                    planSimulationResults[p.output.compareSession.id]
-                  }
-                />
-              );
-            }
-            if (
-              p.state === "output-available" &&
-              isPlanSimulationToolOutput(p.output)
-            ) {
-              return (
-                <PlanSimulationCard
-                  key={idx}
-                  output={p.output}
-                  onOpenCompareSession={onOpenCompareSession}
-                  onOpenScenario={onOpenScenario}
-                />
-              );
-            }
             return (
               <details
                 key={idx}
@@ -2227,174 +2042,6 @@ function MessageBlock({
           }
           return null;
         })}
-      </div>
-    </div>
-  );
-}
-
-function PlanSetCard({
-  output,
-  onOpenCompareSession,
-  onRunPlanSimulation,
-  planSimulationBusyId,
-  planSimulationResult,
-}: {
-  output: PlanSetToolOutput;
-  onOpenCompareSession: (compareSession: ScenarioCompareSession) => void;
-  onRunPlanSimulation: (compareSession: ScenarioCompareSession) => void;
-  planSimulationBusyId: string | null;
-  planSimulationResult?: ScenarioBatchSimulationResponse;
-}) {
-  const compareSession = output.compareSession;
-  const simBusy = planSimulationBusyId === compareSession.id;
-
-  return (
-    <div className="mt-2 rounded-xl border border-cyan-300/15 bg-cyan-300/[0.04] p-3">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="text-[11px] font-medium text-cyan-100">
-            已生成 {output.branchCount} 个候选方案
-          </div>
-          <div className="mt-1 text-[10px] text-slate-400">
-            来源场景：{output.sourceScenarioName}
-          </div>
-        </div>
-        <span className="rounded border border-cyan-300/20 px-1.5 py-0.5 text-[9px] uppercase text-cyan-200/80">
-          Plan Set
-        </span>
-      </div>
-      <div className="mt-3 space-y-2">
-        {output.plans.map((plan, index) => (
-          <div
-            className="rounded-lg border border-slate-700/50 bg-slate-950/40 px-2.5 py-2"
-            key={`${plan.title}-${index}`}
-          >
-            <div className="text-[11px] font-medium text-slate-100">
-              方案 {index + 1} · {plan.title}
-            </div>
-            {plan.concept && (
-              <div className="mt-1 text-[10px] leading-relaxed text-slate-400">
-                {plan.concept}
-              </div>
-            )}
-            {plan.key_actions.length > 0 && (
-              <div className="mt-2 flex flex-wrap gap-1">
-                {plan.key_actions.slice(0, 4).map((item) => (
-                  <span
-                    className="rounded border border-slate-700/50 bg-slate-900/60 px-1.5 py-0.5 text-[9px] text-slate-300"
-                    key={item}
-                  >
-                    {item}
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
-      {planSimulationResult && (
-        <div className="mt-3 rounded-lg border border-emerald-300/15 bg-emerald-300/[0.04] px-2.5 py-2 text-[10px] text-emerald-100">
-          最近一次批量推演已完成，共 {planSimulationResult.results.length}{" "}
-          个结果。
-        </div>
-      )}
-      <div className="mt-3 flex flex-wrap gap-2">
-        <Button
-          className="h-7 px-2 text-[10px]"
-          size="sm"
-          type="button"
-          onClick={() => onOpenCompareSession(compareSession)}
-        >
-          打开对比台
-        </Button>
-        <Button
-          className="h-7 px-2 text-[10px]"
-          size="sm"
-          type="button"
-          variant="ghost"
-          disabled={simBusy}
-          onClick={() => onRunPlanSimulation(compareSession)}
-        >
-          {simBusy ? "推演中..." : "一键并行推演"}
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-function PlanSimulationCard({
-  output,
-  onOpenCompareSession,
-  onOpenScenario,
-}: {
-  output: PlanSimulationToolOutput;
-  onOpenCompareSession: (compareSession: ScenarioCompareSession) => void;
-  onOpenScenario: (scenarioId: string) => void;
-}) {
-  const topResults = output.results.slice(0, 3);
-  return (
-    <div className="mt-2 rounded-xl border border-emerald-300/15 bg-emerald-300/[0.04] p-3">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <div className="text-[11px] font-medium text-emerald-100">
-            批量推演完成
-          </div>
-          <div className="mt-1 text-[10px] text-slate-400">
-            推演步数：{output.steps}
-          </div>
-        </div>
-        <span className="rounded border border-emerald-300/20 px-1.5 py-0.5 text-[9px] uppercase text-emerald-200/80">
-          Results
-        </span>
-      </div>
-      <div className="mt-3 space-y-2">
-        {topResults.map((result, index) => (
-          <div
-            className="flex items-center justify-between gap-3 rounded-lg border border-slate-700/50 bg-slate-950/40 px-2.5 py-2"
-            key={result.scenario_id}
-          >
-            <div className="min-w-0">
-              <div className="truncate text-[11px] font-medium text-slate-100">
-                #{index + 1} {result.scenario_name}
-              </div>
-              <div className="mt-1 text-[10px] text-slate-400">
-                {result.grade} · {result.confidence}
-              </div>
-            </div>
-            <div className="text-right">
-              <div className="text-sm font-semibold text-emerald-200">
-                {result.overall_score}
-              </div>
-              <div className="text-[10px] text-slate-500">score</div>
-            </div>
-          </div>
-        ))}
-      </div>
-      {output.recommendedReason && (
-        <div className="mt-3 text-[10px] leading-relaxed text-emerald-100">
-          {output.recommendedReason}
-        </div>
-      )}
-      <div className="mt-3 flex flex-wrap gap-2">
-        <Button
-          className="h-7 px-2 text-[10px]"
-          size="sm"
-          type="button"
-          onClick={() => onOpenCompareSession(output.compareSession)}
-        >
-          打开对比台
-        </Button>
-        {output.recommendedScenarioId && (
-          <Button
-            className="h-7 px-2 text-[10px]"
-            size="sm"
-            type="button"
-            variant="ghost"
-            onClick={() => onOpenScenario(output.recommendedScenarioId!)}
-          >
-            载入最优方案
-          </Button>
-        )}
       </div>
     </div>
   );

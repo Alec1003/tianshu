@@ -305,7 +305,6 @@ export interface AITacticalCommandPlatformProps {
   onSave?: (data: Record<string, unknown>) => Promise<void> | void;
   /** 另存为新 scenario；平台仅负责报上当前 JSON，名称/跳转由上层处理。 */
   onRequestSaveAs?: (data: Record<string, unknown>) => void;
-  onCreateBranch?: (data: Record<string, unknown>) => void;
   /** 返回想定列表。 */
   onExit?: () => void;
   /** 推演结束时异步归档 AAR。可选；失败不阻断 UI。 */
@@ -317,7 +316,6 @@ export default function AITacticalCommandPlatform({
   initialScenarioData,
   onSave,
   onRequestSaveAs,
-  onCreateBranch,
   onExit,
   onPostAar,
 }: AITacticalCommandPlatformProps = {}) {
@@ -1110,11 +1108,6 @@ export default function AITacticalCommandPlatform({
     onRequestSaveAs(captureCurrentScenarioData());
   }, [onRequestSaveAs, captureCurrentScenarioData]);
 
-  const handleCreateBranchClick = useCallback(() => {
-    if (!onCreateBranch) return;
-    onCreateBranch(captureCurrentScenarioData());
-  }, [onCreateBranch, captureCurrentScenarioData]);
-
   const toggleTimelinePanel = useCallback(() => {
     if (!timelinePanelOpen) setAiSidebarOpen(false);
     setTimelinePanelOpen((value) => !value);
@@ -1135,7 +1128,7 @@ export default function AITacticalCommandPlatform({
 
   // 是否需要渲染顶部 mini bar（路由模式才显示；standalone 兼容老入口）。
   const showRouterChrome = Boolean(
-    scenarioMeta && (onSave || onRequestSaveAs || onCreateBranch || onExit)
+    scenarioMeta && (onSave || onRequestSaveAs || onExit)
   );
 
   return (
@@ -1292,9 +1285,6 @@ export default function AITacticalCommandPlatform({
           onSave={onSave ? () => void handleSaveClick() : undefined}
           onRequestSaveAs={
             onRequestSaveAs ? () => handleSaveAsClick() : undefined
-          }
-          onCreateBranch={
-            onCreateBranch ? () => handleCreateBranchClick() : undefined
           }
           savingState={savingState}
           timelineOpen={timelinePanelOpen}

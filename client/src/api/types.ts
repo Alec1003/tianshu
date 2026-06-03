@@ -17,17 +17,6 @@ export interface AuthTokenResponse {
 
 export type ScenarioStatus = "draft" | "running" | "completed";
 
-export interface ScenarioBranchMeta {
-  parent_scenario_id: string;
-  parent_scenario_name: string;
-  root_scenario_id: string;
-  root_scenario_name: string;
-  branch_label: string;
-  branch_depth: number;
-  created_from_version?: number | null;
-  created_at?: string | null;
-}
-
 export interface ScenarioListItem {
   id: string;
   name: string;
@@ -36,7 +25,6 @@ export interface ScenarioListItem {
   owner_id: string | null;
   version: number;
   status: ScenarioStatus;
-  branch_meta?: ScenarioBranchMeta | null;
   mission_count: number;
   unit_count: number;
   side_count: number;
@@ -162,176 +150,6 @@ export interface TrainingScoreRecord {
   score: TrainingScoreResponse;
   metrics: Record<string, unknown>;
   created_at: string;
-}
-
-export interface ScenarioBranchCreatePayload {
-  name?: string;
-  description?: string;
-  branch_label?: string;
-  status?: ScenarioStatus;
-  data?: Record<string, unknown>;
-}
-
-export interface ScenarioCompareItem extends ScenarioListItem {
-  training_score: TrainingScoreResponse;
-  timeline_event_count: number;
-  latest_event_at?: string | null;
-  aar_count: number;
-  latest_aar_at?: string | null;
-}
-
-export interface ScenarioCompareResponse {
-  baseline_id: string;
-  generated_at: string;
-  items: ScenarioCompareItem[];
-}
-
-export interface ScenarioCompareSnapshotSource {
-  id: string;
-  label: string;
-  archived_record_id: string | null;
-}
-
-export interface ScenarioCompareSnapshotScore {
-  overall_score: number;
-  grade: string;
-  confidence: string;
-  generated_at: string;
-}
-
-export interface ScenarioCompareSnapshotDeltas {
-  versus_baseline: number | null;
-  versus_latest_archived: number | null;
-  versus_live: number | null;
-}
-
-export interface ScenarioCompareSnapshotSummary {
-  mission_count: number;
-  unit_count: number;
-  timeline_event_count: number;
-  aar_count: number;
-}
-
-export interface ScenarioCompareSnapshotItem {
-  id: string;
-  name: string;
-  baseline: boolean;
-  source: ScenarioCompareSnapshotSource;
-  score: ScenarioCompareSnapshotScore;
-  score_deltas: ScenarioCompareSnapshotDeltas;
-  summary: ScenarioCompareSnapshotSummary;
-}
-
-export interface ScenarioCompareSnapshot {
-  generated_at: string;
-  baseline_id: string;
-  baseline_name: string;
-  items: ScenarioCompareSnapshotItem[];
-}
-
-export interface ScenarioCompareReportCreatePayload {
-  title?: string;
-  baseline_id: string;
-  scenario_ids: string[];
-  snapshot: ScenarioCompareSnapshot;
-}
-
-export interface ScenarioCompareReport {
-  id: string;
-  owner_id: string | null;
-  title: string;
-  baseline_scenario_id: string;
-  scenario_ids: string[];
-  snapshot: ScenarioCompareSnapshot;
-  created_at: string;
-}
-
-export interface ScenarioCompareSessionState {
-  baseline_id: string;
-  selected_sources: Record<string, string>;
-  plan_summaries: Record<string, Record<string, unknown>>;
-}
-
-export interface ScenarioCompareSessionCreatePayload {
-  title?: string;
-  source_scenario_id?: string | null;
-  baseline_id: string;
-  scenario_ids: string[];
-  state: ScenarioCompareSessionState;
-}
-
-export interface ScenarioCompareSessionUpdatePayload {
-  title?: string;
-  baseline_id?: string;
-  scenario_ids?: string[];
-  state?: ScenarioCompareSessionState;
-}
-
-export interface ScenarioCompareSession {
-  id: string;
-  owner_id: string | null;
-  title: string;
-  source_scenario_id: string | null;
-  baseline_scenario_id: string;
-  scenario_ids: string[];
-  state: ScenarioCompareSessionState;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface ScenarioCompareForkCreatePayload {
-  branch_count?: number;
-}
-
-export interface ScenarioPlanOption {
-  title: string;
-  concept: string;
-  objective: string;
-  key_actions: string[];
-  advantages: string[];
-  risks: string[];
-}
-
-export interface ScenarioPlanSetCreatePayload {
-  title?: string;
-  include_source_baseline?: boolean;
-  plans: ScenarioPlanOption[];
-}
-
-export interface ScenarioPlanSet {
-  compare_session: ScenarioCompareSession;
-  source_scenario_id: string;
-  source_scenario_name: string;
-  branch_count: number;
-  plans: ScenarioPlanOption[];
-}
-
-export interface ScenarioBatchSimulationPayload {
-  steps?: number;
-  include_baseline?: boolean;
-}
-
-export interface ScenarioBatchSimulationResult {
-  scenario_id: string;
-  scenario_name: string;
-  training_score_record_id: string | null;
-  overall_score: number;
-  grade: string;
-  confidence: string;
-  outcome_reason: string;
-  winner_side_id: string;
-  elapsed_seconds: number;
-  source: string;
-}
-
-export interface ScenarioBatchSimulationResponse {
-  compare_session: ScenarioCompareSession;
-  simulated_at: string;
-  steps: number;
-  include_baseline: boolean;
-  results: ScenarioBatchSimulationResult[];
-  recommended_scenario_id: string | null;
-  recommended_reason: string;
 }
 
 export interface SkillExecutionResult {

@@ -29,12 +29,6 @@ from app.ai.models import (
     SkillExecutionResult,
 )
 from app.ai.skill_registry import TianShuSkillRegistry
-from app.scenarios import service as scenario_service
-from app.scenarios.schemas import (
-    ScenarioBatchSimulationRequest,
-    ScenarioPlanOption,
-    ScenarioPlanSetCreate,
-)
 
 
 SYSTEM_PROMPT = """
@@ -282,115 +276,6 @@ async def _inspect_current_scenario(deps: AgentDeps) -> dict[str, Any]:
     return _log_tool_success(
         deps,
         skill="inspect_current_scenario",
-        parameters=parameters,
-        output=output,
-    )
-
-
-async def _create_plan_set(
-    deps: AgentDeps,
-    *,
-    plans: list[ScenarioPlanOption],
-    title: str,
-    include_source_baseline: bool,
-) -> dict[str, Any]:
-    parameters: dict[str, Any] = {
-        "title": title,
-        "include_source_baseline": include_source_baseline,
-        "plans": [plan.model_dump(mode="json") for plan in plans],
-    }
-    if not _require_plan_workspace(
-        deps,
-        skill="generate_plan_set",
-        parameters=parameters,
-    ):
-        return {"ok": False, "error": "This tool requires an active scenario workspace."}
-    try:
-        result = await scenario_service.create_plan_set_compare_session(
-            deps.session,
-            deps.user,
-            deps.scenario_id or "",
-            payload=ScenarioPlanSetCreate(
-                title=title,
-                include_source_baseline=include_source_baseline,
-                plans=plans,
-            ),
-        )
-    except Exception as exc:
-        return _log_tool_error(
-            deps,
-            skill="generate_plan_set",
-            parameters=parameters,
-            error=str(exc),
-        )
-    output = {
-        "ok": True,
-        "kind": "plan_set",
-        "compareSession": result.compare_session.model_dump(mode="json"),
-        "sourceScenarioId": result.source_scenario_id,
-        "sourceScenarioName": result.source_scenario_name,
-        "branchCount": result.branch_count,
-        "plans": [plan.model_dump(mode="json") for plan in result.plans],
-    }
-    return _log_tool_success(
-        deps,
-        skill="generate_plan_set",
-        parameters=parameters,
-        output=output,
-    )
-
-
-async def _simulate_plan_set(
-    deps: AgentDeps,
-    *,
-    compare_session_id: str,
-    steps: int,
-    include_baseline: bool,
-) -> dict[str, Any]:
-    parameters: dict[str, Any] = {
-        "compare_session_id": compare_session_id,
-        "steps": steps,
-        "include_baseline": include_baseline,
-    }
-    if deps.session is None or deps.user is None or deps.bridge_provider is None:
-        return _log_tool_error(
-            deps,
-            skill="simulate_plan_set",
-            parameters=parameters,
-            error="Plan-set simulation is unavailable in the current context.",
-        )
-    try:
-        result = await scenario_service.simulate_compare_session_batch(
-            deps.session,
-            deps.user,
-            compare_session_id,
-            payload=ScenarioBatchSimulationRequest(
-                steps=steps,
-                include_baseline=include_baseline,
-            ),
-            bridge_provider=deps.bridge_provider,
-        )
-    except Exception as exc:
-        return _log_tool_error(
-            deps,
-            skill="simulate_plan_set",
-            parameters=parameters,
-            error=str(exc),
-        )
-    output = {
-        "ok": True,
-        "kind": "plan_simulation_batch",
-        "compareSession": result.compare_session.model_dump(mode="json"),
-        "steps": result.steps,
-        "includeBaseline": result.include_baseline,
-        "simulatedAt": result.simulated_at.isoformat(),
-        "results": [item.model_dump(mode="json") for item in result.results],
-        "recommendedScenarioId": result.recommended_scenario_id,
-        "recommendedReason": result.recommended_reason,
-    }
-    return _log_tool_success(
-        deps,
-        skill="simulate_plan_set",
         parameters=parameters,
         output=output,
     )
@@ -962,38 +847,8 @@ def build_agent(
     async def inspect_current_scenario(
         ctx: RunContext[AgentDeps],
     ) -> dict[str, Any]:
-        """Read the current scenario summary before generating multiple candidate plans."""
+        """Read the current scenario summary."""
         return await _inspect_current_scenario(ctx.deps)
-
-    @agent.tool
-    async def generate_plan_set(
-        ctx: RunContext[AgentDeps],
-        plans: list[ScenarioPlanOption],
-        title: str = "",
-        include_source_baseline: bool = True,
-    ) -> dict[str, Any]:
-        """Create 2-5 distinct candidate plans as branch scenarios and persist a compare session."""
-        return await _create_plan_set(
-            ctx.deps,
-            plans=plans,
-            title=title,
-            include_source_baseline=include_source_baseline,
-        )
-
-    @agent.tool
-    async def simulate_plan_set(
-        ctx: RunContext[AgentDeps],
-        compare_session_id: str,
-        steps: int = 600,
-        include_baseline: bool = True,
-    ) -> dict[str, Any]:
-        """Batch-run a previously generated compare session and return comparable scores."""
-        return await _simulate_plan_set(
-            ctx.deps,
-            compare_session_id=compare_session_id,
-            steps=steps,
-            include_baseline=include_baseline,
-        )
 
     return agent
 

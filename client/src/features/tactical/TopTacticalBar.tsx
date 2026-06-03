@@ -6,7 +6,6 @@ import {
   BrainCircuit,
   Copy,
   Cpu,
-  GitBranch,
   History,
   LogOut,
   Save,
@@ -34,7 +33,6 @@ interface TopTacticalBarProps {
   onExit?: () => void;
   onSave?: () => void;
   onRequestSaveAs?: () => void;
-  onCreateBranch?: () => void;
   savingState?: "idle" | "saving" | "saved" | "error";
   timelineOpen?: boolean;
   onToggleTimeline?: () => void;
@@ -52,7 +50,6 @@ export default function TopTacticalBar({
   onExit,
   onSave,
   onRequestSaveAs,
-  onCreateBranch,
   savingState,
   timelineOpen,
   onToggleTimeline,
@@ -263,7 +260,7 @@ export default function TopTacticalBar({
       {/* 3. RIGHT: Quick Actions & Save */}
       <div className="flex items-center gap-3">
         {/* Router actions (Save / Save As) */}
-        {(onSave || onRequestSaveAs || onCreateBranch) && (
+        {(onSave || onRequestSaveAs) && (
           <div className="flex items-center gap-2 pr-3 border-r border-cyan-400/20">
             {onSave && !scenarioMeta?.isTemplate && (
               <button
@@ -301,17 +298,6 @@ export default function TopTacticalBar({
               >
                 <Copy className="size-3.5" />
                 <span className="hidden sm:inline">另存</span>
-              </button>
-            )}
-            {onCreateBranch && (
-              <button
-                type="button"
-                onClick={onCreateBranch}
-                className="flex items-center gap-1.5 rounded border border-indigo-400/20 bg-indigo-400/10 px-3 py-1 font-mono text-[10px] font-bold uppercase tracking-widest text-indigo-200 transition-all hover:border-indigo-300/40 hover:bg-indigo-300/15 hover:text-indigo-100"
-                title="创建推演分支"
-              >
-                <GitBranch className="size-3.5" />
-                <span className="hidden sm:inline">分支</span>
               </button>
             )}
           </div>

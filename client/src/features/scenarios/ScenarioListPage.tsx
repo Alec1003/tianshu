@@ -16,7 +16,6 @@ import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import {
   Activity,
-  ArrowRightLeft,
   Bot,
   Box,
   BrainCircuit,
@@ -27,9 +26,7 @@ import {
   Edit3,
   Eye,
   FileInput,
-  FileText,
   FolderKanban,
-  GitBranch,
   LayoutGrid,
   List as ListIcon,
   LogOut,
@@ -52,10 +49,9 @@ import {
 import { ApiError } from "@/api/client";
 import BrandLogo from "@/components/brand/BrandLogo";
 import {
-  createScenarioBranch,
   createScenario,
   deleteScenario,
-  forkScenarioCompareSession,
+  getScenario,
   listScenarios,
 } from "@/api/scenarios";
 import {
@@ -68,8 +64,6 @@ import {
   updateUnitAsset,
 } from "@/api/unitAssets";
 import type {
-  ScenarioCompareReport,
-  ScenarioCompareSession,
   ScenarioListItem,
   ScenarioStatus,
   UnitAsset as ApiUnitAsset,
@@ -78,9 +72,6 @@ import type {
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useAuth } from "@/features/auth/useAuth";
-import ScenarioCompareDialog from "@/features/scenarios/ScenarioCompareDialog";
-import ScenarioCompareReportsDialog from "@/features/scenarios/ScenarioCompareReportsDialog";
-import ScenarioCompareSessionsDialog from "@/features/scenarios/ScenarioCompareSessionsDialog";
 import Dba from "@/game/db/Dba";
 import type { IAircraftModel } from "@/game/db/models/Aircraft";
 import type { IAirbaseModel } from "@/game/db/models/Airbase";
@@ -95,10 +86,6 @@ import {
 import { localizeUnitAssetName } from "@/i18n/entityNames";
 import { cn } from "@/lib/utils";
 import blankScenarioJson from "@/scenarios/blank_scenario.json";
-import {
-  buildScenarioCompareRestoreState,
-  buildScenarioCompareRestoreStateFromSession,
-} from "./scenarioCompare";
 import { projectMetrics } from "./scenarioMetrics";
 
 const EMPTY_SCENARIO_DATA = blankScenarioJson as Record<string, unknown>;
@@ -381,15 +368,6 @@ export default function ScenarioListPage() {
   const [view, setView] = useState<ViewMode>("grid");
   const [activeModule, setActiveModule] = useState<WorkspaceModule>("projects");
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [compareOpen, setCompareOpen] = useState(false);
-  const [compareReportsOpen, setCompareReportsOpen] = useState(false);
-  const [compareSessionsOpen, setCompareSessionsOpen] = useState(false);
-  const [compareIds, setCompareIds] = useState<string[]>([]);
-  const [compareRestoreState, setCompareRestoreState] = useState<ReturnType<
-    typeof buildScenarioCompareRestoreState
-  > | null>(null);
-  const [compareSession, setCompareSession] =
-    useState<ScenarioCompareSession | null>(null);
   const [accountOpen, setAccountOpen] = useState(false);
   const accountRef = useRef<HTMLDivElement | null>(null);
 
@@ -420,14 +398,6 @@ export default function ScenarioListPage() {
   useEffect(() => {
     void refresh();
   }, [refresh]);
-
-  useEffect(() => {
-    setCompareIds((prev) =>
-      prev.filter((id) =>
-        items.some((item) => item.id === id && !item.is_template)
-      )
-    );
-  }, [items]);
 
   const myScenarios = useMemo(
     () => items.filter((item) => !item.is_template),
@@ -465,7 +435,6 @@ export default function ScenarioListPage() {
     try {
       await deleteScenario(id);
       setItems((prev) => prev.filter((item) => item.id !== id));
-      setCompareIds((prev) => prev.filter((itemId) => itemId !== id));
     } catch (err) {
       window.alert(err instanceof ApiError ? err.message : "删除失败");
     }
@@ -473,10 +442,20 @@ export default function ScenarioListPage() {
 
   const handleDuplicate = async (item: ScenarioListItem) => {
     try {
-      const branchDepth = (item.branch_meta?.branch_depth ?? 0) + 1;
-      const created = await createScenarioBranch(item.id, {
-        name: `${item.name} / 分支 ${branchDepth}`,
+      const source = await getScenario(item.id);
+      const copyName = `${item.name} 副本`;
+      const data = JSON.parse(JSON.stringify(source.data)) as Record<
+        string,
+        unknown
+      >;
+      const currentScenario = data.currentScenario as
+        | Record<string, unknown>
+        | undefined;
+      if (currentScenario) currentScenario.name = copyName;
+      const created = await createScenario({
+        name: copyName,
         description: item.description,
+        data,
         status: "draft",
       });
       navigate(`/play/${created.id}`);
@@ -484,64 +463,6 @@ export default function ScenarioListPage() {
       window.alert(err instanceof ApiError ? err.message : "复制失败");
     }
   };
-
-  const handleToggleCompare = useCallback((item: ScenarioListItem) => {
-    setCompareIds((prev) => {
-      if (prev.includes(item.id)) {
-        return prev.filter((id) => id !== item.id);
-      }
-      if (prev.length >= 4) {
-        window.alert("最多同时对比 4 个推演项目");
-        return prev;
-      }
-      return [...prev, item.id];
-    });
-  }, []);
-
-  const handleOpenCompareReport = useCallback(
-    (report: ScenarioCompareReport) => {
-      setCompareReportsOpen(false);
-      setCompareSession(null);
-      setCompareIds(report.scenario_ids);
-      setCompareRestoreState(buildScenarioCompareRestoreState(report));
-      setCompareOpen(true);
-    },
-    []
-  );
-
-  const handleOpenCompareSession = useCallback(
-    (session: ScenarioCompareSession) => {
-      setCompareSessionsOpen(false);
-      setCompareSession(session);
-      setCompareIds(session.scenario_ids);
-      setCompareRestoreState(
-        buildScenarioCompareRestoreStateFromSession(session)
-      );
-      setCompareOpen(true);
-    },
-    []
-  );
-
-  const handleForkCompareSession = useCallback(
-    async (item: ScenarioListItem) => {
-      try {
-        const session = await forkScenarioCompareSession(item.id, {
-          branch_count: 3,
-        });
-        setCompareSession(session);
-        setCompareIds(session.scenario_ids);
-        setCompareRestoreState(
-          buildScenarioCompareRestoreStateFromSession(session)
-        );
-        setCompareOpen(true);
-      } catch (err) {
-        window.alert(
-          err instanceof ApiError ? err.message : "创建对比会话失败"
-        );
-      }
-    },
-    []
-  );
 
   return (
     <div className="dark relative min-h-screen overflow-hidden bg-[#020612] text-slate-100">
@@ -639,55 +560,6 @@ export default function ScenarioListPage() {
 
               {isProjectWorkspace && (
                 <div className="flex flex-wrap gap-3">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    className="h-12 rounded-xl border border-cyan-200/15 bg-slate-950/45 px-5 text-slate-200 hover:bg-white/[0.06]"
-                    onClick={() => setCompareSessionsOpen(true)}
-                  >
-                    <GitBranch className="size-4" />
-                    对比会话
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    className="h-12 rounded-xl border border-cyan-200/15 bg-slate-950/45 px-5 text-slate-200 hover:bg-white/[0.06]"
-                    onClick={() => setCompareReportsOpen(true)}
-                  >
-                    <FileText className="size-4" />
-                    对比报告
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    className="h-12 rounded-xl border border-cyan-200/15 bg-slate-950/45 px-5 text-slate-200 hover:bg-white/[0.06]"
-                    onClick={() => {
-                      const sourceId = compareIds[0];
-                      const source = myScenarios.find(
-                        (item) => item.id === sourceId
-                      );
-                      if (source) void handleForkCompareSession(source);
-                    }}
-                    disabled={compareIds.length !== 1}
-                  >
-                    <GitBranch className="size-4" />
-                    三方案对比
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    className="h-12 rounded-xl border border-cyan-200/15 bg-slate-950/45 px-5 text-slate-200 hover:bg-white/[0.06]"
-                    onClick={() => {
-                      setCompareSession(null);
-                      setCompareRestoreState(null);
-                      setCompareOpen(true);
-                    }}
-                    disabled={compareIds.length < 2}
-                  >
-                    <ArrowRightLeft className="size-4" />
-                    方案对比
-                    {compareIds.length > 0 ? ` (${compareIds.length})` : ""}
-                  </Button>
                   <Button
                     type="button"
                     className="h-12 rounded-xl border border-cyan-200/25 bg-gradient-to-r from-cyan-400 to-blue-600 px-5 text-white shadow-[0_18px_46px_rgba(14,165,233,0.28)] hover:shadow-[0_22px_56px_rgba(14,165,233,0.38)]"
@@ -789,14 +661,7 @@ export default function ScenarioListPage() {
                 items={filteredItems}
                 isTemplateSection={isTemplateWorkspace}
                 onOpen={handleOpen}
-                compareIds={compareIds}
                 onDuplicate={isTemplateWorkspace ? undefined : handleDuplicate}
-                onToggleCompare={
-                  isTemplateWorkspace ? undefined : handleToggleCompare
-                }
-                onForkCompareSession={
-                  isTemplateWorkspace ? undefined : handleForkCompareSession
-                }
                 onDelete={isTemplateWorkspace ? undefined : handleDelete}
               />
             ) : (
@@ -804,14 +669,7 @@ export default function ScenarioListPage() {
                 items={filteredItems}
                 isTemplateSection={isTemplateWorkspace}
                 onOpen={handleOpen}
-                compareIds={compareIds}
                 onDuplicate={isTemplateWorkspace ? undefined : handleDuplicate}
-                onToggleCompare={
-                  isTemplateWorkspace ? undefined : handleToggleCompare
-                }
-                onForkCompareSession={
-                  isTemplateWorkspace ? undefined : handleForkCompareSession
-                }
                 onDelete={isTemplateWorkspace ? undefined : handleDelete}
               />
             )}
@@ -828,33 +686,6 @@ export default function ScenarioListPage() {
           }}
         />
       )}
-
-      <ScenarioCompareDialog
-        open={compareOpen}
-        scenarioIds={compareIds}
-        onClose={() => {
-          setCompareOpen(false);
-          setCompareSession(null);
-          setCompareRestoreState(null);
-        }}
-        onOpenScenario={(id) => navigate(`/play/${id}`)}
-        initialRestoreState={compareRestoreState}
-        initialSession={compareSession}
-      />
-
-      <ScenarioCompareSessionsDialog
-        open={compareSessionsOpen}
-        onClose={() => setCompareSessionsOpen(false)}
-        onOpenScenario={(id) => navigate(`/play/${id}`)}
-        onOpenCompare={handleOpenCompareSession}
-      />
-
-      <ScenarioCompareReportsDialog
-        open={compareReportsOpen}
-        onClose={() => setCompareReportsOpen(false)}
-        onOpenScenario={(id) => navigate(`/play/${id}`)}
-        onOpenCompare={handleOpenCompareReport}
-      />
     </div>
   );
 }
@@ -961,10 +792,7 @@ interface ProjectActions {
   items: ScenarioListItem[];
   onOpen: (id: string) => void;
   onDuplicate?: (item: ScenarioListItem) => void;
-  onToggleCompare?: (item: ScenarioListItem) => void;
-  onForkCompareSession?: (item: ScenarioListItem) => void;
   onDelete?: (id: string, name: string) => void;
-  compareIds?: string[];
   isTemplateSection?: boolean;
 }
 
@@ -972,10 +800,7 @@ function ProjectGrid({
   items,
   onOpen,
   onDuplicate,
-  onToggleCompare,
-  onForkCompareSession,
   onDelete,
-  compareIds = [],
   isTemplateSection,
 }: ProjectActions) {
   return (
@@ -986,14 +811,7 @@ function ProjectGrid({
           item={item}
           index={index}
           onOpen={() => onOpen(item.id)}
-          selectedForCompare={compareIds.includes(item.id)}
           onDuplicate={onDuplicate ? () => onDuplicate(item) : undefined}
-          onToggleCompare={
-            onToggleCompare ? () => onToggleCompare(item) : undefined
-          }
-          onForkCompareSession={
-            onForkCompareSession ? () => onForkCompareSession(item) : undefined
-          }
           onDelete={onDelete ? () => onDelete(item.id, item.name) : undefined}
           isTemplateSection={isTemplateSection}
         />
@@ -1006,20 +824,14 @@ function ProjectCard({
   item,
   index,
   onOpen,
-  selectedForCompare,
   onDuplicate,
-  onToggleCompare,
-  onForkCompareSession,
   onDelete,
   isTemplateSection,
 }: {
   item: ScenarioListItem;
   index: number;
   onOpen: () => void;
-  selectedForCompare?: boolean;
   onDuplicate?: () => void;
-  onToggleCompare?: () => void;
-  onForkCompareSession?: () => void;
   onDelete?: () => void;
   isTemplateSection?: boolean;
 }) {
@@ -1044,9 +856,7 @@ function ProjectCard({
     <Card
       className={cn(
         "group relative overflow-hidden rounded-2xl bg-[#06111f]/78 shadow-[0_18px_70px_rgba(0,0,0,0.28)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_26px_80px_rgba(14,165,233,0.16)]",
-        selectedForCompare
-          ? "border-cyan-200/35 shadow-[0_0_0_1px_rgba(125,211,252,0.12)]"
-          : "border-cyan-200/10 hover:border-cyan-200/30"
+        "border-cyan-200/10 hover:border-cyan-200/30"
       )}
     >
       <div
@@ -1080,12 +890,6 @@ function ProjectCard({
         <div className="text-base font-semibold text-white line-clamp-1">
           {item.name}
         </div>
-        {item.branch_meta && (
-          <div className="mt-2 inline-flex items-center gap-1 rounded-full border border-cyan-200/15 bg-cyan-200/[0.06] px-2 py-1 text-[11px] text-cyan-100">
-            <GitBranch className="size-3" />
-            {item.branch_meta.branch_label}
-          </div>
-        )}
         <p className="mt-1 min-h-[2.5rem] text-sm leading-5 text-slate-500 line-clamp-2">
           {item.description ||
             "暂无描述，可进入项目继续配置目标、任务与推演参数。"}
@@ -1133,9 +937,6 @@ function ProjectCard({
               <ProjectMenu
                 onOpen={onOpen}
                 onDuplicate={onDuplicate}
-                onToggleCompare={onToggleCompare}
-                onForkCompareSession={onForkCompareSession}
-                selectedForCompare={selectedForCompare}
                 onDelete={onDelete}
                 close={() => setMenuOpen(false)}
               />
@@ -1150,17 +951,11 @@ function ProjectCard({
 function ProjectMenu({
   onOpen,
   onDuplicate,
-  onToggleCompare,
-  onForkCompareSession,
-  selectedForCompare,
   onDelete,
   close,
 }: {
   onOpen: () => void;
   onDuplicate?: () => void;
-  onToggleCompare?: () => void;
-  onForkCompareSession?: () => void;
-  selectedForCompare?: boolean;
   onDelete?: () => void;
   close: () => void;
 }) {
@@ -1188,32 +983,6 @@ function ProjectMenu({
         >
           <CopyIcon className="size-3.5 text-slate-400" />
           复制项目
-        </button>
-      )}
-      {onToggleCompare && (
-        <button
-          type="button"
-          onClick={() => {
-            close();
-            onToggleCompare();
-          }}
-          className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-slate-200 hover:bg-white/[0.05]"
-        >
-          <ArrowRightLeft className="size-3.5 text-cyan-200" />
-          {selectedForCompare ? "移出对比" : "加入对比"}
-        </button>
-      )}
-      {onForkCompareSession && (
-        <button
-          type="button"
-          onClick={() => {
-            close();
-            onForkCompareSession();
-          }}
-          className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-slate-200 hover:bg-white/[0.05]"
-        >
-          <GitBranch className="size-3.5 text-cyan-200" />
-          三方案对比
         </button>
       )}
       {onDelete && (
@@ -1290,10 +1059,7 @@ function ProjectList({
   items,
   onOpen,
   onDuplicate,
-  onToggleCompare,
-  onForkCompareSession,
   onDelete,
-  compareIds = [],
   isTemplateSection,
 }: ProjectActions) {
   return (
@@ -1317,10 +1083,7 @@ function ProjectList({
             return (
               <tr
                 key={item.id}
-                className={cn(
-                  "border-t border-cyan-200/5 hover:bg-white/[0.03]",
-                  compareIds.includes(item.id) && "bg-cyan-300/[0.04]"
-                )}
+                className="border-t border-cyan-200/5 hover:bg-white/[0.03]"
               >
                 <td
                   className="max-w-[360px] cursor-pointer px-4 py-4"
@@ -1367,26 +1130,6 @@ function ProjectList({
                       >
                         <CopyIcon className="size-3.5" />
                         复制
-                      </button>
-                    )}
-                    {onToggleCompare && (
-                      <button
-                        type="button"
-                        onClick={() => onToggleCompare(item)}
-                        className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs text-cyan-200 hover:bg-cyan-300/10"
-                      >
-                        <ArrowRightLeft className="size-3.5" />
-                        {compareIds.includes(item.id) ? "移出对比" : "加入对比"}
-                      </button>
-                    )}
-                    {onForkCompareSession && (
-                      <button
-                        type="button"
-                        onClick={() => onForkCompareSession(item)}
-                        className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs text-slate-300 hover:bg-white/5"
-                      >
-                        <GitBranch className="size-3.5" />
-                        三方案
                       </button>
                     )}
                     {onDelete && (

@@ -25,7 +25,6 @@ import { ApiError } from "@/api/client";
 import {
   activateScenario,
   createAarRecord,
-  createScenarioBranch,
   createScenario,
   getScenario,
   updateScenario,
@@ -47,9 +46,6 @@ export default function PlayScenarioPage() {
   const [saveAsOpen, setSaveAsOpen] = useState(false);
   const [saveAsName, setSaveAsName] = useState("");
   const [saveAsBusy, setSaveAsBusy] = useState(false);
-  const [branchOpen, setBranchOpen] = useState(false);
-  const [branchName, setBranchName] = useState("");
-  const [branchBusy, setBranchBusy] = useState(false);
   // The tactical platform calls onRequestSaveAs with the latest JSON. We hold
   // it in state so the dialog can submit it once the user confirms a name.
   const [pendingData, setPendingData] = useState<Record<
@@ -123,18 +119,6 @@ export default function PlayScenarioPage() {
     [scenario]
   );
 
-  const handleCreateBranch = useCallback(
-    (data: Record<string, unknown>) => {
-      const nextDepth = (scenario?.branch_meta?.branch_depth ?? 0) + 1;
-      setPendingData(data);
-      setBranchName(
-        scenario ? `${scenario.name} / 分支 ${nextDepth}` : "推演分支"
-      );
-      setBranchOpen(true);
-    },
-    [scenario]
-  );
-
   const handleSaveAsConfirm = async () => {
     if (!pendingData) return;
     const name = saveAsName.trim();
@@ -149,26 +133,6 @@ export default function PlayScenarioPage() {
       window.alert(err instanceof ApiError ? err.message : "另存为失败");
     } finally {
       setSaveAsBusy(false);
-    }
-  };
-
-  const handleCreateBranchConfirm = async () => {
-    if (!pendingData || !scenario) return;
-    const name = branchName.trim();
-    if (!name) return;
-    setBranchBusy(true);
-    try {
-      const created = await createScenarioBranch(scenario.id, {
-        name,
-        data: pendingData,
-      });
-      setBranchOpen(false);
-      setPendingData(null);
-      navigate(`/play/${created.id}`, { replace: true });
-    } catch (err) {
-      window.alert(err instanceof ApiError ? err.message : "创建分支失败");
-    } finally {
-      setBranchBusy(false);
     }
   };
 
@@ -240,7 +204,6 @@ export default function PlayScenarioPage() {
         initialScenarioData={scenario.data}
         onSave={handleSave}
         onRequestSaveAs={handleRequestSaveAs}
-        onCreateBranch={handleCreateBranch}
         onExit={() => navigate("/scenarios")}
         onPostAar={handlePostAar}
       />
@@ -278,41 +241,6 @@ export default function PlayScenarioPage() {
             disabled={saveAsBusy || !saveAsName.trim()}
           >
             {saveAsBusy ? "保存中…" : "另存为"}
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      <Dialog
-        open={branchOpen}
-        onClose={() => (branchBusy ? null : setBranchOpen(false))}
-        maxWidth="xs"
-        fullWidth
-      >
-        <DialogTitle>创建推演分支</DialogTitle>
-        <DialogContent>
-          <Stack spacing={2} sx={{ mt: 1 }}>
-            <Typography variant="body2" color="text.secondary">
-              基于当前推演状态创建一个独立分支，用于并行方案推演和后续对比。
-            </Typography>
-            <TextField
-              label="分支名称"
-              autoFocus
-              fullWidth
-              value={branchName}
-              onChange={(e) => setBranchName(e.target.value)}
-            />
-          </Stack>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setBranchOpen(false)} disabled={branchBusy}>
-            取消
-          </Button>
-          <Button
-            variant="contained"
-            onClick={handleCreateBranchConfirm}
-            disabled={branchBusy || !branchName.trim()}
-          >
-            {branchBusy ? "创建中..." : "创建分支"}
           </Button>
         </DialogActions>
       </Dialog>

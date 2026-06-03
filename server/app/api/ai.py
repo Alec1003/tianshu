@@ -20,6 +20,7 @@ from app.ai.internal_skills import build_internal_skill_steps
 from app.ai.models import (
     AICommandRequest,
     AICommandResponse,
+    BuiltinMcpToolsResponse,
     CommandApprovalResponse,
     CommandProposalListResponse,
     CustomSkillCreateRequest,
@@ -1551,6 +1552,23 @@ async def validate_external_mcp_server(
         message=message,
         tools=tools,
         trace=trace,
+    )
+
+
+@router.get("/mcp/builtin/tools", response_model=BuiltinMcpToolsResponse)
+async def list_builtin_mcp_tools(
+    user: User = Depends(current_active_user),
+) -> BuiltinMcpToolsResponse:
+    """Return the built-in TianShu MCP tool registry for the settings UI."""
+    _ = user
+    from app.mcp.server import list_builtin_mcp_tool_definitions
+
+    tools = await list_builtin_mcp_tool_definitions()
+    return BuiltinMcpToolsResponse(
+        ok=True,
+        server="TianShu MCP",
+        message=f"{len(tools)} built-in TianShu MCP tools available.",
+        tools=tools,
     )
 
 

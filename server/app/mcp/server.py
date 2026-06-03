@@ -230,6 +230,31 @@ mcp = FastMCP(
 )
 
 
+def _mcp_tool_description(description: str | None) -> str:
+    if not description:
+        return ""
+    for line in description.splitlines():
+        text = line.strip()
+        if text:
+            return text
+    return ""
+
+
+async def list_builtin_mcp_tool_definitions() -> list[dict[str, Any]]:
+    """Return the real tool registry exposed by the built-in TianShu MCP."""
+    tools = await mcp.list_tools()
+    return [
+        {
+            "server": "TianShu MCP",
+            "name": tool.name,
+            "description": _mcp_tool_description(tool.description),
+            "inputSchema": tool.inputSchema or {},
+            "outputSchema": tool.outputSchema or {},
+        }
+        for tool in tools
+    ]
+
+
 # ---------- helpers -----------------------------------------------------------
 
 

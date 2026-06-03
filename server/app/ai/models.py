@@ -92,6 +92,7 @@ class ExternalMcpToolRead(BaseModel):
     name: str
     description: str = ""
     inputSchema: dict[str, Any] = Field(default_factory=dict)
+    outputSchema: dict[str, Any] = Field(default_factory=dict)
 
 
 class ExternalMcpValidateResponse(BaseModel):
@@ -101,6 +102,13 @@ class ExternalMcpValidateResponse(BaseModel):
     message: str
     tools: list[ExternalMcpToolRead] = Field(default_factory=list)
     trace: list[MCPCallTrace] = Field(default_factory=list)
+
+
+class BuiltinMcpToolsResponse(BaseModel):
+    ok: bool
+    server: str
+    message: str
+    tools: list[ExternalMcpToolRead] = Field(default_factory=list)
 
 
 class AgentExecutionSummary(BaseModel):

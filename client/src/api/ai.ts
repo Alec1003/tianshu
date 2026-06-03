@@ -1,5 +1,6 @@
 import { apiCall } from "./client";
 import type {
+  BuiltinMcpToolsResponse,
   CommandApprovalResponse,
   CommandProposalListResponse,
   CustomSkill,
@@ -135,6 +136,10 @@ export async function validateExternalMcpServer(
     method: "POST",
     json: payload,
   });
+}
+
+export async function listBuiltinMcpTools(): Promise<BuiltinMcpToolsResponse> {
+  return apiCall<BuiltinMcpToolsResponse>("/api/ai/mcp/builtin/tools");
 }
 
 export async function loadRuntimeScenario(

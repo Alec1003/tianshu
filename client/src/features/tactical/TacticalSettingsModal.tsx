@@ -922,7 +922,7 @@ function McpConfigSection({
                               <div className="truncate font-mono font-semibold text-slate-100">
                                 {tool.name}
                               </div>
-                              <div className="text-slate-300">
+                              <div className="line-clamp-2 text-slate-300">
                                 {tool.description}
                               </div>
                               <Badge
@@ -973,7 +973,7 @@ function McpConfigSection({
                 type="button"
               >
                 <RefreshCw className="size-4 text-cyan-300" />
-                重启
+                刷新工具
               </button>
               <button
                 className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-200 transition-colors hover:bg-slate-800"

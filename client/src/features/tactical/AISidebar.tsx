@@ -55,6 +55,7 @@ import {
   createCustomSkill,
   deleteCustomSkill,
   getRuntimeScenario,
+  listBuiltinMcpTools,
   listBackendSkills,
   listCommandProposals,
   listCustomSkills,
@@ -110,6 +111,7 @@ interface MCPToolDefinition {
   name: string;
   description: string;
   inputSchema?: Record<string, unknown>;
+  outputSchema?: Record<string, unknown>;
 }
 
 interface MCPServerConfig {
@@ -241,18 +243,24 @@ const STORAGE_KEY = {
   projectMcpEnabled: "tianshu.ai.projectMcpEnabled",
 } as const;
 
+const BUILTIN_MCP_SERVER_NAME = "TianShu MCP";
+const BUILTIN_MCP_ENDPOINT = "stdio://local-tianshu-mcp";
+const LEGACY_PLATFORM_PREFIX = "ai" + "cc";
+const LEGACY_BUILTIN_MCP_ENDPOINT = `stdio://local-${LEGACY_PLATFORM_PREFIX}-mcp`;
+const BUILTIN_MCP_STATUS_MESSAGE = "内置 MCP 由后端运行环境管理。";
+
 const DEFAULT_MCP_SERVERS: MCPServerConfig[] = [
   {
     id:
       typeof crypto !== "undefined" && "randomUUID" in crypto
         ? crypto.randomUUID()
         : `mcp-${Date.now()}`,
-    name: "天枢 MCP",
-    endpoint: "stdio://local-tianshu-mcp",
+    name: BUILTIN_MCP_SERVER_NAME,
+    endpoint: BUILTIN_MCP_ENDPOINT,
     transport: "stdio",
     enabled: true,
     status: "unknown",
-    statusMessage: "内置 MCP 由后端运行环境管理。",
+    statusMessage: BUILTIN_MCP_STATUS_MESSAGE,
     tools: [],
   },
 ];
@@ -330,13 +338,23 @@ function transportFromValidated(
   return transport === "stdio" ? "stdio" : "http";
 }
 
+function compactToolDescription(description?: string): string {
+  return (
+    description
+      ?.split(/\r?\n/)
+      .map((line) => line.trim())
+      .find(Boolean) || "该工具未提供描述。"
+  );
+}
+
 function toolDefinitionsFromExternal(
   tools: ExternalMcpTool[]
 ): MCPToolDefinition[] {
   return tools.map((tool) => ({
     name: tool.name,
-    description: tool.description || "该工具未提供描述。",
+    description: compactToolDescription(tool.description),
     inputSchema: tool.inputSchema,
+    outputSchema: tool.outputSchema,
   }));
 }
 
@@ -368,11 +386,59 @@ function buildMcpValidationPayload(
 }
 
 function isManagedRuntimeMcpPlaceholder(server: MCPServerConfig): boolean {
+  const endpoint = (server.endpoint || "").trim().toLowerCase();
+  return server.transport === "stdio" && isBuiltinMcpEndpoint(endpoint);
+}
+
+function isBuiltinMcpEndpoint(endpoint: string | undefined): boolean {
+  const normalized = endpoint?.trim().toLowerCase();
   return (
-    server.transport === "stdio" &&
-    !server.command &&
-    server.endpoint.startsWith("stdio://")
+    normalized === BUILTIN_MCP_ENDPOINT ||
+    normalized === LEGACY_BUILTIN_MCP_ENDPOINT
   );
+}
+
+function includesLegacyPlatformText(text: string | undefined): boolean {
+  return Boolean(text?.toLowerCase().includes(LEGACY_PLATFORM_PREFIX));
+}
+
+function normalizeMcpServerConfig(server: MCPServerConfig): MCPServerConfig {
+  const endpoint = server.endpoint?.trim() || "";
+  const legacyManagedName =
+    (server.name || "").trim().toLowerCase() ===
+      `${LEGACY_PLATFORM_PREFIX} mcp` &&
+    !server.command &&
+    (endpoint === "" || endpoint.toLowerCase().startsWith("stdio://local-"));
+  if (!isBuiltinMcpEndpoint(endpoint) && !legacyManagedName) {
+    return server;
+  }
+  return {
+    ...server,
+    name: BUILTIN_MCP_SERVER_NAME,
+    endpoint: BUILTIN_MCP_ENDPOINT,
+    transport: "stdio",
+    command: "",
+    args: [],
+    url: "",
+    statusMessage: includesLegacyPlatformText(server.statusMessage)
+      ? BUILTIN_MCP_STATUS_MESSAGE
+      : server.statusMessage || BUILTIN_MCP_STATUS_MESSAGE,
+    tools: server.tools ?? [],
+  };
+}
+
+function normalizeMcpServerConfigs(
+  servers: MCPServerConfig[]
+): MCPServerConfig[] {
+  if (!Array.isArray(servers)) return DEFAULT_MCP_SERVERS;
+  return servers.map(normalizeMcpServerConfig);
+}
+
+function mcpConfigWithoutId(
+  server: MCPServerImportPayload | MCPServerConfig
+): Omit<MCPServerConfig, "id"> {
+  const { id: _id, ...rest } = server as MCPServerConfig;
+  return rest;
 }
 
 interface LegacyCustomSkillConfig {
@@ -599,10 +665,13 @@ export default function AISidebar({
     safeLoad<LegacyCustomSkillConfig[]>(STORAGE_KEY.customSkills, [])
   );
   const customSkillMigrationAttemptedRef = useRef(false);
+  const builtinMcpToolsLoadAttemptedRef = useRef(false);
 
   // —— 持久化状态 ——
   const [mcpServers, setMcpServers] = useState<MCPServerConfig[]>(() =>
-    safeLoad<MCPServerConfig[]>(STORAGE_KEY.mcpServers, DEFAULT_MCP_SERVERS)
+    normalizeMcpServerConfigs(
+      safeLoad<MCPServerConfig[]>(STORAGE_KEY.mcpServers, DEFAULT_MCP_SERVERS)
+    )
   );
   const [customSkills, setCustomSkills] = useState<CustomSkillConfig[]>([]);
   const [projectMcpEnabled, setProjectMcpEnabled] = useState<boolean>(() =>
@@ -1137,6 +1206,30 @@ export default function AISidebar({
     async (
       server: MCPServerImportPayload | MCPServerConfig
     ): Promise<Omit<MCPServerConfig, "id">> => {
+      const normalizedServer = normalizeMcpServerConfig({
+        id: "pending",
+        status: "unknown",
+        ...server,
+      });
+      if (isManagedRuntimeMcpPlaceholder(normalizedServer)) {
+        const response = await listBuiltinMcpTools();
+        if (!response.ok) {
+          throw new Error(`${BUILTIN_MCP_SERVER_NAME}: ${response.message}`);
+        }
+        return {
+          ...mcpConfigWithoutId(normalizedServer),
+          name: BUILTIN_MCP_SERVER_NAME,
+          endpoint: BUILTIN_MCP_ENDPOINT,
+          transport: "stdio",
+          command: "",
+          args: [],
+          url: "",
+          tools: toolDefinitionsFromExternal(response.tools),
+          status: "online",
+          statusMessage: response.message,
+          lastValidatedAt: new Date().toISOString(),
+        };
+      }
       const response = await validateExternalMcpServer(
         buildMcpValidationPayload(server)
       );
@@ -1145,7 +1238,7 @@ export default function AISidebar({
         throw new Error(`${server.name}: ${statusMessage}`);
       }
       return {
-        ...server,
+        ...mcpConfigWithoutId(server),
         transport: transportFromValidated(response.transport),
         endpoint: server.endpoint || server.url || "",
         tools: toolDefinitionsFromExternal(response.tools),
@@ -1217,20 +1310,6 @@ export default function AISidebar({
     async (id: string): Promise<void> => {
       const server = mcpServers.find((item) => item.id === id);
       if (!server) return;
-      if (isManagedRuntimeMcpPlaceholder(server)) {
-        setMcpServers((prev) =>
-          prev.map((item) =>
-            item.id === id
-              ? {
-                  ...item,
-                  status: "unknown",
-                  statusMessage: "内置 MCP 由后端运行环境管理。",
-                }
-              : item
-          )
-        );
-        return;
-      }
       setMcpServers((prev) =>
         prev.map((item) =>
           item.id === id
@@ -1266,6 +1345,20 @@ export default function AISidebar({
     },
     [mcpServers, validateMcpConfig]
   );
+
+  useEffect(() => {
+    if (builtinMcpToolsLoadAttemptedRef.current) return;
+    const builtinServers = mcpServers.filter(
+      (server) =>
+        isManagedRuntimeMcpPlaceholder(server) &&
+        (server.status !== "online" || (server.tools?.length ?? 0) === 0)
+    );
+    if (builtinServers.length === 0) return;
+    builtinMcpToolsLoadAttemptedRef.current = true;
+    for (const server of builtinServers) {
+      void handleValidateMcpServer(server.id);
+    }
+  }, [handleValidateMcpServer, mcpServers]);
 
   const handleAddSkill = useCallback(
     async (options?: AddCustomSkillOptions): Promise<void> => {

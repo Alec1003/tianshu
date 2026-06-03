@@ -342,6 +342,7 @@ def test_ai_routes_reject_unauthenticated_requests() -> None:
             "/api/ai/mcp/validate",
             {"name": "planner", "transport": "stdio", "command": "python"},
         ),
+        ("get", "/api/ai/mcp/builtin/tools", None),
         ("post", "/api/ai/chat", None),
     ]
 
@@ -418,6 +419,25 @@ def test_validate_external_mcp_server_returns_tools_without_secrets(monkeypatch)
     assert server.command == "python"
     assert server.args == ["-m", "planner_mcp"]
     assert server.timeout_seconds == 15.0
+
+
+def test_list_builtin_mcp_tools_returns_registered_tianshu_tools() -> None:
+    client = _build_client(authenticated=True)
+
+    response = client.get("/api/ai/mcp/builtin/tools")
+
+    assert response.status_code == 200
+    payload = response.json()
+    tool_names = {tool["name"] for tool in payload["tools"]}
+    assert payload["ok"] is True
+    assert payload["server"] == "TianShu MCP"
+    assert "runtime_status" in tool_names
+    assert "list_scenarios" in tool_names
+    assert len(payload["tools"]) >= 20
+    assert payload["tools"][0]["server"] == "TianShu MCP"
+    assert isinstance(payload["tools"][0]["inputSchema"], dict)
+    assert isinstance(payload["tools"][0]["outputSchema"], dict)
+    assert ("AI" + "CC") not in response.text
 
 
 def test_ai_runtime_control_endpoints_return_authoritative_snapshot() -> None:

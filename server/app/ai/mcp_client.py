@@ -168,6 +168,7 @@ class MCPClientSkeleton:
                             "name": name,
                             "description": dumped.get("description") or "",
                             "inputSchema": dumped.get("inputSchema") or {},
+                            "outputSchema": dumped.get("outputSchema") or {},
                         }
                     )
                 tools.extend(server_tools)

@@ -114,11 +114,16 @@ const STORAGE_KEY = {
   projectMcpEnabled: "tianshu.ai.projectMcpEnabled",
 };
 
+const BUILTIN_MCP_SERVER_NAME = "TianShu MCP";
+const BUILTIN_MCP_ENDPOINT = "stdio://local-tianshu-mcp";
+const LEGACY_PLATFORM_PREFIX = "ai" + "cc";
+const LEGACY_BUILTIN_MCP_ENDPOINT = `stdio://local-${LEGACY_PLATFORM_PREFIX}-mcp`;
+
 const DEFAULT_MCP_SERVERS: MCPServerConfig[] = [
   {
     id: crypto.randomUUID(),
-    name: "天枢 MCP",
-    endpoint: "stdio://local-tianshu-mcp",
+    name: BUILTIN_MCP_SERVER_NAME,
+    endpoint: BUILTIN_MCP_ENDPOINT,
     transport: "stdio",
     enabled: true,
   },
@@ -156,6 +161,38 @@ function safeRemove(key: string): void {
   } catch (_error) {
     // Ignore local persistence failures.
   }
+}
+
+function isBuiltinMcpEndpoint(endpoint: string | undefined): boolean {
+  const normalized = endpoint?.trim().toLowerCase();
+  return (
+    normalized === BUILTIN_MCP_ENDPOINT ||
+    normalized === LEGACY_BUILTIN_MCP_ENDPOINT
+  );
+}
+
+function normalizeMcpServerConfig(server: MCPServerConfig): MCPServerConfig {
+  const endpoint = server.endpoint?.trim() || "";
+  const legacyManagedName =
+    (server.name || "").trim().toLowerCase() ===
+      `${LEGACY_PLATFORM_PREFIX} mcp` &&
+    (endpoint === "" || endpoint.toLowerCase().startsWith("stdio://local-"));
+  if (!isBuiltinMcpEndpoint(endpoint) && !legacyManagedName) {
+    return server;
+  }
+  return {
+    ...server,
+    name: BUILTIN_MCP_SERVER_NAME,
+    endpoint: BUILTIN_MCP_ENDPOINT,
+    transport: "stdio",
+  };
+}
+
+function normalizeMcpServerConfigs(
+  servers: MCPServerConfig[]
+): MCPServerConfig[] {
+  if (!Array.isArray(servers)) return DEFAULT_MCP_SERVERS;
+  return servers.map(normalizeMcpServerConfig);
 }
 
 function authHeaders(
@@ -215,7 +252,9 @@ export default function OpenClawAssistantPanel({
     safeLoad<ChatMessage[]>(STORAGE_KEY.messages, [])
   );
   const [mcpServers, setMcpServers] = useState<MCPServerConfig[]>(() =>
-    safeLoad<MCPServerConfig[]>(STORAGE_KEY.mcpServers, DEFAULT_MCP_SERVERS)
+    normalizeMcpServerConfigs(
+      safeLoad<MCPServerConfig[]>(STORAGE_KEY.mcpServers, DEFAULT_MCP_SERVERS)
+    )
   );
   const legacyCustomSkillsRef = useRef<LegacyCustomSkillConfig[]>(
     safeLoad<LegacyCustomSkillConfig[]>(STORAGE_KEY.customSkills, [])

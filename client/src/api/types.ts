@@ -416,6 +416,7 @@ export interface ExternalMcpTool {
   name: string;
   description: string;
   inputSchema: Record<string, unknown>;
+  outputSchema?: Record<string, unknown>;
 }
 
 export interface ExternalMcpTrace {
@@ -432,6 +433,13 @@ export interface ExternalMcpValidateResponse {
   message: string;
   tools: ExternalMcpTool[];
   trace: ExternalMcpTrace[];
+}
+
+export interface BuiltinMcpToolsResponse {
+  ok: boolean;
+  server: string;
+  message: string;
+  tools: ExternalMcpTool[];
 }
 
 export interface StructuredCommandStep {

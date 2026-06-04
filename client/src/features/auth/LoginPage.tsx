@@ -7,20 +7,18 @@ import {
 } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
-  ArrowRight,
-  BrainCircuit,
   Eye,
   EyeOff,
   Loader2,
   Lock,
   Mail,
-  Network,
+  RotateCw,
   ShieldCheck,
+  Zap,
 } from "lucide-react";
 
 import { ApiError } from "@/api/client";
 import BrandLogo from "@/components/brand/BrandLogo";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -29,22 +27,17 @@ import { useAuth } from "./useAuth";
 type Tab = "login" | "register";
 type LocationState = { from?: { pathname?: string } } | null;
 
-const PLATFORM_POINTS = [
-  {
-    icon: BrainCircuit,
-    label: "智能推演",
-    text: "围绕场景、模型、MCP 工具和审批链路组织推演任务。",
-  },
-  {
-    icon: Network,
-    label: "统一工作区",
-    text: "将项目、模板、单位库和 AI 配置放在同一操作界面。",
-  },
-  {
-    icon: ShieldCheck,
-    label: "可信访问",
-    text: "登录态、后端运行时和用户操作保持清晰边界。",
-  },
+const VISUAL_NODES = [
+  { label: "数据融合", position: "left-[8%] top-[34%]" },
+  { label: "智能推演", position: "left-[78%] top-[25%]" },
+  { label: "态势感知", position: "left-[12%] top-[74%]" },
+  { label: "精准决策", position: "left-[84%] top-[68%]" },
+];
+
+const TRUST_METRICS = [
+  { icon: ShieldCheck, value: "99.9%", label: "系统可用性" },
+  { icon: Zap, value: "10ms", label: "实时响应" },
+  { icon: RotateCw, value: "24/7", label: "服务保障" },
 ];
 
 export default function LoginPage() {
@@ -109,166 +102,49 @@ export default function LoginPage() {
   const isRegister = tab === "register";
 
   return (
-    <main className="dark h-screen overflow-y-auto bg-[#050812] text-slate-100">
-      <div className="tactical-grid mx-auto flex min-h-screen w-full max-w-[1440px] flex-col px-4 py-4 lg:px-5">
-        <header className="flex min-h-14 items-center justify-between gap-3 border-b border-cyan-300/10 pb-3">
-          <BrandMark />
-          <div className="hidden items-center gap-2 sm:flex">
-            <Badge variant="info">AI Runtime</Badge>
-            <Badge variant="success">Backend Online</Badge>
-          </div>
-        </header>
+    <main className="dark min-h-screen overflow-hidden bg-[#030814] text-slate-100">
+      <div className="relative min-h-screen overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_16%,rgba(14,165,233,0.11),transparent_28%),radial-gradient(circle_at_74%_24%,rgba(37,99,235,0.14),transparent_32%),linear-gradient(135deg,#071423_0%,#030814_52%,#020611_100%)]" />
+        <div className="absolute inset-0 bg-[linear-gradient(rgba(56,189,248,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(56,189,248,0.02)_1px,transparent_1px)] bg-[length:36px_36px]" />
+        <div className="absolute inset-y-0 right-0 w-[32%] bg-[#06111f]/70" />
 
-        <section className="grid flex-1 items-center gap-4 py-4 lg:grid-cols-[minmax(0,1fr)_420px] xl:grid-cols-[minmax(0,1fr)_460px]">
-          <div className="hidden min-h-[560px] flex-col justify-between rounded-lg border border-cyan-300/10 bg-[#08111c] p-5 shadow-[0_1px_0_rgba(255,255,255,0.03)] lg:flex">
-            <div>
-              <div className="flex items-center gap-2">
-                <Badge variant="info">Command Workspace</Badge>
-                <Badge variant="offline">v0.2.0</Badge>
+        <div className="relative grid min-h-screen w-full grid-cols-1 lg:grid-cols-[minmax(0,7fr)_minmax(430px,3fr)]">
+          <section className="relative flex min-h-[620px] flex-col px-6 py-6 sm:px-10 lg:min-h-screen lg:px-16 xl:px-20 2xl:px-24">
+            <BrandMark />
+
+            <div className="relative z-10 mt-12 max-w-4xl lg:mt-14 xl:mt-16">
+              <div className="inline-flex rounded-full border border-cyan-300/20 bg-cyan-300/[0.07] px-4 py-1 text-xs font-medium tracking-[0.16em] text-cyan-200">
+                AI · DATA · DECISION
               </div>
-              <h1 className="mt-5 max-w-2xl text-2xl font-semibold leading-tight tracking-normal text-slate-50 xl:text-3xl">
-                天枢 AI 指挥控制平台
+              <h1 className="mt-7 text-[44px] font-semibold leading-[1.04] tracking-normal text-slate-50 sm:text-[56px] xl:text-[68px]">
+                智能决策 · <span className="text-cyan-300">精准指挥</span>
               </h1>
-              <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-400">
-                面向战术场景、模型配置、后端运行时和 MCP 工具的统一操作入口。
+              <p className="mt-5 max-w-3xl text-base leading-8 text-slate-400">
+                面向战术场景、模型配置、后端运行时和 MCP 工具的统一操作入口，
+                让复杂决策更智能，让指挥流程更清晰。
               </p>
-
-              <div className="mt-6 grid max-w-3xl grid-cols-3 gap-3">
-                <LoginMetric label="入口" value="Scenarios" />
-                <LoginMetric label="运行边界" value="Backend" />
-                <LoginMetric label="身份模式" value="JWT" />
-              </div>
             </div>
 
-            <div className="grid gap-3">
-              {PLATFORM_POINTS.map((item) => (
-                <PlatformPoint key={item.label} {...item} />
-              ))}
-            </div>
-          </div>
+            <TechVisual />
+            <TrustMetrics />
+          </section>
 
-          <Card className="mx-auto w-full max-w-[420px] p-5 lg:mx-0 lg:max-w-none">
-            <div className="mb-5 flex items-center justify-between gap-3">
-              <div>
-                <p className="text-xs font-medium text-cyan-200">
-                  {isRegister ? "创建访问身份" : "访问工作区"}
-                </p>
-                <h2 className="mt-1 text-lg font-semibold tracking-normal text-slate-50">
-                  {isRegister ? "注册天枢平台" : "登录天枢平台"}
-                </h2>
-              </div>
-              <div className="inline-flex rounded-md border border-cyan-300/12 bg-slate-950/55 p-0.5">
-                <TabButton
-                  active={!isRegister}
-                  onClick={() => switchTab("login")}
-                >
-                  登录
-                </TabButton>
-                <TabButton
-                  active={isRegister}
-                  onClick={() => switchTab("register")}
-                >
-                  注册
-                </TabButton>
-              </div>
-            </div>
-
-            <p className="mb-5 text-xs leading-5 text-slate-500">
-              {isRegister
-                ? "使用邮箱和密码创建账户，随后进入项目管理工作台。"
-                : "使用已注册账户继续进入项目、模板和模型配置中心。"}
-            </p>
-
-            <form className="space-y-4" onSubmit={handleSubmit}>
-              <AuthField
-                icon={<Mail className="size-4" />}
-                label="邮箱"
-                htmlFor="auth-email"
-              >
-                <input
-                  id="auth-email"
-                  type="email"
-                  required
-                  autoComplete="email"
-                  value={email}
-                  onChange={(event) => setEmail(event.target.value)}
-                  placeholder="name@example.com"
-                  className="h-10 w-full bg-transparent text-sm text-slate-100 outline-none placeholder:text-slate-600"
-                />
-              </AuthField>
-
-              <AuthField
-                icon={<Lock className="size-4" />}
-                label="密码"
-                htmlFor="auth-password"
-                hint={isRegister ? "至少 8 位" : undefined}
-                trailing={
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword((value) => !value)}
-                    className="grid size-8 place-items-center rounded-md text-slate-500 transition-colors hover:bg-white/[0.06] hover:text-slate-200"
-                    aria-label={showPassword ? "隐藏密码" : "显示密码"}
-                  >
-                    {showPassword ? (
-                      <EyeOff className="size-4" />
-                    ) : (
-                      <Eye className="size-4" />
-                    )}
-                  </button>
-                }
-              >
-                <input
-                  id="auth-password"
-                  type={showPassword ? "text" : "password"}
-                  required
-                  minLength={isRegister ? 8 : undefined}
-                  autoComplete={
-                    isRegister ? "new-password" : "current-password"
-                  }
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  placeholder={isRegister ? "设置登录密码" : "输入登录密码"}
-                  className="h-10 w-full bg-transparent text-sm text-slate-100 outline-none placeholder:text-slate-600"
-                />
-              </AuthField>
-
-              {error ? (
-                <div className="rounded-md border border-red-400/25 bg-red-500/[0.08] px-3 py-2 text-xs leading-5 text-red-100">
-                  {error}
-                </div>
-              ) : null}
-
-              <Button
-                className="h-10 w-full"
-                disabled={submitting}
-                type="submit"
-              >
-                {submitting ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : null}
-                {submitting
-                  ? isRegister
-                    ? "正在创建"
-                    : "正在登录"
-                  : isRegister
-                    ? "创建账户"
-                    : "继续登录"}
-                {!submitting ? <ArrowRight className="size-4" /> : null}
-              </Button>
-            </form>
-
-            <div className="mt-5 border-t border-cyan-300/10 pt-4 text-center text-xs text-slate-500">
-              {isRegister ? "已有账户？" : "还没有账户？"}
-              <button
-                type="button"
-                onClick={() => switchTab(isRegister ? "login" : "register")}
-                className="ml-2 font-medium text-cyan-200 transition-colors hover:text-cyan-50"
-              >
-                {isRegister ? "返回登录" : "立即注册"}
-              </button>
-            </div>
-          </Card>
-        </section>
+          <aside className="relative flex min-h-[620px] items-center justify-center border-t border-sky-300/10 bg-[#04101d]/70 px-6 py-8 backdrop-blur-sm lg:min-h-screen lg:justify-end lg:border-l lg:border-t-0 lg:px-4 xl:px-6 2xl:px-14">
+            <LoginPanel
+              isRegister={isRegister}
+              submitting={submitting}
+              error={error}
+              email={email}
+              password={password}
+              showPassword={showPassword}
+              onEmailChange={setEmail}
+              onPasswordChange={setPassword}
+              onTogglePassword={() => setShowPassword((value) => !value)}
+              onSwitchTab={switchTab}
+              onSubmit={handleSubmit}
+            />
+          </aside>
+        </div>
       </div>
     </main>
   );
@@ -276,50 +152,233 @@ export default function LoginPage() {
 
 function BrandMark() {
   return (
-    <div className="flex items-center gap-3">
-      <BrandLogo frameClassName="size-10" imageClassName="scale-[1.08]" />
+    <div className="flex items-center gap-4">
+      <BrandLogo
+        frameClassName="size-12 rounded-xl border-sky-300/25 bg-sky-400/10 shadow-[0_0_28px_rgba(14,165,233,0.22)]"
+        imageClassName="scale-[1.08]"
+      />
       <div>
-        <div className="text-sm font-semibold tracking-normal text-slate-50">
-          TianShu
+        <div className="text-sm font-semibold tracking-[0.32em] text-slate-50">
+          TIANSHU · COMMAND
         </div>
-        <div className="mt-0.5 text-[11px] text-slate-500">
-          AI Command Center
+        <div className="mt-1 text-xs tracking-[0.22em] text-slate-500">
+          AI NATIVE CONTROL
         </div>
       </div>
     </div>
   );
 }
 
-function PlatformPoint({
-  icon: Icon,
-  label,
-  text,
-}: (typeof PLATFORM_POINTS)[number]) {
+function TechVisual() {
   return (
-    <div className="flex items-start gap-3 rounded-md border border-cyan-300/10 bg-slate-950/45 p-3">
-      <span className="grid size-8 shrink-0 place-items-center rounded-md border border-cyan-300/14 bg-cyan-300/8 text-cyan-200">
-        <Icon className="size-4" />
-      </span>
-      <div className="min-w-0">
-        <div className="text-sm font-medium text-slate-100">{label}</div>
-        <p className="mt-1 text-xs leading-5 text-slate-500">{text}</p>
+    <div
+      className="pointer-events-none relative -ml-3 mt-5 h-[380px] w-full max-w-[1120px] overflow-visible sm:h-[440px] lg:-ml-6 lg:h-[470px] xl:h-[535px] 2xl:h-[590px]"
+      aria-hidden="true"
+    >
+      <div className="absolute inset-x-8 bottom-3 h-[150px] rounded-[50%] bg-[linear-gradient(180deg,transparent,rgba(14,165,233,0.06))]" />
+      <div className="absolute left-[49%] top-[56%] h-[430px] w-[980px] -translate-x-1/2 -translate-y-1/2 rounded-[50%] border border-cyan-300/10" />
+      <div className="absolute left-[49%] top-[56%] h-[342px] w-[800px] -translate-x-1/2 -translate-y-1/2 rounded-[50%] border border-cyan-300/18" />
+      <div className="absolute left-[49%] top-[56%] h-[254px] w-[610px] -translate-x-1/2 -translate-y-1/2 rounded-[50%] border border-cyan-300/24" />
+      <div className="absolute left-[49%] top-[56%] h-[150px] w-[360px] -translate-x-1/2 -translate-y-1/2 rounded-[50%] border border-cyan-200/38" />
+
+      <div className="absolute left-[49%] top-[56%] h-px w-[1040px] -translate-x-1/2 rotate-[-10deg] bg-cyan-300/12" />
+      <div className="absolute left-[49%] top-[56%] h-px w-[920px] -translate-x-1/2 rotate-[22deg] bg-cyan-300/12" />
+      <div className="absolute left-[49%] top-[56%] h-[500px] w-px -translate-y-1/2 rotate-[3deg] bg-cyan-300/18" />
+
+      <div className="absolute left-[49%] top-[56%] grid size-28 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-2xl border border-cyan-200/45 bg-cyan-300/[0.08] shadow-[0_0_48px_rgba(34,211,238,0.18)]">
+        <div className="size-14 rounded-xl border border-cyan-100/50 bg-cyan-300/18 shadow-[0_0_28px_rgba(34,211,238,0.22)]" />
       </div>
+      <div className="absolute left-[49%] top-[56%] h-[210px] w-px -translate-x-1/2 -translate-y-full bg-gradient-to-t from-cyan-300/55 to-transparent" />
+      <div className="absolute left-[49%] top-[42%] h-[150px] w-[280px] -translate-x-1/2 rounded-[50%] border-t border-cyan-300/20" />
+
+      {VISUAL_NODES.map((node) => (
+        <div key={node.label} className={cn("absolute", node.position)}>
+          <span className="absolute -left-6 top-3 size-2 rounded-full bg-cyan-300 shadow-[0_0_18px_rgba(34,211,238,0.7)]" />
+          <div className="rounded-md border border-cyan-300/10 bg-slate-950/45 px-3 py-1.5 text-xs text-slate-400">
+            {node.label}
+          </div>
+        </div>
+      ))}
+
+      <span className="absolute left-[18%] top-[42%] size-2 rounded-full bg-cyan-300 shadow-[0_0_16px_rgba(34,211,238,0.65)]" />
+      <span className="absolute left-[35%] top-[34%] size-1.5 rounded-full bg-cyan-200 shadow-[0_0_14px_rgba(125,211,252,0.55)]" />
+      <span className="absolute left-[59%] top-[30%] size-2 rounded-full bg-cyan-300 shadow-[0_0_16px_rgba(34,211,238,0.65)]" />
+      <span className="absolute left-[68%] top-[61%] size-2 rounded-full bg-cyan-200 shadow-[0_0_14px_rgba(125,211,252,0.55)]" />
+      <span className="absolute left-[42%] top-[77%] size-1.5 rounded-full bg-cyan-300 shadow-[0_0_14px_rgba(34,211,238,0.55)]" />
+      <span className="absolute left-[83%] top-[49%] size-2.5 rounded-full bg-cyan-300 shadow-[0_0_18px_rgba(34,211,238,0.68)]" />
     </div>
   );
 }
 
-function LoginMetric({ label, value }: { label: string; value: string }) {
+function TrustMetrics() {
   return (
-    <div className="rounded-md border border-cyan-300/10 bg-slate-950/45 p-3">
-      <div className="text-[11px] text-slate-500">{label}</div>
-      <div className="mt-1 truncate text-sm font-medium text-slate-100">
-        {value}
-      </div>
+    <div className="relative z-10 mt-auto grid max-w-[760px] grid-cols-3 gap-0 border-t border-cyan-300/10 pt-5 lg:pt-6">
+      {TRUST_METRICS.map(({ icon: Icon, value, label }, index) => (
+        <div
+          key={label}
+          className={cn(
+            "flex items-center gap-3 px-4 first:pl-0 sm:gap-4 sm:px-6",
+            index > 0 ? "border-l border-cyan-300/10" : ""
+          )}
+        >
+          <span className="grid size-10 shrink-0 place-items-center rounded-full border border-cyan-300/20 bg-cyan-300/[0.06] text-cyan-300 sm:size-11">
+            <Icon className="size-4 sm:size-5" />
+          </span>
+          <div>
+            <div className="text-xl font-semibold text-cyan-200 sm:text-2xl">
+              {value}
+            </div>
+            <div className="mt-1 text-xs text-slate-500">{label}</div>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
 
-function TabButton({
+function LoginPanel({
+  isRegister,
+  submitting,
+  error,
+  email,
+  password,
+  showPassword,
+  onEmailChange,
+  onPasswordChange,
+  onTogglePassword,
+  onSwitchTab,
+  onSubmit,
+}: {
+  isRegister: boolean;
+  submitting: boolean;
+  error: string | null;
+  email: string;
+  password: string;
+  showPassword: boolean;
+  onEmailChange: (value: string) => void;
+  onPasswordChange: (value: string) => void;
+  onTogglePassword: () => void;
+  onSwitchTab: (tab: Tab) => void;
+  onSubmit: (event: FormEvent) => void;
+}) {
+  return (
+    <Card className="w-full max-w-[410px] overflow-hidden border-sky-300/30 bg-[#071323]/70 shadow-[0_0_54px_rgba(14,165,233,0.12)] backdrop-blur-xl">
+      <div className="px-8 pb-8 pt-9">
+        <div className="text-center">
+          <h2 className="text-2xl font-semibold tracking-normal text-slate-50">
+            {isRegister ? "创建账户" : "欢迎回来"}
+          </h2>
+          <p className="mt-3 text-sm leading-6 text-slate-400">
+            {isRegister
+              ? "注册后进入 TianShu Command 平台"
+              : "登录以继续使用 TianShu Command 平台"}
+          </p>
+        </div>
+
+        <div className="mt-8 grid grid-cols-2 border-b border-sky-300/10">
+          <PanelTabButton
+            active={!isRegister}
+            onClick={() => onSwitchTab("login")}
+          >
+            登录
+          </PanelTabButton>
+          <PanelTabButton
+            active={isRegister}
+            onClick={() => onSwitchTab("register")}
+          >
+            注册
+          </PanelTabButton>
+        </div>
+
+        <form className="mt-8 space-y-5" onSubmit={onSubmit}>
+          <AuthField
+            icon={<Mail className="size-4" />}
+            label="邮箱"
+            htmlFor="auth-email"
+          >
+            <input
+              id="auth-email"
+              type="email"
+              required
+              autoComplete="email"
+              value={email}
+              onChange={(event) => onEmailChange(event.target.value)}
+              placeholder="请输入邮箱"
+              className="h-12 w-full bg-transparent text-sm text-slate-100 outline-none placeholder:text-slate-500"
+            />
+          </AuthField>
+
+          <AuthField
+            icon={<Lock className="size-4" />}
+            label="密码"
+            htmlFor="auth-password"
+            hint={isRegister ? "至少 8 位" : undefined}
+            trailing={
+              <button
+                type="button"
+                onClick={onTogglePassword}
+                className="grid size-9 place-items-center rounded-md text-slate-400 transition-colors hover:bg-white/[0.06] hover:text-slate-200"
+                aria-label={showPassword ? "隐藏密码" : "显示密码"}
+              >
+                {showPassword ? (
+                  <EyeOff className="size-4" />
+                ) : (
+                  <Eye className="size-4" />
+                )}
+              </button>
+            }
+          >
+            <input
+              id="auth-password"
+              type={showPassword ? "text" : "password"}
+              required
+              minLength={isRegister ? 8 : undefined}
+              autoComplete={isRegister ? "new-password" : "current-password"}
+              value={password}
+              onChange={(event) => onPasswordChange(event.target.value)}
+              placeholder={isRegister ? "请设置登录密码" : "请输入密码"}
+              className="h-12 w-full bg-transparent text-sm text-slate-100 outline-none placeholder:text-slate-500"
+            />
+          </AuthField>
+
+          {error ? (
+            <div className="rounded-md border border-red-400/25 bg-red-500/[0.08] px-3 py-2 text-xs leading-5 text-red-100">
+              {error}
+            </div>
+          ) : null}
+
+          <Button
+            className="h-12 w-full border-sky-300/35 bg-[linear-gradient(90deg,#0ea5e9,#2563eb)] text-sm text-white shadow-[0_0_28px_rgba(37,99,235,0.24)] hover:border-sky-200/60 hover:brightness-110"
+            disabled={submitting}
+            type="submit"
+          >
+            {submitting ? <Loader2 className="size-4 animate-spin" /> : null}
+            {submitting
+              ? isRegister
+                ? "正在创建"
+                : "正在登录"
+              : isRegister
+                ? "注册"
+                : "登录"}
+          </Button>
+        </form>
+
+        <div className="mt-7 text-center text-xs text-slate-500">
+          {isRegister ? "已有账户？" : "还没有账户？"}
+          <button
+            type="button"
+            onClick={() => onSwitchTab(isRegister ? "login" : "register")}
+            className="ml-2 font-medium text-cyan-300 transition-colors hover:text-cyan-100"
+          >
+            {isRegister ? "返回登录" : "立即注册"}
+          </button>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+function PanelTabButton({
   active,
   onClick,
   children,
@@ -333,13 +392,17 @@ function TabButton({
       type="button"
       onClick={onClick}
       className={cn(
-        "h-8 rounded px-3 text-xs font-medium transition-colors",
-        active
-          ? "bg-cyan-300/12 text-cyan-100"
-          : "text-slate-500 hover:text-slate-200"
+        "relative h-12 text-sm font-medium transition-colors",
+        active ? "text-cyan-300" : "text-slate-400 hover:text-slate-200"
       )}
     >
       {children}
+      <span
+        className={cn(
+          "absolute bottom-[-1px] left-0 h-px w-full transition-colors",
+          active ? "bg-cyan-300" : "bg-transparent"
+        )}
+      />
     </button>
   );
 }
@@ -361,12 +424,12 @@ function AuthField({
 }) {
   return (
     <label className="block" htmlFor={htmlFor}>
-      <div className="mb-1.5 flex items-center justify-between text-xs">
-        <span className="font-medium text-slate-300">{label}</span>
-        {hint ? <span className="text-slate-600">{hint}</span> : null}
+      <div className="mb-2 flex items-center justify-between text-sm">
+        <span className="font-medium text-slate-200">{label}</span>
+        {hint ? <span className="text-xs text-slate-500">{hint}</span> : null}
       </div>
-      <div className="flex items-center gap-2 rounded-md border border-cyan-300/12 bg-slate-950/60 px-3 transition-colors focus-within:border-cyan-300/35 focus-within:ring-2 focus-within:ring-cyan-300/10">
-        <span className="grid size-8 shrink-0 place-items-center text-slate-500">
+      <div className="flex items-center gap-3 rounded-md border border-slate-500/25 bg-slate-900/45 px-4 transition-colors focus-within:border-cyan-300/55 focus-within:shadow-[0_0_0_3px_rgba(34,211,238,0.09),0_0_26px_rgba(14,165,233,0.16)]">
+        <span className="grid size-8 shrink-0 place-items-center text-slate-400">
           {icon}
         </span>
         <div className="min-w-0 flex-1">{children}</div>

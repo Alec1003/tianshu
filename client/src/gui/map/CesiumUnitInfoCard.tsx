@@ -32,18 +32,23 @@ interface CesiumUnitInfoCardProps {
   onClose: () => void;
 }
 
+const popupTextColor = "#0f172a";
+const popupLabelColor = "#334155";
+const popupDividerColor = "rgba(15, 23, 42, 0.16)";
+
 function Row({ label, value }: { label: string; value: string }) {
   return (
     <Stack direction="row" spacing={1} sx={{ minWidth: 0 }}>
       <Typography
         variant="caption"
-        sx={{ width: 88, color: "text.secondary", flexShrink: 0 }}
+        sx={{ width: 88, color: popupLabelColor, flexShrink: 0 }}
       >
         {label}
       </Typography>
       <Typography
         variant="caption"
         sx={{
+          color: popupTextColor,
           fontWeight: 500,
           overflow: "hidden",
           textOverflow: "ellipsis",
@@ -274,7 +279,7 @@ export default function CesiumUnitInfoCard({
       >
         <Typography
           variant="caption"
-          sx={{ width: 88, color: "text.secondary", flexShrink: 0 }}
+          sx={{ width: 88, color: popupLabelColor, flexShrink: 0 }}
         >
           {" "}
         </Typography>
@@ -286,7 +291,7 @@ export default function CesiumUnitInfoCard({
         />
         <Typography
           variant="caption"
-          sx={{ width: 36, textAlign: "right", color: "text.secondary" }}
+          sx={{ width: 36, textAlign: "right", color: popupTextColor }}
         >
           {pct.toFixed(0)}%
         </Typography>
@@ -337,8 +342,15 @@ export default function CesiumUnitInfoCard({
           </IconButton>
         }
       />
-      <Divider />
-      <CardContent sx={{ py: 1.25, px: 1.5, "&:last-child": { pb: 1.25 } }}>
+      <Divider sx={{ borderColor: popupDividerColor }} />
+      <CardContent
+        sx={{
+          py: 1.25,
+          px: 1.5,
+          color: popupTextColor,
+          "&:last-child": { pb: 1.25 },
+        }}
+      >
         <Stack spacing={0.5}>
           <Row label={t("unit.field.side")} value={sideName} />
           <Row label={t("unit.field.position")} value={position} />

@@ -16,7 +16,6 @@ import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import {
   Activity,
-  Bot,
   Box,
   BrainCircuit,
   ChevronDown,
@@ -36,7 +35,6 @@ import {
   Play,
   Plus,
   Radar,
-  Search,
   Sparkles,
   Star,
   Trash2,
@@ -47,7 +45,7 @@ import {
 } from "lucide-react";
 
 import { ApiError } from "@/api/client";
-import BrandLogo from "@/components/brand/BrandLogo";
+import { AppShell, type AppShellNavItem } from "@/components/layout/AppShell";
 import {
   createScenario,
   deleteScenario,
@@ -71,6 +69,11 @@ import type {
 } from "@/api/types";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
+import { SearchInput } from "@/components/ui/search-input";
+import { StatCard } from "@/components/ui/stat-card";
+import { TabButton, Tabs } from "@/components/ui/tabs";
+import { Toolbar, ToolbarGroup } from "@/components/ui/toolbar";
 import { useAuth } from "@/features/auth/useAuth";
 import Dba from "@/game/db/Dba";
 import type { IAircraftModel } from "@/game/db/models/Aircraft";
@@ -349,11 +352,8 @@ function thumbStyle(id: string, status: VisualStatus): CSSProperties {
           ? 38
           : 220;
   return {
-    backgroundImage: [
-      `radial-gradient(90% 80% at 70% 25%, hsla(${accent},90%,58%,0.38), transparent 62%)`,
-      `radial-gradient(80% 70% at 12% 56%, hsla(${(hue + 28) % 360},85%,50%,0.28), transparent 58%)`,
-      "linear-gradient(135deg, rgba(2,8,23,0.86), rgba(3,7,18,0.98))",
-    ].join(","),
+    backgroundColor: "#07111d",
+    borderColor: `hsla(${accent},90%,58%,0.18)`,
   };
 }
 
@@ -366,6 +366,7 @@ export default function ScenarioListPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [view, setView] = useState<ViewMode>("grid");
+  const [query, setQuery] = useState("");
   const [activeModule, setActiveModule] = useState<WorkspaceModule>("projects");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
@@ -420,13 +421,54 @@ export default function ScenarioListPage() {
     return myScenarios;
   }, [activeModule, myScenarios, templates]);
 
-  const filteredItems = moduleItems;
+  const queryText = query.trim().toLowerCase();
+  const filteredItems = useMemo(() => {
+    if (!queryText) return moduleItems;
+    return moduleItems.filter((item) =>
+      [
+        item.name,
+        item.description,
+        item.status,
+        item.owner_id,
+        item.created_at,
+        item.updated_at,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase()
+        .includes(queryText)
+    );
+  }, [moduleItems, queryText]);
 
   const activeCopy = MODULE_COPY[activeModule];
   const activeModuleLabel =
     MODULES.find((module) => module.id === activeModule)?.label ?? "项目管理";
   const isProjectWorkspace = activeModule === "projects";
   const isTemplateWorkspace = activeModule === "templates";
+  const shellNavItems = useMemo<AppShellNavItem[]>(
+    () =>
+      MODULES.map((module) => ({
+        id: module.id,
+        label: module.label,
+        caption: module.caption,
+        icon: module.icon,
+        badge:
+          module.id === "projects"
+            ? myScenarios.length
+            : module.id === "templates"
+              ? templates.length
+              : unitAssetCount,
+      })),
+    [myScenarios.length, templates.length, unitAssetCount]
+  );
+  const runningCount = useMemo(
+    () => myScenarios.filter((item) => statusOf(item) === "running").length,
+    [myScenarios]
+  );
+  const completedCount = useMemo(
+    () => myScenarios.filter((item) => statusOf(item) === "completed").length,
+    [myScenarios]
+  );
 
   const handleOpen = (id: string) => navigate(`/play/${id}`);
 
@@ -465,179 +507,151 @@ export default function ScenarioListPage() {
   };
 
   return (
-    <div className="dark relative min-h-screen overflow-hidden bg-[#020612] text-slate-100">
-      <WorkspaceBackdrop />
-
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[248px] border-r border-cyan-200/10 bg-[#030814]/78 px-5 py-5 backdrop-blur-2xl lg:flex lg:flex-col">
-        <Brand />
-
-        <nav className="mt-10 space-y-2">
-          {MODULES.map((module) => {
-            const Icon = module.icon;
-            const active = module.id === activeModule;
-            return (
-              <button
-                key={module.id}
-                type="button"
-                onClick={() => setActiveModule(module.id)}
-                className={cn(
-                  "group relative flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left transition-all",
-                  active
-                    ? "border border-cyan-200/20 bg-cyan-300/[0.09] text-cyan-100 shadow-[0_0_36px_rgba(14,165,233,0.16)]"
-                    : "text-slate-400 hover:bg-white/[0.04] hover:text-slate-100"
-                )}
-              >
-                {active && (
-                  <span className="absolute -left-5 top-1/2 h-8 w-1 -translate-y-1/2 rounded-r-full bg-cyan-300 shadow-[0_0_18px_rgba(125,211,252,0.75)]" />
-                )}
-                <span
-                  className={cn(
-                    "grid size-10 place-items-center rounded-xl border transition-colors",
-                    active
-                      ? "border-cyan-200/30 bg-cyan-300/15 text-cyan-100"
-                      : "border-white/8 bg-white/[0.03] text-slate-400 group-hover:text-cyan-200"
-                  )}
-                >
-                  <Icon className="size-5" />
-                </span>
-                <span>
-                  <span className="block text-sm font-medium">
-                    {module.label}
-                  </span>
-                  <span className="mt-0.5 block text-xs text-slate-500">
-                    {module.caption}
-                  </span>
-                </span>
-              </button>
-            );
-          })}
-        </nav>
-
-        <div className="mt-auto text-xs leading-7 text-slate-600">
-          <div>天枢战术工作空间</div>
-          <div>v0.2.0</div>
+    <AppShell
+      activeNavItem={activeModule}
+      actions={
+        isProjectWorkspace ? (
+          <Button onClick={() => setDialogOpen(true)} type="button">
+            <Plus className="size-4" />
+            新建项目
+          </Button>
+        ) : null
+      }
+      description={activeCopy.subtitle}
+      eyebrow={activeCopy.eyebrow}
+      navItems={shellNavItems}
+      onNavItemSelect={(id) => {
+        setActiveModule(id as WorkspaceModule);
+        setQuery("");
+      }}
+      rightPanel={
+        activeModule === "assets" ? undefined : (
+          <WorkspaceDetailPanel
+            isTemplateSection={isTemplateWorkspace}
+            items={filteredItems}
+            onCreate={isProjectWorkspace ? () => setDialogOpen(true) : undefined}
+            onOpen={handleOpen}
+          />
+        )
+      }
+      title={activeCopy.title}
+      topRight={
+        <AccountMenu
+          userEmail={user?.email}
+          displayName={user?.display_name || user?.email || "Operator"}
+          isSuperuser={Boolean(user?.is_superuser)}
+          accountOpen={accountOpen}
+          setAccountOpen={setAccountOpen}
+          accountRef={accountRef}
+          onLogout={logout}
+        />
+      }
+    >
+      <div className="space-y-4">
+        <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+          <StatCard
+            caption="本地可编辑工作项"
+            icon={FolderKanban}
+            label="自定义项目"
+            tone="cyan"
+            value={myScenarios.length}
+          />
+          <StatCard
+            caption="后端系统模板"
+            icon={PackageOpen}
+            label="系统模板"
+            tone="slate"
+            value={templates.length}
+          />
+          <StatCard
+            caption="平台单位库"
+            icon={Database}
+            label="单位资产"
+            tone="green"
+            value={unitAssetCount}
+          />
+          <StatCard
+            caption={`${completedCount} 已归档`}
+            icon={Activity}
+            label="运行中"
+            tone="amber"
+            value={runningCount}
+          />
         </div>
-      </aside>
 
-      <div className="relative z-10 min-h-screen lg:pl-[248px]">
-        <header className="sticky top-0 z-30 border-b border-cyan-200/10 bg-[#020612]/74 backdrop-blur-2xl">
-          <div className="flex h-[78px] items-center gap-4 px-5 sm:px-7 lg:px-8">
-            <div className="lg:hidden">
-              <Brand compact />
-            </div>
-
-            <div className="flex-1" />
-
-            <AccountMenu
-              userEmail={user?.email}
-              displayName={user?.display_name || user?.email || "Operator"}
-              isSuperuser={Boolean(user?.is_superuser)}
-              accountOpen={accountOpen}
-              setAccountOpen={setAccountOpen}
-              accountRef={accountRef}
-              onLogout={logout}
-            />
+        {error && (
+          <div className="rounded-lg border border-red-400/25 bg-red-500/[0.08] px-3 py-2 text-xs text-red-100">
+            {error}
           </div>
-        </header>
+        )}
 
-        <main className="px-5 pb-10 pt-6 sm:px-7 lg:px-8">
-          <section className="relative overflow-hidden rounded-2xl border border-cyan-200/10 bg-white/[0.035] p-5 shadow-[0_24px_90px_rgba(0,0,0,0.28)] backdrop-blur-xl sm:p-6">
-            <div className="pointer-events-none absolute inset-0 tactical-grid opacity-30" />
-            <div className="pointer-events-none absolute right-0 top-0 h-40 w-1/2 bg-[radial-gradient(circle_at_70%_0%,rgba(14,165,233,0.18),transparent_58%)]" />
-            <div className="relative flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
-              <div>
-                <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-cyan-200/15 bg-cyan-200/[0.06] px-3 py-1 text-xs text-cyan-100">
-                  <Bot className="size-3.5" />
-                  {activeCopy.eyebrow}
+        <Card className="p-3">
+          <Toolbar className="border-0 bg-transparent p-0">
+            <ToolbarGroup>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <h2 className="text-sm font-semibold text-slate-100">
+                    {activeModuleLabel}
+                  </h2>
+                  <span className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[11px] text-slate-500">
+                    {activeModule === "assets"
+                      ? unitAssetCount
+                      : filteredItems.length}
+                  </span>
                 </div>
-                <h1 className="text-2xl font-semibold tracking-normal text-white sm:text-3xl">
-                  {activeCopy.title}
-                </h1>
-                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">
-                  {activeCopy.subtitle}
+                <p className="mt-1 text-xs text-slate-500">
+                  {activeModule === "assets"
+                    ? "管理飞机、舰艇、设施、机场与武器数据。"
+                    : "搜索、筛选并打开推演工作项。"}
                 </p>
               </div>
-
-              {isProjectWorkspace && (
-                <div className="flex flex-wrap gap-3">
-                  <Button
-                    type="button"
-                    className="h-12 rounded-xl border border-cyan-200/25 bg-gradient-to-r from-cyan-400 to-blue-600 px-5 text-white shadow-[0_18px_46px_rgba(14,165,233,0.28)] hover:shadow-[0_22px_56px_rgba(14,165,233,0.38)]"
-                    onClick={() => setDialogOpen(true)}
-                  >
-                    <Plus className="size-4" />
-                    新建项目
-                  </Button>
-                </div>
+            </ToolbarGroup>
+            <ToolbarGroup>
+              {activeModule !== "assets" && (
+                <SearchInput
+                  className="w-full sm:w-64"
+                  onChange={(event) => setQuery(event.target.value)}
+                  onClear={() => setQuery("")}
+                  placeholder="搜索名称、状态、描述"
+                  value={query}
+                />
               )}
-            </div>
-          </section>
+              <select
+                value={activeModule}
+                onChange={(event) => {
+                  setActiveModule(event.target.value as WorkspaceModule);
+                  setQuery("");
+                }}
+                className="h-9 rounded-md border border-cyan-300/12 bg-slate-950/60 px-2.5 text-xs text-slate-300 outline-none focus:border-cyan-300/35"
+              >
+                {MODULES.map((module) => (
+                  <option key={module.id} value={module.id}>
+                    {module.label}
+                  </option>
+                ))}
+              </select>
+              {activeModule !== "assets" && (
+                <Tabs>
+                  <TabButton
+                    active={view === "grid"}
+                    onClick={() => setView("grid")}
+                    title="网格视图"
+                  >
+                    <LayoutGrid className="size-4" />
+                  </TabButton>
+                  <TabButton
+                    active={view === "list"}
+                    onClick={() => setView("list")}
+                    title="列表视图"
+                  >
+                    <ListIcon className="size-4" />
+                  </TabButton>
+                </Tabs>
+              )}
+            </ToolbarGroup>
+          </Toolbar>
 
-          {error && (
-            <div className="mt-5 rounded-xl border border-red-400/25 bg-red-500/[0.08] px-4 py-3 text-sm text-red-100">
-              {error}
-            </div>
-          )}
-
-          <section className="mt-5 rounded-2xl border border-cyan-200/10 bg-white/[0.03] p-4 shadow-[0_24px_90px_rgba(0,0,0,0.22)] backdrop-blur-xl sm:p-5">
-            <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-              <div className="flex items-center gap-2">
-                <h2 className="text-lg font-semibold text-slate-100">
-                  {activeModuleLabel}
-                </h2>
-                <span className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-xs text-slate-500">
-                  {activeModule === "assets"
-                    ? unitAssetCount
-                    : filteredItems.length}
-                </span>
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <select
-                  value={activeModule}
-                  onChange={(event) =>
-                    setActiveModule(event.target.value as WorkspaceModule)
-                  }
-                  className="h-10 rounded-xl border border-cyan-200/15 bg-slate-950/50 px-3 text-sm text-slate-300 outline-none focus:border-cyan-200/35"
-                >
-                  {MODULES.map((module) => (
-                    <option key={module.id} value={module.id}>
-                      {module.label}
-                    </option>
-                  ))}
-                </select>
-                {activeModule !== "assets" && (
-                  <div className="flex overflow-hidden rounded-xl border border-cyan-200/15 bg-slate-950/45">
-                    <button
-                      type="button"
-                      onClick={() => setView("grid")}
-                      title="网格视图"
-                      className={cn(
-                        "grid size-10 place-items-center transition-colors",
-                        view === "grid"
-                          ? "bg-cyan-300/15 text-cyan-100"
-                          : "text-slate-500 hover:text-slate-200"
-                      )}
-                    >
-                      <LayoutGrid className="size-4" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setView("list")}
-                      title="列表视图"
-                      className={cn(
-                        "grid size-10 place-items-center transition-colors",
-                        view === "list"
-                          ? "bg-cyan-300/15 text-cyan-100"
-                          : "text-slate-500 hover:text-slate-200"
-                      )}
-                    >
-                      <ListIcon className="size-4" />
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-
+          <div className="mt-4">
             {loading ? (
               <Skeleton view={view} />
             ) : activeModule === "assets" ? (
@@ -673,8 +687,8 @@ export default function ScenarioListPage() {
                 onDelete={isTemplateWorkspace ? undefined : handleDelete}
               />
             )}
-          </section>
-        </main>
+          </div>
+        </Card>
       </div>
 
       {dialogOpen && (
@@ -686,42 +700,7 @@ export default function ScenarioListPage() {
           }}
         />
       )}
-    </div>
-  );
-}
-
-function WorkspaceBackdrop() {
-  return (
-    <>
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0"
-        style={{
-          background:
-            "radial-gradient(circle at 18% 10%, rgba(14,165,233,0.15), transparent 28%), radial-gradient(circle at 82% 16%, rgba(99,102,241,0.13), transparent 28%), radial-gradient(circle at 52% 105%, rgba(8,47,73,0.42), transparent 40%), linear-gradient(135deg,#020612 0%,#06101d 46%,#02040b 100%)",
-        }}
-      />
-      <div className="pointer-events-none absolute inset-0 tactical-grid opacity-[0.24]" />
-      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(90deg,rgba(2,6,18,0.72)_0%,rgba(2,6,18,0.18)_48%,rgba(2,6,18,0.72)_100%)]" />
-    </>
-  );
-}
-
-function Brand({ compact = false }: { compact?: boolean }) {
-  return (
-    <div className="flex items-center gap-3">
-      <BrandLogo frameClassName="size-11" imageClassName="scale-[1.08]" />
-      {!compact && (
-        <div>
-          <div className="text-sm font-semibold tracking-[0.18em] text-white">
-            天枢平台
-          </div>
-          <div className="mt-1 text-xs tracking-[0.16em] text-slate-500">
-            AI TACTICAL WORKSPACE
-          </div>
-        </div>
-      )}
-    </div>
+    </AppShell>
   );
 }
 
@@ -747,9 +726,9 @@ function AccountMenu({
       <button
         type="button"
         onClick={() => setAccountOpen((value) => !value)}
-        className="flex h-11 items-center gap-3 rounded-xl border border-cyan-200/15 bg-white/[0.035] px-2.5 text-sm text-slate-100 transition-colors hover:border-cyan-200/30 hover:bg-white/[0.06]"
+        className="flex h-9 items-center gap-2 rounded-md border border-cyan-300/12 bg-slate-950/55 px-2 text-xs text-slate-100 transition-colors hover:border-cyan-300/25 hover:bg-white/[0.045]"
       >
-        <span className="grid size-8 place-items-center rounded-full bg-gradient-to-br from-slate-200 to-sky-500 text-slate-950">
+        <span className="grid size-7 place-items-center rounded-full border border-cyan-300/12 bg-cyan-300/10 text-cyan-100">
           <UserIcon className="size-4" />
         </span>
         <span className="hidden max-w-[9rem] truncate md:block">
@@ -759,7 +738,7 @@ function AccountMenu({
       </button>
 
       {accountOpen && (
-        <div className="absolute right-0 top-full mt-2 w-64 overflow-hidden rounded-2xl border border-cyan-200/15 bg-[#07111f] shadow-[0_24px_80px_rgba(0,0,0,0.42)]">
+        <div className="absolute right-0 top-full mt-2 w-64 overflow-hidden rounded-lg border border-cyan-300/14 bg-[#08111c] shadow-[0_10px_28px_rgba(0,0,0,0.34)]">
           <div className="border-b border-cyan-200/10 px-4 py-3 text-sm">
             <div className="font-medium text-slate-100">{displayName}</div>
             <div className="mt-1 truncate text-xs text-slate-500">
@@ -855,14 +834,10 @@ function ProjectCard({
   return (
     <Card
       className={cn(
-        "group relative overflow-hidden rounded-2xl bg-[#06111f]/78 shadow-[0_18px_70px_rgba(0,0,0,0.28)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_26px_80px_rgba(14,165,233,0.16)]",
+        "group relative overflow-hidden rounded-lg bg-[#08111c] transition-colors",
         "border-cyan-200/10 hover:border-cyan-200/30"
       )}
     >
-      <div
-        className="pointer-events-none absolute -inset-px opacity-0 blur-xl transition-opacity duration-300 group-hover:opacity-100"
-        style={{ backgroundColor: visualMeta.glow }}
-      />
       <button
         type="button"
         onClick={onOpen}
@@ -881,16 +856,16 @@ function ProjectCard({
             {visualMeta.label}
           </span>
         </div>
-        <span className="absolute right-3 top-3 grid size-8 place-items-center rounded-xl border border-white/10 bg-slate-950/40 text-slate-300 backdrop-blur transition-colors hover:text-amber-200">
+        <span className="absolute right-3 top-3 grid size-8 place-items-center rounded-md border border-white/10 bg-slate-950/70 text-slate-300 transition-colors hover:text-amber-200">
           <Star className="size-4" />
         </span>
       </button>
 
       <div className="relative px-4 pb-4 pt-3">
-        <div className="text-base font-semibold text-white line-clamp-1">
+        <div className="text-sm font-semibold text-white line-clamp-1">
           {item.name}
         </div>
-        <p className="mt-1 min-h-[2.5rem] text-sm leading-5 text-slate-500 line-clamp-2">
+        <p className="mt-1 min-h-[2.5rem] text-xs leading-5 text-slate-500 line-clamp-2">
           {item.description ||
             "暂无描述，可进入项目继续配置目标、任务与推演参数。"}
         </p>
@@ -919,7 +894,7 @@ function ProjectCard({
             variant="ghost"
             size="sm"
             onClick={onOpen}
-            className="h-8 rounded-lg border border-cyan-200/10 bg-cyan-200/[0.04] px-3 text-cyan-100 hover:bg-cyan-200/[0.08]"
+            className="h-8 rounded-md border border-cyan-200/10 bg-cyan-200/[0.04] px-3 text-cyan-100 hover:bg-cyan-200/[0.08]"
           >
             <Play className="size-3.5" />
             {visualMeta.action}
@@ -929,7 +904,7 @@ function ProjectCard({
               type="button"
               title="更多操作"
               onClick={() => setMenuOpen((value) => !value)}
-              className="grid size-8 place-items-center rounded-lg text-slate-500 hover:bg-white/[0.06] hover:text-slate-200"
+              className="grid size-8 place-items-center rounded-md text-slate-500 hover:bg-white/[0.06] hover:text-slate-200"
             >
               <MoreHorizontal className="size-4" />
             </button>
@@ -960,7 +935,7 @@ function ProjectMenu({
   close: () => void;
 }) {
   return (
-    <div className="absolute bottom-full right-0 z-20 mb-2 w-40 overflow-hidden rounded-xl border border-cyan-200/15 bg-[#07111f] shadow-[0_20px_70px_rgba(0,0,0,0.42)]">
+    <div className="absolute bottom-full right-0 z-20 mb-2 w-40 overflow-hidden rounded-lg border border-cyan-200/15 bg-[#08111c] shadow-[0_10px_28px_rgba(0,0,0,0.34)]">
       <button
         type="button"
         onClick={() => {
@@ -1050,7 +1025,7 @@ function MapThumbnail({ status }: { status: VisualStatus }) {
           </g>
         ))}
       </svg>
-      <div className="absolute inset-0 bg-gradient-to-t from-[#020612] via-transparent to-transparent" />
+      <div className="absolute inset-0 border-t border-cyan-300/8 bg-[#020612]/35" />
     </>
   );
 }
@@ -1063,8 +1038,8 @@ function ProjectList({
   isTemplateSection,
 }: ProjectActions) {
   return (
-    <div className="overflow-hidden rounded-2xl border border-cyan-200/10 bg-slate-950/32">
-      <table className="min-w-full text-sm">
+    <div className="overflow-hidden rounded-lg border border-cyan-200/10 bg-slate-950/32">
+      <table className="min-w-full text-xs">
         <thead className="bg-white/[0.035] text-xs text-slate-500">
           <tr>
             <th className="px-4 py-3 text-left font-medium">项目</th>
@@ -1150,6 +1125,93 @@ function ProjectList({
         </tbody>
       </table>
     </div>
+  );
+}
+
+function WorkspaceDetailPanel({
+  items,
+  isTemplateSection,
+  onCreate,
+  onOpen,
+}: {
+  items: ScenarioListItem[];
+  isTemplateSection: boolean;
+  onCreate?: () => void;
+  onOpen: (id: string) => void;
+}) {
+  const latestItems = items.slice(0, 5);
+  const activeCount = items.filter((item) => statusOf(item) === "running").length;
+  const unitTotal = items.reduce(
+    (total, item) => total + Math.max(0, item.unit_count ?? 0),
+    0
+  );
+
+  return (
+    <Card className="sticky top-[80px] p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-sm font-semibold text-slate-50">
+            {isTemplateSection ? "模板详情" : "项目详情"}
+          </h2>
+          <p className="mt-1 text-xs leading-5 text-slate-500">
+            {isTemplateSection
+              ? "系统模板只读，可复制为个人项目后推演。"
+              : "当前列表的运行状态、单位规模和最近更新。"}
+          </p>
+        </div>
+        <span className="rounded-full border border-cyan-300/16 bg-cyan-300/8 px-2 py-0.5 text-[11px] text-cyan-100">
+          {items.length}
+        </span>
+      </div>
+
+      <div className="mt-4 grid grid-cols-2 gap-2">
+        <DetailMetric label="运行中" value={String(activeCount)} />
+        <DetailMetric label="单位总量" value={String(unitTotal)} />
+      </div>
+
+      <div className="mt-4 border-t border-cyan-300/10 pt-4">
+        <div className="mb-2 text-xs font-medium text-slate-300">最近更新</div>
+        {latestItems.length === 0 ? (
+          <EmptyState
+            className="min-h-32 px-3 py-5"
+            description="当前筛选条件下暂无项目。"
+            title="暂无数据"
+          />
+        ) : (
+          <div className="space-y-1">
+            {latestItems.map((item, index) => {
+              const visualStatus = visualStatusOf(item, index, isTemplateSection);
+              const meta = VISUAL_STATUS_META[visualStatus];
+              return (
+                <button
+                  className="flex w-full items-center gap-2 rounded-md border border-transparent px-2 py-2 text-left hover:border-cyan-300/12 hover:bg-white/[0.035]"
+                  key={item.id}
+                  onClick={() => onOpen(item.id)}
+                  type="button"
+                >
+                  <span className={cn("size-1.5 shrink-0 rounded-full", meta.dot)} />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-xs font-medium text-slate-200">
+                      {item.name}
+                    </span>
+                    <span className="mt-0.5 block truncate text-[11px] text-slate-600">
+                      {relativeTime(item.updated_at)}
+                    </span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {onCreate ? (
+        <Button className="mt-4 w-full" onClick={onCreate} type="button" variant="outline">
+          <Plus className="size-4" />
+          新建项目
+        </Button>
+      ) : null}
+    </Card>
   );
 }
 
@@ -1332,31 +1394,25 @@ function DataAssetWorkspace() {
                   type="button"
                   onClick={() => setActiveType(type.id)}
                   className={cn(
-                    "group relative overflow-hidden rounded-2xl border p-4 text-left transition-all hover:-translate-y-0.5",
+                    "group relative overflow-hidden rounded-lg border p-3 text-left transition-colors",
                     active
-                      ? "border-cyan-200/35 bg-cyan-200/[0.08] shadow-[0_18px_58px_rgba(14,165,233,0.15)]"
-                      : "border-cyan-200/10 bg-slate-950/28 hover:border-cyan-200/24 hover:bg-white/[0.045]"
+                      ? "border-cyan-300/30 bg-cyan-300/[0.08]"
+                      : "border-cyan-300/10 bg-slate-950/35 hover:border-cyan-300/22 hover:bg-white/[0.035]"
                   )}
                 >
-                  <div
-                    className={cn(
-                      "absolute inset-0 bg-gradient-to-br",
-                      type.tone
-                    )}
-                  />
                   <div className="relative">
-                    <div className="mb-4 flex items-center justify-between">
-                      <span className="grid size-10 place-items-center rounded-xl border border-white/10 bg-white/[0.06] text-cyan-100">
+                    <div className="mb-3 flex items-center justify-between">
+                      <span className="grid size-8 place-items-center rounded-md border border-cyan-300/12 bg-cyan-300/[0.06] text-cyan-100">
                         <Icon className="size-5" />
                       </span>
-                      <span className="text-2xl font-semibold text-white">
+                      <span className="text-lg font-semibold text-white">
                         {count}
                       </span>
                     </div>
-                    <div className="text-sm font-medium text-slate-100">
+                    <div className="text-xs font-medium text-slate-100">
                       {type.label}
                     </div>
-                    <div className="mt-1 text-xs text-slate-500">
+                    <div className="mt-1 text-[11px] text-slate-500">
                       Platform Unit Assets
                     </div>
                   </div>
@@ -1365,20 +1421,19 @@ function DataAssetWorkspace() {
             })}
           </div>
 
-          <div className="flex flex-col gap-3 rounded-2xl border border-cyan-200/10 bg-slate-950/24 p-3 md:flex-row md:items-center">
-            <div className="relative min-w-0 flex-1">
-              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-500" />
-              <input
+          <Toolbar>
+            <ToolbarGroup className="flex-1">
+              <SearchInput
+                className="w-full"
                 value={localQuery}
                 onChange={(event) => setLocalQuery(event.target.value)}
+                onClear={() => setLocalQuery("")}
                 placeholder="搜索单位名称、类型、指标、加油机、防空、武器..."
-                className="h-11 w-full rounded-xl border border-cyan-200/10 bg-slate-950/50 pl-10 pr-3 text-sm text-slate-100 outline-none placeholder:text-slate-600 focus:border-cyan-200/40"
               />
-            </div>
-            <div className="flex flex-wrap gap-2">
+            </ToolbarGroup>
+            <ToolbarGroup>
               <Button
                 type="button"
-                className="h-11 rounded-xl border border-cyan-200/25 bg-gradient-to-r from-cyan-400 to-blue-600 px-4 text-white shadow-[0_14px_34px_rgba(14,165,233,0.22)]"
                 onClick={() => setAddDialogOpen(true)}
               >
                 <Plus className="size-4" />
@@ -1389,7 +1444,7 @@ function DataAssetWorkspace() {
                 onChange={(event) =>
                   setImportMode(event.target.value as "skip" | "replace")
                 }
-                className="h-11 rounded-xl border border-cyan-200/15 bg-slate-950/50 px-3 text-sm text-slate-200 outline-none focus:border-cyan-200/40"
+                className="h-9 rounded-md border border-cyan-300/12 bg-slate-950/60 px-2.5 text-xs text-slate-300 outline-none focus:border-cyan-300/35"
               >
                 <option value="skip">冲突跳过</option>
                 <option value="replace">覆盖自定义</option>
@@ -1397,7 +1452,6 @@ function DataAssetWorkspace() {
               <Button
                 type="button"
                 variant="ghost"
-                className="h-11 rounded-xl border border-cyan-200/15 bg-white/[0.035] px-4 text-slate-200 hover:bg-white/[0.06]"
                 onClick={() => importRef.current?.click()}
               >
                 <UploadCloud className="size-4" />
@@ -1406,7 +1460,6 @@ function DataAssetWorkspace() {
               <Button
                 type="button"
                 variant="ghost"
-                className="h-11 rounded-xl border border-cyan-200/15 bg-white/[0.035] px-4 text-slate-200 hover:bg-white/[0.06]"
                 onClick={handleExport}
               >
                 <FileInput className="size-4" />
@@ -1414,23 +1467,23 @@ function DataAssetWorkspace() {
               </Button>
               <Button
                 type="button"
-                variant="ghost"
-                className="h-11 rounded-xl border border-amber-200/15 bg-amber-300/[0.04] px-4 text-amber-100 hover:bg-amber-300/[0.08]"
+                variant="outline"
+                className="border-amber-300/18 bg-amber-300/[0.04] text-amber-100 hover:bg-amber-300/[0.08]"
                 onClick={handleReset}
               >
                 恢复默认
               </Button>
-            </div>
-          </div>
+            </ToolbarGroup>
+          </Toolbar>
 
           {notice && (
-            <div className="rounded-xl border border-emerald-300/20 bg-emerald-400/[0.08] px-4 py-3 text-sm text-emerald-100">
+            <div className="rounded-lg border border-emerald-300/20 bg-emerald-400/[0.08] px-3 py-2 text-xs text-emerald-100">
               {notice}
             </div>
           )}
 
           {assetError && (
-            <div className="rounded-xl border border-red-400/25 bg-red-500/[0.08] px-4 py-3 text-sm text-red-100">
+            <div className="rounded-lg border border-red-400/25 bg-red-500/[0.08] px-3 py-2 text-xs text-red-100">
               {assetError}
             </div>
           )}
@@ -1671,7 +1724,7 @@ function AddUnitAssetDialog({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
       onClick={(event) => {
         if (
           event.target === event.currentTarget &&
@@ -1682,9 +1735,9 @@ function AddUnitAssetDialog({
         }
       }}
     >
-      <Card className="max-h-[92vh] w-full max-w-2xl overflow-auto rounded-2xl border-cyan-200/15 bg-[#07111f] p-6 shadow-[0_24px_90px_rgba(0,0,0,0.45)]">
+      <Card className="max-h-[92vh] w-full max-w-2xl overflow-auto rounded-lg border-cyan-200/15 bg-[#08111c] p-4 shadow-[0_10px_28px_rgba(0,0,0,0.34)]">
         <div className="flex items-center gap-3">
-          <span className="grid size-11 place-items-center rounded-2xl border border-cyan-200/25 bg-cyan-300/10 text-cyan-200">
+          <span className="grid size-9 place-items-center rounded-md border border-cyan-200/20 bg-cyan-300/10 text-cyan-200">
             <Icon className="size-5" />
           </span>
           <div>
@@ -1714,7 +1767,7 @@ function AddUnitAssetDialog({
                   })
                 }
                 disabled={submitting || generating || isEditing}
-                className="h-11 w-full rounded-xl border border-cyan-200/15 bg-slate-950/50 px-3 text-sm text-slate-100 outline-none focus:border-cyan-200/45"
+                className="h-9 w-full rounded-md border border-cyan-200/15 bg-slate-950/60 px-3 text-xs text-slate-100 outline-none focus:border-cyan-200/45"
               >
                 {UNIT_ASSET_TYPES.filter((type) => type.id !== "all").map(
                   (type) => (
@@ -1746,7 +1799,7 @@ function AddUnitAssetDialog({
           </div>
 
           {!isEditing && (
-            <div className="rounded-2xl border border-cyan-200/10 bg-cyan-300/[0.035] p-4">
+            <div className="rounded-lg border border-cyan-200/10 bg-cyan-300/[0.035] p-3">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
                 <label className="block min-w-0 flex-1">
                   <span className="mb-2 flex items-center gap-2 text-sm text-cyan-100">
@@ -1761,7 +1814,7 @@ function AddUnitAssetDialog({
                       setAiNotice(null);
                     }}
                     placeholder="补充用途、国家、版本或别名，例如：空中加油机 / 五代战斗机 / 舰载预警机"
-                    className="h-11 w-full rounded-xl border border-cyan-200/15 bg-slate-950/50 px-3 text-sm text-slate-100 outline-none placeholder:text-slate-600 focus:border-cyan-200/45"
+                    className="h-9 w-full rounded-md border border-cyan-200/15 bg-slate-950/60 px-3 text-xs text-slate-100 outline-none placeholder:text-slate-600 focus:border-cyan-200/45"
                   />
                 </label>
                 <Button
@@ -1769,14 +1822,14 @@ function AddUnitAssetDialog({
                   variant="ghost"
                   onClick={handleGenerate}
                   disabled={submitting || generating}
-                  className="h-11 rounded-xl border border-cyan-200/20 bg-slate-950/35 px-4 text-cyan-100 hover:bg-cyan-300/[0.08]"
+                  className="h-9 rounded-md border border-cyan-200/20 bg-slate-950/35 px-3 text-xs text-cyan-100 hover:bg-cyan-300/[0.08]"
                 >
                   <Sparkles className="size-4" />
                   {generating ? "生成中..." : "AI 生成"}
                 </Button>
               </div>
               {aiNotice && (
-                <div className="mt-3 rounded-xl border border-emerald-300/20 bg-emerald-400/[0.08] px-3 py-2 text-sm text-emerald-100">
+                <div className="mt-3 rounded-lg border border-emerald-300/20 bg-emerald-400/[0.08] px-3 py-2 text-xs text-emerald-100">
                   {aiNotice}
                 </div>
               )}
@@ -1821,7 +1874,7 @@ function AddUnitAssetDialog({
           )}
 
           {form.type === "aircraft" && (
-            <div className="rounded-2xl border border-cyan-200/10 bg-white/[0.025] p-4">
+            <div className="rounded-lg border border-cyan-200/10 bg-white/[0.025] p-3">
               <label className="flex items-center gap-3 text-sm text-slate-300">
                 <input
                   type="checkbox"
@@ -1956,7 +2009,7 @@ function AddUnitAssetDialog({
           )}
 
           {error && (
-            <div className="rounded-xl border border-red-400/25 bg-red-500/[0.08] px-3 py-2 text-sm text-red-100">
+            <div className="rounded-lg border border-red-400/25 bg-red-500/[0.08] px-3 py-2 text-xs text-red-100">
               {error}
             </div>
           )}
@@ -1967,14 +2020,14 @@ function AddUnitAssetDialog({
               variant="ghost"
               onClick={onClose}
               disabled={submitting || generating}
-              className="rounded-xl px-4 text-slate-300 hover:bg-white/[0.06]"
+              className="rounded-md px-3 text-slate-300 hover:bg-white/[0.06]"
             >
               取消
             </Button>
             <Button
               type="submit"
               disabled={submitting || generating}
-              className="rounded-xl border border-cyan-200/25 bg-gradient-to-r from-cyan-400 to-blue-600 px-4 text-white shadow-[0_18px_46px_rgba(14,165,233,0.25)]"
+              className="rounded-md border border-cyan-200/25 bg-cyan-300/12 px-3 text-cyan-50"
             >
               {submitting
                 ? "保存中..."
@@ -2018,7 +2071,7 @@ function AssetFormInput({
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
-        className="h-11 w-full rounded-xl border border-cyan-200/15 bg-slate-950/50 px-3 text-sm text-slate-100 outline-none placeholder:text-slate-600 focus:border-cyan-200/45"
+        className="h-9 w-full rounded-md border border-cyan-200/15 bg-slate-950/60 px-3 text-xs text-slate-100 outline-none placeholder:text-slate-600 focus:border-cyan-200/45"
       />
     </label>
   );
@@ -2651,32 +2704,31 @@ function UnitAssetCard({
       type="button"
       onClick={onSelect}
       className={cn(
-        "group relative overflow-hidden rounded-2xl border p-4 text-left transition-all hover:-translate-y-0.5",
+        "group relative overflow-hidden rounded-lg border p-3 text-left transition-colors",
         active
-          ? "border-cyan-200/35 bg-cyan-200/[0.075] shadow-[0_20px_70px_rgba(14,165,233,0.14)]"
+          ? "border-cyan-300/30 bg-cyan-300/[0.075]"
           : "border-cyan-200/10 bg-slate-950/28 hover:border-cyan-200/24 hover:bg-white/[0.04]"
       )}
     >
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_80%_0%,rgba(14,165,233,0.12),transparent_44%)] opacity-80" />
-      <div className="relative flex gap-4">
-        <span className="grid size-12 shrink-0 place-items-center rounded-2xl border border-white/10 bg-white/[0.055] text-cyan-100">
-          <Icon className="size-6" />
+      <div className="relative flex gap-3">
+        <span className="grid size-9 shrink-0 place-items-center rounded-md border border-cyan-300/12 bg-cyan-300/[0.06] text-cyan-100">
+          <Icon className="size-5" />
         </span>
         <span className="min-w-0 flex-1">
-          <span className="mb-2 inline-flex rounded-full border border-cyan-200/15 bg-cyan-200/[0.06] px-2 py-0.5 text-[10px] font-semibold text-cyan-100">
+          <span className="mb-2 inline-flex rounded-full border border-cyan-200/15 bg-cyan-200/[0.06] px-2 py-0.5 text-[10px] font-medium text-cyan-100">
             {asset.typeLabel}
           </span>
-          <span className="block truncate text-base font-semibold text-white">
+          <span className="block truncate text-sm font-semibold text-white">
             {asset.name}
           </span>
-          <span className="mt-1 block truncate text-sm text-slate-500">
+          <span className="mt-1 block truncate text-xs text-slate-500">
             {asset.role}
           </span>
-          <span className="mt-3 flex flex-wrap gap-2 text-xs text-slate-400">
-            <span className="rounded-lg bg-white/[0.04] px-2 py-1">
+          <span className="mt-3 flex flex-wrap gap-2 text-[11px] text-slate-400">
+            <span className="rounded-md bg-white/[0.04] px-2 py-1">
               {asset.primaryMetric}
             </span>
-            <span className="rounded-lg bg-white/[0.04] px-2 py-1">
+            <span className="rounded-md bg-white/[0.04] px-2 py-1">
               {asset.secondaryMetric}
             </span>
           </span>
@@ -2701,7 +2753,7 @@ function UnitAssetDetail({
 }) {
   if (!asset) {
     return (
-      <Card className="rounded-2xl border-cyan-200/10 bg-slate-950/24 p-5">
+      <Card className="rounded-lg border-cyan-200/10 bg-slate-950/24 p-4">
         <div className="text-sm text-slate-500">选择一个单位查看详细参数。</div>
       </Card>
     );
@@ -2723,8 +2775,7 @@ function UnitAssetDetail({
       : [];
 
   return (
-    <Card className="sticky top-24 h-fit overflow-hidden rounded-2xl border-cyan-200/10 bg-[#06111f]/82 p-5 shadow-[0_24px_90px_rgba(0,0,0,0.24)]">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(14,165,233,0.16),transparent_42%)]" />
+    <Card className="sticky top-20 h-fit overflow-hidden rounded-lg border-cyan-200/10 bg-[#08111c] p-4">
       <div className="relative">
         <div className="mb-5 flex items-start justify-between gap-4">
           <div>
@@ -2737,10 +2788,10 @@ function UnitAssetDetail({
             <p className="mt-1 text-sm text-slate-500">{asset.role}</p>
           </div>
           <div className="flex shrink-0 flex-col items-end gap-2">
-            <span className="rounded-full border border-emerald-300/20 bg-emerald-400/10 px-3 py-1 text-xs text-emerald-100">
+            <span className="rounded-full border border-emerald-300/20 bg-emerald-400/10 px-2 py-0.5 text-[11px] text-emerald-100">
               {asset.status}
             </span>
-            <span className="rounded-full border border-cyan-200/15 bg-cyan-200/[0.06] px-3 py-1 text-xs text-cyan-100">
+            <span className="rounded-full border border-cyan-200/15 bg-cyan-200/[0.06] px-2 py-0.5 text-[11px] text-cyan-100">
               {asset.isSystem ? "系统默认" : "自定义"}
             </span>
           </div>
@@ -2751,7 +2802,7 @@ function UnitAssetDetail({
             <Button
               type="button"
               variant="ghost"
-              className="h-9 flex-1 rounded-xl border border-cyan-200/15 bg-white/[0.035] text-slate-200 hover:bg-white/[0.06]"
+              className="h-9 flex-1 rounded-md border border-cyan-200/15 bg-white/[0.035] text-slate-200 hover:bg-white/[0.06]"
               onClick={onEdit}
             >
               <Edit3 className="size-4" />
@@ -2760,7 +2811,7 @@ function UnitAssetDetail({
             <Button
               type="button"
               variant="ghost"
-              className="h-9 flex-1 rounded-xl border border-red-300/15 bg-red-400/[0.04] text-red-100 hover:bg-red-400/[0.08]"
+              className="h-9 flex-1 rounded-md border border-red-300/15 bg-red-400/[0.04] text-red-100 hover:bg-red-400/[0.08]"
               onClick={onDelete}
             >
               <Trash2 className="size-4" />
@@ -2782,7 +2833,7 @@ function UnitAssetDetail({
             {detailEntries.map((entry) => (
               <div
                 key={entry.key}
-                className="flex items-center justify-between gap-3 rounded-xl border border-white/8 bg-white/[0.035] px-3 py-2 text-sm"
+                className="flex items-center justify-between gap-3 rounded-md border border-white/8 bg-white/[0.035] px-3 py-2 text-xs"
               >
                 <span className="text-slate-500">{entry.label}</span>
                 <span className="max-w-[12rem] truncate text-right text-slate-100">
@@ -2802,7 +2853,7 @@ function UnitAssetDetail({
               {source.map(([key, value]) => (
                 <div
                   key={key}
-                  className="rounded-xl border border-cyan-200/10 bg-cyan-200/[0.035] px-3 py-2 text-xs text-slate-400"
+                  className="rounded-md border border-cyan-200/10 bg-cyan-200/[0.035] px-3 py-2 text-xs text-slate-400"
                 >
                   <span className="mr-2 text-cyan-200">
                     {UNIT_ASSET_SOURCE_LABELS[key] ?? key}
@@ -2820,7 +2871,7 @@ function UnitAssetDetail({
 
 function DetailMetric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl border border-cyan-200/10 bg-white/[0.035] p-3">
+    <div className="rounded-md border border-cyan-200/10 bg-white/[0.035] p-3">
       <div className="text-xs text-slate-500">{label}</div>
       <div className="mt-1 truncate text-sm font-medium text-slate-100">
         {value}
@@ -2841,19 +2892,19 @@ function Empty({
   onAction?: () => void;
 }) {
   return (
-    <div className="flex flex-col items-center rounded-2xl border border-dashed border-cyan-200/15 bg-slate-950/30 px-6 py-14 text-center">
-      <div className="grid size-12 place-items-center rounded-2xl border border-cyan-200/20 bg-cyan-300/10 text-cyan-200">
+    <div className="flex flex-col items-center rounded-lg border border-dashed border-cyan-200/15 bg-slate-950/30 px-6 py-10 text-center">
+      <div className="grid size-10 place-items-center rounded-md border border-cyan-200/20 bg-cyan-300/10 text-cyan-200">
         <Sparkles className="size-5" />
       </div>
-      <div className="mt-4 text-base font-semibold text-slate-100">{title}</div>
-      <div className="mt-1 max-w-md text-sm leading-6 text-slate-500">
+      <div className="mt-3 text-sm font-semibold text-slate-100">{title}</div>
+      <div className="mt-1 max-w-md text-xs leading-5 text-slate-500">
         {description}
       </div>
       {onAction && (
         <Button
           type="button"
           onClick={onAction}
-          className="mt-5 rounded-xl border border-cyan-200/25 bg-gradient-to-r from-cyan-400 to-blue-600 px-4 text-white"
+          className="mt-4 rounded-md border border-cyan-200/25 bg-cyan-300/12 px-3 text-cyan-50"
         >
           <Plus className="size-4" />
           {actionLabel}
@@ -2866,7 +2917,7 @@ function Empty({
 function Skeleton({ view }: { view: ViewMode }) {
   if (view === "list") {
     return (
-      <div className="overflow-hidden rounded-2xl border border-cyan-200/10 bg-slate-950/30">
+      <div className="overflow-hidden rounded-lg border border-cyan-200/10 bg-slate-950/30">
         {Array.from({ length: 5 }).map((_, index) => (
           <div
             key={index}
@@ -2886,7 +2937,7 @@ function Skeleton({ view }: { view: ViewMode }) {
       {Array.from({ length: 8 }).map((_, index) => (
         <div
           key={index}
-          className="overflow-hidden rounded-2xl border border-cyan-200/10 bg-[#06111f]/70"
+          className="overflow-hidden rounded-lg border border-cyan-200/10 bg-[#06111f]/70"
         >
           <div className="aspect-[16/9] animate-pulse bg-white/5" />
           <div className="space-y-3 p-4">
@@ -2946,14 +2997,14 @@ function CreateScenarioDialog({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
       onClick={(event) => {
         if (event.target === event.currentTarget && !submitting) onClose();
       }}
     >
-      <Card className="w-full max-w-md rounded-2xl border-cyan-200/15 bg-[#07111f] p-6 shadow-[0_24px_90px_rgba(0,0,0,0.45)]">
+      <Card className="w-full max-w-md rounded-lg border-cyan-200/15 bg-[#08111c] p-4 shadow-[0_10px_28px_rgba(0,0,0,0.34)]">
         <div className="flex items-center gap-3">
-          <span className="grid size-10 place-items-center rounded-2xl border border-cyan-200/25 bg-cyan-300/10 text-cyan-200">
+          <span className="grid size-9 place-items-center rounded-md border border-cyan-200/20 bg-cyan-300/10 text-cyan-200">
             <Plus className="size-5" />
           </span>
           <div>
@@ -2976,7 +3027,7 @@ function CreateScenarioDialog({
               value={name}
               onChange={(event) => setName(event.target.value)}
               placeholder="例如：东海防空压力分析推演"
-              className="w-full rounded-xl border border-cyan-200/15 bg-slate-950/50 px-3 py-3 text-sm text-slate-100 outline-none placeholder:text-slate-600 focus:border-cyan-200/45"
+              className="w-full rounded-md border border-cyan-200/15 bg-slate-950/60 px-3 py-2 text-xs text-slate-100 outline-none placeholder:text-slate-600 focus:border-cyan-200/45"
             />
           </div>
 
@@ -2990,12 +3041,12 @@ function CreateScenarioDialog({
               value={description}
               onChange={(event) => setDescription(event.target.value)}
               placeholder="简要说明本项目的推演目标、想定背景或评估方向"
-              className="w-full resize-none rounded-xl border border-cyan-200/15 bg-slate-950/50 px-3 py-3 text-sm text-slate-100 outline-none placeholder:text-slate-600 focus:border-cyan-200/45"
+              className="w-full resize-none rounded-md border border-cyan-200/15 bg-slate-950/60 px-3 py-2 text-xs text-slate-100 outline-none placeholder:text-slate-600 focus:border-cyan-200/45"
             />
           </div>
 
           {error && (
-            <div className="rounded-xl border border-red-400/25 bg-red-500/[0.08] px-3 py-2 text-sm text-red-100">
+            <div className="rounded-lg border border-red-400/25 bg-red-500/[0.08] px-3 py-2 text-xs text-red-100">
               {error}
             </div>
           )}
@@ -3006,14 +3057,14 @@ function CreateScenarioDialog({
               variant="ghost"
               onClick={onClose}
               disabled={submitting}
-              className="rounded-xl px-4 text-slate-300 hover:bg-white/[0.06]"
+              className="rounded-md px-3 text-slate-300 hover:bg-white/[0.06]"
             >
               取消
             </Button>
             <Button
               type="submit"
               disabled={submitting || !name.trim()}
-              className="rounded-xl border border-cyan-200/25 bg-gradient-to-r from-cyan-400 to-blue-600 px-4 text-white shadow-[0_18px_46px_rgba(14,165,233,0.25)]"
+              className="rounded-md border border-cyan-200/25 bg-cyan-300/12 px-3 text-cyan-50"
             >
               {submitting ? "创建中..." : "创建并进入"}
             </Button>

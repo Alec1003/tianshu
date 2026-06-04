@@ -37,7 +37,7 @@ from blade.engine.weaponEngagement import (
     is_threat_detected,
     check_target_tracked_by_count,
     launch_weapon,
-    route_aircraft_to_strike_position,
+    route_unit_to_strike_position,
     weapon_engagement,
     weapon_can_engage_target,
     weapon_can_target_type,
@@ -857,15 +857,15 @@ class Game:
                 if not target:
                     is_mission_ongoing = False
 
-                attackers = list(
-                    filter(
-                        lambda attacker: attacker is not None,
-                        [
-                            self.current_scenario.get_aircraft(attacker_id)
-                            for attacker_id in mission.assigned_unit_ids
-                        ],
+                attackers = [
+                    attacker
+                    for attacker in (
+                        self.current_scenario.get_aircraft(attacker_id)
+                        or self.current_scenario.get_ship(attacker_id)
+                        for attacker_id in mission.assigned_unit_ids
                     )
-                )
+                    if attacker is not None
+                ]
 
                 if len(attackers) < 1:
                     is_mission_ongoing = False
@@ -881,7 +881,8 @@ class Game:
                     mission.side_id, DoctrineType.AIRCRAFT_RTB_WHEN_STRIKE_MISSION_COMPLETE
                 ) and not is_mission_ongoing:
                     for attacker in attackers:
-                        self.aircraft_return_to_base(attacker.id)
+                        if isinstance(attacker, Aircraft):
+                            self.aircraft_return_to_base(attacker.id)
 
                 return is_mission_ongoing
             else:
@@ -909,7 +910,10 @@ class Game:
                 if attacker_id in attackers_handled_this_tick:
                     continue
                 attackers_handled_this_tick.add(attacker_id)
-                attacker = self.current_scenario.get_aircraft(attacker_id)
+                attacker = (
+                    self.current_scenario.get_aircraft(attacker_id)
+                    or self.current_scenario.get_ship(attacker_id)
+                )
                 if attacker is None:
                     continue
                 if attacker.side_id != mission.side_id:
@@ -942,12 +946,12 @@ class Game:
                     )
                     * 1000
                 ) / NAUTICAL_MILES_TO_METERS
-                aircraft_weapon_with_max_range = self.get_best_weapon_against_target(
+                attacker_weapon_with_max_range = self.get_best_weapon_against_target(
                     attacker,
                     target,
                     require_in_range=False,
                 )
-                if aircraft_weapon_with_max_range is None:
+                if attacker_weapon_with_max_range is None:
                     continue
                 detection_range_nm = get_effective_detection_range(
                     self.current_scenario, attacker
@@ -963,15 +967,15 @@ class Game:
                 if (
                     launch_position_distance_nm > detection_range_nm
                     or launch_position_distance_nm
-                    > aircraft_weapon_with_max_range.get_engagement_range()
+                    > attacker_weapon_with_max_range.get_engagement_range()
                 ):
-                    route_aircraft_to_strike_position(
+                    route_unit_to_strike_position(
                         self.current_scenario,
                         attacker,
                         mission.assigned_target_ids[0],
                         min(
                             detection_range_nm,
-                            aircraft_weapon_with_max_range.get_engagement_range(),
+                            attacker_weapon_with_max_range.get_engagement_range(),
                         ),
                     )
                 elif is_threat_detected(target, attacker, self.current_scenario):
@@ -985,7 +989,8 @@ class Game:
                     launch_weapon(
                         self.current_scenario, attacker, target, launched_weapon, 1
                     )
-                    attacker.target_id = target.id
+                    if isinstance(attacker, Aircraft):
+                        attacker.target_id = target.id
 
     def update_all_aircraft_position(self) -> None:
         for aircraft in list(self.current_scenario.aircraft):

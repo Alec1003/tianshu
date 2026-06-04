@@ -1001,6 +1001,72 @@ def test_strike_mission_uses_loaded_weapon_when_longest_range_weapon_is_empty() 
     assert loaded_short_range.current_quantity == 0
 
 
+def test_ship_assigned_to_strike_mission_launches_against_hostile_surface_target() -> None:
+    naval_gun = _surface_weapon(quantity=1)
+    naval_gun.id = "naval-gun"
+    naval_gun.class_name = "Naval Gunfire"
+    ship = Ship(
+        id="blue-ship",
+        name="Blue Ship",
+        side_id="blue",
+        class_name="Battleship",
+        latitude=0.0,
+        longitude=0.0,
+        altitude=0.0,
+        heading=0.0,
+        speed=20.0,
+        current_fuel=1000.0,
+        max_fuel=1000.0,
+        fuel_rate=10.0,
+        range=100.0,
+        weapons=[naval_gun],
+    )
+    target = Facility(
+        id="red-site",
+        name="Red Site",
+        side_id="red",
+        class_name="Coastal Battery",
+        latitude=0.0,
+        longitude=0.0,
+        range=100.0,
+        weapons=[],
+    )
+    relationships = Relationships()
+    relationships.add_hostile("blue", "red")
+    scenario = Scenario(
+        id="s1",
+        name="Ship strike mission",
+        start_time=0,
+        current_time=0,
+        duration=600,
+        sides=[
+            Side(id="blue", name="BLUE", color="blue"),
+            Side(id="red", name="RED", color="red"),
+        ],
+        ships=[ship],
+        facilities=[target],
+        missions=[
+            StrikeMission(
+                id="strike-1",
+                name="Naval Strike",
+                side_id="blue",
+                assigned_unit_ids=[ship.id],
+                assigned_target_ids=[target.id],
+                active=True,
+            )
+        ],
+        relationships=relationships,
+    )
+    game = Game(current_scenario=scenario)
+
+    game.update_units_on_strike_mission()
+
+    assert len(scenario.weapons) == 1
+    assert scenario.weapons[0].class_name == "Naval Gunfire"
+    assert scenario.weapons[0].target_id == target.id
+    assert naval_gun.current_quantity == 0
+
+
 def test_facility_auto_defense_uses_loaded_weapon_when_longest_range_weapon_is_empty() -> None:
     empty_long_range = Weapon(
         id="empty-long-range",

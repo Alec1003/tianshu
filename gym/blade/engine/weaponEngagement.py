@@ -347,30 +347,44 @@ def aircraft_pursuit(
     )
 
 
-def route_aircraft_to_strike_position(
+def route_unit_to_strike_position(
     current_scenario: Scenario,
-    aircraft: Aircraft,
+    unit: Aircraft | Ship,
     target_id: str,
     strike_radius_nm: float,
 ) -> None:
     target = current_scenario.get_target(target_id)
     if target is None:
         return
-    if len(aircraft.weapons) < 1:
+    if len(unit.weapons) < 1:
         return
 
-    bearing_between_aircraft_and_target = get_bearing_between_two_points(
-        aircraft.latitude, aircraft.longitude, target.latitude, target.longitude
+    bearing_between_unit_and_target = get_bearing_between_two_points(
+        unit.latitude, unit.longitude, target.latitude, target.longitude
     )
-    bearing_between_target_and_aircraft = get_bearing_between_two_points(
-        target.latitude, target.longitude, aircraft.latitude, aircraft.longitude
+    bearing_between_target_and_unit = get_bearing_between_two_points(
+        target.latitude, target.longitude, unit.latitude, unit.longitude
     )
     strike_location = get_terminal_coordinates_from_distance_and_bearing(
         target.latitude,
         target.longitude,
         (strike_radius_nm * NAUTICAL_MILES_TO_METERS) / 1000,
-        bearing_between_target_and_aircraft,
+        bearing_between_target_and_unit,
     )
 
-    aircraft.route.append([strike_location[0], strike_location[1]])
-    aircraft.heading = bearing_between_aircraft_and_target
+    unit.route.append([strike_location[0], strike_location[1]])
+    unit.heading = bearing_between_unit_and_target
+
+
+def route_aircraft_to_strike_position(
+    current_scenario: Scenario,
+    aircraft: Aircraft,
+    target_id: str,
+    strike_radius_nm: float,
+) -> None:
+    route_unit_to_strike_position(
+        current_scenario,
+        aircraft,
+        target_id,
+        strike_radius_nm,
+    )

@@ -1351,7 +1351,12 @@ export default function AITacticalCommandPlatform({
           现搬到地图列底部，4 个核心卡片在 lg+ 横向 4 列铺开，腾出右侧
           槽位给后续 AI 工具栏。
         */}
-        <SimulationInspectorPanel game={game} snapshot={snapshot} />
+        <SimulationInspectorPanel
+          game={game}
+          runtimeScenarioId={scenarioId}
+          scenarioId={scenarioMeta?.id}
+          snapshot={snapshot}
+        />
       </main>
 
       <AISidebar

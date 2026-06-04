@@ -43,13 +43,22 @@ function AppShell({
   className,
 }: AppShellProps) {
   return (
-    <div className={cn("dark min-h-screen overflow-hidden bg-[#050812] text-slate-100", className)}>
+    <div
+      className={cn(
+        "dark min-h-screen overflow-hidden bg-[#050812] text-slate-100",
+        className
+      )}
+    >
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-[232px] border-r border-cyan-300/10 bg-[#070c16] px-3 py-4 lg:flex lg:flex-col">
         <div className="flex items-center gap-3 px-2">
           <BrandLogo frameClassName="size-9 rounded-lg shadow-none backdrop-blur-none" />
           <div className="min-w-0">
-            <div className="truncate text-sm font-semibold text-slate-50">TianShu</div>
-            <div className="truncate text-[11px] text-slate-500">AI Command Center</div>
+            <div className="truncate text-sm font-semibold text-slate-50">
+              TianShu
+            </div>
+            <div className="truncate text-[11px] text-slate-500">
+              AI Command Center
+            </div>
           </div>
         </div>
 
@@ -80,7 +89,9 @@ function AppShell({
                   <Icon className="size-4" />
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-xs font-medium">{item.label}</span>
+                  <span className="block truncate text-xs font-medium">
+                    {item.label}
+                  </span>
                   {item.caption ? (
                     <span className="mt-0.5 block truncate text-[11px] text-slate-600">
                       {item.caption}
@@ -88,7 +99,9 @@ function AppShell({
                   ) : null}
                 </span>
                 {item.badge !== undefined ? (
-                  <Badge variant={active ? "default" : "offline"}>{item.badge}</Badge>
+                  <Badge variant={active ? "default" : "offline"}>
+                    {item.badge}
+                  </Badge>
                 ) : null}
               </button>
             );
@@ -118,13 +131,19 @@ function AppShell({
                     {eyebrow}
                   </Badge>
                 ) : null}
-                <h1 className="truncate text-base font-semibold text-slate-50">{title}</h1>
+                <h1 className="truncate text-base font-semibold text-slate-50">
+                  {title}
+                </h1>
               </div>
               {description ? (
-                <p className="mt-1 max-w-3xl truncate text-xs text-slate-500">{description}</p>
+                <p className="mt-1 max-w-3xl truncate text-xs text-slate-500">
+                  {description}
+                </p>
               ) : null}
             </div>
-            {actions ? <div className="flex shrink-0 items-center gap-2">{actions}</div> : null}
+            {actions ? (
+              <div className="flex shrink-0 items-center gap-2">{actions}</div>
+            ) : null}
             {topRight ? <div className="shrink-0">{topRight}</div> : null}
           </div>
           <nav className="flex gap-2 overflow-x-auto border-t border-cyan-300/8 px-4 py-2 lg:hidden">
@@ -146,7 +165,9 @@ function AppShell({
                   <Icon className="size-3.5" />
                   <span>{item.label}</span>
                   {item.badge !== undefined ? (
-                    <Badge variant={active ? "default" : "offline"}>{item.badge}</Badge>
+                    <Badge variant={active ? "default" : "offline"}>
+                      {item.badge}
+                    </Badge>
                   ) : null}
                 </button>
               );

@@ -96,6 +96,27 @@ def test_production_rejects_sqlite_database() -> None:
         validate_production_settings(settings)
 
 
+@pytest.mark.parametrize(
+    ("field", "message"),
+    [
+        ("mcp_http_dev_user_id", "TIANSHU_MCP_HTTP_DEV_USER_ID"),
+        ("mcp_user_id", "TIANSHU_MCP_USER_ID"),
+    ],
+)
+def test_production_rejects_mcp_dev_user_bypass(field: str, message: str) -> None:
+    settings = Settings(
+        env="production",
+        database_url="postgresql+asyncpg://tianshu:secret@db/tianshu",
+        jwt_secret="x" * MIN_PRODUCTION_JWT_SECRET_LENGTH,
+        model_config_secret="m" * MIN_PRODUCTION_MODEL_CONFIG_SECRET_LENGTH,
+        first_user_is_superuser=False,
+        **{field: "00000000-0000-0000-0000-000000000001"},
+    )
+
+    with pytest.raises(RuntimeError, match=message):
+        validate_production_settings(settings)
+
+
 def test_production_accepts_hardened_settings() -> None:
     settings = Settings(
         env="production",

@@ -374,11 +374,15 @@ def load_default_catalog() -> UnitAssetCatalog:
 
 async def seed_default_unit_assets(session: AsyncSession) -> int:
     catalog = load_default_catalog()
-    seeded = 0
+    changed = 0
     for asset_type, item in iter_catalog_items(catalog):
         name, normalized = normalize_asset_data(asset_type, item)
         existing = await _find_system_by_type_name(session, asset_type, name)
         if existing is not None:
+            if existing.data != normalized:
+                existing.data = normalized
+                existing.version += 1
+                changed += 1
             continue
         session.add(
             UnitAsset(
@@ -389,7 +393,7 @@ async def seed_default_unit_assets(session: AsyncSession) -> int:
                 owner_id=None,
             )
         )
-        seeded += 1
-    if seeded:
+        changed += 1
+    if changed:
         await session.commit()
-    return seeded
+    return changed

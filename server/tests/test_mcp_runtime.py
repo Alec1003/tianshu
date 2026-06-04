@@ -28,6 +28,7 @@ from app.mcp.server import (
     set_shared_bridge_provider,
     set_shared_runtime_provider,
     runtime_deploy_aircraft,
+    runtime_deploy_ship,
 )
 from app.mcp.schemas import RuntimeOutcome, RuntimeStatus
 
@@ -357,6 +358,35 @@ async def test_mcp_runtime_deploy_aircraft_rejects_unknown_class(
 
     assert payload["code"] == "unknown_aircraft_class"
     assert payload["details"] == {"class_name": "Imaginary Airframe"}
+
+
+@pytest.mark.asyncio
+async def test_mcp_runtime_deploy_ship_rejects_unknown_class(
+    session_maker, user, monkeypatch
+):
+    from app.mcp import server as mcp_server_mod
+
+    monkeypatch.setattr(mcp_server_mod, "async_session_maker", session_maker)
+    ctx = SimpleNamespace(
+        request_context=SimpleNamespace(
+            lifespan_context=SimpleNamespace(user=None, runtime=None)
+        )
+    )
+
+    token = set_request_user(user)
+    try:
+        payload = await runtime_deploy_ship(
+            ctx,  # type: ignore[arg-type]
+            class_name="Imaginary Ship",
+            latitude=10.0,
+            longitude=20.0,
+            side="blue",
+        )
+    finally:
+        reset_request_user(token)
+
+    assert payload["code"] == "unknown_ship_class"
+    assert payload["details"] == {"class_name": "Imaginary Ship"}
 
 
 @pytest.mark.asyncio

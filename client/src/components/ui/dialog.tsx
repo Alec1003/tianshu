@@ -12,7 +12,13 @@ interface DialogProps {
   labelledBy?: string;
 }
 
-function Dialog({ open, onOpenChange, children, className, labelledBy }: DialogProps) {
+function Dialog({
+  open,
+  onOpenChange,
+  children,
+  className,
+  labelledBy,
+}: DialogProps) {
   React.useEffect(() => {
     if (!open) return;
     const onKey = (event: KeyboardEvent) => {
@@ -67,7 +73,10 @@ function DialogTitle({
 }: React.HTMLAttributes<HTMLHeadingElement>) {
   return (
     <h2
-      className={cn("text-sm font-semibold tracking-normal text-slate-50", className)}
+      className={cn(
+        "text-sm font-semibold tracking-normal text-slate-50",
+        className
+      )}
       {...props}
     />
   );
@@ -78,7 +87,10 @@ function DialogDescription({
   ...props
 }: React.HTMLAttributes<HTMLParagraphElement>) {
   return (
-    <p className={cn("mt-1 text-xs leading-5 text-slate-400", className)} {...props} />
+    <p
+      className={cn("mt-1 text-xs leading-5 text-slate-400", className)}
+      {...props}
+    />
   );
 }
 

@@ -290,20 +290,31 @@ class CommandRuleEngine:
                     "class_name",
                 )
             )
-        elif (
-            step.skill == "deploy_aircraft"
-            and not isinstance(params.get("template"), dict)
-            and not self.runtime.is_known_aircraft_class(class_name)
-        ):
-            issues.append(
-                self._issue(
-                    "blocking",
-                    "unknown_aircraft_class",
-                    "数据库中不存在该飞机型号，禁止由大模型生成占位飞机。请先录入单位资产库。",
-                    step.id,
-                    "class_name",
+        else:
+            known_check_names = {
+                "deploy_aircraft": ("aircraft", "is_known_aircraft_class"),
+                "deploy_ship": ("ship", "is_known_ship_class"),
+                "deploy_facility": ("facility", "is_known_facility_class"),
+                "deploy_airbase": ("airbase", "is_known_airbase_class"),
+            }
+            check = known_check_names.get(step.skill)
+            check_fn = getattr(self.runtime, check[1], None) if check else None
+            if (
+                check is not None
+                and check_fn is not None
+                and not isinstance(params.get("template"), dict)
+                and not check_fn(class_name)
+            ):
+                unit_type = check[0]
+                issues.append(
+                    self._issue(
+                        "blocking",
+                        f"unknown_{unit_type}_class",
+                        "Unit type is not present in the asset database; placeholder deployment is forbidden.",
+                        step.id,
+                        "class_name",
+                    )
                 )
-            )
         issues.extend(self._validate_coordinates(step.id, latitude, longitude))
         side = params.get("side")
         if side:

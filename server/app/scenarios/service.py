@@ -199,8 +199,14 @@ async def list_aar_records(
     *,
     limit: int = 50,
 ) -> Sequence[AarRecord]:
-    sc = await _load_or_404(session, scenario_id)
-    _ensure_can_read(sc, user)
+    try:
+        sc = await _load_or_404(session, scenario_id)
+        _ensure_can_read(sc, user)
+    except ScenarioNotFoundError:
+        # AAR creation intentionally supports runtime-only/imported scenario ids
+        # as correlation tags. Listing keeps the same owner scope, so it can
+        # safely return the caller's own free-form records.
+        pass
     limit = max(1, min(int(limit), 200))
     stmt = (
         select(AarRecord)

@@ -59,6 +59,15 @@ class FakeRuntime:
     def is_known_aircraft_class(self, class_name: str) -> bool:
         return class_name == "F-35A Lightning II"
 
+    def is_known_ship_class(self, class_name: str) -> bool:
+        return class_name == "Destroyer"
+
+    def is_known_facility_class(self, class_name: str) -> bool:
+        return class_name == "S-400 Triumf"
+
+    def is_known_airbase_class(self, class_name: str) -> bool:
+        return class_name == "Al Udeid Air Base"
+
 
 class FakeRegistry:
     def __init__(self) -> None:
@@ -69,6 +78,7 @@ class FakeRegistry:
             "simulation_step",
             "move_unit",
             "deploy_aircraft",
+            "deploy_ship",
             "deploy_obstacle",
             "update_unit_state",
             "attack_unit",
@@ -154,6 +164,37 @@ def test_unknown_aircraft_deploy_is_blocked_before_approval() -> None:
     assert proposal.status == "blocked"
     assert any(
         issue.code == "unknown_aircraft_class"
+        for issue in proposal.adjudication.issues
+    )
+    with pytest.raises(ValueError):
+        queue.approve_and_execute(proposal.id)
+    assert registry.calls == []
+
+
+def test_unknown_ship_deploy_is_blocked_before_approval() -> None:
+    registry = FakeRegistry()
+    queue = CommandApprovalQueue(FakeRuntime(), registry)  # type: ignore[arg-type]
+
+    proposal = queue.create_proposal(
+        command="deploy imaginary ship",
+        source="llm_tool",
+        steps=[
+            StructuredCommandStep(
+                id="s1",
+                skill="deploy_ship",
+                parameters={
+                    "class_name": "Imaginary Ship",
+                    "latitude": 10.0,
+                    "longitude": 20.0,
+                    "side": "blue",
+                },
+            )
+        ],
+    )
+
+    assert proposal.status == "blocked"
+    assert any(
+        issue.code == "unknown_ship_class"
         for issue in proposal.adjudication.issues
     )
     with pytest.raises(ValueError):

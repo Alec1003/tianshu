@@ -529,7 +529,9 @@ export default function ScenarioListPage() {
           <WorkspaceDetailPanel
             isTemplateSection={isTemplateWorkspace}
             items={filteredItems}
-            onCreate={isProjectWorkspace ? () => setDialogOpen(true) : undefined}
+            onCreate={
+              isProjectWorkspace ? () => setDialogOpen(true) : undefined
+            }
             onOpen={handleOpen}
           />
         )
@@ -1140,7 +1142,9 @@ function WorkspaceDetailPanel({
   onOpen: (id: string) => void;
 }) {
   const latestItems = items.slice(0, 5);
-  const activeCount = items.filter((item) => statusOf(item) === "running").length;
+  const activeCount = items.filter(
+    (item) => statusOf(item) === "running"
+  ).length;
   const unitTotal = items.reduce(
     (total, item) => total + Math.max(0, item.unit_count ?? 0),
     0
@@ -1180,7 +1184,11 @@ function WorkspaceDetailPanel({
         ) : (
           <div className="space-y-1">
             {latestItems.map((item, index) => {
-              const visualStatus = visualStatusOf(item, index, isTemplateSection);
+              const visualStatus = visualStatusOf(
+                item,
+                index,
+                isTemplateSection
+              );
               const meta = VISUAL_STATUS_META[visualStatus];
               return (
                 <button
@@ -1189,7 +1197,9 @@ function WorkspaceDetailPanel({
                   onClick={() => onOpen(item.id)}
                   type="button"
                 >
-                  <span className={cn("size-1.5 shrink-0 rounded-full", meta.dot)} />
+                  <span
+                    className={cn("size-1.5 shrink-0 rounded-full", meta.dot)}
+                  />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-xs font-medium text-slate-200">
                       {item.name}
@@ -1206,7 +1216,12 @@ function WorkspaceDetailPanel({
       </div>
 
       {onCreate ? (
-        <Button className="mt-4 w-full" onClick={onCreate} type="button" variant="outline">
+        <Button
+          className="mt-4 w-full"
+          onClick={onCreate}
+          type="button"
+          variant="outline"
+        >
           <Plus className="size-4" />
           新建项目
         </Button>
@@ -1432,10 +1447,7 @@ function DataAssetWorkspace() {
               />
             </ToolbarGroup>
             <ToolbarGroup>
-              <Button
-                type="button"
-                onClick={() => setAddDialogOpen(true)}
-              >
+              <Button type="button" onClick={() => setAddDialogOpen(true)}>
                 <Plus className="size-4" />
                 添加单位
               </Button>
@@ -1457,11 +1469,7 @@ function DataAssetWorkspace() {
                 <UploadCloud className="size-4" />
                 导入单位库
               </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={handleExport}
-              >
+              <Button type="button" variant="ghost" onClick={handleExport}>
                 <FileInput className="size-4" />
                 导出单位库
               </Button>
@@ -1863,10 +1871,10 @@ function AddUnitAssetDialog({
                 required
               />
               <AssetFormInput
-                label="航程 / 射程"
+                label="探测半径 / 射程"
                 value={form.range}
                 onChange={(value) => update({ range: value })}
-                placeholder="1200"
+                placeholder="120"
                 type="number"
                 required
               />
@@ -2091,7 +2099,7 @@ function createUnitAssetPayloadFromForm(form: AddUnitForm): {
       speed: readNumber(form.speed, "速度"),
       maxFuel: readNumber(form.maxFuel, "最大燃料"),
       fuelRate: readNumber(form.fuelRate, "燃料消耗"),
-      range: readNumber(form.range, "航程"),
+      range: readNumber(form.range, "探测半径"),
       isTanker: form.isTanker,
       fuelOffloadCapacity: form.isTanker
         ? readOptionalNumber(form.fuelOffloadCapacity)
@@ -2136,7 +2144,7 @@ function createUnitAssetPayloadFromForm(form: AddUnitForm): {
       speed: readNumber(form.speed, "速度"),
       maxFuel: readNumber(form.maxFuel, "最大燃料"),
       fuelRate: readNumber(form.fuelRate, "燃料消耗"),
-      range: readNumber(form.range, "航程"),
+      range: readNumber(form.range, "探测半径"),
       dataSource: {
         speedSrc: "Manual",
         maxFuelSrc: "Manual",
@@ -2244,7 +2252,15 @@ const UNIT_ASSET_FIELD_LABELS: Record<string, string> = {
   speed: "速度",
   maxFuel: "最大燃料",
   fuelRate: "燃料消耗",
-  range: "航程 / 射程",
+  range: "探测半径 / 射程",
+  rangeRole: "范围口径",
+  rangeConfidence: "范围可信度",
+  rangeNotes: "范围说明",
+  ferryRangeNm: "转场航程",
+  combatRadiusNm: "作战半径",
+  missionRangeNm: "任务半径",
+  enduranceRangeNm: "续航里程",
+  targetTypes: "目标类型",
   lethality: "杀伤值",
   latitude: "纬度",
   longitude: "经度",
@@ -2264,7 +2280,9 @@ const UNIT_ASSET_SOURCE_LABELS: Record<string, string> = {
   speedSrc: "速度来源",
   maxFuelSrc: "燃料来源",
   fuelRateSrc: "消耗来源",
-  rangeSrc: "航程来源",
+  rangeSrc: "范围来源",
+  ferryRangeSrc: "航程来源",
+  enduranceRangeSrc: "续航来源",
 };
 
 const COUNTRY_LABELS: Record<string, string> = {
@@ -2368,7 +2386,7 @@ function buildUnitAssetRecords(apiAssets: ApiUnitAsset[]): UnitAssetRecord[] {
         role,
         primaryMetric: formatSpeedMetric(unit.speed, unit.units?.speedUnit),
         secondaryMetric: formatRangeMetric(
-          "航程",
+          "探测",
           unit.range,
           unit.units?.rangeUnit
         ),
@@ -2405,7 +2423,7 @@ function buildUnitAssetRecords(apiAssets: ApiUnitAsset[]): UnitAssetRecord[] {
         role: classifyShip(canonicalName),
         primaryMetric: formatSpeedMetric(unit.speed, unit.units?.speedUnit),
         secondaryMetric: formatRangeMetric(
-          "航程",
+          "探测",
           unit.range,
           unit.units?.rangeUnit
         ),
@@ -2500,7 +2518,7 @@ function buildUnitAssets(unitDb: Dba): UnitAssetRecord[] {
       role,
       primaryMetric: formatSpeedMetric(unit.speed, unit.units?.speedUnit),
       secondaryMetric: formatRangeMetric(
-        "航程",
+        "探测",
         unit.range,
         unit.units?.rangeUnit
       ),
@@ -2530,7 +2548,7 @@ function buildUnitAssets(unitDb: Dba): UnitAssetRecord[] {
       role: classifyShip(unit.className),
       primaryMetric: formatSpeedMetric(unit.speed, unit.units?.speedUnit),
       secondaryMetric: formatRangeMetric(
-        "航程",
+        "探测",
         unit.range,
         unit.units?.rangeUnit
       ),

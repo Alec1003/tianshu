@@ -79,3 +79,20 @@ def test_custom_skills_api_rejects_missing_skill(tmp_path) -> None:
     )
 
     assert response.status_code == 404
+
+
+def test_custom_skills_api_skips_invalid_skill_file(tmp_path) -> None:
+    client = _build_client(tmp_path)
+    created_response = client.post(
+        "/api/ai/custom-skills",
+        json={"name": "Valid", "description": "Valid skill."},
+    )
+    assert created_response.status_code == 201
+    skill_id = created_response.json()["id"]
+    skill_path = next(tmp_path.rglob(f"{skill_id}.json"))
+    (skill_path.parent / "broken.json").write_text("{not-json", encoding="utf-8")
+
+    response = client.get("/api/ai/custom-skills")
+
+    assert response.status_code == 200
+    assert [item["id"] for item in response.json()["skills"]] == [skill_id]

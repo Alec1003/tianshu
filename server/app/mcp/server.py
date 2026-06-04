@@ -72,6 +72,14 @@ from app.unit_assets.service import find_accessible_unit_asset_by_name
 logger = logging.getLogger(__name__)
 
 
+_KNOWN_UNIT_CHECKS: dict[str, Callable[[str], bool]] = {
+    "aircraft": TianShuRuntime.is_known_aircraft_class,
+    "ship": TianShuRuntime.is_known_ship_class,
+    "facility": TianShuRuntime.is_known_facility_class,
+    "airbase": TianShuRuntime.is_known_airbase_class,
+}
+
+
 # ---------- lifespan ----------------------------------------------------------
 
 
@@ -399,6 +407,43 @@ def _err(exc: ScenarioServiceError) -> dict[str, Any]:
         retryable=exc.retryable,
         details=exc.details,
     ).model_dump()
+
+
+async def _deployment_template_or_error(
+    ctx: Context,
+    *,
+    asset_type: str,
+    class_name: str,
+) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
+    try:
+        user = _get_user(ctx)
+    except _UnauthenticatedError as exc:
+        return None, ToolError(
+            code="unauthenticated",
+            message=str(exc),
+        ).model_dump()
+
+    async with async_session_maker() as session:
+        asset = await find_accessible_unit_asset_by_name(
+            session,
+            user,
+            asset_type=asset_type,
+            name=class_name,
+        )
+        if asset is not None:
+            return dict(asset.data), None
+
+    known_check = _KNOWN_UNIT_CHECKS[asset_type]
+    if not known_check(class_name):
+        return None, ToolError(
+            code=f"unknown_{asset_type}_class",
+            message=(
+                "Unit type is not present in the asset database; "
+                "placeholder deployment is forbidden."
+            ),
+            details={"class_name": class_name},
+        ).model_dump()
+    return None, None
 
 
 def _scenario_summary(sc: Scenario) -> dict[str, Any]:
@@ -1192,17 +1237,29 @@ async def runtime_deploy_ship(
     name: str | None = None,
 ) -> dict[str, Any]:
     """在活想定中部署一艘舰艇。"""
+    template, error_payload = await _deployment_template_or_error(
+        ctx,
+        asset_type="ship",
+        class_name=class_name,
+    )
+    if error_payload is not None:
+        return error_payload
+
+    parameters: dict[str, Any] = {
+        "class_name": class_name,
+        "latitude": latitude,
+        "longitude": longitude,
+        "side": side,
+        "name": name,
+    }
+    if template is not None:
+        parameters["template"] = template
+
     return await _create_runtime_proposal(
         ctx,
         command=f"MCP runtime_deploy_ship class_name={class_name}",
         skill="deploy_ship",
-        parameters={
-            "class_name": class_name,
-            "latitude": latitude,
-            "longitude": longitude,
-            "side": side,
-            "name": name,
-        },
+        parameters=parameters,
     )
 
 
@@ -1216,17 +1273,29 @@ async def runtime_deploy_facility(
     name: str | None = None,
 ) -> dict[str, Any]:
     """在活想定中部署一处地面设施（防空 / 雷达 / 指挥所等）。"""
+    template, error_payload = await _deployment_template_or_error(
+        ctx,
+        asset_type="facility",
+        class_name=class_name,
+    )
+    if error_payload is not None:
+        return error_payload
+
+    parameters: dict[str, Any] = {
+        "class_name": class_name,
+        "latitude": latitude,
+        "longitude": longitude,
+        "side": side,
+        "name": name,
+    }
+    if template is not None:
+        parameters["template"] = template
+
     return await _create_runtime_proposal(
         ctx,
         command=f"MCP runtime_deploy_facility class_name={class_name}",
         skill="deploy_facility",
-        parameters={
-            "class_name": class_name,
-            "latitude": latitude,
-            "longitude": longitude,
-            "side": side,
-            "name": name,
-        },
+        parameters=parameters,
     )
 
 
@@ -1240,17 +1309,29 @@ async def runtime_deploy_airbase(
     name: str | None = None,
 ) -> dict[str, Any]:
     """在活想定中部署一座机场（aircraft 的 homeBase）。"""
+    template, error_payload = await _deployment_template_or_error(
+        ctx,
+        asset_type="airbase",
+        class_name=class_name,
+    )
+    if error_payload is not None:
+        return error_payload
+
+    parameters: dict[str, Any] = {
+        "class_name": class_name,
+        "latitude": latitude,
+        "longitude": longitude,
+        "side": side,
+        "name": name,
+    }
+    if template is not None:
+        parameters["template"] = template
+
     return await _create_runtime_proposal(
         ctx,
         command=f"MCP runtime_deploy_airbase class_name={class_name}",
         skill="deploy_airbase",
-        parameters={
-            "class_name": class_name,
-            "latitude": latitude,
-            "longitude": longitude,
-            "side": side,
-            "name": name,
-        },
+        parameters=parameters,
     )
 
 

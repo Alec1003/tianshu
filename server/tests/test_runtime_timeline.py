@@ -136,6 +136,55 @@ async def test_runtime_events_are_listed_in_replay_order(db_session, user) -> No
 
 
 @pytest.mark.anyio
+async def test_runtime_events_can_list_latest_window_in_replay_order(
+    db_session,
+    user,
+) -> None:
+    first = await record_runtime_event(
+        db_session,
+        user,
+        event_type="runtime.start",
+        action="start",
+        summary="first",
+        before_scenario=_scenario(1, []),
+        after_scenario=_scenario(1, []),
+    )
+    await asyncio.sleep(0.001)
+    second = await record_runtime_event(
+        db_session,
+        user,
+        event_type="runtime.step",
+        action="step",
+        summary="second",
+        before_scenario=_scenario(2, []),
+        after_scenario=_scenario(2, []),
+    )
+    await asyncio.sleep(0.001)
+    third = await record_runtime_event(
+        db_session,
+        user,
+        event_type="runtime.pause",
+        action="pause",
+        summary="third",
+        before_scenario=_scenario(3, []),
+        after_scenario=_scenario(3, []),
+    )
+
+    rows = await list_runtime_events(
+        db_session,
+        user,
+        scenario_id="scenario-a",
+        limit=2,
+        latest=True,
+    )
+
+    assert first is not None
+    assert second is not None
+    assert third is not None
+    assert [row.id for row in rows] == [second.id, third.id]
+
+
+@pytest.mark.anyio
 async def test_runtime_event_keeps_zero_current_time(db_session, user) -> None:
     record = await record_runtime_event(
         db_session,

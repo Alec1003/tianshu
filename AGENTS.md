@@ -102,6 +102,11 @@ Backend (prefix `TIANSHU_`, see `server/app/config.py`):
 
 Frontend (see `client/.env.example`): `VITE_AI_SERVER_URL`, `VITE_API_SERVER_URL`, `VITE_CESIUM_ION_TOKEN`, `VITE_AUTH0_*`, `VITE_ENV`.
 
+## Verification account
+
+- For local/manual verification, use the user-provided account email `18272870582@163.com`.
+- Do not commit the plaintext password to this repository. For scripted checks, read it from `TIANSHU_VERIFY_PASSWORD` or ask the user to provide it in the current session.
+
 ## Development notes
 
 - Platform entry point is `http://localhost:3000/` — no `?map=ol` query param needed; default map is `CesiumScenarioMap`.

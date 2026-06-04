@@ -303,6 +303,7 @@ async def list_runtime_events(
     event_type: str | None = None,
     category: str | None = None,
     limit: int = 200,
+    latest: bool = False,
 ) -> Sequence[RuntimeEvent]:
     owner_id = _owner_uuid(user)
     if owner_id is None:
@@ -321,8 +322,11 @@ async def list_runtime_events(
         stmt = stmt.where(RuntimeEvent.event_type == event_type)
     if category:
         stmt = stmt.where(RuntimeEvent.category == category)
-    stmt = stmt.order_by(RuntimeEvent.created_at.asc(), RuntimeEvent.id.asc()).limit(
-        max(1, min(limit, 500))
-    )
+    if latest:
+        stmt = stmt.order_by(RuntimeEvent.created_at.desc(), RuntimeEvent.id.desc())
+    else:
+        stmt = stmt.order_by(RuntimeEvent.created_at.asc(), RuntimeEvent.id.asc())
+    stmt = stmt.limit(max(1, min(limit, 500)))
     result = await session.execute(stmt)
-    return result.scalars().all()
+    rows = result.scalars().all()
+    return list(reversed(rows)) if latest else rows

@@ -213,7 +213,8 @@ export default class Game {
       maxQuantity,
       currentQuantity,
       sideColor: weapon.sideColor,
-      targetTypes: template?.targetTypes ?? weapon.targetTypes ?? loadedTargetTypes,
+      targetTypes:
+        template?.targetTypes ?? weapon.targetTypes ?? loadedTargetTypes,
     });
   }
 

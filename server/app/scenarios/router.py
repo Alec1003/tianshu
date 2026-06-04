@@ -242,6 +242,7 @@ async def list_scenario_timeline(
     event_type: str | None = None,
     category: str | None = None,
     limit: int = 200,
+    latest: bool = False,
     user: User = Depends(current_active_user),
     session: AsyncSession = Depends(get_async_session),
 ) -> RuntimeTimelineResponse:
@@ -260,6 +261,7 @@ async def list_scenario_timeline(
         event_type=event_type,
         category=category,
         limit=limit,
+        latest=latest,
     )
     return RuntimeTimelineResponse(events=list(events))
 

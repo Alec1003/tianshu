@@ -49,11 +49,64 @@ async def test_seed_default_unit_assets_loads_existing_unit_db(db_session):
     assert seeded == 111
     assert len(assets) == 111
     assert any(a.type == "aircraft" and a.name == "KC-135R Stratotanker" for a in assets)
+    carrier = next(a for a in assets if a.type == "ship" and a.name == "Aircraft Carrier")
+    assert carrier.data["rangeRole"] == "detectionRangeNm"
+    assert carrier.data["range"] < carrier.data["enduranceRangeNm"]
+    weapons = {a.name: a for a in assets if a.type == "weapon"}
+    amraam = weapons["AIM-120 AMRAAM"]
+    assert amraam.data["targetTypes"] == ["aircraft"]
+    assert amraam.data["rangeConfidence"] == "public-estimate"
+    sidewinder = weapons["AIM-9 Sidewinder"]
+    assert sidewinder.data["range"] == 15.6
+    assert sidewinder.data["variant"] == "AIM-9M"
+    assert sidewinder.data["rangeConfidence"] == "official-public"
+    jassm = weapons["AGM-158 JASSM"]
+    assert jassm.data["range"] == 200
+    assert jassm.data["variant"] == "AGM-158A JASSM baseline"
+    assert "JASSM-ER" in jassm.data["rangeNotes"]
+    s500 = weapons["77N6 (S-500 Prometey)"]
+    assert s500.data["range"] == 324
+    assert s500.data["rangeConfidence"] == "public-estimate-low"
+    assert s500.data["targetTypes"] == ["weapon"]
+    hq19 = weapons["HQ-19"]
+    assert hq19.data["rangeConfidence"] == "public-estimate-low"
+    assert hq19.data["targetTypes"] == ["weapon"]
+    assert weapons["Aster 30"].data["range"] == 54
+    assert weapons["Barak 8"].data["range"] == 38
+    s500_facility = next(
+        a for a in assets if a.type == "facility" and a.name == "S-500 Prometey"
+    )
+    assert s500_facility.data["range"] == 324
+    assert s500_facility.data["rangeConfidence"] == "public-estimate-low"
     growler = next(
         a for a in assets if a.type == "aircraft" and a.name == "EA-18G Growler"
     )
     assert growler.data["isElectronicWarfare"] is True
     assert growler.data["jammingRange"] > 0
+    assert growler.data["rangeRole"] == "detectionRangeNm"
+
+
+async def test_seed_default_unit_assets_updates_system_asset_data(db_session):
+    await svc.seed_default_unit_assets(db_session)
+    row = await db_session.execute(
+        select(UnitAsset).where(
+            UnitAsset.type == "ship",
+            UnitAsset.name == "Destroyer",
+            UnitAsset.is_system.is_(True),
+        )
+    )
+    destroyer = row.scalar_one()
+    destroyer.data = {**destroyer.data, "range": 5000}
+    previous_version = destroyer.version
+    await db_session.commit()
+
+    changed = await svc.seed_default_unit_assets(db_session)
+    await db_session.refresh(destroyer)
+
+    assert changed == 1
+    assert destroyer.version == previous_version + 1
+    assert destroyer.data["range"] == 220
+    assert destroyer.data["enduranceRangeNm"] == 5000
 
 
 async def test_create_lists_own_custom_asset(db_session, user):

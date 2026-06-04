@@ -65,7 +65,12 @@ function proxyToBackend(request, response, backendPort) {
 
 function resolveStaticPath(rootDir, requestUrl) {
   const url = new URL(requestUrl || "/", "http://127.0.0.1");
-  const pathname = decodeURIComponent(url.pathname);
+  let pathname = "/";
+  try {
+    pathname = decodeURIComponent(url.pathname);
+  } catch {
+    return null;
+  }
   const requested = pathname === "/" ? "/index.html" : pathname;
   const candidate = path.resolve(rootDir, `.${requested}`);
   const root = path.resolve(rootDir);
@@ -123,5 +128,6 @@ function createDesktopServer({ distDir, backendPort, port = 0 }) {
 }
 
 module.exports = {
-  createDesktopServer
+  createDesktopServer,
+  resolveStaticPath
 };

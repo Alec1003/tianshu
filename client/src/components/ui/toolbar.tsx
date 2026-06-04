@@ -21,7 +21,12 @@ function ToolbarGroup({
   className,
   ...props
 }: React.HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("flex min-w-0 flex-wrap items-center gap-2", className)} {...props} />;
+  return (
+    <div
+      className={cn("flex min-w-0 flex-wrap items-center gap-2", className)}
+      {...props}
+    />
+  );
 }
 
 export { Toolbar, ToolbarGroup };

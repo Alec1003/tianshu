@@ -1,5 +1,11 @@
 import { useMemo } from "react";
-import { ArrowLeft, Bot, CheckCircle2, FolderKanban, Server } from "lucide-react";
+import {
+  ArrowLeft,
+  Bot,
+  CheckCircle2,
+  FolderKanban,
+  Server,
+} from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 import { AppShell, type AppShellNavItem } from "@/components/layout/AppShell";

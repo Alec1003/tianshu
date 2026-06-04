@@ -238,10 +238,24 @@ function sendUpdateStatus(payload) {
   mainWindow?.webContents.send("desktop:update-status", payload);
 }
 
+function allowUnsignedAutoUpdates() {
+  return process.env.TIANSHU_ALLOW_UNSIGNED_AUTO_UPDATES === "true";
+}
+
+function unsignedUpdatesAreBlocked() {
+  return autoUpdater.verifyUpdateCodeSignature === false && !allowUnsignedAutoUpdates();
+}
+
 async function checkForUpdates() {
   if (!app.isPackaged) {
     sendUpdateStatus({ status: "skipped", message: "Updater only runs in packaged builds." });
     return { skipped: true };
+  }
+  if (unsignedUpdatesAreBlocked()) {
+    const message =
+      "Auto-update is disabled until Windows code signing and update signature verification are enabled.";
+    sendUpdateStatus({ status: "skipped", message });
+    return { skipped: true, message };
   }
 
   try {
@@ -255,6 +269,11 @@ async function checkForUpdates() {
 }
 
 function configureUpdater() {
+  if (unsignedUpdatesAreBlocked()) {
+    autoUpdater.autoDownload = false;
+    autoUpdater.autoInstallOnAppQuit = false;
+    return;
+  }
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = true;
   autoUpdater.on("checking-for-update", () =>

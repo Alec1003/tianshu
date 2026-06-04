@@ -107,6 +107,33 @@ def test_deploy_aircraft_rejects_unknown_class_without_template() -> None:
     assert runtime.game.current_scenario.aircraft == []
 
 
+@pytest.mark.parametrize(
+    ("method_name", "collection_name", "message"),
+    [
+        ("deploy_ship", "ships", "Unknown ship class"),
+        ("deploy_facility", "facilities", "Unknown facility class"),
+        ("deploy_airbase", "airbases", "Unknown airbase class"),
+    ],
+)
+def test_deploy_units_reject_unknown_class_without_template(
+    method_name: str,
+    collection_name: str,
+    message: str,
+) -> None:
+    runtime = _runtime()
+    deploy = getattr(runtime, method_name)
+
+    with pytest.raises(ValueError, match=message):
+        deploy(
+            "Imaginary Unit",
+            latitude=10.0,
+            longitude=20.0,
+            side="blue",
+        )
+
+    assert getattr(runtime.game.current_scenario, collection_name) == []
+
+
 def test_runtime_unit_mutations_are_applied_in_backend_scenario() -> None:
     runtime = _runtime()
     runtime.deploy_ship("Destroyer", 11.0, 21.0, side="blue")

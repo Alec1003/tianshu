@@ -41,6 +41,8 @@ install_legacy_env_aliases(
         "TIANSHU_ALLOW_PRIVATE_MODEL_BASE_URLS",
         "TIANSHU_EXTERNAL_MCP_SERVERS",
         "TIANSHU_MODEL_CONFIG_SECRET",
+        "TIANSHU_MCP_HTTP_DEV_USER_ID",
+        "TIANSHU_MCP_USER_ID",
     ]
 )
 
@@ -136,6 +138,14 @@ class Settings(BaseSettings):
             "LLM agent may list and call."
         ),
     )
+    mcp_http_dev_user_id: str = Field(
+        default="",
+        description="Dev-only HTTP MCP auth bypass user id.",
+    )
+    mcp_user_id: str = Field(
+        default="",
+        description="Dev-only stdio MCP auth bypass user id.",
+    )
     model_config_secret: str = Field(
         default="",
         description=(
@@ -180,6 +190,10 @@ def validate_production_settings(settings: Settings) -> None:
         errors.append("TIANSHU_FIRST_USER_IS_SUPERUSER must be false in production")
     if settings.database_url.strip().startswith("sqlite"):
         errors.append("TIANSHU_DATABASE_URL must use PostgreSQL in production")
+    if settings.mcp_http_dev_user_id.strip():
+        errors.append("TIANSHU_MCP_HTTP_DEV_USER_ID must be unset in production")
+    if settings.mcp_user_id.strip():
+        errors.append("TIANSHU_MCP_USER_ID must be unset in production")
     model_secret = settings.model_config_secret.strip()
     if len(model_secret) < MIN_PRODUCTION_MODEL_CONFIG_SECRET_LENGTH:
         errors.append(

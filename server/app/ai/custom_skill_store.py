@@ -2,11 +2,14 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import re
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+
+from pydantic import ValidationError
 
 from app.ai.models import (
     CustomSkillCreateRequest,
@@ -16,6 +19,7 @@ from app.ai.models import (
 from app.config import get_settings
 
 SAFE_ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,80}$")
+logger = logging.getLogger(__name__)
 
 
 class CustomSkillStoreError(ValueError):
@@ -69,9 +73,16 @@ class CustomSkillStore:
         for path in sorted(user_dir.glob("*.json")):
             if path.name.startswith("."):
                 continue
-            with path.open("r", encoding="utf-8") as handle:
-                data = json.load(handle)
-            skills.append(CustomSkillRead.model_validate(data))
+            try:
+                with path.open("r", encoding="utf-8") as handle:
+                    data = json.load(handle)
+                skills.append(CustomSkillRead.model_validate(data))
+            except (OSError, json.JSONDecodeError, ValidationError) as exc:
+                logger.warning(
+                    "custom_skill_store: skipping invalid custom skill file %s: %s",
+                    path,
+                    exc,
+                )
         return skills
 
     def create(
@@ -126,8 +137,11 @@ class CustomSkillStore:
         path = self._skill_path(user_id, skill_id)
         if not path.exists():
             raise CustomSkillNotFoundError("Custom skill not found.")
-        with path.open("r", encoding="utf-8") as handle:
-            return CustomSkillRead.model_validate(json.load(handle))
+        try:
+            with path.open("r", encoding="utf-8") as handle:
+                return CustomSkillRead.model_validate(json.load(handle))
+        except (OSError, json.JSONDecodeError, ValidationError) as exc:
+            raise CustomSkillStoreError("Invalid custom skill file.") from exc
 
     def _new_skill_id(self, user_id: str) -> str:
         while True:

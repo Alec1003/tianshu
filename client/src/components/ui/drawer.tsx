@@ -67,14 +67,21 @@ function DrawerTitle({
   className,
   ...props
 }: React.HTMLAttributes<HTMLHeadingElement>) {
-  return <h2 className={cn("text-sm font-semibold text-slate-50", className)} {...props} />;
+  return (
+    <h2
+      className={cn("text-sm font-semibold text-slate-50", className)}
+      {...props}
+    />
+  );
 }
 
 function DrawerContent({
   className,
   ...props
 }: React.HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("h-full overflow-y-auto p-4", className)} {...props} />;
+  return (
+    <div className={cn("h-full overflow-y-auto p-4", className)} {...props} />
+  );
 }
 
 function DrawerCloseButton({

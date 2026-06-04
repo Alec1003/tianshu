@@ -33,7 +33,9 @@ function EmptyState({
       </div>
       <h3 className="mt-3 text-sm font-semibold text-slate-100">{title}</h3>
       {description ? (
-        <p className="mt-1 max-w-md text-xs leading-5 text-slate-500">{description}</p>
+        <p className="mt-1 max-w-md text-xs leading-5 text-slate-500">
+          {description}
+        </p>
       ) : null}
       {actionLabel && onAction ? (
         <Button className="mt-4" onClick={onAction} type="button">

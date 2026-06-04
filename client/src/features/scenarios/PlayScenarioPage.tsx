@@ -36,9 +36,10 @@ export default function PlayScenarioPage() {
   const [saveAsOpen, setSaveAsOpen] = useState(false);
   const [saveAsName, setSaveAsName] = useState("");
   const [saveAsBusy, setSaveAsBusy] = useState(false);
-  const [pendingData, setPendingData] = useState<Record<string, unknown> | null>(
-    null
-  );
+  const [pendingData, setPendingData] = useState<Record<
+    string,
+    unknown
+  > | null>(null);
 
   useEffect(() => {
     let cancelled = false;

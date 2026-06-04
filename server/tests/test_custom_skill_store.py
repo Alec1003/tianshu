@@ -69,3 +69,33 @@ def test_custom_skill_store_rejects_unsafe_skill_ids(tmp_path) -> None:
 
     with pytest.raises(CustomSkillStoreError):
         store.delete("user-1", "bad.json")
+
+
+def test_custom_skill_store_skips_invalid_json_files(tmp_path) -> None:
+    store = CustomSkillStore(tmp_path)
+    skill = store.create(
+        "user-1",
+        CustomSkillCreateRequest(
+            name="Valid",
+            description="Still loads when another file is broken.",
+        ),
+    )
+    skill_path = next(tmp_path.rglob(f"{skill.id}.json"))
+    (skill_path.parent / "broken.json").write_text("{not-json", encoding="utf-8")
+
+    listed = store.list("user-1")
+
+    assert [item.id for item in listed] == [skill.id]
+
+
+def test_custom_skill_store_rejects_corrupted_skill_on_get(tmp_path) -> None:
+    store = CustomSkillStore(tmp_path)
+    skill = store.create(
+        "user-1",
+        CustomSkillCreateRequest(name="Broken", description="Will be corrupted."),
+    )
+    skill_path = next(tmp_path.rglob(f"{skill.id}.json"))
+    skill_path.write_text("{not-json", encoding="utf-8")
+
+    with pytest.raises(CustomSkillStoreError):
+        store.get("user-1", skill.id)

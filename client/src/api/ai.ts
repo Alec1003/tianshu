@@ -42,12 +42,14 @@ export async function listRuntimeTimeline(params?: {
   eventType?: string;
   category?: string;
   limit?: number;
+  latest?: boolean;
 }): Promise<RuntimeTimelineResponse> {
   const query = new URLSearchParams();
   if (params?.scenarioId) query.set("scenario_id", params.scenarioId);
   if (params?.eventType) query.set("event_type", params.eventType);
   if (params?.category) query.set("category", params.category);
   if (params?.limit !== undefined) query.set("limit", String(params.limit));
+  if (params?.latest !== undefined) query.set("latest", String(params.latest));
   const suffix = query.toString() ? `?${query.toString()}` : "";
   return apiCall<RuntimeTimelineResponse>(`/api/ai/runtime/timeline${suffix}`);
 }

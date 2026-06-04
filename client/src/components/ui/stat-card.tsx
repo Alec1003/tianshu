@@ -20,7 +20,13 @@ const toneClass: Record<NonNullable<StatCardProps["tone"]>, string> = {
   slate: "text-slate-300 bg-white/[0.035] border-slate-700/70",
 };
 
-function StatCard({ label, value, caption, icon: Icon, tone = "cyan" }: StatCardProps) {
+function StatCard({
+  label,
+  value,
+  caption,
+  icon: Icon,
+  tone = "cyan",
+}: StatCardProps) {
   return (
     <Card className="p-3">
       <div className="flex items-start justify-between gap-3">
@@ -29,10 +35,19 @@ function StatCard({ label, value, caption, icon: Icon, tone = "cyan" }: StatCard
           <div className="mt-1 truncate text-lg font-semibold tabular-nums text-slate-50">
             {value}
           </div>
-          {caption ? <div className="mt-1 truncate text-[11px] text-slate-500">{caption}</div> : null}
+          {caption ? (
+            <div className="mt-1 truncate text-[11px] text-slate-500">
+              {caption}
+            </div>
+          ) : null}
         </div>
         {Icon ? (
-          <span className={cn("grid size-8 shrink-0 place-items-center rounded-md border", toneClass[tone])}>
+          <span
+            className={cn(
+              "grid size-8 shrink-0 place-items-center rounded-md border",
+              toneClass[tone]
+            )}
+          >
             <Icon className="size-4" />
           </span>
         ) : null}

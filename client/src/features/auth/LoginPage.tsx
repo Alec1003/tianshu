@@ -158,10 +158,16 @@ export default function LoginPage() {
                 </h2>
               </div>
               <div className="inline-flex rounded-md border border-cyan-300/12 bg-slate-950/55 p-0.5">
-                <TabButton active={!isRegister} onClick={() => switchTab("login")}>
+                <TabButton
+                  active={!isRegister}
+                  onClick={() => switchTab("login")}
+                >
                   登录
                 </TabButton>
-                <TabButton active={isRegister} onClick={() => switchTab("register")}>
+                <TabButton
+                  active={isRegister}
+                  onClick={() => switchTab("register")}
+                >
                   注册
                 </TabButton>
               </div>
@@ -174,7 +180,11 @@ export default function LoginPage() {
             </p>
 
             <form className="space-y-4" onSubmit={handleSubmit}>
-              <AuthField icon={<Mail className="size-4" />} label="邮箱" htmlFor="auth-email">
+              <AuthField
+                icon={<Mail className="size-4" />}
+                label="邮箱"
+                htmlFor="auth-email"
+              >
                 <input
                   id="auth-email"
                   type="email"
@@ -212,7 +222,9 @@ export default function LoginPage() {
                   type={showPassword ? "text" : "password"}
                   required
                   minLength={isRegister ? 8 : undefined}
-                  autoComplete={isRegister ? "new-password" : "current-password"}
+                  autoComplete={
+                    isRegister ? "new-password" : "current-password"
+                  }
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
                   placeholder={isRegister ? "设置登录密码" : "输入登录密码"}
@@ -226,8 +238,14 @@ export default function LoginPage() {
                 </div>
               ) : null}
 
-              <Button className="h-10 w-full" disabled={submitting} type="submit">
-                {submitting ? <Loader2 className="size-4 animate-spin" /> : null}
+              <Button
+                className="h-10 w-full"
+                disabled={submitting}
+                type="submit"
+              >
+                {submitting ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : null}
                 {submitting
                   ? isRegister
                     ? "正在创建"
@@ -316,7 +334,9 @@ function TabButton({
       onClick={onClick}
       className={cn(
         "h-8 rounded px-3 text-xs font-medium transition-colors",
-        active ? "bg-cyan-300/12 text-cyan-100" : "text-slate-500 hover:text-slate-200"
+        active
+          ? "bg-cyan-300/12 text-cyan-100"
+          : "text-slate-500 hover:text-slate-200"
       )}
     >
       {children}

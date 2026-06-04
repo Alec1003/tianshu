@@ -68,7 +68,7 @@ FALLBACK_WEAPON_TEMPLATES = {
         "speed": 1500.0,
         "max_fuel": 100.0,
         "fuel_rate": 80.0,
-        "range": 19.0,
+        "range": 15.6,
         "lethality": 0.60,
         "target_types": ["aircraft"],
     },
@@ -284,6 +284,18 @@ class TianShuRuntime:
     @classmethod
     def is_known_aircraft_class(cls, class_name: str) -> bool:
         return cls._find_exact_db_row(AircraftDb, "class_name", class_name) is not None
+
+    @classmethod
+    def is_known_ship_class(cls, class_name: str) -> bool:
+        return cls._find_exact_db_row(ShipDb, "class_name", class_name) is not None
+
+    @classmethod
+    def is_known_facility_class(cls, class_name: str) -> bool:
+        return cls._find_exact_db_row(FacilityDb, "class_name", class_name) is not None
+
+    @classmethod
+    def is_known_airbase_class(cls, class_name: str) -> bool:
+        return cls._find_exact_db_row(AirbaseDb, "name", class_name) is not None
 
     @staticmethod
     def _row_value(row: dict[str, Any], *keys: str, default: Any = None) -> Any:
@@ -817,7 +829,15 @@ class TianShuRuntime:
         with self._lock:
             side_id = self._resolve_side_id(side)
             side_color = self._side_color(side_id)
-            row = template or self._find_db_row(ShipDb, "class_name", class_name)
+            row = (
+                template
+                if template is not None
+                else self._find_exact_db_row(ShipDb, "class_name", class_name)
+            )
+            if row is None:
+                raise ValueError(
+                    f"Unknown ship class: {class_name}. Add it to the unit asset database before deployment."
+                )
             ship = Ship(
                 id=str(uuid4()),
                 name=name or f"{class_name} #{len(self.game.current_scenario.ships) + 1}",
@@ -864,7 +884,15 @@ class TianShuRuntime:
         with self._lock:
             side_id = self._resolve_side_id(side)
             side_color = self._side_color(side_id)
-            row = template or self._find_db_row(FacilityDb, "class_name", class_name)
+            row = (
+                template
+                if template is not None
+                else self._find_exact_db_row(FacilityDb, "class_name", class_name)
+            )
+            if row is None:
+                raise ValueError(
+                    f"Unknown facility class: {class_name}. Add it to the unit asset database before deployment."
+                )
             facility = Facility(
                 id=str(uuid4()),
                 name=name or f"{class_name} #{len(self.game.current_scenario.facilities) + 1}",
@@ -899,7 +927,15 @@ class TianShuRuntime:
         with self._lock:
             side_id = self._resolve_side_id(side)
             side_color = self._side_color(side_id)
-            _row = template or self._find_db_row(AirbaseDb, "name", class_name)
+            row = (
+                template
+                if template is not None
+                else self._find_exact_db_row(AirbaseDb, "name", class_name)
+            )
+            if row is None:
+                raise ValueError(
+                    f"Unknown airbase class: {class_name}. Add it to the unit asset database before deployment."
+                )
             airbase = Airbase(
                 id=str(uuid4()),
                 name=name or class_name,

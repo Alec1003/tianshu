@@ -275,6 +275,22 @@ async def test_create_aar_record_and_list(db_session, user):
     assert records[0].id == rec.id
 
 
+async def test_create_free_form_aar_record_and_list_by_owner(db_session, user):
+    rec = await svc.create_aar_record(
+        db_session,
+        user,
+        "runtime-only-scenario",
+        outcome_reason="timeout",
+        winner_side_id="BLUE",
+        summary={"score": 1},
+        ended_at=datetime.now(tz=timezone.utc),
+    )
+
+    records = await svc.list_aar_records(db_session, user, "runtime-only-scenario")
+
+    assert [item.id for item in records] == [rec.id]
+
+
 async def test_create_aar_rejects_long_outcome_reason(db_session, user):
     sc = await svc.create_scenario(db_session, user, name="x", data={})
     with pytest.raises(ScenarioInvalidError):

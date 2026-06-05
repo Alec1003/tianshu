@@ -102,24 +102,24 @@ export default function LoginPage() {
   const isRegister = tab === "register";
 
   return (
-    <main className="dark min-h-screen overflow-hidden bg-[#030814] text-slate-100">
-      <div className="relative min-h-screen overflow-hidden">
+    <main className="dark min-h-dvh overflow-y-auto overflow-x-hidden bg-[#030814] text-slate-100 lg:overflow-hidden">
+      <div className="relative min-h-dvh overflow-hidden">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_16%,rgba(14,165,233,0.11),transparent_28%),radial-gradient(circle_at_74%_24%,rgba(37,99,235,0.14),transparent_32%),linear-gradient(135deg,#071423_0%,#030814_52%,#020611_100%)]" />
         <div className="absolute inset-0 bg-[linear-gradient(rgba(56,189,248,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(56,189,248,0.02)_1px,transparent_1px)] bg-[length:36px_36px]" />
         <div className="absolute inset-y-0 right-0 w-[32%] bg-[#06111f]/70" />
 
-        <div className="relative grid min-h-screen w-full grid-cols-1 lg:grid-cols-[minmax(0,7fr)_minmax(430px,3fr)]">
-          <section className="relative flex min-h-[620px] flex-col px-6 py-6 sm:px-10 lg:min-h-screen lg:px-16 xl:px-20 2xl:px-24">
+        <div className="relative grid min-h-dvh w-full grid-cols-1 lg:grid-cols-[minmax(0,7fr)_minmax(430px,3fr)]">
+          <section className="relative flex min-h-[360px] flex-col px-6 py-6 sm:min-h-[520px] sm:px-10 lg:min-h-dvh lg:px-16 xl:px-20 2xl:px-24">
             <BrandMark />
 
-            <div className="relative z-10 mt-12 max-w-4xl lg:mt-14 xl:mt-16">
-              <div className="inline-flex rounded-full border border-cyan-300/20 bg-cyan-300/[0.07] px-4 py-1 text-xs font-medium tracking-[0.16em] text-cyan-200">
+            <div className="relative z-10 mt-9 max-w-4xl lg:mt-14 xl:mt-16">
+              <div className="inline-flex rounded-full border border-cyan-300/20 bg-cyan-300/[0.07] px-4 py-1 text-[11px] font-medium tracking-[0.16em] text-cyan-200 sm:text-xs">
                 AI · DATA · DECISION
               </div>
-              <h1 className="mt-7 text-[44px] font-semibold leading-[1.04] tracking-normal text-slate-50 sm:text-[56px] xl:text-[68px]">
+              <h1 className="mt-6 text-[36px] font-semibold leading-[1.05] tracking-normal text-slate-50 sm:text-[56px] xl:text-[68px]">
                 智能决策 · <span className="text-cyan-300">精准指挥</span>
               </h1>
-              <p className="mt-5 max-w-3xl text-base leading-8 text-slate-400">
+              <p className="mt-4 max-w-3xl text-sm leading-7 text-slate-300 sm:text-base sm:leading-8 lg:text-slate-400">
                 面向战术场景、模型配置、后端运行时和 MCP 工具的统一操作入口，
                 让复杂决策更智能，让指挥流程更清晰。
               </p>
@@ -129,7 +129,7 @@ export default function LoginPage() {
             <TrustMetrics />
           </section>
 
-          <aside className="relative flex min-h-[620px] items-center justify-center border-t border-sky-300/10 bg-[#04101d]/70 px-6 py-8 backdrop-blur-sm lg:min-h-screen lg:justify-end lg:border-l lg:border-t-0 lg:px-4 xl:px-6 2xl:px-14">
+          <aside className="relative flex min-h-[420px] items-center justify-center border-t border-sky-300/10 bg-[#04101d]/82 px-5 py-8 backdrop-blur-sm sm:px-6 lg:min-h-dvh lg:justify-end lg:border-l lg:border-t-0 lg:bg-[#04101d]/70 lg:px-4 xl:px-6 2xl:px-14">
             <LoginPanel
               isRegister={isRegister}
               submitting={submitting}
@@ -172,7 +172,7 @@ function BrandMark() {
 function TechVisual() {
   return (
     <div
-      className="pointer-events-none relative -ml-3 mt-5 h-[380px] w-full max-w-[1120px] overflow-visible sm:h-[440px] lg:-ml-6 lg:h-[470px] xl:h-[535px] 2xl:h-[590px]"
+      className="pointer-events-none relative -ml-3 mt-5 hidden h-[340px] w-full max-w-[1120px] overflow-visible sm:block sm:h-[400px] lg:-ml-6 lg:h-[470px] xl:h-[535px] 2xl:h-[590px]"
       aria-hidden="true"
     >
       <div className="absolute inset-x-8 bottom-3 h-[150px] rounded-[50%] bg-[linear-gradient(180deg,transparent,rgba(14,165,233,0.06))]" />
@@ -212,7 +212,7 @@ function TechVisual() {
 
 function TrustMetrics() {
   return (
-    <div className="relative z-10 mt-auto grid max-w-[760px] grid-cols-3 gap-0 border-t border-cyan-300/10 pt-5 lg:pt-6">
+    <div className="relative z-10 mt-auto hidden max-w-[760px] grid-cols-3 gap-0 border-t border-cyan-300/10 pt-5 sm:grid lg:pt-6">
       {TRUST_METRICS.map(({ icon: Icon, value, label }, index) => (
         <div
           key={label}
@@ -300,7 +300,9 @@ function LoginPanel({
               id="auth-email"
               type="email"
               required
+              autoCapitalize="none"
               autoComplete="email"
+              autoCorrect="off"
               value={email}
               onChange={(event) => onEmailChange(event.target.value)}
               placeholder="请输入邮箱"
@@ -317,7 +319,7 @@ function LoginPanel({
               <button
                 type="button"
                 onClick={onTogglePassword}
-                className="grid size-9 place-items-center rounded-md text-slate-400 transition-colors hover:bg-white/[0.06] hover:text-slate-200"
+                className="grid size-9 place-items-center rounded-md text-slate-400 transition-colors hover:bg-white/[0.06] hover:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/55"
                 aria-label={showPassword ? "隐藏密码" : "显示密码"}
               >
                 {showPassword ? (
@@ -342,12 +344,17 @@ function LoginPanel({
           </AuthField>
 
           {error ? (
-            <div className="rounded-md border border-red-400/25 bg-red-500/[0.08] px-3 py-2 text-xs leading-5 text-red-100">
+            <div
+              className="rounded-md border border-red-400/25 bg-red-500/[0.08] px-3 py-2 text-xs leading-5 text-red-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.035)]"
+              role="alert"
+            >
+              <span className="font-medium">无法继续：</span>
               {error}
             </div>
           ) : null}
 
           <Button
+            aria-busy={submitting}
             className="h-12 w-full border-sky-300/35 bg-[linear-gradient(90deg,#0ea5e9,#2563eb)] text-sm text-white shadow-[0_0_28px_rgba(37,99,235,0.24)] hover:border-sky-200/60 hover:brightness-110"
             disabled={submitting}
             type="submit"
@@ -392,7 +399,7 @@ function PanelTabButton({
       type="button"
       onClick={onClick}
       className={cn(
-        "relative h-12 text-sm font-medium transition-colors",
+        "relative h-12 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/55 focus-visible:ring-offset-2 focus-visible:ring-offset-[#071323]",
         active ? "text-cyan-300" : "text-slate-400 hover:text-slate-200"
       )}
     >

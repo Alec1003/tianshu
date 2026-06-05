@@ -4,7 +4,8 @@
       "PowerShell(& \"..\\\\.python312\\\\python.exe\" -m app.mcp)",
       "mcp__tianshu__runtime_deploy_ship",
       "mcp__tianshu__runtime_status",
-      "PowerShell(npm install *)"
+      "PowerShell(npm install *)",
+      "mcp__codegraph__codegraph_context"
     ]
   },
   "enableAllProjectMcpServers": true,

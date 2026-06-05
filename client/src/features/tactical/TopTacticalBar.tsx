@@ -103,7 +103,7 @@ export default function TopTacticalBar({
     : 50;
 
   return (
-    <header className="relative z-40 flex h-14 shrink-0 items-center justify-between border-b border-cyan-300/14 bg-[#030913]/94 px-4 shadow-[inset_0_-1px_0_rgba(125,211,252,0.04)] backdrop-blur-xl">
+    <header className="relative z-40 flex h-14 shrink-0 items-center justify-between border-b border-cyan-300/16 bg-[#030913]/94 bg-[radial-gradient(circle_at_18%_0%,rgba(34,211,238,0.08),transparent_28%)] px-4 shadow-[inset_0_-1px_0_rgba(125,211,252,0.05),0_10px_34px_rgba(0,0,0,0.22)] backdrop-blur-xl">
       {!reduceMotion && (
         <div className="pointer-events-none absolute inset-0 overflow-hidden opacity-[0.12]">
           <motion.div

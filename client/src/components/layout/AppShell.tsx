@@ -45,11 +45,11 @@ function AppShell({
   return (
     <div
       className={cn(
-        "dark min-h-screen overflow-hidden bg-[#050812] text-slate-100",
+        "dark min-h-screen overflow-hidden bg-[#050812] bg-[radial-gradient(circle_at_18%_0%,rgba(14,165,233,0.09),transparent_30%),linear-gradient(180deg,#050812_0%,#030712_100%)] text-slate-100",
         className
       )}
     >
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[232px] border-r border-cyan-300/10 bg-[#070c16] px-3 py-4 shadow-[inset_-1px_0_0_rgba(125,211,252,0.03)] lg:flex lg:flex-col">
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[232px] border-r border-cyan-300/12 bg-[#070c16]/96 px-3 py-4 shadow-[inset_-1px_0_0_rgba(125,211,252,0.04),18px_0_48px_rgba(0,0,0,0.16)] backdrop-blur-xl lg:flex lg:flex-col">
         <div className="flex items-center gap-3 px-2">
           <BrandLogo frameClassName="size-9 rounded-lg shadow-none backdrop-blur-none" />
           <div className="min-w-0">
@@ -119,7 +119,7 @@ function AppShell({
       </aside>
 
       <div className="flex min-h-screen min-w-0 flex-col lg:pl-[232px]">
-        <header className="sticky top-0 z-20 border-b border-cyan-300/10 bg-[#050812]/96 backdrop-blur-xl">
+        <header className="sticky top-0 z-20 border-b border-cyan-300/12 bg-[#050812]/96 shadow-[0_12px_38px_rgba(0,0,0,0.18)] backdrop-blur-xl">
           <div className="flex min-h-[64px] items-center gap-3 px-4 py-3 lg:px-5">
             <div className="lg:hidden">
               <BrandLogo frameClassName="size-9 rounded-lg shadow-none backdrop-blur-none" />
@@ -146,7 +146,7 @@ function AppShell({
             ) : null}
             {topRight ? <div className="shrink-0">{topRight}</div> : null}
           </div>
-          <nav className="flex gap-2 overflow-x-auto border-t border-cyan-300/8 px-4 py-2 lg:hidden">
+          <nav className="hud-scroll-area flex gap-2 overflow-x-auto border-t border-cyan-300/8 px-4 py-2 lg:hidden">
             {navItems.map((item) => {
               const Icon = item.icon;
               const active = item.id === activeNavItem;
@@ -175,7 +175,7 @@ function AppShell({
           </nav>
         </header>
 
-        <main className="min-h-0 flex-1 overflow-y-auto px-4 py-4 lg:px-5">
+        <main className="hud-scroll-area min-h-0 flex-1 overflow-y-auto px-4 py-4 lg:px-5">
           {rightPanel ? (
             <div className="grid min-h-full gap-4 xl:grid-cols-[minmax(0,1fr)_360px] 2xl:grid-cols-[minmax(0,1fr)_392px]">
               <div className="min-w-0">{children}</div>

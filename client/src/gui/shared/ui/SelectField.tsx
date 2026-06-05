@@ -41,6 +41,8 @@ export default function SelectField(props: ISelectFieldProps) {
         onChange={(event) => handleChange(event)}
         multiple={props.multiple ?? false}
         sx={props.sx ?? defaultSelectStyle}
+        MenuProps={props.MenuProps}
+        disabled={props.disabled}
         displayEmpty={false}
         input={<OutlinedInput label={props.label} />}
         renderValue={(selected) => {

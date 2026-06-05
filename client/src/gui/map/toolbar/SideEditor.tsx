@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import Card from "@mui/material/Card";
-import { colorPalette } from "@/utils/constants";
 import {
   Button,
   CardContent,
@@ -9,13 +8,14 @@ import {
   Stack,
   Box,
   MenuItem,
-  Paper,
   FormControl,
   FormGroup,
   FormControlLabel,
+  IconButton,
+  Modal,
   Switch,
 } from "@mui/material";
-import { Popover } from "@/gui/shared/ui/MuiComponents";
+import CloseIcon from "@mui/icons-material/Close";
 import TextField from "@/gui/shared/ui/TextField";
 import Side from "@/game/Side";
 import { SIDE_COLOR } from "@/utils/colors";
@@ -75,9 +75,9 @@ interface SideEditorProps {
 const cardContentStyle = {
   display: "flex",
   flexDirection: "column",
-  rowGap: "12px",
-  px: 2.25,
-  py: 2.25,
+  rowGap: "14px",
+  px: 2.5,
+  py: 2.5,
 };
 
 const cardStyle = {
@@ -86,9 +86,11 @@ const cardStyle = {
   border: "1px solid rgba(103, 232, 249, 0.18)",
   boxShadow:
     "0 24px 64px rgba(2, 6, 23, 0.6), inset 0 1px 0 rgba(103, 232, 249, 0.08)",
-  borderRadius: "14px",
+  borderRadius: "16px",
   backdropFilter: "blur(24px)",
-  minWidth: 280,
+  width: "min(560px, calc(100vw - 32px))",
+  maxHeight: "calc(100vh - 48px)",
+  overflow: "auto",
 };
 
 const bottomButtonsStackStyle = {
@@ -340,7 +342,50 @@ const SideEditor = (props: SideEditorProps) => {
   const cardContent = () => {
     return (
       <CardContent sx={cardContentStyle}>
-        <Stack direction="row" spacing={2}>
+        <Box
+          sx={{
+            mx: -2.5,
+            mt: -2.5,
+            mb: 0.25,
+            px: 2.5,
+            py: 1.75,
+            borderBottom: "1px solid rgba(103, 232, 249, 0.14)",
+            background:
+              "linear-gradient(180deg, rgba(103, 232, 249, 0.08), rgba(8, 21, 35, 0))",
+          }}
+        >
+          <Box sx={{ alignItems: "flex-start", display: "flex", gap: 2 }}>
+            <Box sx={{ minWidth: 0, flex: 1 }}>
+              <Box
+                id="side-editor-title"
+                sx={{ color: "#e2e8f0", fontSize: 15, fontWeight: 700 }}
+              >
+                {props.side ? "编辑阵营" : "新增阵营"}
+              </Box>
+              <Box sx={{ mt: 0.5, color: "#64748b", fontSize: 12 }}>
+                配置阵营颜色、敌友关系与自动交战规则
+              </Box>
+            </Box>
+            <IconButton
+              aria-label="关闭阵营编辑器"
+              onClick={handleClose}
+              size="small"
+              sx={{
+                border: "1px solid rgba(148, 163, 184, 0.18)",
+                color: "#94a3b8",
+                backgroundColor: "rgba(15, 23, 42, 0.5)",
+                "&:hover": {
+                  backgroundColor: "rgba(248, 113, 113, 0.12)",
+                  borderColor: "rgba(248, 113, 113, 0.32)",
+                  color: "#fca5a5",
+                },
+              }}
+            >
+              <CloseIcon fontSize="small" />
+            </IconButton>
+          </Box>
+        </Box>
+        <Stack direction="row" spacing={1.5} sx={{ alignItems: "flex-start" }}>
           {/** Side Name Text Field */}
           <TextField
             id="side-name"
@@ -352,6 +397,7 @@ const SideEditor = (props: SideEditorProps) => {
             }}
             error={sideNameError}
             helperText={sideNameError ? t("sideEditor.nameRequired") : ""}
+            fullWidth
             sx={darkTextFieldStyle}
           />
           {/** Side Color Select Field */}
@@ -361,6 +407,7 @@ const SideEditor = (props: SideEditorProps) => {
             onChange={(e) => setSideColor(e.target.value as SIDE_COLOR)}
             sx={darkCompactSelectStyle}
             MenuProps={darkSelectMenuProps}
+            inputProps={{ "aria-label": "阵营颜色" }}
             renderValue={() => (
               <Box
                 display="flex"
@@ -403,8 +450,14 @@ const SideEditor = (props: SideEditorProps) => {
             ))}
           </Select>
         </Stack>
-        <Stack sx={bottomButtonsStackStyle} direction="row" spacing={2}>
-          <FormControl fullWidth sx={{ mb: 2 }} error={sideRelationshipsError}>
+        <Box
+          sx={{
+            display: "grid",
+            gap: 1.5,
+            gridTemplateColumns: { xs: "1fr", sm: "repeat(2, minmax(0, 1fr))" },
+          }}
+        >
+          <FormControl fullWidth sx={{ mb: 0.5 }} error={sideRelationshipsError}>
             <SelectField
               id="hostiles-selector"
               labelId="hostiles-selector-label"
@@ -425,36 +478,44 @@ const SideEditor = (props: SideEditorProps) => {
               multiple
             />
           </FormControl>
-        </Stack>
-        <FormControl fullWidth sx={{ mb: 2 }} error={sideRelationshipsError}>
-          <SelectField
-            id="allies-selector"
-            labelId="allies-selector-label"
-            label={t("sideEditor.allies")}
-            labelSx={darkFieldLabelStyle}
-            selectItems={otherSides.map((side: Side) => {
-              return {
-                name: localizeSideName(side.name),
-                value: side.id,
-              };
-            })}
-            value={sideAllies}
-            onChange={(value) => {
-              setSideAllies(value as string[]);
-            }}
-            sx={darkSelectFieldStyle}
-            MenuProps={darkSelectMenuProps}
-            multiple
-          />
-        </FormControl>
+          <FormControl fullWidth sx={{ mb: 0.5 }} error={sideRelationshipsError}>
+            <SelectField
+              id="allies-selector"
+              labelId="allies-selector-label"
+              label={t("sideEditor.allies")}
+              labelSx={darkFieldLabelStyle}
+              selectItems={otherSides.map((side: Side) => {
+                return {
+                  name: localizeSideName(side.name),
+                  value: side.id,
+                };
+              })}
+              value={sideAllies}
+              onChange={(value) => {
+                setSideAllies(value as string[]);
+              }}
+              sx={darkSelectFieldStyle}
+              MenuProps={darkSelectMenuProps}
+              multiple
+            />
+          </FormControl>
+        </Box>
+        {sideRelationshipsError ? (
+          <Box sx={{ mt: -0.5, color: "#fca5a5", fontSize: 12 }}>
+            同一阵营不能同时设为敌方和友方。
+          </Box>
+        ) : null}
         <FormGroup
           sx={{
             mt: 0.5,
             px: 1.5,
             py: 1.25,
-            borderRadius: "10px",
+            borderRadius: "12px",
             border: "1px solid rgba(103, 232, 249, 0.14)",
             backgroundColor: "rgba(8, 21, 35, 0.5)",
+            display: "grid",
+            gridTemplateColumns: { xs: "1fr", sm: "repeat(2, minmax(0, 1fr))" },
+            columnGap: 1.5,
           }}
         >
           {/** Doctrine Switches */}
@@ -517,24 +578,29 @@ const SideEditor = (props: SideEditorProps) => {
   };
 
   return (
-    <Popover
+    <Modal
+      aria-labelledby="side-editor-title"
       open={props.open}
-      anchorEl={props.anchorEl}
-      anchorOrigin={{
-        vertical: "bottom",
-        horizontal: "left",
-      }}
       onClose={handleClose}
-      component={Paper}
-      sx={{
-        backgroundColor: "transparent",
-        boxShadow: "none",
-      }}
+      sx={{ zIndex: 1300 }}
     >
-      <Box>
-        <Card sx={cardStyle}>{cardContent()}</Card>
+      <Box
+        sx={{
+          alignItems: "center",
+          display: "flex",
+          inset: 0,
+          justifyContent: "center",
+          p: 2,
+          position: "fixed",
+          backgroundColor: "rgba(1, 4, 10, 0.66)",
+          backdropFilter: "blur(6px)",
+        }}
+      >
+        <Card aria-modal="true" role="dialog" sx={cardStyle}>
+          {cardContent()}
+        </Card>
       </Box>
-    </Popover>
+    </Modal>
   );
 };
 

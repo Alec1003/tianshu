@@ -32,9 +32,9 @@ interface CesiumUnitInfoCardProps {
   onClose: () => void;
 }
 
-const popupTextColor = "#0f172a";
-const popupLabelColor = "#334155";
-const popupDividerColor = "rgba(15, 23, 42, 0.16)";
+const popupTextColor = "#e2e8f0";
+const popupLabelColor = "#94a3b8";
+const popupDividerColor = "rgba(125, 211, 252, 0.16)";
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
@@ -287,7 +287,12 @@ export default function CesiumUnitInfoCard({
           variant="determinate"
           value={pct}
           color={color}
-          sx={{ flex: 1, height: 6, borderRadius: 3 }}
+          sx={{
+            flex: 1,
+            height: 6,
+            borderRadius: 3,
+            backgroundColor: "rgba(15, 23, 42, 0.72)",
+          }}
         />
         <Typography
           variant="caption"
@@ -302,19 +307,30 @@ export default function CesiumUnitInfoCard({
   return (
     <Card
       sx={{
-        width: 280,
-        backgroundColor: "rgba(255,255,255,0.96)",
-        boxShadow: 4,
+        width: 296,
+        overflow: "hidden",
+        border: "1px solid rgba(125, 211, 252, 0.18)",
+        backgroundColor: "rgba(8, 17, 28, 0.96)",
+        backgroundImage:
+          "radial-gradient(circle at top left, rgba(56, 189, 248, 0.1), transparent 34%)",
+        boxShadow:
+          "inset 0 1px 0 rgba(255,255,255,0.05), 0 18px 42px rgba(0,0,0,0.42)",
+        backdropFilter: "blur(14px)",
       }}
     >
       <CardHeader
         sx={{
           py: 1,
           px: 1.5,
-          backgroundColor: unit.sideColor,
-          color: "#fff",
-          "& .MuiCardHeader-title": { fontSize: 14, fontWeight: 600 },
-          "& .MuiCardHeader-subheader": { fontSize: 12, color: "#f0f0f0" },
+          background: `linear-gradient(90deg, ${unit.sideColor}88, rgba(2, 6, 23, 0.72))`,
+          color: "#f8fafc",
+          borderBottom: "1px solid rgba(125, 211, 252, 0.16)",
+          "& .MuiCardHeader-title": {
+            fontSize: 14,
+            fontWeight: 700,
+            letterSpacing: "0.01em",
+          },
+          "& .MuiCardHeader-subheader": { fontSize: 12, color: "#cbd5e1" },
         }}
         title={
           isObjective ? (
@@ -336,7 +352,12 @@ export default function CesiumUnitInfoCard({
             size="small"
             aria-label={t("common.close")}
             onClick={onClose}
-            sx={{ color: "#fff" }}
+            sx={{
+              color: "#f8fafc",
+              border: "1px solid rgba(255,255,255,0.18)",
+              backgroundColor: "rgba(2, 6, 23, 0.24)",
+              "&:hover": { backgroundColor: "rgba(2, 6, 23, 0.42)" },
+            }}
           >
             <CloseIcon fontSize="small" />
           </IconButton>

@@ -67,6 +67,7 @@ import type {
   UnitAsset as ApiUnitAsset,
   UnitAssetCreatePayload,
 } from "@/api/types";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -233,6 +234,25 @@ const STATUS_META: Record<
     dot: "bg-slate-300",
   },
 };
+
+function StatusBadge({ status }: { status: VisualStatus }) {
+  const meta = VISUAL_STATUS_META[status];
+  const variant =
+    status === "live"
+      ? "success"
+      : status === "simulation"
+        ? "info"
+        : status === "draft"
+          ? "warning"
+          : "muted";
+
+  return (
+    <Badge className="px-2.5 py-1 font-semibold tracking-wide" variant={variant}>
+      <span className={cn("size-1.5 rounded-full", meta.dot)} />
+      {meta.label}
+    </Badge>
+  );
+}
 
 const UNIT_ASSET_TYPES: Array<{
   id: UnitAssetType | "all";
@@ -728,7 +748,10 @@ function AccountMenu({
       <button
         type="button"
         onClick={() => setAccountOpen((value) => !value)}
-        className="flex h-9 items-center gap-2 rounded-md border border-cyan-300/12 bg-slate-950/55 px-2 text-xs text-slate-100 transition-colors hover:border-cyan-300/25 hover:bg-white/[0.045]"
+        aria-expanded={accountOpen}
+        aria-haspopup="menu"
+        aria-label="打开账户菜单"
+        className="flex h-9 items-center gap-2 rounded-md border border-cyan-300/12 bg-slate-950/55 px-2 text-xs text-slate-100 transition-colors hover:border-cyan-300/25 hover:bg-white/[0.045] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/55"
       >
         <span className="grid size-7 place-items-center rounded-full border border-cyan-300/12 bg-cyan-300/10 text-cyan-100">
           <UserIcon className="size-4" />
@@ -740,7 +763,10 @@ function AccountMenu({
       </button>
 
       {accountOpen && (
-        <div className="absolute right-0 top-full mt-2 w-64 overflow-hidden rounded-lg border border-cyan-300/14 bg-[#08111c] shadow-[0_10px_28px_rgba(0,0,0,0.34)]">
+        <div
+          className="absolute right-0 top-full mt-2 w-64 overflow-hidden rounded-lg border border-cyan-300/14 bg-[#08111c] shadow-[0_10px_28px_rgba(0,0,0,0.34)]"
+          role="menu"
+        >
           <div className="border-b border-cyan-200/10 px-4 py-3 text-sm">
             <div className="font-medium text-slate-100">{displayName}</div>
             <div className="mt-1 truncate text-xs text-slate-500">
@@ -758,7 +784,8 @@ function AccountMenu({
               setAccountOpen(false);
               onLogout();
             }}
-            className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm text-slate-300 hover:bg-white/[0.04]"
+            className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm text-slate-300 hover:bg-white/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/55"
+            role="menuitem"
           >
             <LogOut className="size-4 text-slate-500" />
             退出登录
@@ -836,8 +863,8 @@ function ProjectCard({
   return (
     <Card
       className={cn(
-        "group relative overflow-hidden rounded-lg bg-[#08111c] transition-colors",
-        "border-cyan-200/10 hover:border-cyan-200/26"
+        "group relative overflow-hidden rounded-lg bg-[#08111c] transition-[border-color,box-shadow,transform] duration-150",
+        "border-cyan-200/10 hover:-translate-y-0.5 hover:border-cyan-200/28 hover:shadow-hud-cyan motion-reduce:hover:translate-y-0"
       )}
     >
       <button
@@ -848,15 +875,7 @@ function ProjectCard({
       >
         <MapThumbnail status={visualStatus} />
         <div className="absolute left-3 top-3">
-          <span
-            className={cn(
-              "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold tracking-wide",
-              visualMeta.tone
-            )}
-          >
-            <span className={cn("size-1.5 rounded-full", visualMeta.dot)} />
-            {visualMeta.label}
-          </span>
+          <StatusBadge status={visualStatus} />
         </div>
         <span className="absolute right-3 top-3 grid size-8 place-items-center rounded-md border border-white/10 bg-slate-950/70 text-slate-300 transition-colors hover:text-amber-200">
           <Star className="size-4" />
@@ -904,6 +923,9 @@ function ProjectCard({
           <div ref={menuRef} className="relative">
             <button
               type="button"
+              aria-expanded={menuOpen}
+              aria-haspopup="menu"
+              aria-label={`打开「${item.name}」更多操作`}
               title="更多操作"
               onClick={() => setMenuOpen((value) => !value)}
               className="grid size-8 place-items-center rounded-md text-slate-400 hover:bg-white/[0.06] hover:text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/55"
@@ -937,14 +959,18 @@ function ProjectMenu({
   close: () => void;
 }) {
   return (
-    <div className="absolute bottom-full right-0 z-20 mb-2 w-40 overflow-hidden rounded-lg border border-cyan-200/15 bg-[#08111c] shadow-[0_10px_28px_rgba(0,0,0,0.34)]">
+    <div
+      className="absolute bottom-full right-0 z-20 mb-2 w-40 overflow-hidden rounded-lg border border-cyan-200/15 bg-[#08111c] shadow-[0_10px_28px_rgba(0,0,0,0.34)]"
+      role="menu"
+    >
       <button
         type="button"
         onClick={() => {
           close();
           onOpen();
         }}
-        className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-slate-200 hover:bg-white/[0.05]"
+        className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-slate-200 hover:bg-white/[0.05] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/55"
+        role="menuitem"
       >
         <Eye className="size-3.5 text-cyan-200" />
         查看详情
@@ -956,7 +982,8 @@ function ProjectMenu({
             close();
             onDuplicate();
           }}
-          className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-slate-200 hover:bg-white/[0.05]"
+          className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-slate-200 hover:bg-white/[0.05] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/55"
+          role="menuitem"
         >
           <CopyIcon className="size-3.5 text-slate-400" />
           复制项目
@@ -969,7 +996,8 @@ function ProjectMenu({
             close();
             onDelete();
           }}
-          className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-red-300 hover:bg-red-500/10"
+          className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-red-300 hover:bg-red-500/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300/55"
+          role="menuitem"
         >
           <Trash2 className="size-3.5" />
           删除项目
@@ -1055,7 +1083,6 @@ function ProjectList({
         <tbody>
           {items.map((item, index) => {
             const visualStatus = visualStatusOf(item, index, isTemplateSection);
-            const visualMeta = VISUAL_STATUS_META[visualStatus];
             const metrics = projectMetrics(item);
             return (
               <tr
@@ -1072,17 +1099,7 @@ function ProjectList({
                   </div>
                 </td>
                 <td className="px-4 py-4">
-                  <span
-                    className={cn(
-                      "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold",
-                      visualMeta.tone
-                    )}
-                  >
-                    <span
-                      className={cn("size-1.5 rounded-full", visualMeta.dot)}
-                    />
-                    {visualMeta.label}
-                  </span>
+                  <StatusBadge status={visualStatus} />
                 </td>
                 <td className="px-4 py-4 text-slate-400">{metrics.tasks}</td>
                 <td className="px-4 py-4 text-slate-400">{metrics.units}</td>

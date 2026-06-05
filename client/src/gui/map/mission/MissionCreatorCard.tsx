@@ -38,9 +38,9 @@ interface MissionCreatorCardProps {
 }
 
 const cardContentStyle = {
-  display: "flex",
-  flexDirection: "column",
-  rowGap: "10px",
+  display: "grid",
+  rowGap: "16px",
+  padding: "18px",
 };
 
 const closeButtonStyle = {
@@ -58,10 +58,71 @@ const cardStyle = {
   minWidth: "400px",
   maxWidth: "400px",
   minHeight: "200px",
+  overflow: "hidden",
   backgroundColor: "#050b13",
+  backgroundImage:
+    "radial-gradient(circle at top left, rgba(76,201,240,0.08), transparent 34%)",
   border: "1px solid rgba(76,201,240,0.18)",
   boxShadow: "0 24px 90px rgba(0,0,0,0.46)",
   borderRadius: "16px",
+};
+
+const fieldStyle = {
+  mb: 0,
+  borderRadius: 2,
+  bgcolor: "rgba(15,23,42,0.86)",
+  color: "#e5e7eb",
+  "& .MuiOutlinedInput-root": { borderRadius: 2 },
+  "& .MuiOutlinedInput-notchedOutline": {
+    borderColor: "rgba(76,201,240,0.22)",
+  },
+  "&:hover .MuiOutlinedInput-notchedOutline": {
+    borderColor: "rgba(76,201,240,0.38)",
+  },
+  "& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline": {
+    borderColor: "rgba(103,232,249,0.72)",
+    boxShadow: "0 0 0 2px rgba(103,232,249,0.12)",
+  },
+  "& .MuiSvgIcon-root": { color: "#a5f3fc" },
+  "& .MuiInputBase-input": { color: "#e5e7eb" },
+};
+
+const labelStyle = {
+  color: "#94a3b8",
+  "&.Mui-focused": { color: "#a5f3fc" },
+};
+
+const selectMenuProps = {
+  PaperProps: {
+    sx: {
+      backgroundColor: "rgba(7, 17, 29, 0.98)",
+      color: "#e2e8f0",
+      border: "1px solid rgba(103, 232, 249, 0.2)",
+      boxShadow: "0 24px 64px rgba(2, 6, 23, 0.6)",
+      borderRadius: "10px",
+      "& .MuiMenuItem-root": {
+        color: "#e2e8f0",
+        "&:hover": { backgroundColor: "rgba(103, 232, 249, 0.1)" },
+        "&.Mui-selected": {
+          backgroundColor: "rgba(103, 232, 249, 0.2)",
+        },
+      },
+    },
+  },
+};
+
+const primaryButtonStyle = {
+  borderRadius: "10px",
+  py: 1.1,
+  color: "#06202a",
+  fontWeight: 700,
+  textTransform: "none" as const,
+  background: "linear-gradient(90deg, #67e8f9, #38bdf8)",
+  boxShadow: "0 0 28px rgba(56, 189, 248, 0.2)",
+  "&:hover": {
+    background: "linear-gradient(90deg, #a5f3fc, #38bdf8)",
+    boxShadow: "0 0 34px rgba(56, 189, 248, 0.3)",
+  },
 };
 
 const createPlaceholderMissionName = (missionType: "Patrol" | "Strike") => {
@@ -149,6 +210,9 @@ const MissionCreatorCard = (props: MissionCreatorCardProps) => {
           id="mission-creator-area-selector"
           labelId="mission-creator-area-selector-label"
           label="巡逻区域"
+          labelSx={labelStyle}
+          sx={fieldStyle}
+          MenuProps={selectMenuProps}
           value={selectedReferencePoints}
           selectItems={sortedReferencePoints.map((item) => {
             return {
@@ -172,6 +236,9 @@ const MissionCreatorCard = (props: MissionCreatorCardProps) => {
           id="mission-creator-target-selector"
           labelId="mission-creator-target-selector-label"
           label="打击目标"
+          labelSx={labelStyle}
+          sx={fieldStyle}
+          MenuProps={selectMenuProps}
           value={selectedTargets}
           selectItems={sortedTargets.map((item) => {
             return {
@@ -213,6 +280,9 @@ const MissionCreatorCard = (props: MissionCreatorCardProps) => {
             ]}
             labelId="mission-creator-type-selector-label"
             label="任务类型"
+            labelSx={labelStyle}
+            sx={fieldStyle}
+            MenuProps={selectMenuProps}
             value={selectedMissionType}
             onChange={(value) => {
               setSelectedMissionType(value as "Patrol" | "Strike");
@@ -226,6 +296,8 @@ const MissionCreatorCard = (props: MissionCreatorCardProps) => {
         <TextField
           id="mission-name"
           label="任务名称"
+          sx={fieldStyle}
+          InputLabelProps={{ sx: labelStyle }}
           value={missionName}
           onChange={(event) => {
             setMissionName(event.target.value);
@@ -237,6 +309,9 @@ const MissionCreatorCard = (props: MissionCreatorCardProps) => {
             id="mission-creator-unit-selector"
             labelId="mission-creator-unit-selector-label"
             label="执行单位"
+            labelSx={labelStyle}
+            sx={fieldStyle}
+            MenuProps={selectMenuProps}
             selectItems={sortedAircraft.map((item) => {
               return {
                 name: localizeUnitName(item.name),
@@ -253,8 +328,14 @@ const MissionCreatorCard = (props: MissionCreatorCardProps) => {
         {/** Mission Specific Select Fields: Patrol Or Strike */}
         {missionSpecificComponent}
         {/** Create Mission Button */}
-        <Stack spacing={2} direction={"row"} sx={{ justifyContent: "center" }}>
-          <Button onClick={handleCreateMission} fullWidth variant="contained">
+        <Stack spacing={2} direction="row" sx={{ justifyContent: "center", pt: 0.5 }}>
+          <Button
+            onClick={handleCreateMission}
+            fullWidth
+            variant="contained"
+            disableElevation
+            sx={primaryButtonStyle}
+          >
             创建任务
           </Button>
         </Stack>
@@ -265,8 +346,9 @@ const MissionCreatorCard = (props: MissionCreatorCardProps) => {
   const resolvedCardStyle = props.dialogMode
     ? {
         ...cardStyle,
-        maxWidth: "100%",
-        minWidth: "100%",
+        width: "100%",
+        maxWidth: 720,
+        minWidth: 0,
       }
     : cardStyle;
   const rootStyle = props.dialogMode

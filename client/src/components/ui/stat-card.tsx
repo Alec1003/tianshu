@@ -13,11 +13,11 @@ interface StatCardProps {
 }
 
 const toneClass: Record<NonNullable<StatCardProps["tone"]>, string> = {
-  cyan: "text-cyan-200 bg-cyan-300/8 border-cyan-300/16",
-  green: "text-emerald-200 bg-emerald-300/8 border-emerald-300/16",
-  amber: "text-amber-200 bg-amber-300/8 border-amber-300/16",
-  red: "text-red-200 bg-red-300/8 border-red-300/16",
-  slate: "text-slate-200 bg-white/[0.035] border-slate-700/70",
+  cyan: "text-slate-100 bg-tactical-accent/10 border-tactical-active",
+  green: "text-emerald-100 bg-tactical-green/10 border-tactical-green/25",
+  amber: "text-amber-100 bg-tactical-amber/10 border-tactical-amber/25",
+  red: "text-red-100 bg-tactical-red/10 border-tactical-red/25",
+  slate: "text-slate-200 bg-white/[0.03] border-tactical-line",
 };
 
 function StatCard({
@@ -32,7 +32,7 @@ function StatCard({
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="truncate text-[11px] text-slate-400">{label}</div>
-          <div className="mt-1 truncate text-lg font-semibold tabular-nums text-slate-50">
+          <div className="mt-1 truncate font-mono text-lg font-semibold tabular-nums text-slate-50">
             {value}
           </div>
           {caption ? (

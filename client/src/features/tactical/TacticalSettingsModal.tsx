@@ -115,32 +115,32 @@ export default function TacticalSettingsModal(
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={() => onOpenChange(false)}
-            className="absolute inset-0 bg-[#01040a]/80 backdrop-blur-md"
+            className="absolute inset-0 bg-black/72 backdrop-blur-md"
           />
 
           {/* Modal Container */}
           <motion.div
-            aria-label="AI 战术配置中心"
+            aria-label="战术配置中心"
             aria-modal="true"
             initial={{ opacity: 0, scale: 0.95, y: 10 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 10 }}
             role="dialog"
             transition={{ type: "spring", stiffness: 400, damping: 30 }}
-            className="relative flex h-[86vh] w-[94vw] max-w-7xl overflow-hidden rounded-xl border border-cyan-400/30 bg-[#030914] shadow-[0_0_50px_rgba(8,145,178,0.15)] ring-1 ring-white/5"
+            className="relative flex h-[86vh] w-[94vw] max-w-7xl overflow-hidden rounded-xl border border-tactical-line bg-tactical-panel shadow-[0_24px_90px_rgba(0,0,0,0.38)] ring-1 ring-white/5"
           >
             {/* Header / Sidebar (Left) */}
-            <div className="flex w-64 shrink-0 flex-col border-r border-cyan-400/20 bg-[#02050c]">
-              <div className="flex h-14 items-center gap-3 border-b border-cyan-400/20 px-5">
-                <div className="grid size-7 place-items-center rounded bg-cyan-950/50 text-cyan-400 border border-cyan-400/20">
+            <div className="flex w-64 shrink-0 flex-col border-r border-tactical-line bg-tactical-bg">
+              <div className="flex h-14 items-center gap-3 border-b border-tactical-line px-5">
+                <div className="grid size-7 place-items-center rounded border border-tactical-line bg-white/[0.04] text-tactical-accent">
                   <Shield className="size-4" />
                 </div>
                 <div className="flex flex-col">
                   <span className="font-mono text-xs font-bold tracking-wider text-slate-100">
-                    AI 战术配置中心
+                    战术配置中心
                   </span>
                   <span className="text-[9px] uppercase tracking-widest text-cyan-500/70">
-                    战术参数中枢
+                    工具链与系统参数
                   </span>
                 </div>
               </div>
@@ -157,14 +157,14 @@ export default function TacticalSettingsModal(
                       className={cn(
                         "flex w-full items-start gap-3 rounded-lg px-3 py-2.5 text-left transition-all",
                         isActive
-                          ? "bg-cyan-400/10 border border-cyan-400/20 shadow-[inset_0_0_12px_rgba(34,211,238,0.05)]"
+                          ? "border border-tactical-active bg-tactical-accent/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.025)]"
                           : "border border-transparent hover:bg-white/5"
                       )}
                     >
                       <Icon
                         className={cn(
                           "mt-0.5 size-4 shrink-0 transition-colors",
-                          isActive ? "text-cyan-400" : "text-slate-500"
+                          isActive ? "text-tactical-accent" : "text-slate-500"
                         )}
                       />
                       <div className="flex flex-col">
@@ -172,7 +172,7 @@ export default function TacticalSettingsModal(
                           className={cn(
                             "font-mono text-[11px] uppercase tracking-wider",
                             isActive
-                              ? "text-cyan-100 font-bold"
+                              ? "font-semibold text-slate-100"
                               : "text-slate-300"
                           )}
                         >
@@ -187,13 +187,10 @@ export default function TacticalSettingsModal(
                 })}
               </div>
 
-              <div className="border-t border-cyan-400/20 p-4">
+              <div className="border-t border-tactical-line p-4">
                 <div className="flex items-center gap-2">
-                  <span className="relative flex size-2">
-                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
-                    <span className="relative inline-flex size-2 rounded-full bg-emerald-500"></span>
-                  </span>
-                  <span className="font-mono text-[10px] uppercase text-emerald-400/80">
+                  <span className="size-2 rounded-full bg-tactical-green" />
+                  <span className="text-[10px] text-emerald-300/80">
                     系统在线
                   </span>
                 </div>
@@ -201,7 +198,7 @@ export default function TacticalSettingsModal(
             </div>
 
             {/* Content Area (Right) */}
-            <div className="flex flex-1 flex-col relative bg-gradient-to-b from-[#050914] to-[#02050c]">
+            <div className="relative flex flex-1 flex-col bg-gradient-to-b from-tactical-panel to-tactical-bg">
               <button
                 aria-label="关闭战术配置中心"
                 onClick={() => onOpenChange(false)}

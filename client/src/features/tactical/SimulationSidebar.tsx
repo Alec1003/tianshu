@@ -242,11 +242,11 @@ function Section({
   defaultOpen?: boolean;
 }) {
   return (
-    <div className="overflow-hidden rounded-lg border border-cyan-300/10 bg-[#07111d]/72 shadow-[inset_0_1px_0_rgba(255,255,255,0.035)]">
+    <div className="overflow-hidden rounded-lg border border-tactical-line bg-tactical-panel/72 shadow-[inset_0_1px_0_rgba(255,255,255,0.025)]">
       <details className="group" open={defaultOpen}>
-        <summary className="flex cursor-pointer list-none items-center gap-2.5 px-3 py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/55">
+        <summary className="flex cursor-pointer list-none items-center gap-2.5 px-3 py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-tactical-accent/55">
           {Icon && (
-            <div className="grid size-7 place-items-center rounded-md border border-cyan-300/14 bg-cyan-300/8 text-cyan-200">
+            <div className="grid size-7 place-items-center rounded-md border border-tactical-line bg-white/[0.035] text-tactical-accent">
               <Icon className="size-4" />
             </div>
           )}
@@ -271,7 +271,7 @@ function MissionSummaryCard({
   onDelete: () => void;
 }) {
   return (
-    <div className="box-border block w-full min-w-0 max-w-full overflow-hidden rounded-lg border border-cyan-300/10 bg-slate-950/32 p-3 text-left transition-colors hover:border-cyan-300/30 hover:bg-cyan-300/8">
+    <div className="box-border block w-full min-w-0 max-w-full overflow-hidden rounded-lg border border-tactical-line bg-slate-950/28 p-3 text-left transition-colors hover:border-tactical-active hover:bg-white/[0.035]">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="truncate text-sm font-semibold text-slate-100">
@@ -292,7 +292,7 @@ function MissionSummaryCard({
               className={cn(
                 "rounded-full border px-2 py-0.5 text-[10px]",
                 mission.active
-                  ? "border-cyan-300/18 bg-cyan-300/8 text-cyan-200"
+                  ? "border-tactical-active bg-tactical-accent/10 text-slate-100"
                   : "border-slate-500/20 bg-white/5 text-slate-400"
               )}
             >
@@ -303,7 +303,7 @@ function MissionSummaryCard({
         <div className="flex shrink-0 items-center gap-1">
           <button
             aria-label={`编辑任务 ${mission.name}`}
-            className="grid size-8 place-items-center rounded-lg border border-cyan-300/14 bg-cyan-300/8 text-cyan-100 transition-all hover:border-cyan-300/45"
+            className="grid size-8 place-items-center rounded-lg border border-tactical-line bg-white/[0.035] text-tactical-accent transition-all hover:border-cyan-300/45"
             onClick={onEdit}
             title="编辑任务"
             type="button"
@@ -353,10 +353,10 @@ function CountTile({
   return (
     <div
       className={cn(
-        "rounded-lg border bg-slate-950/35 p-3 transition-all hover:bg-white/[0.04]",
-        tone === "cyan" && "border-cyan-300/14 text-cyan-100",
-        tone === "red" && "border-red-300/14 text-red-100",
-        tone === "green" && "border-emerald-300/14 text-emerald-100"
+        "rounded-lg border bg-slate-950/30 p-3 transition-all hover:bg-white/[0.035]",
+        tone === "cyan" && "border-tactical-line text-slate-100",
+        tone === "red" && "border-tactical-red/20 text-red-100",
+        tone === "green" && "border-tactical-green/20 text-emerald-100"
       )}
     >
       <Icon className="mb-2 size-5" />
@@ -376,12 +376,12 @@ function InfoRow({
   tone?: "cyan" | "green" | "red" | "amber";
 }) {
   return (
-    <div className="min-w-0 rounded-xl border border-cyan-300/10 bg-slate-950/32 px-3 py-2.5">
+    <div className="min-w-0 rounded-xl border border-tactical-line bg-slate-950/28 px-3 py-2.5">
       <span className="block truncate text-[11px] text-slate-500">{label}</span>
       <span
         className={cn(
           "mt-1 block truncate font-mono text-xs",
-          tone === "cyan" && "text-cyan-200",
+          tone === "cyan" && "text-slate-100",
           tone === "green" && "text-emerald-200",
           tone === "red" && "text-red-200",
           tone === "amber" && "text-amber-200"
@@ -403,7 +403,7 @@ function DoctrineRow({
   description: string;
 }) {
   return (
-    <div className="rounded-lg border border-cyan-300/10 bg-slate-950/35 p-3">
+    <div className="rounded-lg border border-tactical-line bg-slate-950/30 p-3">
       <div className="flex items-center justify-between gap-3">
         <span className="text-sm font-medium text-slate-100">{label}</span>
         <span
@@ -451,8 +451,9 @@ function PlacementActionCard({
         "box-border block w-full min-w-0 max-w-full rounded-xl border p-3 text-left transition-all",
         disabled
           ? "cursor-not-allowed border-slate-700/50 bg-slate-950/20 text-slate-600"
-          : "border-cyan-300/10 bg-slate-950/32 hover:border-cyan-300/35 hover:bg-cyan-300/8",
-        expanded && "border-cyan-300/38 bg-cyan-300/10 shadow-hud-cyan",
+          : "border-tactical-line bg-slate-950/28 hover:border-tactical-active hover:bg-white/[0.035]",
+        expanded &&
+          "border-tactical-active bg-tactical-accent/10 shadow-hud-cyan",
         className
       )}
       disabled={disabled}
@@ -465,7 +466,7 @@ function PlacementActionCard({
             "grid size-8 shrink-0 place-items-center rounded-lg border",
             disabled
               ? "border-slate-700/50 bg-white/5 text-slate-600"
-              : "border-cyan-300/14 bg-cyan-300/8 text-cyan-100"
+              : "border-tactical-line bg-white/[0.035] text-tactical-accent"
           )}
         >
           <Icon className="size-4" />
@@ -572,7 +573,7 @@ function PlacementOptionItem({
       type="button"
     >
       <div className="flex items-start gap-2.5">
-        <div className="grid size-8 shrink-0 place-items-center rounded-lg border border-cyan-300/14 bg-cyan-300/8 text-cyan-100">
+        <div className="grid size-8 shrink-0 place-items-center rounded-lg border border-tactical-line bg-white/[0.035] text-tactical-accent">
           <Icon className="size-4" />
         </div>
         <div className="min-w-0 flex-1">
@@ -592,7 +593,7 @@ function PlacementOptionItem({
                   className={cn(
                     "rounded-full border px-2 py-0.5 font-mono text-[10px]",
                     idx === 0
-                      ? "border-cyan-300/14 bg-cyan-300/8 text-cyan-200"
+                      ? "border-tactical-line bg-white/[0.035] text-tactical-accent"
                       : "border-cyan-300/10 bg-white/[0.03] text-slate-400"
                   )}
                 >
@@ -662,7 +663,7 @@ function PlacementFloatingMenu({
     >
       <div className="flex items-start justify-between gap-3 border-b border-cyan-300/10 px-4 py-3">
         <div className="flex min-w-0 items-start gap-2.5">
-          <div className="grid size-9 shrink-0 place-items-center rounded-md border border-cyan-300/14 bg-cyan-300/8 text-cyan-100">
+          <div className="grid size-9 shrink-0 place-items-center rounded-md border border-tactical-line bg-white/[0.035] text-tactical-accent">
             <Icon className="size-4" />
           </div>
           <div className="min-w-0">
@@ -773,7 +774,7 @@ function SideControlCard({
         </button>
         <button
           aria-label={`编辑阵营 ${side.name}`}
-          className="grid size-8 shrink-0 place-items-center rounded-lg border border-cyan-300/14 bg-cyan-300/8 text-cyan-100 transition-all hover:border-cyan-300/45"
+          className="grid size-8 shrink-0 place-items-center rounded-lg border border-tactical-line bg-white/[0.035] text-tactical-accent transition-all hover:border-cyan-300/45"
           onClick={onEdit}
           title="编辑阵营与关系"
           type="button"
@@ -797,9 +798,9 @@ function CapabilityCard({
   status: string;
 }) {
   return (
-    <div className="rounded-lg border border-cyan-300/10 bg-slate-950/35 p-3">
+    <div className="rounded-lg border border-tactical-line bg-slate-950/30 p-3">
       <div className="flex items-start gap-3">
-        <div className="grid size-9 shrink-0 place-items-center rounded-xl border border-cyan-300/14 bg-cyan-300/8 text-cyan-100">
+        <div className="grid size-9 shrink-0 place-items-center rounded-xl border border-tactical-line bg-white/[0.035] text-tactical-accent">
           <Icon className="size-4" />
         </div>
         <div className="min-w-0">

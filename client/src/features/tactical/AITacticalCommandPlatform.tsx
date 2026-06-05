@@ -1133,7 +1133,7 @@ export default function AITacticalCommandPlatform({
 
   return (
     <div
-      className="dark h-screen overflow-hidden bg-tactical-bg text-tactical-text lg:grid"
+      className="dark h-dvh overflow-hidden bg-tactical-bg text-tactical-text lg:grid"
       style={{
         gridTemplateColumns: [
           "64px",
@@ -1146,12 +1146,12 @@ export default function AITacticalCommandPlatform({
     >
       <motion.nav
         animate={{ opacity: 1 }}
-        className="hidden border-r border-cyan-300/10 bg-[#030912]/95 px-2 py-5 shadow-[inset_-1px_0_0_rgba(125,211,252,0.03)] backdrop-blur-xl lg:flex lg:flex-col"
+        className="hidden border-r border-tactical-line bg-tactical-panel/96 px-2 py-5 shadow-[inset_-1px_0_0_rgba(255,255,255,0.025)] backdrop-blur-xl lg:flex lg:flex-col"
         initial={{ opacity: 0 }}
         style={{ gridColumn: "1 / 2", gridRow: "1 / 3" }}
       >
         <div className="mb-7 flex justify-center">
-          <div className="grid size-11 place-items-center rounded-lg border border-cyan-300/16 bg-cyan-300/8 text-cyan-100">
+          <div className="grid size-11 place-items-center rounded-lg border border-tactical-line bg-white/[0.035] text-slate-200">
             <Shield className="size-6" />
           </div>
         </div>
@@ -1161,10 +1161,10 @@ export default function AITacticalCommandPlatform({
             <button
               aria-label={label}
               className={cn(
-                "group grid size-11 place-items-center rounded-lg border text-slate-400 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/55",
+                "group grid size-11 place-items-center rounded-lg border text-slate-400 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-tactical-accent/55",
                 activeRailItem === id
-                  ? "border-cyan-300/24 bg-cyan-300/10 text-cyan-100"
-                  : "border-transparent hover:border-cyan-300/12 hover:bg-white/5 hover:text-slate-100"
+                  ? "border-tactical-active bg-tactical-accent/10 text-slate-100"
+                  : "border-transparent hover:border-tactical-line hover:bg-white/[0.045] hover:text-slate-100"
               )}
               key={id}
               onClick={() => setActiveRailItem(id)}
@@ -1181,7 +1181,7 @@ export default function AITacticalCommandPlatform({
             aria-label={aiSidebarOpen ? "关闭 AI 侧栏" : "打开 AI 侧栏"}
             className={cn(
               "size-10",
-              aiSidebarOpen ? "text-cyan-100" : "text-slate-300"
+              aiSidebarOpen ? "text-slate-100" : "text-slate-300"
             )}
             onClick={toggleAiSidebar}
             size="icon"
@@ -1207,7 +1207,7 @@ export default function AITacticalCommandPlatform({
             aria-label="AI / 系统设置"
             className={cn(
               "size-10",
-              settingsModalOpen ? "text-cyan-100" : "text-slate-300"
+              settingsModalOpen ? "text-slate-100" : "text-slate-300"
             )}
             onClick={() => setSettingsModalOpen((value) => !value)}
             size="icon"
@@ -1257,13 +1257,13 @@ export default function AITacticalCommandPlatform({
           <div
             aria-label="拖动调整左侧栏宽度"
             aria-orientation="vertical"
-            className="group absolute inset-y-0 right-0 z-30 flex w-1.5 -translate-x-px cursor-col-resize items-center justify-center hover:bg-cyan-300/12"
+            className="group absolute inset-y-0 right-0 z-30 flex w-1.5 -translate-x-px cursor-col-resize items-center justify-center hover:bg-white/[0.04]"
             onDoubleClick={handleSidebarResizeReset}
             onMouseDown={handleSidebarResizeStart}
             role="separator"
             title="拖动调整宽度，双击复位"
           >
-            <div className="h-12 w-[2px] rounded-full bg-cyan-300/0 transition-colors group-hover:bg-cyan-300/55" />
+            <div className="h-12 w-[2px] rounded-full bg-transparent transition-colors group-hover:bg-tactical-accent/55" />
           </div>
         </div>
       )}
@@ -1295,7 +1295,7 @@ export default function AITacticalCommandPlatform({
       </div>
 
       <main
-        className="relative isolate z-0 flex min-h-0 min-w-0 flex-col overflow-hidden bg-[#050914]"
+        className="relative isolate z-0 flex min-h-0 min-w-0 flex-col overflow-hidden bg-tactical-bg"
         style={{ gridColumn: "3 / 4", gridRow: "2 / 3" }}
       >
         {/*
@@ -1340,8 +1340,8 @@ export default function AITacticalCommandPlatform({
             showRoutes={showRoutes}
           />
 
-          <div className="pointer-events-none absolute inset-0 z-[1] tactical-grid opacity-30" />
-          <div className="pointer-events-none absolute inset-x-0 top-0 z-[2] h-28 bg-gradient-to-b from-[#050914] via-[#050914]/55 to-transparent" />
+          <div className="pointer-events-none absolute inset-0 z-[1] tactical-grid opacity-20" />
+          <div className="pointer-events-none absolute inset-x-0 top-0 z-[2] h-28 bg-gradient-to-b from-tactical-bg via-tactical-bg/50 to-transparent" />
         </div>
 
         {/*

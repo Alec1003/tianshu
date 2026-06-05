@@ -45,11 +45,11 @@ function AppShell({
   return (
     <div
       className={cn(
-        "dark min-h-screen overflow-hidden bg-[#050812] bg-[radial-gradient(circle_at_18%_0%,rgba(14,165,233,0.09),transparent_30%),linear-gradient(180deg,#050812_0%,#030712_100%)] text-slate-100",
+        "dark min-h-dvh overflow-hidden bg-tactical-bg bg-[radial-gradient(circle_at_18%_0%,rgba(103,199,216,0.045),transparent_32%),linear-gradient(180deg,#04070d_0%,#02050a_100%)] text-slate-100",
         className
       )}
     >
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[232px] border-r border-cyan-300/12 bg-[#070c16]/96 px-3 py-4 shadow-[inset_-1px_0_0_rgba(125,211,252,0.04),18px_0_48px_rgba(0,0,0,0.16)] backdrop-blur-xl lg:flex lg:flex-col">
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[232px] border-r border-tactical-line bg-tactical-panel/96 px-3 py-4 shadow-[inset_-1px_0_0_rgba(255,255,255,0.025),18px_0_48px_rgba(0,0,0,0.16)] backdrop-blur-xl lg:flex lg:flex-col">
         <div className="flex items-center gap-3 px-2">
           <BrandLogo frameClassName="size-9 rounded-lg shadow-none backdrop-blur-none" />
           <div className="min-w-0">
@@ -57,7 +57,7 @@ function AppShell({
               TianShu
             </div>
             <div className="truncate text-[11px] text-slate-400">
-              AI Command Center
+              Tactical Workspace
             </div>
           </div>
         </div>
@@ -70,9 +70,9 @@ function AppShell({
               <button
                 key={item.id}
                 className={cn(
-                  "group flex w-full items-center gap-2 rounded-md border px-2 py-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/55",
+                  "group flex w-full items-center gap-2 rounded-md border px-2 py-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-tactical-accent/55",
                   active
-                    ? "border-cyan-300/20 bg-cyan-300/10 text-cyan-50"
+                    ? "border-tactical-active bg-tactical-accent/10 text-slate-50"
                     : "border-transparent text-slate-300 hover:bg-white/[0.045] hover:text-slate-100"
                 )}
                 onClick={() => onNavItemSelect(item.id)}
@@ -82,7 +82,7 @@ function AppShell({
                   className={cn(
                     "grid size-8 shrink-0 place-items-center rounded-md border",
                     active
-                      ? "border-cyan-300/18 bg-cyan-300/10 text-cyan-100"
+                      ? "border-tactical-active bg-tactical-accent/10 text-slate-100"
                       : "border-slate-800 bg-slate-950/45 text-slate-400 group-hover:text-slate-200"
                   )}
                 >
@@ -118,8 +118,8 @@ function AppShell({
         </div>
       </aside>
 
-      <div className="flex min-h-screen min-w-0 flex-col lg:pl-[232px]">
-        <header className="sticky top-0 z-20 border-b border-cyan-300/12 bg-[#050812]/96 shadow-[0_12px_38px_rgba(0,0,0,0.18)] backdrop-blur-xl">
+      <div className="flex min-h-dvh min-w-0 flex-col lg:pl-[232px]">
+        <header className="sticky top-0 z-20 border-b border-tactical-line bg-tactical-bg/96 shadow-[0_12px_38px_rgba(0,0,0,0.18)] backdrop-blur-xl">
           <div className="flex min-h-[64px] items-center gap-3 px-4 py-3 lg:px-5">
             <div className="lg:hidden">
               <BrandLogo frameClassName="size-9 rounded-lg shadow-none backdrop-blur-none" />
@@ -146,7 +146,7 @@ function AppShell({
             ) : null}
             {topRight ? <div className="shrink-0">{topRight}</div> : null}
           </div>
-          <nav className="hud-scroll-area flex gap-2 overflow-x-auto border-t border-cyan-300/8 px-4 py-2 lg:hidden">
+          <nav className="hud-scroll-area flex gap-2 overflow-x-auto border-t border-tactical-line px-4 py-2 lg:hidden">
             {navItems.map((item) => {
               const Icon = item.icon;
               const active = item.id === activeNavItem;
@@ -156,7 +156,7 @@ function AppShell({
                   className={cn(
                     "inline-flex shrink-0 items-center gap-2 rounded-md border px-2.5 py-1.5 text-xs transition-colors",
                     active
-                      ? "border-cyan-300/22 bg-cyan-300/10 text-cyan-50"
+                      ? "border-tactical-active bg-tactical-accent/10 text-slate-50"
                       : "border-transparent text-slate-400 hover:bg-white/[0.045] hover:text-slate-100"
                   )}
                   onClick={() => onNavItemSelect(item.id)}

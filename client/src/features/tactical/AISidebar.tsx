@@ -1543,23 +1543,23 @@ export default function AISidebar({
         <aside
           className={cn(
             "relative hidden h-full min-h-0 min-w-0 flex-col border-l",
-            "border-slate-700/50 bg-[#0a0f18]/95 backdrop-blur-2xl lg:flex",
+            "border-tactical-line bg-tactical-panel/96 backdrop-blur-2xl lg:flex",
             panelClassName
           )}
           style={panelStyle}
         >
           {/* 顶部：标题 + tabs + 关闭 */}
-          <header className="flex items-center justify-between gap-2 border-b border-slate-700/50 px-3 py-2.5">
+          <header className="flex items-center justify-between gap-2 border-b border-tactical-line px-3 py-2.5">
             <div className="flex items-center gap-2">
-              <div className="grid size-7 place-items-center rounded-lg border border-slate-700/50 bg-slate-800/50 text-slate-300">
+              <div className="grid size-7 place-items-center rounded-lg border border-tactical-line bg-white/[0.035] text-tactical-accent">
                 <Sparkles className="size-3.5" />
               </div>
               <div>
                 <div className="text-[10px] uppercase tracking-[0.32em] text-slate-500">
-                  AI Copilot
+                  情报参谋席
                 </div>
                 <div className="flex items-center gap-1.5 text-sm font-semibold text-slate-100 leading-tight">
-                  天枢助手
+                  工具链与指令审批
                   {scenarioId && (
                     <span
                       className="rounded bg-slate-800/50 px-1.5 py-0.5 font-mono text-[9px] font-normal tracking-wider text-slate-400"
@@ -1597,7 +1597,7 @@ export default function AISidebar({
             </div>
           </header>
 
-          <div className="flex items-center gap-1 border-b border-slate-700/50 px-3 py-1.5">
+          <div className="flex items-center gap-1 border-b border-tactical-line px-3 py-1.5">
             <TabButton
               active={activeTab === "chat"}
               icon={<MessageSquare className="size-3.5" />}
@@ -1605,16 +1605,12 @@ export default function AISidebar({
               onClick={() => onTabChange("chat")}
             />
             <div className="ml-auto text-[11px] text-slate-500">
-              {busy ? (
-                <span className="inline-flex items-center gap-1">
-                  <Loader2 className="size-3 animate-spin" /> Thinking
-                </span>
-              ) : chatError ? (
+              {chatError ? (
                 <span className="inline-flex items-center gap-1 text-red-300">
-                  <AlertTriangle className="size-3" /> Error
+                  <AlertTriangle className="size-3" /> 异常
                 </span>
               ) : (
-                <span>Ready</span>
+                <span>待命</span>
               )}
             </div>
           </div>
@@ -1732,6 +1728,11 @@ function ChatPanel({
     () => new Map(commandProposals.map((proposal) => [proposal.id, proposal])),
     [commandProposals]
   );
+  const latestUserMessageId = useMemo(
+    () =>
+      [...messages].reverse().find((message) => message.role === "user")?.id,
+    [messages]
+  );
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -1761,11 +1762,9 @@ function ChatPanel({
         {messages.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-xs text-slate-500">
             <Sparkles className="size-5 text-slate-600" />
-            <div className="text-slate-400">
-              Ask anything about this scenario
-            </div>
+            <div className="text-slate-400">查询态势或提交推演指令</div>
             <div className="text-[11px] text-slate-600">
-              示例：开始推演、部署单位、查看战况……
+              示例：开始推演、部署单位、查看战况
             </div>
           </div>
         ) : (
@@ -1784,6 +1783,9 @@ function ChatPanel({
             return (
               <div className="space-y-1" key={m.id}>
                 <MessageBlock message={m} />
+                {busy && m.id === latestUserMessageId ? (
+                  <ThinkingBubble />
+                ) : null}
                 <ApprovalQueuePanel
                   busyId={proposalBusyId}
                   error={null}
@@ -1828,8 +1830,8 @@ function ChatPanel({
             }}
             placeholder={
               chatMode === "ask"
-                ? "Ask about this scenario without changing it..."
-                : "Command this scenario..."
+                ? "查询当前想定，不改变场景..."
+                : "输入将改变场景的推演指令..."
             }
             value={commandInput}
             rows={2}
@@ -1843,7 +1845,7 @@ function ChatPanel({
               />
               <span className="hidden truncate sm:inline">
                 {busy
-                  ? "Thinking..."
+                  ? "Stop to cancel"
                   : chatMode === "ask"
                     ? "Ask mode"
                     : "Command mode"}
@@ -2273,6 +2275,17 @@ function RunStatusCard({ summary }: { summary: ChatRunSummary }) {
           </div>
         </details>
       )}
+    </div>
+  );
+}
+
+function ThinkingBubble() {
+  return (
+    <div className="flex items-start justify-start pl-1">
+      <div className="inline-flex max-w-[92%] items-center gap-2 rounded-lg border border-cyan-300/15 bg-cyan-300/[0.045] px-3 py-2 text-[11px] text-cyan-100">
+        <Loader2 className="size-3 animate-spin" />
+        <span>助手正在思考…</span>
+      </div>
     </div>
   );
 }

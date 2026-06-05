@@ -457,7 +457,11 @@ const SideEditor = (props: SideEditorProps) => {
             gridTemplateColumns: { xs: "1fr", sm: "repeat(2, minmax(0, 1fr))" },
           }}
         >
-          <FormControl fullWidth sx={{ mb: 0.5 }} error={sideRelationshipsError}>
+          <FormControl
+            fullWidth
+            sx={{ mb: 0.5 }}
+            error={sideRelationshipsError}
+          >
             <SelectField
               id="hostiles-selector"
               labelId="hostiles-selector-label"
@@ -478,7 +482,11 @@ const SideEditor = (props: SideEditorProps) => {
               multiple
             />
           </FormControl>
-          <FormControl fullWidth sx={{ mb: 0.5 }} error={sideRelationshipsError}>
+          <FormControl
+            fullWidth
+            sx={{ mb: 0.5 }}
+            error={sideRelationshipsError}
+          >
             <SelectField
               id="allies-selector"
               labelId="allies-selector-label"

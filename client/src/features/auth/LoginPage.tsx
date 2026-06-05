@@ -28,16 +28,16 @@ type Tab = "login" | "register";
 type LocationState = { from?: { pathname?: string } } | null;
 
 const VISUAL_NODES = [
-  { label: "数据融合", position: "left-[8%] top-[34%]" },
-  { label: "智能推演", position: "left-[78%] top-[25%]" },
-  { label: "态势感知", position: "left-[12%] top-[74%]" },
-  { label: "精准决策", position: "left-[84%] top-[68%]" },
+  { label: "项目库", position: "left-[8%] top-[34%]" },
+  { label: "运行时", position: "left-[78%] top-[25%]" },
+  { label: "单位数据", position: "left-[12%] top-[74%]" },
+  { label: "参谋工具", position: "left-[84%] top-[68%]" },
 ];
 
 const TRUST_METRICS = [
-  { icon: ShieldCheck, value: "99.9%", label: "系统可用性" },
-  { icon: Zap, value: "10ms", label: "实时响应" },
-  { icon: RotateCw, value: "24/7", label: "服务保障" },
+  { icon: ShieldCheck, value: "项目", label: "场景工作区" },
+  { icon: Zap, value: "运行时", label: "推演同步" },
+  { icon: RotateCw, value: "MCP", label: "工具链接入" },
 ];
 
 export default function LoginPage() {
@@ -102,26 +102,25 @@ export default function LoginPage() {
   const isRegister = tab === "register";
 
   return (
-    <main className="dark min-h-dvh overflow-y-auto overflow-x-hidden bg-[#030814] text-slate-100 lg:overflow-hidden">
+    <main className="dark min-h-dvh overflow-y-auto overflow-x-hidden bg-tactical-bg text-slate-100 lg:overflow-hidden">
       <div className="relative min-h-dvh overflow-hidden">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_16%,rgba(14,165,233,0.11),transparent_28%),radial-gradient(circle_at_74%_24%,rgba(37,99,235,0.14),transparent_32%),linear-gradient(135deg,#071423_0%,#030814_52%,#020611_100%)]" />
-        <div className="absolute inset-0 bg-[linear-gradient(rgba(56,189,248,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(56,189,248,0.02)_1px,transparent_1px)] bg-[length:36px_36px]" />
-        <div className="absolute inset-y-0 right-0 w-[32%] bg-[#06111f]/70" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_16%,rgba(103,199,216,0.07),transparent_30%),radial-gradient(circle_at_74%_24%,rgba(148,163,184,0.06),transparent_34%),linear-gradient(135deg,#0a1018_0%,#04070d_54%,#02050a_100%)]" />
+        <div className="absolute inset-0 tactical-grid" />
+        <div className="absolute inset-y-0 right-0 w-[32%] bg-tactical-panel/70" />
 
         <div className="relative grid min-h-dvh w-full grid-cols-1 lg:grid-cols-[minmax(0,7fr)_minmax(430px,3fr)]">
           <section className="relative flex min-h-[360px] flex-col px-6 py-6 sm:min-h-[520px] sm:px-10 lg:min-h-dvh lg:px-16 xl:px-20 2xl:px-24">
             <BrandMark />
 
             <div className="relative z-10 mt-9 max-w-4xl lg:mt-14 xl:mt-16">
-              <div className="inline-flex rounded-full border border-cyan-300/20 bg-cyan-300/[0.07] px-4 py-1 text-[11px] font-medium tracking-[0.16em] text-cyan-200 sm:text-xs">
-                AI · DATA · DECISION
+              <div className="inline-flex rounded-md border border-tactical-line bg-white/[0.04] px-4 py-1 text-[11px] font-medium tracking-[0.12em] text-slate-300 sm:text-xs">
+                TIANSHU COMMAND
               </div>
               <h1 className="mt-6 text-[36px] font-semibold leading-[1.05] tracking-normal text-slate-50 sm:text-[56px] xl:text-[68px]">
-                智能决策 · <span className="text-cyan-300">精准指挥</span>
+                天枢战术推演<span className="text-tactical-accent">控制台</span>
               </h1>
               <p className="mt-4 max-w-3xl text-sm leading-7 text-slate-300 sm:text-base sm:leading-8 lg:text-slate-400">
-                面向战术场景、模型配置、后端运行时和 MCP 工具的统一操作入口，
-                让复杂决策更智能，让指挥流程更清晰。
+                连接项目、模板、单位库与运行时，在同一态势图上完成推演控制。
               </p>
             </div>
 
@@ -129,7 +128,7 @@ export default function LoginPage() {
             <TrustMetrics />
           </section>
 
-          <aside className="relative flex min-h-[420px] items-center justify-center border-t border-sky-300/10 bg-[#04101d]/82 px-5 py-8 backdrop-blur-sm sm:px-6 lg:min-h-dvh lg:justify-end lg:border-l lg:border-t-0 lg:bg-[#04101d]/70 lg:px-4 xl:px-6 2xl:px-14">
+          <aside className="relative flex min-h-[420px] items-center justify-center border-t border-tactical-line bg-tactical-panel/82 px-5 py-8 backdrop-blur-sm sm:px-6 lg:min-h-dvh lg:justify-end lg:border-l lg:border-t-0 lg:bg-tactical-panel/70 lg:px-4 xl:px-6 2xl:px-14">
             <LoginPanel
               isRegister={isRegister}
               submitting={submitting}
@@ -154,7 +153,7 @@ function BrandMark() {
   return (
     <div className="flex items-center gap-4">
       <BrandLogo
-        frameClassName="size-12 rounded-xl border-sky-300/25 bg-sky-400/10 shadow-[0_0_28px_rgba(14,165,233,0.22)]"
+        frameClassName="size-12 rounded-xl border-tactical-line bg-white/[0.04] shadow-none"
         imageClassName="scale-[1.08]"
       />
       <div>
@@ -162,7 +161,7 @@ function BrandMark() {
           TIANSHU · COMMAND
         </div>
         <div className="mt-1 text-xs tracking-[0.22em] text-slate-500">
-          AI NATIVE CONTROL
+          TACTICAL WORKSTATION
         </div>
       </div>
     </div>
@@ -176,7 +175,7 @@ function TechVisual() {
       aria-hidden="true"
     >
       <div className="absolute inset-x-8 bottom-3 h-[150px] rounded-[50%] bg-[linear-gradient(180deg,transparent,rgba(14,165,233,0.06))]" />
-      <div className="absolute left-[49%] top-[56%] h-[430px] w-[980px] -translate-x-1/2 -translate-y-1/2 rounded-[50%] border border-cyan-300/10" />
+      <div className="absolute left-[49%] top-[56%] h-[430px] w-[980px] -translate-x-1/2 -translate-y-1/2 rounded-[50%] border border-tactical-line" />
       <div className="absolute left-[49%] top-[56%] h-[342px] w-[800px] -translate-x-1/2 -translate-y-1/2 rounded-[50%] border border-cyan-300/18" />
       <div className="absolute left-[49%] top-[56%] h-[254px] w-[610px] -translate-x-1/2 -translate-y-1/2 rounded-[50%] border border-cyan-300/24" />
       <div className="absolute left-[49%] top-[56%] h-[150px] w-[360px] -translate-x-1/2 -translate-y-1/2 rounded-[50%] border border-cyan-200/38" />
@@ -194,7 +193,7 @@ function TechVisual() {
       {VISUAL_NODES.map((node) => (
         <div key={node.label} className={cn("absolute", node.position)}>
           <span className="absolute -left-6 top-3 size-2 rounded-full bg-cyan-300 shadow-[0_0_18px_rgba(34,211,238,0.7)]" />
-          <div className="rounded-md border border-cyan-300/10 bg-slate-950/45 px-3 py-1.5 text-xs text-slate-400">
+          <div className="rounded-md border border-tactical-line bg-slate-950/45 px-3 py-1.5 text-xs text-slate-400">
             {node.label}
           </div>
         </div>
@@ -212,20 +211,20 @@ function TechVisual() {
 
 function TrustMetrics() {
   return (
-    <div className="relative z-10 mt-auto hidden max-w-[760px] grid-cols-3 gap-0 border-t border-cyan-300/10 pt-5 sm:grid lg:pt-6">
+    <div className="relative z-10 mt-auto hidden max-w-[760px] grid-cols-3 gap-0 border-t border-tactical-line pt-5 sm:grid lg:pt-6">
       {TRUST_METRICS.map(({ icon: Icon, value, label }, index) => (
         <div
           key={label}
           className={cn(
             "flex items-center gap-3 px-4 first:pl-0 sm:gap-4 sm:px-6",
-            index > 0 ? "border-l border-cyan-300/10" : ""
+            index > 0 ? "border-l border-tactical-line" : ""
           )}
         >
-          <span className="grid size-10 shrink-0 place-items-center rounded-full border border-cyan-300/20 bg-cyan-300/[0.06] text-cyan-300 sm:size-11">
+          <span className="grid size-10 shrink-0 place-items-center rounded-full border border-tactical-line bg-white/[0.035] text-tactical-accent sm:size-11">
             <Icon className="size-4 sm:size-5" />
           </span>
           <div>
-            <div className="text-xl font-semibold text-cyan-200 sm:text-2xl">
+            <div className="text-xl font-semibold text-slate-100 sm:text-2xl">
               {value}
             </div>
             <div className="mt-1 text-xs text-slate-500">{label}</div>
@@ -262,7 +261,7 @@ function LoginPanel({
   onSubmit: (event: FormEvent) => void;
 }) {
   return (
-    <Card className="w-full max-w-[410px] overflow-hidden border-sky-300/30 bg-[#071323]/70 shadow-[0_0_54px_rgba(14,165,233,0.12)] backdrop-blur-xl">
+    <Card className="w-full max-w-[410px] overflow-hidden border-tactical-line bg-tactical-panel/78 shadow-[0_24px_80px_rgba(0,0,0,0.28)] backdrop-blur-xl">
       <div className="px-8 pb-8 pt-9">
         <div className="text-center">
           <h2 className="text-2xl font-semibold tracking-normal text-slate-50">
@@ -319,7 +318,7 @@ function LoginPanel({
               <button
                 type="button"
                 onClick={onTogglePassword}
-                className="grid size-9 place-items-center rounded-md text-slate-400 transition-colors hover:bg-white/[0.06] hover:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/55"
+                className="grid size-9 place-items-center rounded-md text-slate-400 transition-colors hover:bg-white/[0.06] hover:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-tactical-accent/55"
                 aria-label={showPassword ? "隐藏密码" : "显示密码"}
               >
                 {showPassword ? (
@@ -399,7 +398,7 @@ function PanelTabButton({
       type="button"
       onClick={onClick}
       className={cn(
-        "relative h-12 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/55 focus-visible:ring-offset-2 focus-visible:ring-offset-[#071323]",
+        "relative h-12 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-tactical-accent/55 focus-visible:ring-offset-2 focus-visible:ring-offset-[#071323]",
         active ? "text-cyan-300" : "text-slate-400 hover:text-slate-200"
       )}
     >

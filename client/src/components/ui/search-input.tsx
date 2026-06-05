@@ -3,10 +3,8 @@ import { Search, X } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
-interface SearchInputProps extends Omit<
-  React.InputHTMLAttributes<HTMLInputElement>,
-  "type"
-> {
+interface SearchInputProps
+  extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "type"> {
   onClear?: () => void;
 }
 

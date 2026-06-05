@@ -153,19 +153,19 @@ const MODULE_COPY: Record<
 > = {
   projects: {
     title: "项目管理",
-    subtitle: "AI 驱动的仿真工作空间，创建、管理和运行你的战术场景。",
-    eyebrow: "AI Tactical Workspace",
+    subtitle: "管理推演项目、模板与单位数据。所有场景可直接进入战术控制台。",
+    eyebrow: "Scenario Workspace",
   },
   templates: {
     title: "模板中心",
-    subtitle: "仅保存和浏览可复用推演模板，保持模板资产干净、稳定、可复用。",
-    eyebrow: "Template Intelligence",
+    subtitle: "浏览可复用推演模板，复制为个人项目后进入控制台推演。",
+    eyebrow: "Scenario Templates",
   },
   assets: {
     title: "数据资产",
     subtitle:
       "统一维护平台单位库，集中管理飞机、舰艇、地面设施、机场与武器模型。",
-    eyebrow: "Unit Asset Registry",
+    eyebrow: "Unit Registry",
   },
 };
 
@@ -181,31 +181,31 @@ const VISUAL_STATUS_META: Record<
   }
 > = {
   live: {
-    label: "LIVE",
-    tone: "border-emerald-300/35 bg-emerald-400/15 text-emerald-100",
+    label: "运行中",
+    tone: "border-emerald-300/30 bg-emerald-400/10 text-emerald-100",
     dot: "bg-emerald-300",
     accent: "emerald",
     glow: "rgba(16,185,129,0.34)",
     action: "继续推演",
   },
   simulation: {
-    label: "SIMULATION",
-    tone: "border-sky-300/35 bg-sky-400/15 text-sky-100",
+    label: "推演项目",
+    tone: "border-tactical-active bg-tactical-accent/10 text-slate-100",
     dot: "bg-sky-300",
     accent: "sky",
     glow: "rgba(14,165,233,0.32)",
     action: "继续推演",
   },
   draft: {
-    label: "DRAFT",
-    tone: "border-amber-300/35 bg-amber-400/15 text-amber-100",
+    label: "草稿",
+    tone: "border-amber-300/30 bg-amber-400/10 text-amber-100",
     dot: "bg-amber-300",
     accent: "amber",
     glow: "rgba(245,158,11,0.28)",
     action: "编辑项目",
   },
   archived: {
-    label: "ARCHIVED",
+    label: "已归档",
     tone: "border-slate-300/25 bg-slate-300/10 text-slate-200",
     dot: "bg-slate-300",
     accent: "slate",
@@ -247,8 +247,13 @@ function StatusBadge({ status }: { status: VisualStatus }) {
           : "muted";
 
   return (
-    <Badge className="px-2.5 py-1 font-semibold tracking-wide" variant={variant}>
-      <span className={cn("size-1.5 rounded-full", meta.dot)} />
+    <Badge
+      className="px-2.5 py-1 font-semibold tracking-wide"
+      variant={variant}
+    >
+      {status === "live" ? (
+        <span className={cn("size-1.5 rounded-full", meta.dot)} />
+      ) : null}
       {meta.label}
     </Badge>
   );
@@ -644,7 +649,7 @@ export default function ScenarioListPage() {
                   setActiveModule(event.target.value as WorkspaceModule);
                   setQuery("");
                 }}
-                className="h-9 rounded-md border border-cyan-300/12 bg-slate-950/60 px-2.5 text-xs text-slate-300 outline-none focus:border-cyan-300/35 focus-visible:ring-2 focus-visible:ring-cyan-300/45"
+                className="h-9 rounded-md border border-tactical-line bg-slate-950/60 px-2.5 text-xs text-slate-300 outline-none focus:border-tactical-active focus-visible:ring-2 focus-visible:ring-tactical-accent/45"
               >
                 {MODULES.map((module) => (
                   <option key={module.id} value={module.id}>
@@ -686,7 +691,7 @@ export default function ScenarioListPage() {
                 description={
                   isTemplateWorkspace
                     ? "调整搜索条件，或等待管理员沉淀新的推演模板。"
-                    : "调整搜索条件，或新建一个推演项目开始构建你的 AI 战术工作空间。"
+                    : "调整搜索条件，或新建一个推演项目进入战术控制台。"
                 }
                 onAction={
                   isTemplateWorkspace ? undefined : () => setDialogOpen(true)
@@ -1445,7 +1450,7 @@ function DataAssetWorkspace() {
                       {type.label}
                     </div>
                     <div className="mt-1 text-[11px] text-slate-500">
-                      Platform Unit Assets
+                      平台单位数据
                     </div>
                   </div>
                 </button>
@@ -1473,7 +1478,7 @@ function DataAssetWorkspace() {
                 onChange={(event) =>
                   setImportMode(event.target.value as "skip" | "replace")
                 }
-                className="h-9 rounded-md border border-cyan-300/12 bg-slate-950/60 px-2.5 text-xs text-slate-300 outline-none focus:border-cyan-300/35 focus-visible:ring-2 focus-visible:ring-cyan-300/45"
+                className="h-9 rounded-md border border-tactical-line bg-slate-950/60 px-2.5 text-xs text-slate-300 outline-none focus:border-tactical-active focus-visible:ring-2 focus-visible:ring-tactical-accent/45"
               >
                 <option value="skip">冲突跳过</option>
                 <option value="replace">覆盖自定义</option>

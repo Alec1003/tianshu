@@ -4,19 +4,19 @@ import { createTheme, type Theme } from "@mui/material/styles";
 // Dark = primary (operations) mode. Sand/Light = secondary (briefing) mode.
 // Accent ramps stay on neutral metal grays plus a single mil-green primary
 // to keep the UI legible over satellite / vector base maps.
-const TACTICAL_GREEN = "#4ec07a";
-const TACTICAL_GREEN_DIM = "#3aa166";
-const ALERT_AMBER = "#e0a536";
-const ALERT_RED = "#c4452f";
+const TACTICAL_GREEN = "#69b982";
+const TACTICAL_GREEN_DIM = "#4f9368";
+const ALERT_AMBER = "#d6a449";
+const ALERT_RED = "#c75b4a";
 
 const DARK = {
-  bg: "#0d1117",
-  surface: "#161b22",
-  surfaceElev: "#1c2330",
-  border: "#30363d",
-  borderStrong: "#46505c",
-  text: "#d1d5db",
-  textDim: "#8b95a3",
+  bg: "#04070d",
+  surface: "#0a1018",
+  surfaceElev: "#101923",
+  border: "rgba(148, 163, 184, 0.18)",
+  borderStrong: "rgba(148, 163, 184, 0.32)",
+  text: "#e5e7eb",
+  textDim: "#9aa6b5",
 };
 
 const LIGHT = {
@@ -30,24 +30,17 @@ const LIGHT = {
 };
 
 const SHARED_TYPOGRAPHY = {
-  fontFamily: [
-    '"JetBrains Mono"',
-    '"Roboto Mono"',
-    "Roboto",
-    "Helvetica",
-    "Arial",
-    "sans-serif",
-  ].join(","),
+  fontFamily: ["Inter", "Roboto", "Helvetica", "Arial", "sans-serif"].join(","),
   h6: {
     fontWeight: 600,
-    letterSpacing: "0.06em",
-    textTransform: "uppercase" as const,
+    letterSpacing: "0.02em",
+    textTransform: "none" as const,
   },
   body2: { fontSize: 12 },
   button: {
     fontWeight: 600,
-    letterSpacing: "0.05em",
-    textTransform: "uppercase" as const,
+    letterSpacing: "0.02em",
+    textTransform: "none" as const,
   },
 };
 
@@ -89,7 +82,7 @@ export const tianshuDarkTheme: Theme = createTheme({
         root: {
           borderRadius: 2,
           color: DARK.text,
-          "&:hover": { backgroundColor: "rgba(78,192,122,0.12)" },
+          "&:hover": { backgroundColor: "rgba(103,199,216,0.1)" },
         },
       },
     },

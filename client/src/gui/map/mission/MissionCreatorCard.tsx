@@ -328,7 +328,11 @@ const MissionCreatorCard = (props: MissionCreatorCardProps) => {
         {/** Mission Specific Select Fields: Patrol Or Strike */}
         {missionSpecificComponent}
         {/** Create Mission Button */}
-        <Stack spacing={2} direction="row" sx={{ justifyContent: "center", pt: 0.5 }}>
+        <Stack
+          spacing={2}
+          direction="row"
+          sx={{ justifyContent: "center", pt: 0.5 }}
+        >
           <Button
             onClick={handleCreateMission}
             fullWidth

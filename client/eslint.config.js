@@ -26,7 +26,10 @@ export default tseslint
           { allowConstantExport: true },
         ],
         // Prettier
-        "prettier/prettier": ["error", { singleQuote: false }],
+        "prettier/prettier": [
+          "error",
+          { singleQuote: false, endOfLine: "auto" },
+        ],
         quotes: ["error", "single"],
         // TS
         "no-unused-vars": "off",

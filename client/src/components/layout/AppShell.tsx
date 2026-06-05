@@ -49,14 +49,14 @@ function AppShell({
         className
       )}
     >
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[232px] border-r border-cyan-300/10 bg-[#070c16] px-3 py-4 lg:flex lg:flex-col">
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[232px] border-r border-cyan-300/10 bg-[#070c16] px-3 py-4 shadow-[inset_-1px_0_0_rgba(125,211,252,0.03)] lg:flex lg:flex-col">
         <div className="flex items-center gap-3 px-2">
           <BrandLogo frameClassName="size-9 rounded-lg shadow-none backdrop-blur-none" />
           <div className="min-w-0">
             <div className="truncate text-sm font-semibold text-slate-50">
               TianShu
             </div>
-            <div className="truncate text-[11px] text-slate-500">
+            <div className="truncate text-[11px] text-slate-400">
               AI Command Center
             </div>
           </div>
@@ -70,10 +70,10 @@ function AppShell({
               <button
                 key={item.id}
                 className={cn(
-                  "group flex w-full items-center gap-2 rounded-md border px-2 py-2 text-left transition-colors",
+                  "group flex w-full items-center gap-2 rounded-md border px-2 py-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/55",
                   active
-                    ? "border-cyan-300/16 bg-cyan-300/10 text-cyan-50"
-                    : "border-transparent text-slate-400 hover:bg-white/[0.045] hover:text-slate-100"
+                    ? "border-cyan-300/20 bg-cyan-300/10 text-cyan-50"
+                    : "border-transparent text-slate-300 hover:bg-white/[0.045] hover:text-slate-100"
                 )}
                 onClick={() => onNavItemSelect(item.id)}
                 type="button"
@@ -83,7 +83,7 @@ function AppShell({
                     "grid size-8 shrink-0 place-items-center rounded-md border",
                     active
                       ? "border-cyan-300/18 bg-cyan-300/10 text-cyan-100"
-                      : "border-slate-800 bg-slate-950/45 text-slate-500 group-hover:text-slate-300"
+                      : "border-slate-800 bg-slate-950/45 text-slate-400 group-hover:text-slate-200"
                   )}
                 >
                   <Icon className="size-4" />
@@ -93,7 +93,7 @@ function AppShell({
                     {item.label}
                   </span>
                   {item.caption ? (
-                    <span className="mt-0.5 block truncate text-[11px] text-slate-600">
+                    <span className="mt-0.5 block truncate text-[11px] text-slate-400">
                       {item.caption}
                     </span>
                   ) : null}
@@ -108,7 +108,7 @@ function AppShell({
           })}
         </nav>
 
-        <div className="mt-auto px-2 text-[11px] leading-5 text-slate-600">
+        <div className="mt-auto px-2 text-[11px] leading-5 text-slate-500">
           {footer ?? (
             <>
               <div>运行边界: 后端 Runtime</div>
@@ -119,7 +119,7 @@ function AppShell({
       </aside>
 
       <div className="flex min-h-screen min-w-0 flex-col lg:pl-[232px]">
-        <header className="sticky top-0 z-20 border-b border-cyan-300/10 bg-[#050812]/96">
+        <header className="sticky top-0 z-20 border-b border-cyan-300/10 bg-[#050812]/96 backdrop-blur-xl">
           <div className="flex min-h-[64px] items-center gap-3 px-4 py-3 lg:px-5">
             <div className="lg:hidden">
               <BrandLogo frameClassName="size-9 rounded-lg shadow-none backdrop-blur-none" />

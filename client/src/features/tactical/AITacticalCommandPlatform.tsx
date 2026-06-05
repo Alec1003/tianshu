@@ -1146,12 +1146,12 @@ export default function AITacticalCommandPlatform({
     >
       <motion.nav
         animate={{ opacity: 1 }}
-        className="hidden border-r border-cyan-300/10 bg-[#030912]/95 px-2 py-5 backdrop-blur-2xl lg:flex lg:flex-col"
+        className="hidden border-r border-cyan-300/10 bg-[#030912]/95 px-2 py-5 shadow-[inset_-1px_0_0_rgba(125,211,252,0.03)] backdrop-blur-xl lg:flex lg:flex-col"
         initial={{ opacity: 0 }}
         style={{ gridColumn: "1 / 2", gridRow: "1 / 3" }}
       >
         <div className="mb-7 flex justify-center">
-          <div className="grid size-11 place-items-center rounded-2xl border border-cyan-300/18 bg-cyan-300/8 text-cyan-100 shadow-hud-cyan">
+          <div className="grid size-11 place-items-center rounded-lg border border-cyan-300/16 bg-cyan-300/8 text-cyan-100">
             <Shield className="size-6" />
           </div>
         </div>
@@ -1161,10 +1161,10 @@ export default function AITacticalCommandPlatform({
             <button
               aria-label={label}
               className={cn(
-                "group grid size-11 place-items-center rounded-xl border text-slate-500 transition-all",
+                "group grid size-11 place-items-center rounded-lg border text-slate-400 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/55",
                 activeRailItem === id
-                  ? "border-cyan-300/25 bg-cyan-300/12 text-cyan-100 shadow-hud-cyan"
-                  : "border-transparent hover:border-cyan-300/12 hover:bg-white/5 hover:text-slate-200"
+                  ? "border-cyan-300/24 bg-cyan-300/10 text-cyan-100"
+                  : "border-transparent hover:border-cyan-300/12 hover:bg-white/5 hover:text-slate-100"
               )}
               key={id}
               onClick={() => setActiveRailItem(id)}
@@ -1181,7 +1181,7 @@ export default function AITacticalCommandPlatform({
             aria-label={aiSidebarOpen ? "关闭 AI 侧栏" : "打开 AI 侧栏"}
             className={cn(
               "size-10",
-              aiSidebarOpen ? "text-cyan-100 shadow-hud-cyan" : "text-slate-400"
+              aiSidebarOpen ? "text-cyan-100" : "text-slate-300"
             )}
             onClick={toggleAiSidebar}
             size="icon"
@@ -1207,9 +1207,7 @@ export default function AITacticalCommandPlatform({
             aria-label="AI / 系统设置"
             className={cn(
               "size-10",
-              settingsModalOpen
-                ? "text-cyan-100 shadow-hud-cyan"
-                : "text-slate-400"
+              settingsModalOpen ? "text-cyan-100" : "text-slate-300"
             )}
             onClick={() => setSettingsModalOpen((value) => !value)}
             size="icon"
@@ -1342,7 +1340,7 @@ export default function AITacticalCommandPlatform({
             showRoutes={showRoutes}
           />
 
-          <div className="pointer-events-none absolute inset-0 z-[1] tactical-grid opacity-45" />
+          <div className="pointer-events-none absolute inset-0 z-[1] tactical-grid opacity-30" />
           <div className="pointer-events-none absolute inset-x-0 top-0 z-[2] h-28 bg-gradient-to-b from-[#050914] via-[#050914]/55 to-transparent" />
         </div>
 

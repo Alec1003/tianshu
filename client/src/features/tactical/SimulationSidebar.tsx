@@ -242,16 +242,16 @@ function Section({
   defaultOpen?: boolean;
 }) {
   return (
-    <div className="rounded-2xl border border-cyan-300/12 bg-[#07111d]/70 shadow-[inset_0_1px_0_rgba(103,232,249,0.08)] overflow-hidden">
+    <div className="overflow-hidden rounded-lg border border-cyan-300/10 bg-[#07111d]/72 shadow-[inset_0_1px_0_rgba(255,255,255,0.035)]">
       <details className="group" open={defaultOpen}>
-        <summary className="flex cursor-pointer list-none items-center gap-2.5 px-3 py-2">
+        <summary className="flex cursor-pointer list-none items-center gap-2.5 px-3 py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/55">
           {Icon && (
-            <div className="grid size-7 place-items-center rounded-lg border border-cyan-300/14 bg-cyan-300/8 text-cyan-200">
+            <div className="grid size-7 place-items-center rounded-md border border-cyan-300/14 bg-cyan-300/8 text-cyan-200">
               <Icon className="size-4" />
             </div>
           )}
           <span className="text-sm font-semibold text-slate-100">{title}</span>
-          <ChevronDown className="ml-auto size-4 text-slate-500 transition-transform group-open:rotate-180" />
+          <ChevronDown className="ml-auto size-4 text-slate-400 transition-transform group-open:rotate-180" />
         </summary>
         <div className="px-3 pb-3 pt-1">{children}</div>
       </details>
@@ -271,7 +271,7 @@ function MissionSummaryCard({
   onDelete: () => void;
 }) {
   return (
-    <div className="box-border block w-full min-w-0 max-w-full overflow-hidden rounded-xl border border-cyan-300/10 bg-slate-950/32 p-3 text-left transition-all hover:border-cyan-300/35 hover:bg-cyan-300/8">
+    <div className="box-border block w-full min-w-0 max-w-full overflow-hidden rounded-lg border border-cyan-300/10 bg-slate-950/32 p-3 text-left transition-colors hover:border-cyan-300/30 hover:bg-cyan-300/8">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="truncate text-sm font-semibold text-slate-100">
@@ -652,7 +652,7 @@ function PlacementFloatingMenu({
   return (
     <motion.div
       animate={{ opacity: 1, y: 0, scale: 1 }}
-      className="pointer-events-auto fixed z-[60] flex flex-col overflow-hidden rounded-2xl border border-cyan-300/18 bg-[#07111d]/95 shadow-[0_24px_72px_rgba(0,0,0,0.55)] backdrop-blur-2xl"
+      className="pointer-events-auto fixed z-[60] flex flex-col overflow-hidden rounded-lg border border-cyan-300/16 bg-[#07111d]/96 shadow-[0_18px_48px_rgba(0,0,0,0.48)] backdrop-blur-xl"
       exit={{ opacity: 0, y: 14, scale: 0.97 }}
       initial={{ opacity: 0, y: 14, scale: 0.97 }}
       ref={innerRef}
@@ -662,7 +662,7 @@ function PlacementFloatingMenu({
     >
       <div className="flex items-start justify-between gap-3 border-b border-cyan-300/10 px-4 py-3">
         <div className="flex min-w-0 items-start gap-2.5">
-          <div className="grid size-9 shrink-0 place-items-center rounded-lg border border-cyan-300/14 bg-cyan-300/8 text-cyan-100">
+          <div className="grid size-9 shrink-0 place-items-center rounded-md border border-cyan-300/14 bg-cyan-300/8 text-cyan-100">
             <Icon className="size-4" />
           </div>
           <div className="min-w-0">
@@ -672,7 +672,7 @@ function PlacementFloatingMenu({
             <div className="mt-0.5 truncate text-sm font-semibold text-slate-100">
               {meta.title}
             </div>
-            <div className="mt-0.5 line-clamp-1 text-[11px] text-slate-500">
+            <div className="mt-0.5 line-clamp-1 text-[11px] text-slate-400">
               选择型号后在地图左键落点部署，按 Esc 取消
             </div>
           </div>
@@ -683,7 +683,7 @@ function PlacementFloatingMenu({
           </span>
           <button
             aria-label="关闭"
-            className="grid size-7 place-items-center rounded-lg border border-cyan-300/12 bg-white/5 text-slate-400 transition-all hover:border-cyan-300/35 hover:text-cyan-100"
+            className="grid size-7 place-items-center rounded-md border border-cyan-300/12 bg-white/5 text-slate-300 transition-colors hover:border-cyan-300/35 hover:text-cyan-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/55"
             onClick={onClose}
             type="button"
           >
@@ -693,7 +693,7 @@ function PlacementFloatingMenu({
       </div>
       <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-3">
         {options.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-cyan-300/12 bg-slate-950/30 px-3 py-6 text-center text-xs text-slate-500">
+          <div className="rounded-lg border border-dashed border-cyan-300/12 bg-slate-950/30 px-3 py-6 text-center text-xs text-slate-400">
             该类型暂无可选项
           </div>
         ) : (
@@ -1745,18 +1745,18 @@ export default function SimulationSidebar({
   return (
     <motion.aside
       animate={{ opacity: 1, x: 0 }}
-      className="hidden min-h-0 w-full min-w-0 shrink-0 overflow-hidden border-r border-cyan-300/10 bg-[#050b13]/88 p-4 backdrop-blur-2xl lg:flex lg:flex-col"
+      className="hidden min-h-0 w-full min-w-0 shrink-0 overflow-hidden border-r border-cyan-300/10 bg-[#050b13]/90 p-4 shadow-[inset_-1px_0_0_rgba(125,211,252,0.03)] backdrop-blur-xl lg:flex lg:flex-col"
       initial={{ opacity: 0, x: -18 }}
       transition={{ duration: 0.35, ease: "easeOut" }}
     >
       <div className="mb-4 px-1">
-        <div className="text-xs uppercase tracking-[0.26em] text-cyan-300/70">
+        <div className="text-xs uppercase tracking-[0.18em] text-cyan-300/70">
           天枢 {meta.eyebrow}
         </div>
         <div className="mt-1.5 text-xl font-semibold text-slate-100">
           {meta.title}
         </div>
-        <div className="mt-1 line-clamp-2 text-xs leading-relaxed text-slate-500">
+        <div className="mt-1 line-clamp-2 text-xs leading-relaxed text-slate-400">
           {meta.description}
         </div>
       </div>

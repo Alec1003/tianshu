@@ -595,13 +595,13 @@ export default function ScenarioListPage() {
                   <h2 className="text-sm font-semibold text-slate-100">
                     {activeModuleLabel}
                   </h2>
-                  <span className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[11px] text-slate-500">
+                  <span className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[11px] text-slate-300">
                     {activeModule === "assets"
                       ? unitAssetCount
                       : filteredItems.length}
                   </span>
                 </div>
-                <p className="mt-1 text-xs text-slate-500">
+                <p className="mt-1 text-xs text-slate-400">
                   {activeModule === "assets"
                     ? "管理飞机、舰艇、设施、机场与武器数据。"
                     : "搜索、筛选并打开推演工作项。"}
@@ -624,7 +624,7 @@ export default function ScenarioListPage() {
                   setActiveModule(event.target.value as WorkspaceModule);
                   setQuery("");
                 }}
-                className="h-9 rounded-md border border-cyan-300/12 bg-slate-950/60 px-2.5 text-xs text-slate-300 outline-none focus:border-cyan-300/35"
+                className="h-9 rounded-md border border-cyan-300/12 bg-slate-950/60 px-2.5 text-xs text-slate-300 outline-none focus:border-cyan-300/35 focus-visible:ring-2 focus-visible:ring-cyan-300/45"
               >
                 {MODULES.map((module) => (
                   <option key={module.id} value={module.id}>
@@ -837,13 +837,13 @@ function ProjectCard({
     <Card
       className={cn(
         "group relative overflow-hidden rounded-lg bg-[#08111c] transition-colors",
-        "border-cyan-200/10 hover:border-cyan-200/30"
+        "border-cyan-200/10 hover:border-cyan-200/26"
       )}
     >
       <button
         type="button"
         onClick={onOpen}
-        className="relative block aspect-[16/9] w-full overflow-hidden text-left"
+        className="relative block aspect-[16/9] w-full overflow-hidden text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/55"
         style={thumbStyle(item.id, visualStatus)}
       >
         <MapThumbnail status={visualStatus} />
@@ -867,12 +867,12 @@ function ProjectCard({
         <div className="text-sm font-semibold text-white line-clamp-1">
           {item.name}
         </div>
-        <p className="mt-1 min-h-[2.5rem] text-xs leading-5 text-slate-500 line-clamp-2">
+        <p className="mt-1 min-h-[2.5rem] text-xs leading-5 text-slate-400 line-clamp-2">
           {item.description ||
             "暂无描述，可进入项目继续配置目标、任务与推演参数。"}
         </p>
 
-        <div className="mt-4 flex flex-wrap items-center gap-4 text-xs text-slate-500">
+        <div className="mt-4 flex flex-wrap items-center gap-4 text-xs text-slate-400">
           <span className="inline-flex items-center gap-1">
             <Activity className="size-3.5" />
             {metrics.tasks} 任务
@@ -888,7 +888,7 @@ function ProjectCard({
         </div>
 
         <div className="mt-4 flex items-center gap-2 border-t border-cyan-200/10 pt-3">
-          <span className="mr-auto text-xs text-slate-500">
+          <span className="mr-auto text-xs text-slate-400">
             {relativeTime(item.updated_at)}
           </span>
           <Button
@@ -896,7 +896,7 @@ function ProjectCard({
             variant="ghost"
             size="sm"
             onClick={onOpen}
-            className="h-8 rounded-md border border-cyan-200/10 bg-cyan-200/[0.04] px-3 text-cyan-100 hover:bg-cyan-200/[0.08]"
+            className="h-8 rounded-md border border-cyan-200/12 bg-cyan-200/[0.045] px-3 text-cyan-100 hover:bg-cyan-200/[0.08]"
           >
             <Play className="size-3.5" />
             {visualMeta.action}
@@ -906,7 +906,7 @@ function ProjectCard({
               type="button"
               title="更多操作"
               onClick={() => setMenuOpen((value) => !value)}
-              className="grid size-8 place-items-center rounded-md text-slate-500 hover:bg-white/[0.06] hover:text-slate-200"
+              className="grid size-8 place-items-center rounded-md text-slate-400 hover:bg-white/[0.06] hover:text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/55"
             >
               <MoreHorizontal className="size-4" />
             </button>
@@ -1456,7 +1456,7 @@ function DataAssetWorkspace() {
                 onChange={(event) =>
                   setImportMode(event.target.value as "skip" | "replace")
                 }
-                className="h-9 rounded-md border border-cyan-300/12 bg-slate-950/60 px-2.5 text-xs text-slate-300 outline-none focus:border-cyan-300/35"
+                className="h-9 rounded-md border border-cyan-300/12 bg-slate-950/60 px-2.5 text-xs text-slate-300 outline-none focus:border-cyan-300/35 focus-visible:ring-2 focus-visible:ring-cyan-300/45"
               >
                 <option value="skip">冲突跳过</option>
                 <option value="replace">覆盖自定义</option>
@@ -1775,7 +1775,7 @@ function AddUnitAssetDialog({
                   })
                 }
                 disabled={submitting || generating || isEditing}
-                className="h-9 w-full rounded-md border border-cyan-200/15 bg-slate-950/60 px-3 text-xs text-slate-100 outline-none focus:border-cyan-200/45"
+                className="h-9 w-full rounded-md border border-cyan-200/15 bg-slate-950/60 px-3 text-xs text-slate-100 outline-none focus:border-cyan-200/45 focus-visible:ring-2 focus-visible:ring-cyan-300/45"
               >
                 {UNIT_ASSET_TYPES.filter((type) => type.id !== "all").map(
                   (type) => (
@@ -1822,7 +1822,7 @@ function AddUnitAssetDialog({
                       setAiNotice(null);
                     }}
                     placeholder="补充用途、国家、版本或别名，例如：空中加油机 / 五代战斗机 / 舰载预警机"
-                    className="h-9 w-full rounded-md border border-cyan-200/15 bg-slate-950/60 px-3 text-xs text-slate-100 outline-none placeholder:text-slate-600 focus:border-cyan-200/45"
+                    className="h-9 w-full rounded-md border border-cyan-200/15 bg-slate-950/60 px-3 text-xs text-slate-100 outline-none placeholder:text-slate-600 focus:border-cyan-200/45 focus-visible:ring-2 focus-visible:ring-cyan-300/45"
                   />
                 </label>
                 <Button
@@ -2079,7 +2079,7 @@ function AssetFormInput({
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
-        className="h-9 w-full rounded-md border border-cyan-200/15 bg-slate-950/60 px-3 text-xs text-slate-100 outline-none placeholder:text-slate-600 focus:border-cyan-200/45"
+        className="h-9 w-full rounded-md border border-cyan-200/15 bg-slate-950/60 px-3 text-xs text-slate-100 outline-none placeholder:text-slate-600 focus:border-cyan-200/45 focus-visible:ring-2 focus-visible:ring-cyan-300/45"
       />
     </label>
   );
@@ -2915,7 +2915,7 @@ function Empty({
         <Sparkles className="size-5" />
       </div>
       <div className="mt-3 text-sm font-semibold text-slate-100">{title}</div>
-      <div className="mt-1 max-w-md text-xs leading-5 text-slate-500">
+      <div className="mt-1 max-w-md text-xs leading-5 text-slate-400">
         {description}
       </div>
       {onAction && (
@@ -3045,7 +3045,7 @@ function CreateScenarioDialog({
               value={name}
               onChange={(event) => setName(event.target.value)}
               placeholder="例如：东海防空压力分析推演"
-              className="w-full rounded-md border border-cyan-200/15 bg-slate-950/60 px-3 py-2 text-xs text-slate-100 outline-none placeholder:text-slate-600 focus:border-cyan-200/45"
+              className="w-full rounded-md border border-cyan-200/15 bg-slate-950/60 px-3 py-2 text-xs text-slate-100 outline-none placeholder:text-slate-600 focus:border-cyan-200/45 focus-visible:ring-2 focus-visible:ring-cyan-300/45"
             />
           </div>
 
@@ -3059,7 +3059,7 @@ function CreateScenarioDialog({
               value={description}
               onChange={(event) => setDescription(event.target.value)}
               placeholder="简要说明本项目的推演目标、想定背景或评估方向"
-              className="w-full resize-none rounded-md border border-cyan-200/15 bg-slate-950/60 px-3 py-2 text-xs text-slate-100 outline-none placeholder:text-slate-600 focus:border-cyan-200/45"
+              className="w-full resize-none rounded-md border border-cyan-200/15 bg-slate-950/60 px-3 py-2 text-xs text-slate-100 outline-none placeholder:text-slate-600 focus:border-cyan-200/45 focus-visible:ring-2 focus-visible:ring-cyan-300/45"
             />
           </div>
 

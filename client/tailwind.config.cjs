@@ -37,15 +37,20 @@ module.exports = {
           foreground: "hsl(var(--card-foreground))",
         },
         tactical: {
-          bg: "#0B0F14",
-          panel: "#111827",
-          elevated: "#1A2233",
-          cyan: "#4CC9F0",
-          blue: "#4895EF",
-          red: "#EF233C",
-          green: "#06D6A0",
+          bg: "#050812",
+          panel: "#08111C",
+          elevated: "#0B1624",
+          control: "#0B1826",
+          border: "rgba(125,211,252,0.13)",
+          active: "rgba(103,232,249,0.34)",
+          cyan: "#38BDF8",
+          blue: "#60A5FA",
+          red: "#EF4444",
+          amber: "#F59E0B",
+          green: "#22C55E",
           text: "#E5E7EB",
-          muted: "#94A3B8",
+          muted: "#CBD5E1",
+          quiet: "#94A3B8",
         },
       },
       fontFamily: {
@@ -54,11 +59,11 @@ module.exports = {
       },
       boxShadow: {
         "hud-cyan":
-          "0 0 0 1px rgba(76,201,240,0.35), 0 0 36px rgba(76,201,240,0.16)",
+          "0 0 0 1px rgba(103,232,249,0.26), 0 0 18px rgba(56,189,248,0.08)",
         "hud-red":
-          "0 0 0 1px rgba(239,35,60,0.34), 0 0 32px rgba(239,35,60,0.14)",
+          "0 0 0 1px rgba(239,68,68,0.3), 0 0 18px rgba(239,68,68,0.08)",
         "hud-green":
-          "0 0 0 1px rgba(6,214,160,0.3), 0 0 28px rgba(6,214,160,0.14)",
+          "0 0 0 1px rgba(34,197,94,0.28), 0 0 16px rgba(34,197,94,0.08)",
       },
       keyframes: {
         "tactical-pulse": {

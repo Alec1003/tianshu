@@ -38,7 +38,7 @@ from typing import Any
 
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
-from app.compat import get_env
+from app.config import get_settings
 from app.auth.models import User
 from app.db.session import async_session_maker
 from app.mcp.auth import (
@@ -70,7 +70,7 @@ async def _resolve_user(token: str | None) -> User | None:
     Intentionally swallows ``McpAuthError`` -- the middleware turns ``None``
     into a 401 envelope; we don't want stack traces on the MCP wire.
     """
-    dev_user_id = get_env(ENV_HTTP_DEV_USER_ID).strip()
+    dev_user_id = get_settings().mcp_http_dev_user_id.strip()
     if dev_user_id:
         # Dev-only path: warn loudly and short-circuit token verification.
         logger.warning(

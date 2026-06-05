@@ -1,5 +1,2 @@
 [mcp_servers.tianshu]
 url = "http://127.0.0.1:8000/api/mcp/"
-
-[mcp_servers.tianshu.http_headers]
-Authorization = "Bearer <jwt>"

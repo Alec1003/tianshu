@@ -1,6 +1,6 @@
 param(
   [int]$Port = 8000,
-  [string]$Host = "127.0.0.1"
+  [string]$ListenHost = "127.0.0.1"
 )
 
 $ErrorActionPreference = "Stop"
@@ -18,7 +18,13 @@ if (!(Test-Path $pythonExe)) {
 if (Test-Path $pidFile) {
   $oldPid = Get-Content $pidFile -ErrorAction SilentlyContinue
   if ($oldPid) {
-    try { Stop-Process -Id ([int]$oldPid) -Force -ErrorAction SilentlyContinue } catch {}
+    try {
+      $oldProcess = Get-Process -Id ([int]$oldPid) -ErrorAction SilentlyContinue
+      if ($oldProcess) {
+        Stop-Process -Id $oldProcess.Id -Force -ErrorAction SilentlyContinue
+        Wait-Process -Id $oldProcess.Id -Timeout 5 -ErrorAction SilentlyContinue
+      }
+    } catch {}
   }
   Remove-Item -LiteralPath $pidFile -Force -ErrorAction SilentlyContinue
 }
@@ -28,7 +34,7 @@ if (Test-Path $errLog) { Remove-Item -LiteralPath $errLog -Force }
 
 $proc = Start-Process `
   -FilePath $pythonExe `
-  -ArgumentList "-m","uvicorn","app.main:app","--host",$Host,"--port",$Port `
+  -ArgumentList "-m","uvicorn","app.main:app","--host",$ListenHost,"--port",$Port `
   -WorkingDirectory $PSScriptRoot `
   -RedirectStandardOutput $outLog `
   -RedirectStandardError $errLog `
@@ -38,7 +44,7 @@ $proc.Id | Set-Content -Path $pidFile
 
 Start-Sleep -Seconds 2
 
-Write-Output "AI backend started. PID=$($proc.Id), HOST=$Host, PORT=$Port"
+Write-Output "AI backend started. PID=$($proc.Id), HOST=$ListenHost, PORT=$Port"
 Write-Output "PID file: $pidFile"
 Write-Output "Logs:"
 Write-Output "  OUT: $outLog"

@@ -4,7 +4,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from app.ai import bridge_registry as registry_mod
-from app.ai.bridge_registry import AICCBridgeRegistry
+from app.ai.bridge_registry import TianShuBridgeRegistry
 
 
 class _FakeBridge:
@@ -26,9 +26,9 @@ class _FakeBridge:
 def test_bridge_registry_reuses_bridge_per_user_and_isolates_users(
     monkeypatch,
 ) -> None:
-    monkeypatch.setattr(registry_mod, "AICCOpenClawBridge", _FakeBridge)
+    monkeypatch.setattr(registry_mod, "TianShuOpenClawBridge", _FakeBridge)
     scenario_path = Path("scenario.json")
-    registry = AICCBridgeRegistry(
+    registry = TianShuBridgeRegistry(
         scenario_path=scenario_path,
         llm_model="openai:test",
         llm_api_key="sk-test",
@@ -50,8 +50,8 @@ def test_bridge_registry_reuses_bridge_per_user_and_isolates_users(
 
 
 def test_bridge_registry_isolates_scenarios_for_the_same_user(monkeypatch) -> None:
-    monkeypatch.setattr(registry_mod, "AICCOpenClawBridge", _FakeBridge)
-    registry = AICCBridgeRegistry(scenario_path=Path("scenario.json"))
+    monkeypatch.setattr(registry_mod, "TianShuOpenClawBridge", _FakeBridge)
+    registry = TianShuBridgeRegistry(scenario_path=Path("scenario.json"))
     user = SimpleNamespace(id="user-a")
 
     bridge_default = registry.get_bridge_for_user(user)

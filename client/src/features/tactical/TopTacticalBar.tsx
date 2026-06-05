@@ -1,12 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import {
   Activity,
   ArrowLeft,
   BrainCircuit,
   Copy,
   Cpu,
-  GitBranch,
   History,
   LogOut,
   Save,
@@ -34,7 +33,6 @@ interface TopTacticalBarProps {
   onExit?: () => void;
   onSave?: () => void;
   onRequestSaveAs?: () => void;
-  onCreateBranch?: () => void;
   savingState?: "idle" | "saving" | "saved" | "error";
   timelineOpen?: boolean;
   onToggleTimeline?: () => void;
@@ -52,7 +50,6 @@ export default function TopTacticalBar({
   onExit,
   onSave,
   onRequestSaveAs,
-  onCreateBranch,
   savingState,
   timelineOpen,
   onToggleTimeline,
@@ -63,6 +60,7 @@ export default function TopTacticalBar({
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement | null>(null);
   const isRunning = snapshot.runState === "running";
+  const reduceMotion = useReducedMotion();
   const operatorName =
     user?.display_name?.trim() || user?.email?.split("@")[0] || "操作员";
   const operatorInitial = operatorName.trim().slice(0, 1).toUpperCase();
@@ -105,15 +103,16 @@ export default function TopTacticalBar({
     : 50;
 
   return (
-    <header className="relative z-40 flex h-14 shrink-0 items-center justify-between border-b border-cyan-400/20 bg-[#01040a]/90 px-4 backdrop-blur-2xl shadow-[0_4px_30px_rgba(8,145,178,0.1)]">
-      {/* Background Scanning Animation */}
-      <div className="pointer-events-none absolute inset-0 overflow-hidden opacity-20">
-        <motion.div
-          animate={{ x: ["-100%", "200%"] }}
-          transition={{ repeat: Infinity, duration: 8, ease: "linear" }}
-          className="h-full w-1/4 bg-gradient-to-r from-transparent via-cyan-400/10 to-transparent skew-x-12"
-        />
-      </div>
+    <header className="relative z-40 flex h-14 shrink-0 items-center justify-between border-b border-cyan-300/14 bg-[#030913]/94 px-4 shadow-[inset_0_-1px_0_rgba(125,211,252,0.04)] backdrop-blur-xl">
+      {!reduceMotion && (
+        <div className="pointer-events-none absolute inset-0 overflow-hidden opacity-[0.12]">
+          <motion.div
+            animate={{ x: ["-100%", "200%"] }}
+            transition={{ repeat: Infinity, duration: 10, ease: "linear" }}
+            className="h-full w-1/5 bg-gradient-to-r from-transparent via-cyan-300/10 to-transparent skew-x-12"
+          />
+        </div>
+      )}
 
       {/* 1. LEFT: Platform Identity */}
       <div className="flex items-center gap-4">
@@ -132,7 +131,7 @@ export default function TopTacticalBar({
         <div className="flex items-center gap-3">
           <div className="relative">
             <BrandLogo
-              frameClassName="size-8 rounded-lg border-cyan-400/30 bg-cyan-950/40 shadow-[0_0_12px_rgba(34,211,238,0.2)]"
+              frameClassName="size-8 rounded-lg border-cyan-400/24 bg-cyan-950/30 shadow-none"
               imageClassName="scale-[1.04]"
             />
             <div className="absolute -bottom-1 -right-1 size-2.5 rounded-full border border-[#01040a] bg-emerald-400" />
@@ -142,11 +141,11 @@ export default function TopTacticalBar({
               <span className="font-mono text-sm font-bold tracking-widest text-slate-100">
                 天枢
               </span>
-              <span className="rounded border border-cyan-400/20 bg-cyan-400/10 px-1 py-px font-mono text-[9px] uppercase text-cyan-300">
+              <span className="rounded border border-cyan-400/16 bg-cyan-400/8 px-1 py-px font-mono text-[9px] uppercase text-cyan-200">
                 指挥
               </span>
             </div>
-            <div className="text-[10px] uppercase tracking-widest text-cyan-500/70">
+            <div className="text-[10px] uppercase tracking-widest text-slate-400">
               AI 战术指挥网络
             </div>
           </div>
@@ -171,7 +170,7 @@ export default function TopTacticalBar({
             )}
             {isRunning && (
               <span className="ml-1 flex items-center gap-1.5 rounded-full border border-emerald-400/30 bg-emerald-400/10 px-2 py-0.5 text-[9px] uppercase tracking-widest text-emerald-400">
-                <span className="size-1.5 animate-pulse rounded-full bg-emerald-400" />
+                <span className="tactical-state-dot size-1.5 animate-pulse rounded-full bg-emerald-400" />
                 推演中
               </span>
             )}
@@ -185,7 +184,7 @@ export default function TopTacticalBar({
 
       {/* 2. MIDDLE: Tactical Status Bus */}
       <div className="hidden flex-1 justify-center xl:flex">
-        <div className="flex items-center gap-6 rounded-full border border-white/5 bg-white/[0.02] px-6 py-1.5 shadow-inner">
+        <div className="flex items-center gap-5 rounded-md border border-cyan-300/10 bg-slate-950/40 px-5 py-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.025)]">
           <div className="flex items-center gap-2">
             <Activity className="size-3 text-cyan-500" />
             <span className="font-mono text-[10px] text-slate-400">态势</span>
@@ -199,7 +198,7 @@ export default function TopTacticalBar({
           <div className="flex items-center gap-2">
             <Cpu className="size-3 text-cyan-500" />
             <span className="font-mono text-[10px] text-slate-400">AI</span>
-            <span className="font-mono text-xs font-bold text-cyan-400 shadow-cyan-400 drop-shadow-md">
+            <span className="font-mono text-xs font-bold text-cyan-300">
               在线
             </span>
           </div>
@@ -210,7 +209,7 @@ export default function TopTacticalBar({
             <Signal
               className={cn(
                 "size-3",
-                isRunning ? "text-emerald-400 animate-pulse" : "text-slate-500"
+                isRunning ? "text-emerald-400 animate-pulse" : "text-slate-400"
               )}
             />
             <span className="font-mono text-[10px] text-slate-400">状态</span>
@@ -240,7 +239,7 @@ export default function TopTacticalBar({
                 <span className="font-mono text-[9px] text-blue-400">蓝方</span>
                 <div className="relative h-1.5 flex-1 overflow-hidden rounded-full bg-red-900/50">
                   <div
-                    className="absolute inset-y-0 left-0 bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)]"
+                    className="absolute inset-y-0 left-0 bg-blue-500"
                     style={{ width: `${blueRatio}%` }}
                   />
                 </div>
@@ -263,20 +262,20 @@ export default function TopTacticalBar({
       {/* 3. RIGHT: Quick Actions & Save */}
       <div className="flex items-center gap-3">
         {/* Router actions (Save / Save As) */}
-        {(onSave || onRequestSaveAs || onCreateBranch) && (
-          <div className="flex items-center gap-2 pr-3 border-r border-cyan-400/20">
+        {(onSave || onRequestSaveAs) && (
+          <div className="flex items-center gap-2 border-r border-cyan-400/14 pr-3">
             {onSave && !scenarioMeta?.isTemplate && (
               <button
                 type="button"
                 onClick={onSave}
                 disabled={savingState === "saving"}
                 className={cn(
-                  "flex items-center gap-1.5 rounded border px-3 py-1 font-mono text-[10px] font-bold uppercase tracking-widest transition-all",
+                  "flex items-center gap-1.5 rounded-md border px-3 py-1 font-mono text-[10px] font-bold uppercase tracking-widest transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/55",
                   savingState === "saved"
                     ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
                     : savingState === "error"
                       ? "border-red-500/30 bg-red-500/10 text-red-300"
-                      : "border-cyan-400/30 bg-cyan-400/10 text-cyan-300 hover:border-cyan-400/50 hover:bg-cyan-400/20 hover:shadow-[0_0_8px_rgba(34,211,238,0.15)]"
+                      : "border-cyan-400/24 bg-cyan-400/8 text-cyan-200 hover:border-cyan-400/42 hover:bg-cyan-400/14"
                 )}
                 title="保存到当前想定"
               >
@@ -296,22 +295,11 @@ export default function TopTacticalBar({
               <button
                 type="button"
                 onClick={onRequestSaveAs}
-                className="flex items-center gap-1.5 rounded border border-white/10 bg-white/5 px-3 py-1 font-mono text-[10px] font-bold uppercase tracking-widest text-slate-300 transition-all hover:border-cyan-400/30 hover:bg-cyan-400/5 hover:text-cyan-300 hover:shadow-[0_0_8px_rgba(34,211,238,0.1)]"
+                className="flex items-center gap-1.5 rounded-md border border-white/10 bg-white/[0.035] px-3 py-1 font-mono text-[10px] font-bold uppercase tracking-widest text-slate-300 transition-colors hover:border-cyan-400/28 hover:bg-cyan-400/10 hover:text-cyan-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/55"
                 title="另存为新想定"
               >
                 <Copy className="size-3.5" />
                 <span className="hidden sm:inline">另存</span>
-              </button>
-            )}
-            {onCreateBranch && (
-              <button
-                type="button"
-                onClick={onCreateBranch}
-                className="flex items-center gap-1.5 rounded border border-indigo-400/20 bg-indigo-400/10 px-3 py-1 font-mono text-[10px] font-bold uppercase tracking-widest text-indigo-200 transition-all hover:border-indigo-300/40 hover:bg-indigo-300/15 hover:text-indigo-100"
-                title="创建推演分支"
-              >
-                <GitBranch className="size-3.5" />
-                <span className="hidden sm:inline">分支</span>
               </button>
             )}
           </div>
@@ -320,7 +308,7 @@ export default function TopTacticalBar({
         <div className="hidden items-center gap-1 md:flex">
           <button
             aria-label={mapSceneMode === "3d" ? "切换二维地图" : "切换三维地图"}
-            className="grid size-8 place-items-center rounded bg-transparent text-slate-400 transition-colors hover:bg-white/5 hover:text-cyan-300 disabled:cursor-not-allowed disabled:opacity-40"
+            className="grid size-8 place-items-center rounded-md bg-transparent text-slate-300 transition-colors hover:bg-white/5 hover:text-cyan-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/55 disabled:cursor-not-allowed disabled:opacity-40"
             disabled={!onToggleMapSceneMode}
             onClick={onToggleMapSceneMode}
             title={mapSceneMode === "3d" ? "切换为二维地图" : "切换为三维地图"}
@@ -332,17 +320,17 @@ export default function TopTacticalBar({
           </button>
         </div>
 
-        <div className="hidden h-6 w-px bg-cyan-400/20 md:block" />
+        <div className="hidden h-6 w-px bg-cyan-400/14 md:block" />
 
         <button
           aria-label={timelineOpen ? "关闭推演回放" : "打开推演回放"}
           disabled={!onToggleTimeline}
           onClick={() => onToggleTimeline && onToggleTimeline()}
           className={cn(
-            "flex h-8 items-center gap-2 rounded border px-3 transition-all",
+            "flex h-8 items-center gap-2 rounded-md border px-3 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/55",
             timelineOpen
-              ? "border-cyan-400/50 bg-cyan-400/10 text-cyan-300 shadow-[0_0_12px_rgba(34,211,238,0.2)]"
-              : "border-white/5 bg-white/5 text-slate-300 hover:border-cyan-400/30 hover:bg-cyan-400/5 hover:text-cyan-300"
+              ? "border-cyan-400/42 bg-cyan-400/10 text-cyan-200"
+              : "border-white/10 bg-white/[0.035] text-slate-300 hover:border-cyan-400/28 hover:bg-cyan-400/10 hover:text-cyan-200"
           )}
           title={timelineOpen ? "关闭推演回放" : "打开推演回放"}
           type="button"
@@ -357,10 +345,10 @@ export default function TopTacticalBar({
           aria-label={aiSidebarOpen ? "关闭 AI 助手" : "打开 AI 助手"}
           onClick={() => onToggleAiSidebar()}
           className={cn(
-            "flex h-8 items-center gap-2 rounded border px-3 transition-all",
+            "flex h-8 items-center gap-2 rounded-md border px-3 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/55",
             aiSidebarOpen
-              ? "border-cyan-400/50 bg-cyan-400/10 text-cyan-300 shadow-[0_0_12px_rgba(34,211,238,0.2)]"
-              : "border-white/5 bg-white/5 text-slate-300 hover:border-cyan-400/30 hover:bg-cyan-400/5 hover:text-cyan-300"
+              ? "border-cyan-400/42 bg-cyan-400/10 text-cyan-200"
+              : "border-white/10 bg-white/[0.035] text-slate-300 hover:border-cyan-400/28 hover:bg-cyan-400/10 hover:text-cyan-200"
           )}
           title={aiSidebarOpen ? "关闭 AI 助手" : "打开 AI 助手"}
           type="button"
@@ -376,10 +364,10 @@ export default function TopTacticalBar({
           disabled={!onToggleSettings}
           onClick={() => onToggleSettings && onToggleSettings()}
           className={cn(
-            "grid size-8 place-items-center rounded border transition-all",
+            "grid size-8 place-items-center rounded-md border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/55",
             settingsOpen
-              ? "border-cyan-400/50 bg-cyan-400/10 text-cyan-300"
-              : "border-transparent bg-transparent text-slate-400 hover:bg-white/5 hover:text-cyan-300"
+              ? "border-cyan-400/42 bg-cyan-400/10 text-cyan-200"
+              : "border-transparent bg-transparent text-slate-300 hover:bg-white/5 hover:text-cyan-200"
           )}
           title={settingsOpen ? "关闭战术配置中心" : "打开战术配置中心"}
           type="button"
@@ -393,10 +381,10 @@ export default function TopTacticalBar({
             aria-haspopup="menu"
             aria-label="当前操作员"
             className={cn(
-              "grid size-8 place-items-center rounded-full border bg-[#01040a] transition-all",
+              "grid size-8 place-items-center rounded-full border bg-[#030913] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/55",
               userMenuOpen
-                ? "border-cyan-400/60 text-cyan-200 shadow-[0_0_16px_rgba(34,211,238,0.22)]"
-                : "border-cyan-400/20 text-slate-400 hover:border-cyan-400/45 hover:text-cyan-300"
+                ? "border-cyan-400/50 text-cyan-200"
+                : "border-cyan-400/18 text-slate-300 hover:border-cyan-400/38 hover:text-cyan-200"
             )}
             onClick={() => setUserMenuOpen((value) => !value)}
             title="当前操作员"
@@ -407,7 +395,7 @@ export default function TopTacticalBar({
 
           {userMenuOpen && (
             <div
-              className="absolute right-0 top-11 z-50 w-72 overflow-hidden rounded-xl border border-cyan-400/20 bg-[#050914]/98 shadow-[0_18px_44px_rgba(0,0,0,0.45),0_0_24px_rgba(34,211,238,0.1)] backdrop-blur-2xl"
+              className="absolute right-0 top-11 z-50 w-72 overflow-hidden rounded-lg border border-cyan-400/16 bg-[#050914]/98 shadow-[0_18px_44px_rgba(0,0,0,0.38)] backdrop-blur-xl"
               role="menu"
             >
               <div className="border-b border-white/10 px-4 py-3">

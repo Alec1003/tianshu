@@ -11,8 +11,8 @@ sys.path.insert(0, os.path.abspath("../gym"))
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
-project = "aicc"
-copyright = "2025, AICC AI"
+project = "tianshu"
+copyright = "2025, TianShu AI"
 author = "Luke"
 release = "0.1"
 

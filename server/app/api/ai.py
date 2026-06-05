@@ -3,18 +3,34 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import shlex
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai.model_checker import check_model_connectivity
+from app.ai.custom_skill_store import (
+    CustomSkillNotFoundError,
+    CustomSkillStore,
+    CustomSkillStoreError,
+)
+from app.ai.internal_skills import build_internal_skill_steps
 from app.ai.models import (
     AICommandRequest,
     AICommandResponse,
+    BuiltinMcpToolsResponse,
     CommandApprovalResponse,
     CommandProposalListResponse,
+    CustomSkillCreateRequest,
+    CustomSkillListResponse,
+    CustomSkillRead,
+    CustomSkillUpdateRequest,
+    ExternalMcpValidateRequest,
+    ExternalMcpValidateResponse,
+    InternalSkillProposalRequest,
+    InternalSkillProposalResponse,
     ModelCheckRequest,
     ModelCheckResponse,
     RuntimeAddWeaponRequest,
@@ -34,6 +50,7 @@ from app.ai.models import (
     RuntimeUpdateUnitRequest,
     RuntimeUpdateWeaponQuantityRequest,
 )
+from app.ai.mcp_client import MCPClientSkeleton, MCPServerConfig
 from app.ai.command_service import (
     CommandProposalNotFoundError,
     get_command_proposal,
@@ -48,17 +65,17 @@ from app.ai.model_config_service import (
     resolve_stored_model_credentials,
     upsert_model_provider_config,
 )
-from app.aicc_runtime.persistence import (
+from app.tianshu_runtime.persistence import (
     ensure_runtime_state_loaded,
     save_runtime_state,
 )
-from app.aicc_runtime.schemas import RuntimeTimelineResponse
-from app.aicc_runtime.timeline import (
+from app.tianshu_runtime.schemas import RuntimeTimelineResponse
+from app.tianshu_runtime.timeline import (
     list_runtime_events,
     record_runtime_event,
     runtime_scenario_id,
 )
-from app.aicc_runtime.visibility import compute_runtime_visibility
+from app.tianshu_runtime.visibility import compute_runtime_visibility
 from app.auth.models import User
 from app.auth.users import current_active_user
 from app.db.session import async_session_maker, get_async_session
@@ -72,11 +89,27 @@ router = APIRouter(
     dependencies=[Depends(current_active_user)],
 )
 
-RUNTIME_SCENARIO_HEADER = "x-aicc-scenario-id"
+RUNTIME_SCENARIO_HEADER = "x-tianshu-scenario-id"
+HEADER_PREFIX = "x-tianshu-"
+LEGACY_HEADER_PREFIX = "x-" + "ai" + "cc" + "-"
+
+
+def _legacy_header_name(name: str) -> str:
+    if name.startswith(HEADER_PREFIX):
+        return LEGACY_HEADER_PREFIX + name[len(HEADER_PREFIX) :]
+    return LEGACY_HEADER_PREFIX + name
+
+
+def _header_value(request: Request, name: str) -> str:
+    return (
+        request.headers.get(name)
+        or request.headers.get(_legacy_header_name(name))
+        or ""
+    )
 
 
 def _runtime_context_from_request(request: Request) -> str | None:
-    return (request.headers.get(RUNTIME_SCENARIO_HEADER) or "").strip() or None
+    return _header_value(request, RUNTIME_SCENARIO_HEADER).strip() or None
 
 
 def _bridge_for_user(request: Request, user: User) -> Any:
@@ -87,6 +120,17 @@ def _bridge_for_user(request: Request, user: User) -> Any:
             scenario_id=_runtime_context_from_request(request),
         )
     return request.app.state.bridge
+
+
+def _custom_skill_store(request: Request) -> CustomSkillStore:
+    store = getattr(request.app.state, "custom_skill_store", None)
+    if store is not None:
+        return store
+    return CustomSkillStore.from_settings()
+
+
+def _custom_skill_created_by(user: User) -> str:
+    return str(getattr(user, "email", None) or getattr(user, "id", "operator"))
 
 
 async def _bridge_for_user_loaded(
@@ -207,6 +251,8 @@ def _proposal_execution_event_type(proposal: Any) -> str:
             "simulation_step": "runtime.step",
             "load_scenario_snapshot": "scenario.loaded",
             "move_unit": "runtime.move_unit",
+            "attack_unit": "runtime.attack_unit",
+            "update_weapon_quantity": "runtime.update_weapon_quantity",
             "delete_unit": "runtime.delete_unit",
             "update_unit_state": "runtime.update_unit",
             "trigger_tactical_event": "runtime.tactical_event",
@@ -507,6 +553,54 @@ async def reject_command_proposal(
     return CommandApprovalResponse(proposal=proposal, snapshot=None)
 
 
+@router.post(
+    "/internal-skills/proposals",
+    response_model=InternalSkillProposalResponse,
+)
+async def create_internal_skill_proposal(
+    request: Request,
+    payload: InternalSkillProposalRequest,
+    session: AsyncSession = Depends(get_async_session),
+    user: User = Depends(current_active_user),
+) -> InternalSkillProposalResponse:
+    bridge = await _bridge_for_user_loaded(request, user, session)
+    queue = getattr(bridge, "command_approvals", None)
+    if queue is None:
+        raise RuntimeError("AI bridge does not expose command approvals")
+    try:
+        steps = build_internal_skill_steps(bridge.runtime, payload.draft)
+        proposal = queue.create_proposal(
+            command=payload.command or payload.draft.name,
+            steps=steps,
+            source="internal_skill",
+        )
+        saved = await save_command_proposal(
+            session,
+            user,
+            proposal,
+            scenario_id=_runtime_context_from_request(request),
+        )
+        queue.hydrate(saved)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
+
+    await record_runtime_event(
+        session,
+        user,
+        event_type="command.proposed",
+        action="internal_skill_proposal_created",
+        actor=saved.source,
+        summary=f"内部战术技能提案：{payload.draft.name}",
+        payload={"draft": payload.draft.model_dump(mode="json"), "proposal": saved.model_dump(mode="json")},
+        runtime=getattr(bridge, "runtime", None),
+        proposal_id=saved.id,
+    )
+    return InternalSkillProposalResponse(draft=payload.draft, proposal=saved)
+
+
 @router.get("/runtime/scenario")
 async def runtime_scenario(
     request: Request,
@@ -517,7 +611,7 @@ async def runtime_scenario(
 
     This is the **read-only** counterpart to the MCP ``runtime_*`` tools:
     the front-end (or any HTTP client) can poll this endpoint to grab the
-    latest snapshot of the shared ``AICCRuntime`` that MCP / AI
+    latest snapshot of the shared ``TianShuRuntime`` that MCP / AI
     commands are mutating. The returned shape is identical to the
     ``scenario`` field in ``POST /api/ai/command`` responses, so
     ``game.loadScenario(JSON.stringify(response))`` works on the client.
@@ -547,6 +641,7 @@ async def runtime_timeline(
     event_type: str | None = None,
     category: str | None = None,
     limit: int = 200,
+    latest: bool = False,
     session: AsyncSession = Depends(get_async_session),
     user: User = Depends(current_active_user),
 ) -> RuntimeTimelineResponse:
@@ -561,6 +656,7 @@ async def runtime_timeline(
         event_type=event_type,
         category=category,
         limit=limit,
+        latest=latest,
     )
     return RuntimeTimelineResponse(events=list(events))
 
@@ -1278,6 +1374,208 @@ def list_skills(
     return {"skills": [definition.model_dump() for definition in bridge.skill_registry.definitions()]}
 
 
+@router.get("/custom-skills", response_model=CustomSkillListResponse)
+def list_custom_skills(
+    request: Request,
+    user: User = Depends(current_active_user),
+) -> CustomSkillListResponse:
+    store = _custom_skill_store(request)
+    return CustomSkillListResponse(
+        skills=store.list(str(user.id)),
+        skillsDir=str(store.root_dir),
+    )
+
+
+@router.post(
+    "/custom-skills",
+    response_model=CustomSkillRead,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_custom_skill(
+    request: Request,
+    payload: CustomSkillCreateRequest,
+    user: User = Depends(current_active_user),
+) -> CustomSkillRead:
+    try:
+        return _custom_skill_store(request).create(
+            str(user.id),
+            payload,
+            created_by=_custom_skill_created_by(user),
+        )
+    except CustomSkillStoreError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
+
+
+@router.patch("/custom-skills/{skill_id}", response_model=CustomSkillRead)
+def update_custom_skill(
+    request: Request,
+    skill_id: str,
+    payload: CustomSkillUpdateRequest,
+    user: User = Depends(current_active_user),
+) -> CustomSkillRead:
+    try:
+        return _custom_skill_store(request).update(str(user.id), skill_id, payload)
+    except CustomSkillNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Custom skill not found.",
+        ) from exc
+    except CustomSkillStoreError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
+
+
+@router.delete(
+    "/custom-skills/{skill_id}",
+    response_class=Response,
+    response_model=None,
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def delete_custom_skill(
+    request: Request,
+    skill_id: str,
+    user: User = Depends(current_active_user),
+) -> None:
+    try:
+        _custom_skill_store(request).delete(str(user.id), skill_id)
+    except CustomSkillNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Custom skill not found.",
+        ) from exc
+    except CustomSkillStoreError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
+
+
+def _external_mcp_transport(payload: ExternalMcpValidateRequest) -> str:
+    transport = payload.transport.strip().lower().replace("-", "_")
+    if transport in {"http", "sse", "streamablehttp", "streamable_http"}:
+        return "streamable_http"
+    if transport == "stdio":
+        return "stdio"
+    raise HTTPException(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        detail=f"Unsupported MCP transport: {payload.transport}",
+    )
+
+
+def _split_mcp_command_line(command_line: str) -> tuple[str, list[str]]:
+    if not command_line.strip() or command_line.startswith("stdio://"):
+        return "", []
+    try:
+        parts = shlex.split(command_line, posix=True)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Invalid stdio command line: {exc}",
+        ) from exc
+    if not parts:
+        return "", []
+    return parts[0], parts[1:]
+
+
+def _external_mcp_config_from_payload(
+    payload: ExternalMcpValidateRequest,
+) -> MCPServerConfig:
+    transport = _external_mcp_transport(payload)
+    endpoint = payload.endpoint.strip()
+    command = payload.command.strip()
+    args = [arg for arg in payload.args if arg.strip()]
+    url = (payload.url or "").strip()
+
+    if transport == "stdio":
+        if not command:
+            command, fallback_args = _split_mcp_command_line(endpoint)
+            args = args or fallback_args
+        if not command:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="stdio MCP validation requires command or command-line endpoint.",
+            )
+        url = ""
+    else:
+        url = url or endpoint
+        if not url:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="HTTP MCP validation requires url or endpoint.",
+            )
+        command = ""
+        args = []
+
+    return MCPServerConfig(
+        name=payload.name,
+        transport=transport,
+        command=command,
+        args=args,
+        env=dict(payload.env),
+        url=url,
+        headers=dict(payload.headers),
+        allowed_tools=list(payload.allowedTools),
+        enabled=payload.enabled,
+        timeout_seconds=min(max(float(payload.timeoutSeconds), 1.0), 15.0),
+    )
+
+
+@router.post("/mcp/validate", response_model=ExternalMcpValidateResponse)
+async def validate_external_mcp_server(
+    payload: ExternalMcpValidateRequest,
+    user: User = Depends(current_active_user),
+) -> ExternalMcpValidateResponse:
+    """Validate one operator-provided MCP server and return its tool list.
+
+    The config is intentionally not persisted server-side here. The client uses
+    this as a connection proof before saving its local MCP configuration.
+    """
+    _ = user
+    config = _external_mcp_config_from_payload(payload)
+    client = MCPClientSkeleton()
+    try:
+        client.register_server(config)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
+
+    trace, tools = await client.list_tools(config.name)
+    ok = any(item.status == "ok" for item in trace)
+    message = trace[-1].message if trace else "MCP validation finished."
+    return ExternalMcpValidateResponse(
+        ok=ok,
+        server=config.name,
+        transport=config.normalized_transport(),  # type: ignore[arg-type]
+        message=message,
+        tools=tools,
+        trace=trace,
+    )
+
+
+@router.get("/mcp/builtin/tools", response_model=BuiltinMcpToolsResponse)
+async def list_builtin_mcp_tools(
+    user: User = Depends(current_active_user),
+) -> BuiltinMcpToolsResponse:
+    """Return the built-in TianShu MCP tool registry for the settings UI."""
+    _ = user
+    from app.mcp.server import list_builtin_mcp_tool_definitions
+
+    tools = await list_builtin_mcp_tool_definitions()
+    return BuiltinMcpToolsResponse(
+        ok=True,
+        server="TianShu MCP",
+        message=f"{len(tools)} built-in TianShu MCP tools available.",
+        tools=tools,
+    )
+
+
 @router.post("/model/check", response_model=ModelCheckResponse)
 async def check_model(
     payload: ModelCheckRequest,
@@ -1332,22 +1630,22 @@ def _read_model_override_from_headers(
 ) -> tuple[str, str, str, str, str]:
     """Pull per-request model override fields from custom headers.
 
-    The AI sidebar sends ``X-AICC-Model-{Provider,Name,Api-Key,Base-Url}``
+    The AI sidebar sends ``X-TianShu-Model-{Provider,Name,Api-Key,Base-Url}``
     whenever the user has filled in a model config. Empty / missing
     headers fall back to "" so the caller can decide between override and
     the env-configured global agent.
     """
     return (
-        (request.headers.get("x-aicc-model-provider-id") or "").strip(),
-        (request.headers.get("x-aicc-model-provider") or "").strip(),
-        (request.headers.get("x-aicc-model-name") or "").strip(),
-        (request.headers.get("x-aicc-model-api-key") or "").strip(),
-        (request.headers.get("x-aicc-model-base-url") or "").strip(),
+        _header_value(request, "x-tianshu-model-provider-id").strip(),
+        _header_value(request, "x-tianshu-model-provider").strip(),
+        _header_value(request, "x-tianshu-model-name").strip(),
+        _header_value(request, "x-tianshu-model-api-key").strip(),
+        _header_value(request, "x-tianshu-model-base-url").strip(),
     )
 
 
 def _read_chat_mode_from_headers(request: Request) -> str:
-    mode = (request.headers.get("x-aicc-chat-mode") or "command").strip().lower()
+    mode = (_header_value(request, "x-tianshu-chat-mode") or "command").strip().lower()
     return "ask" if mode == "ask" else "command"
 
 
@@ -1365,7 +1663,7 @@ async def chat(
     consume out of the box.
 
     Model override: when the request carries
-    ``X-AICC-Model-{Provider,Name,Api-Key,Base-Url}`` headers (i.e. the
+    ``X-TianShu-Model-{Provider,Name,Api-Key,Base-Url}`` headers (i.e. the
     user filled in the sidebar Settings panel) we build a one-off agent
     so the user-supplied credentials/provider actually drive the stream.
     Otherwise we fall back to the env-configured ``bridge.pydantic_agent``.
@@ -1425,8 +1723,8 @@ async def chat(
                     json.dumps(
                         {
                             "error": (
-                                "No LLM configured. Either set AICC_LLM_MODEL + "
-                                "AICC_LLM_API_KEY on the server, or fill the "
+                                "No LLM configured. Either set TIANSHU_LLM_MODEL + "
+                                "TIANSHU_LLM_API_KEY on the server, or fill the "
                                 "model section in the AI sidebar (Settings)."
                             )
                         }
@@ -1475,6 +1773,13 @@ async def chat(
         approval_queue=approval_queue,
         proposal_recorder=_record_proposal if approval_queue is not None else None,
         mcp_client=bridge.mcp_client,
+        session=session,
+        user=user,
+        scenario_id=_runtime_context_from_request(request),
+        bridge_provider=lambda owner, scenario_ctx=None: _bridge_for_user(
+            request,
+            owner,
+        ),
     )
     return await VercelAIAdapter.dispatch_request(
         request,

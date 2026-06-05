@@ -1,2 +1,2 @@
-"""AICC AI backend package."""
+"""TianShu AI backend package."""
 

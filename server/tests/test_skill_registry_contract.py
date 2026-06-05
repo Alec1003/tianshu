@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from app.ai.skill_registry import AICCSkillRegistry
+import pytest
+
+from app.ai.skill_registry import TianShuSkillRegistry
 
 
 class FakeRuntime:
@@ -49,6 +51,33 @@ class FakeRuntime:
     def update_unit_state(self, **kwargs):
         return self._ok(**kwargs)
 
+    def attack_unit(self, **kwargs):
+        return self._ok(**kwargs)
+
+    def update_weapon_quantity(self, **kwargs):
+        return self._ok(**kwargs)
+
+    def add_weapon_to_unit(self, **kwargs):
+        return self._ok(**kwargs)
+
+    def delete_weapon_from_unit(self, **kwargs):
+        return self._ok(**kwargs)
+
+    def create_patrol_mission(self, **kwargs):
+        return self._ok(**kwargs)
+
+    def update_patrol_mission(self, **kwargs):
+        return self._ok(**kwargs)
+
+    def create_strike_mission(self, **kwargs):
+        return self._ok(**kwargs)
+
+    def update_strike_mission(self, **kwargs):
+        return self._ok(**kwargs)
+
+    def delete_mission(self, **kwargs):
+        return self._ok(**kwargs)
+
     def trigger_tactical_event(self, **kwargs):
         return self._ok(**kwargs)
 
@@ -72,7 +101,7 @@ class FakeRuntime:
 
 
 def test_skill_definitions_are_user_readable_and_complete():
-    registry = AICCSkillRegistry(runtime=FakeRuntime())
+    registry = TianShuSkillRegistry(runtime=FakeRuntime())
     definitions = {definition.name: definition for definition in registry.definitions()}
 
     assert "deploy_obstacle" in definitions
@@ -83,3 +112,42 @@ def test_skill_definitions_are_user_readable_and_complete():
     descriptions = [definition.description for definition in definitions.values()]
     assert not any("�" in description for description in descriptions)
     assert not any("鍚" in description for description in descriptions)
+
+
+def test_skill_registry_exposes_harness_capabilities():
+    registry = TianShuSkillRegistry(runtime=FakeRuntime())
+
+    capability_names = {capability.name for capability in registry.capabilities()}
+
+    assert "simulation_step" in capability_names
+    assert "deploy_aircraft" in capability_names
+    assert registry.harness.get_capability("simulation_step").access == "control"
+    assert registry.harness.get_capability("deploy_aircraft").access == "write"
+
+
+def test_skill_registry_execute_routes_through_harness():
+    registry = TianShuSkillRegistry(runtime=FakeRuntime())
+
+    output = registry.execute(
+        "simulation_step",
+        {"steps": 9},
+        source="test",
+        actor_id="operator-1",
+        scenario_id="scenario-1",
+        request_id="request-1",
+    )
+
+    assert output == {"ok": True, "steps": 9}
+    stats = registry.harness.stats("simulation_step")
+    assert stats.usage_count == 1
+    assert stats.last_source == "test"
+    assert stats.last_actor_id == "operator-1"
+    assert stats.last_scenario_id == "scenario-1"
+    assert stats.last_request_id == "request-1"
+
+
+def test_skill_registry_rejects_unknown_skill_before_execution():
+    registry = TianShuSkillRegistry(runtime=FakeRuntime())
+
+    with pytest.raises(ValueError, match="Skill not registered"):
+        registry.execute("missing_skill", {})

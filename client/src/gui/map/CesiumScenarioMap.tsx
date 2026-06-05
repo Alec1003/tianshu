@@ -225,10 +225,22 @@ const SATELLITE_MAXIMUM_LEVEL = parseImageryMaximumLevel(
   import.meta.env.VITE_CESIUM_SATELLITE_MAX_LEVEL as string | undefined,
   DEFAULT_SATELLITE_MAXIMUM_LEVEL
 );
+const DEFAULT_ARCGIS_IMAGERY_TILE_URL =
+  "https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
+const ARCGIS_IMAGERY_TILE_URL =
+  (
+    import.meta.env.VITE_CESIUM_ARCGIS_IMAGERY_TILE_URL as string | undefined
+  )?.trim() || DEFAULT_ARCGIS_IMAGERY_TILE_URL;
+const DEFAULT_ARCGIS_IMAGERY_MAXIMUM_LEVEL = 19;
+const ARCGIS_IMAGERY_MAXIMUM_LEVEL = parseImageryMaximumLevel(
+  import.meta.env.VITE_CESIUM_ARCGIS_IMAGERY_MAX_LEVEL as string | undefined,
+  DEFAULT_ARCGIS_IMAGERY_MAXIMUM_LEVEL
+);
 
-// Base-layer URL templates. All four are reachable without tokens.
+// Base-layer URL templates. All layers are reachable without tokens by default.
 // `lightVector` = Gaode (Amap) vector w/ Chinese labels.
 // `darkMatter`  = CartoDB Dark Matter raster (tactical / night ops).
+// `arcgisImagery` = ArcGIS World Imagery MapServer tiles for 3D globe.
 // `satellite`   = Gaode satellite raster, clamped to z16 by default because
 //                 some sea areas return placeholder tiles at z17+.
 // `sentinel`    = EOX Sentinel-2 cloudless (open ESA Copernicus data, free,
@@ -248,6 +260,12 @@ function imageryProviderFor(
         url: "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png",
         subdomains: ["a", "b", "c", "d"],
         maximumLevel: 19,
+      });
+    case "arcgisImagery":
+      return new UrlTemplateImageryProvider({
+        url: ARCGIS_IMAGERY_TILE_URL,
+        maximumLevel: ARCGIS_IMAGERY_MAXIMUM_LEVEL,
+        credit: "ArcGIS World Imagery",
       });
     case "satellite":
       return new UrlTemplateImageryProvider({
@@ -356,7 +374,7 @@ export default function CesiumScenarioMap({
   // Toolbar-driven state. baseLayer + placement live in React so re-renders
   // update the toolbar UI; refs mirror them for the long-lived Cesium effect.
   const [internalBaseLayer, setInternalBaseLayer] =
-    useState<CesiumBaseLayerKey>("satellite");
+    useState<CesiumBaseLayerKey>("arcgisImagery");
   const baseLayer = controlledBaseLayer ?? internalBaseLayer;
   const setBaseLayer = useCallback(
     (nextBaseLayer: CesiumBaseLayerKey) => {
@@ -371,7 +389,9 @@ export default function CesiumScenarioMap({
   // 2D / 3D scene morph state. Cesium uses SceneMode.SCENE2D / SCENE3D; we
   // mirror to React state so the floating top toolbar can highlight the
   // active button without subscribing to scene events.
-  const [is3D, setIs3D] = useState(controlledSceneMode === "3d");
+  const [is3D, setIs3D] = useState(
+    controlledSceneMode === undefined ? true : controlledSceneMode === "3d"
+  );
   const activeSceneMode: CesiumSceneModeKey =
     controlledSceneMode ?? (is3D ? "3d" : "2d");
   const [internalPlacement, setInternalPlacement] =
@@ -401,13 +421,13 @@ export default function CesiumScenarioMap({
   }, [onScenarioMutation]);
   const reportRuntimeUnavailable = useCallback((action: RuntimeActionKey) => {
     const label = RUNTIME_ACTION_LABELS[action];
-    console.error(`[AICC] runtime handler missing: ${action}`);
+    console.error(`[TianShu] runtime handler missing: ${action}`);
     window.alert(`后端仿真接口未就绪，无法${label}。请刷新页面后重试。`);
   }, []);
   const reportRuntimeFailure = useCallback(
     (action: RuntimeActionKey, err: unknown) => {
       const label = RUNTIME_ACTION_LABELS[action];
-      console.error(`[AICC] runtime ${action} failed:`, err);
+      console.error(`[TianShu] runtime ${action} failed:`, err);
       window.alert(`${label}失败，请检查后端服务后重试。`);
     },
     []
@@ -923,8 +943,7 @@ export default function CesiumScenarioMap({
       homeButton: false,
       infoBox: false,
       sceneModePicker: false,
-      // Start in flat 2D mode by default so legacy users don't see a globe
-      // until they explicitly toggle 3D from the floating top toolbar.
+      // Start in 3D by default so the tactical view opens as a globe.
       sceneMode:
         activeSceneMode === "3d" ? SceneMode.SCENE3D : SceneMode.SCENE2D,
       mapMode2D: MapMode2D.ROTATE,

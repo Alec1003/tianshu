@@ -17,7 +17,7 @@ Why an ASGI middleware (not a FastAPI ``Depends``):
        header before they reach the tool layer.
 
 Dev escape hatch:
-    Setting ``AICC_MCP_HTTP_DEV_USER_ID=<uuid>`` skips token validation and
+    Setting ``TIANSHU_MCP_HTTP_DEV_USER_ID=<uuid>`` skips token validation and
     pins every request to that user. Only meaningful for local debugging
     (mcp inspector, smoke scripts) -- ``logger.warning`` flags it loudly so
     it doesn't ship to prod by accident.
@@ -34,12 +34,11 @@ from __future__ import annotations
 
 import json
 import logging
-import os
-import uuid
 from typing import Any
 
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
+from app.config import get_settings
 from app.auth.models import User
 from app.db.session import async_session_maker
 from app.mcp.auth import (
@@ -51,7 +50,7 @@ from app.mcp.server import reset_request_user, set_request_user
 
 logger = logging.getLogger(__name__)
 
-ENV_HTTP_DEV_USER_ID = "AICC_MCP_HTTP_DEV_USER_ID"
+ENV_HTTP_DEV_USER_ID = "TIANSHU_MCP_HTTP_DEV_USER_ID"
 
 
 def _bearer_from_scope(scope: Scope) -> str | None:
@@ -71,7 +70,7 @@ async def _resolve_user(token: str | None) -> User | None:
     Intentionally swallows ``McpAuthError`` -- the middleware turns ``None``
     into a 401 envelope; we don't want stack traces on the MCP wire.
     """
-    dev_user_id = os.environ.get(ENV_HTTP_DEV_USER_ID, "").strip()
+    dev_user_id = get_settings().mcp_http_dev_user_id.strip()
     if dev_user_id:
         # Dev-only path: warn loudly and short-circuit token verification.
         logger.warning(
@@ -147,8 +146,6 @@ class BearerAuthASGI:
         # frameworks reuse tasks across requests in some setups).
         ctx_token = set_request_user(user)
         try:
-            # Lightweight access log; aligns with FastAPI's uvicorn access.
-            request_id = scope.get("headers", [])
             logger.debug(
                 "mcp.http_auth: authorized user=%s path=%s",
                 user.email,

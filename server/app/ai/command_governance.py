@@ -14,8 +14,8 @@ from app.ai.models import (
     SkillExecutionResult,
     StructuredCommandStep,
 )
-from app.ai.skill_registry import AICCSkillRegistry
-from app.aicc_runtime.runtime import AICCRuntime
+from app.ai.skill_registry import TianShuSkillRegistry
+from app.tianshu_runtime.runtime import TianShuRuntime
 
 ALLOWED_SKILLS = {
     "simulation_start",
@@ -32,6 +32,10 @@ ALLOWED_SKILLS = {
     "delete_unit",
     "move_unit",
     "update_unit_state",
+    "attack_unit",
+    "update_weapon_quantity",
+    "create_patrol_mission",
+    "create_strike_mission",
     "trigger_tactical_event",
     "update_situation_layer",
     "load_script",
@@ -50,6 +54,7 @@ HIGH_RISK_SKILLS = {
     "simulation_reset",
     "delete_unit",
     "update_unit_state",
+    "attack_unit",
     "load_script",
     "control_script_flow",
     "load_scenario_snapshot",
@@ -111,7 +116,7 @@ class CommandRuleEngine:
     proposal can enter the human approval queue. It never mutates runtime state.
     """
 
-    def __init__(self, runtime: AICCRuntime, registry: AICCSkillRegistry) -> None:
+    def __init__(self, runtime: TianShuRuntime, registry: TianShuSkillRegistry) -> None:
         self.runtime = runtime
         self.registry = registry
 
@@ -187,6 +192,15 @@ class CommandRuleEngine:
 
         if skill in {"delete_unit", "move_unit", "update_unit_state"}:
             issues.extend(self._validate_unit_target(step))
+
+        if skill == "attack_unit":
+            issues.extend(self._validate_attack(step))
+
+        if skill == "update_weapon_quantity":
+            issues.extend(self._validate_weapon_quantity(step))
+
+        if skill in {"create_patrol_mission", "create_strike_mission"}:
+            issues.extend(self._validate_mission(step))
 
         if skill == "move_unit":
             issues.extend(self._validate_route(step))
@@ -276,6 +290,31 @@ class CommandRuleEngine:
                     "class_name",
                 )
             )
+        else:
+            known_check_names = {
+                "deploy_aircraft": ("aircraft", "is_known_aircraft_class"),
+                "deploy_ship": ("ship", "is_known_ship_class"),
+                "deploy_facility": ("facility", "is_known_facility_class"),
+                "deploy_airbase": ("airbase", "is_known_airbase_class"),
+            }
+            check = known_check_names.get(step.skill)
+            check_fn = getattr(self.runtime, check[1], None) if check else None
+            if (
+                check is not None
+                and check_fn is not None
+                and not isinstance(params.get("template"), dict)
+                and not check_fn(class_name)
+            ):
+                unit_type = check[0]
+                issues.append(
+                    self._issue(
+                        "blocking",
+                        f"unknown_{unit_type}_class",
+                        "Unit type is not present in the asset database; placeholder deployment is forbidden.",
+                        step.id,
+                        "class_name",
+                    )
+                )
         issues.extend(self._validate_coordinates(step.id, latitude, longitude))
         side = params.get("side")
         if side:
@@ -420,6 +459,207 @@ class CommandRuleEngine:
                 )
         return issues
 
+    def _validate_mission(
+        self, step: StructuredCommandStep
+    ) -> list[CommandAdjudicationIssue]:
+        issues: list[CommandAdjudicationIssue] = []
+        params = step.parameters
+        name = str(params.get("name") or "").strip()
+        assigned_unit_ids = params.get("assigned_unit_ids")
+        if not name:
+            issues.append(
+                self._issue(
+                    "blocking",
+                    "missing_mission_name",
+                    "Mission proposal must include a mission name.",
+                    step.id,
+                    "name",
+                )
+            )
+        if not isinstance(assigned_unit_ids, list) or not assigned_unit_ids:
+            issues.append(
+                self._issue(
+                    "blocking",
+                    "missing_assigned_units",
+                    "Mission proposal must assign at least one unit.",
+                    step.id,
+                    "assigned_unit_ids",
+                )
+            )
+        else:
+            for index, unit_id in enumerate(assigned_unit_ids):
+                if self._find_any_unit(str(unit_id)) is None:
+                    issues.append(
+                        self._issue(
+                            "blocking",
+                            "assigned_unit_not_found",
+                            f"Assigned unit not found: {unit_id}",
+                            step.id,
+                            f"assigned_unit_ids[{index}]",
+                        )
+                    )
+
+        if step.skill == "create_patrol_mission":
+            reference_point_ids = params.get("reference_point_ids")
+            if not isinstance(reference_point_ids, list) or len(reference_point_ids) < 3:
+                issues.append(
+                    self._issue(
+                        "blocking",
+                        "missing_patrol_area",
+                        "Patrol mission requires at least three reference points.",
+                        step.id,
+                        "reference_point_ids",
+                    )
+                )
+            else:
+                scenario = self.runtime.game.current_scenario
+                for index, point_id in enumerate(reference_point_ids):
+                    if scenario.get_reference_point(str(point_id)) is None:
+                        issues.append(
+                            self._issue(
+                                "blocking",
+                                "reference_point_not_found",
+                                f"Reference point not found: {point_id}",
+                                step.id,
+                                f"reference_point_ids[{index}]",
+                            )
+                        )
+
+        if step.skill == "create_strike_mission":
+            target_ids = params.get("assigned_target_ids")
+            if not isinstance(target_ids, list) or not target_ids:
+                issues.append(
+                    self._issue(
+                        "blocking",
+                        "missing_strike_targets",
+                        "Strike mission requires at least one target.",
+                        step.id,
+                        "assigned_target_ids",
+                    )
+                )
+            else:
+                for index, target_id in enumerate(target_ids):
+                    if self._find_any_unit(str(target_id)) is None:
+                        issues.append(
+                            self._issue(
+                                "blocking",
+                                "strike_target_not_found",
+                                f"Strike target not found: {target_id}",
+                                step.id,
+                                f"assigned_target_ids[{index}]",
+                            )
+                        )
+        return issues
+
+    def _validate_attack(
+        self, step: StructuredCommandStep
+    ) -> list[CommandAdjudicationIssue]:
+        issues: list[CommandAdjudicationIssue] = []
+        params = step.parameters
+        attacker_type = str(params.get("attacker_type") or "").strip()
+        attacker_id = str(params.get("attacker_id") or "").strip()
+        target_id = str(params.get("target_id") or "").strip()
+        if attacker_type not in {"aircraft", "ship"}:
+            issues.append(
+                self._issue(
+                    "blocking",
+                    "invalid_attacker_type",
+                    "打击命令的 attacker_type 必须是 aircraft 或 ship。",
+                    step.id,
+                    "attacker_type",
+                )
+            )
+        if attacker_type and attacker_id:
+            issues.extend(
+                self._validate_unit_target(
+                    step.model_copy(
+                        update={
+                            "parameters": {
+                                "unit_type": attacker_type,
+                                "unit_id": attacker_id,
+                            }
+                        }
+                    )
+                )
+            )
+        else:
+            issues.append(
+                self._issue(
+                    "blocking",
+                    "missing_attacker",
+                    "打击命令必须包含 attacker_type 和 attacker_id。",
+                    step.id,
+                    "attacker_id",
+                )
+            )
+        scenario = self.runtime.game.current_scenario
+        target_getter = getattr(scenario, "get_target", None)
+        target = target_getter(target_id) if callable(target_getter) else self._find_any_unit(target_id)
+        if not target_id or target is None:
+            issues.append(
+                self._issue(
+                    "blocking",
+                    "target_not_found",
+                    f"当前 runtime 中找不到打击目标：{target_id}",
+                    step.id,
+                    "target_id",
+                )
+            )
+        if not bool(params.get("auto")) and not str(params.get("weapon_id") or "").strip():
+            issues.append(
+                self._issue(
+                    "warning",
+                    "manual_attack_without_weapon",
+                    "未指定 weapon_id 时建议将 auto 设为 true，由后端选择可发射武器。",
+                    step.id,
+                    "weapon_id",
+                )
+            )
+        return issues
+
+    def _validate_weapon_quantity(
+        self, step: StructuredCommandStep
+    ) -> list[CommandAdjudicationIssue]:
+        issues = self._validate_unit_target(step)
+        params = step.parameters
+        weapon_id = str(params.get("weapon_id") or "").strip()
+        if not weapon_id:
+            issues.append(
+                self._issue(
+                    "blocking",
+                    "missing_weapon_id",
+                    "武器数量调整必须包含 weapon_id。",
+                    step.id,
+                    "weapon_id",
+                )
+            )
+        increment = _to_float(params.get("increment"))
+        if increment is None:
+            issues.append(
+                self._issue(
+                    "blocking",
+                    "invalid_weapon_increment",
+                    "武器数量调整必须包含数字 increment。",
+                    step.id,
+                    "increment",
+                )
+            )
+        return issues
+
+    def _find_any_unit(self, unit_id: str) -> Any | None:
+        scenario = self.runtime.game.current_scenario
+        for getter_name in (
+            "get_aircraft",
+            "get_ship",
+            "get_facility",
+            "get_airbase",
+        ):
+            getter = getattr(scenario, getter_name, None)
+            unit = getter(unit_id) if callable(getter) else None
+            if unit is not None:
+                return unit
+        return None
+
     def _validate_coordinates(
         self,
         step_id: str,
@@ -483,7 +723,7 @@ class CommandRuleEngine:
 class CommandApprovalQueue:
     """In-memory, runtime-local command approval queue."""
 
-    def __init__(self, runtime: AICCRuntime, registry: AICCSkillRegistry) -> None:
+    def __init__(self, runtime: TianShuRuntime, registry: TianShuSkillRegistry) -> None:
         self.runtime = runtime
         self.registry = registry
         self.rules = CommandRuleEngine(runtime, registry)
@@ -496,6 +736,7 @@ class CommandApprovalQueue:
         command: str,
         steps: list[StructuredCommandStep],
         source: str,
+        plan_metadata: dict[str, Any] | None = None,
     ) -> CommandProposal:
         now = _utc_now()
         adjudication = self.rules.adjudicate(steps)
@@ -508,6 +749,7 @@ class CommandApprovalQueue:
             updated_at=now,
             steps=steps,
             adjudication=adjudication,
+            plan_metadata=plan_metadata or {},
         )
         with self._lock:
             self._proposals[proposal.id] = proposal
@@ -654,6 +896,12 @@ class CommandApprovalQueue:
             return f"删除 {parameters.get('unit_type')} {parameters.get('unit_id')}"
         if skill == "simulation_step":
             return f"推进仿真 {parameters.get('steps', 1)} 秒"
+        if skill == "attack_unit":
+            return f"打击目标 {parameters.get('target_id') or ''}".strip()
+        if skill == "update_weapon_quantity":
+            return f"调整武器 {parameters.get('weapon_id') or ''}".strip()
         if skill == "load_scenario_snapshot":
             return f"Load scenario {parameters.get('name') or parameters.get('scenario_id') or ''}".strip()
+        if skill in {"create_patrol_mission", "create_strike_mission"}:
+            return f"Create mission {parameters.get('name') or ''}".strip()
         return skill.replace("_", " ")

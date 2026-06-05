@@ -243,6 +243,11 @@ export default class Dba {
           fuelRate,
           range: range ?? 100,
           lethality,
+          targetTypes: Array.isArray(weapon.targetTypes)
+            ? weapon.targetTypes
+            : Array.isArray(weapon.target_types)
+              ? weapon.target_types
+              : [],
         });
       });
       this.weaponDb = finalImportedWeaponDb.filter(

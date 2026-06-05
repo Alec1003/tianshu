@@ -1,0 +1,115 @@
+{
+  "name": "tianshu-desktop",
+  "version": "0.2.4",
+  "private": true,
+  "description": "TianShu desktop package",
+  "main": "electron/main.cjs",
+  "author": "Alec1003",
+  "license": "Apache-2.0",
+  "engines": {
+    "node": ">=22.12.0 <=23.9.0",
+    "npm": ">=10.5.0 <=10.9.2"
+  },
+  "scripts": {
+    "build:client": "npm --prefix client run build",
+    "lint": "npm --prefix client run lint",
+    "test": "npm --prefix client run test",
+    "test:backend": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"& '.\\.python312\\python.exe' -m pytest server/tests -q --basetemp server/.pytest-tmp\"",
+    "electron:check": "node electron/check-resources.cjs",
+    "electron:dev": "npm run build:client && electron .",
+    "electron:pack": "npm run build:client && npm run electron:check && electron-builder --win --dir",
+    "electron:dist": "npm run build:client && npm run electron:check && electron-builder --win nsis",
+    "electron:publish": "npm run build:client && npm run electron:check && electron-builder --win nsis --publish always"
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.3"
+  },
+  "devDependencies": {
+    "electron": "^42.3.2",
+    "electron-builder": "^26.8.1"
+  },
+  "build": {
+    "appId": "com.alec1003.tianshu",
+    "productName": "TianShu",
+    "artifactName": "TianShu-Setup-${version}-${arch}.${ext}",
+    "directories": {
+      "output": "dist-electron"
+    },
+    "asar": true,
+    "files": [
+      "electron/**/*",
+      "package.json",
+      "node_modules/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "client/dist",
+        "to": "client/dist"
+      },
+      {
+        "from": "server",
+        "to": "server",
+        "filter": [
+          "**/*",
+          "!data/**",
+          "!.pytest-tmp/**",
+          "!**/__pycache__/**",
+          "!**/*.pyc"
+        ]
+      },
+      {
+        "from": "gym",
+        "to": "gym",
+        "filter": [
+          "**/*",
+          "!**/__pycache__/**",
+          "!**/*.pyc"
+        ]
+      },
+      {
+        "from": "client/src/scenarios",
+        "to": "client/src/scenarios"
+      },
+      {
+        "from": ".python312",
+        "to": ".python312",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "Alec1003",
+        "repo": "tianshu"
+      }
+    ],
+    "win": {
+      "signAndEditExecutable": false,
+      "signExts": [
+        "!.exe"
+      ],
+      "verifyUpdateCodeSignature": false,
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "requestedExecutionLevel": "asInvoker"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "deleteAppDataOnUninstall": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "TianShu"
+    },
+    "electronUpdaterCompatibility": ">=2.16"
+  }
+}

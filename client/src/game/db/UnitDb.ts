@@ -675,7 +675,7 @@ export const AirbaseDb: IAirbaseModel[] = [
 export const FacilityDb: IFacilityModel[] = [
   {
     className: "S-400 Triumf",
-    range: 200, // No official source available, using 200 as the range
+    range: 216, // public representative S-400 system estimate
   },
   {
     className: "S-300V4",
@@ -683,59 +683,59 @@ export const FacilityDb: IFacilityModel[] = [
   },
   {
     className: "S-500 Prometey",
-    range: 200, // No official source available, using 200 as the range
+    range: 324, // public low-confidence S-500 estimate, converted from 600 km
   },
   {
     className: "Buk-M3",
-    range: 50, // No official source available, using 50 as the range
+    range: 38, // public representative Buk-M3 estimate
   },
   {
     className: "Tor-M2",
-    range: 10, // No official source available, using 10 as the range
+    range: 8.6, // public representative Tor-M2 estimate
   },
   {
     className: "Pantsir-S1",
-    range: 10, // No official source available, using 10 as the range
+    range: 10.8, // public representative Pantsir-S1 estimate
   },
   {
     className: "HQ-9",
-    range: 200, // No official source available, using 200 as the range
+    range: 108, // public representative HQ-9 estimate
   },
   {
     className: "HQ-19",
-    range: 200, // No official source available, using 200 as the range
+    range: 162, // public low-confidence HQ-19 estimate
   },
   {
     className: "HQ-16",
-    range: 50, // No official source available, using 50 as the range
+    range: 38, // public representative HQ-16B/LY-80 estimate
   },
   {
     className: "HQ-17",
-    range: 10, // No official source available, using 10 as the range
+    range: 8.1, // public representative HQ-17 estimate
   },
   {
     className: "HQ-7",
-    range: 10, // No official source available, using 10 as the range
+    range: 8.1, // public representative HQ-7 estimate
   },
   {
     className: "MIM-104 Patriot",
-    range: 200, // No official source available, using 200 as the range
+    range: 86, // public representative Patriot PAC-2/PAC-3 family estimate
   },
   {
     className: "THAAD",
-    range: 200, // No official source available, using 200 as the range
+    range: 108, // public representative THAAD estimate
   },
   {
     className: "Aster 30",
-    range: 50, // No official source available, using 50 as the range
+    range: 54, // MBDA public Aster 30 estimate, converted from 100 km
   },
   {
     className: "Barak 8",
-    range: 50, // No official source available, using 50 as the range
+    range: 38, // IAI public Barak 8 LR estimate, converted from 70 km
   },
   {
     className: "NASAMS",
-    range: 50, // No official source available, using 50 as the range
+    range: 25, // public representative NASAMS estimate
   },
 ];
 
@@ -795,14 +795,16 @@ export const WeaponDb: IWeaponModel[] = [
     fuelRate: 350, // lbs/hr
     range: 86,
     lethality: 0.65,
+    targetTypes: ["aircraft"],
   },
   {
     className: "AIM-9 Sidewinder",
     speed: 1500,
     maxFuel: 100,
     fuelRate: 80,
-    range: 19,
+    range: 15.6,
     lethality: 0.6,
+    targetTypes: ["aircraft"],
   },
   {
     className: "AIM-54 Phoenix",
@@ -811,6 +813,7 @@ export const WeaponDb: IWeaponModel[] = [
     fuelRate: 300,
     range: 100,
     lethality: 0.85,
+    targetTypes: ["aircraft"],
   },
   {
     className: "AGM-65 Maverick",
@@ -819,6 +822,7 @@ export const WeaponDb: IWeaponModel[] = [
     fuelRate: 120,
     range: 12,
     lethality: 0.7,
+    targetTypes: ["facility", "airbase", "ship"],
   },
   {
     className: "AGM-84 Harpoon",
@@ -827,6 +831,7 @@ export const WeaponDb: IWeaponModel[] = [
     fuelRate: 150,
     range: 67,
     lethality: 0.8,
+    targetTypes: ["ship"],
   },
   {
     className: "AGM-86 ALCM",
@@ -835,14 +840,16 @@ export const WeaponDb: IWeaponModel[] = [
     fuelRate: 600,
     range: 1300,
     lethality: 0.75,
+    targetTypes: ["facility", "airbase"],
   },
   {
     className: "AGM-158 JASSM",
     speed: 1200,
     maxFuel: 18498,
     fuelRate: 1000,
-    range: 500,
+    range: 200,
     lethality: 0.8,
+    targetTypes: ["facility", "airbase", "ship"],
   },
   {
     className: "BGM-109 Tomahawk",
@@ -851,6 +858,7 @@ export const WeaponDb: IWeaponModel[] = [
     fuelRate: 850,
     range: 900,
     lethality: 0.75,
+    targetTypes: ["facility", "airbase", "ship"],
   },
 
   // Ship-Launched and Fleet Air Defense Missiles
@@ -861,6 +869,7 @@ export const WeaponDb: IWeaponModel[] = [
     fuelRate: 200,
     range: 90,
     lethality: 0.85,
+    targetTypes: ["aircraft", "weapon"],
   },
   {
     className: "RIM-174 Standard SM-6",
@@ -869,6 +878,7 @@ export const WeaponDb: IWeaponModel[] = [
     fuelRate: 300,
     range: 130,
     lethality: 0.9,
+    targetTypes: ["aircraft", "weapon", "ship"],
   },
   {
     className: "RGM-84 Harpoon",
@@ -877,6 +887,7 @@ export const WeaponDb: IWeaponModel[] = [
     fuelRate: 150,
     range: 67,
     lethality: 0.8,
+    targetTypes: ["ship"],
   },
   {
     className: "RIM-116 RAM",
@@ -885,6 +896,7 @@ export const WeaponDb: IWeaponModel[] = [
     fuelRate: 100,
     range: 5.5,
     lethality: 0.8,
+    targetTypes: ["aircraft", "weapon"],
   },
 
   // Surface-to-Air (SAM) Missiles
@@ -895,6 +907,7 @@ export const WeaponDb: IWeaponModel[] = [
     fuelRate: 300,
     range: 135,
     lethality: 0.9,
+    targetTypes: ["aircraft", "weapon"],
   },
   {
     className: "9M96 (S-300V4)",
@@ -903,14 +916,16 @@ export const WeaponDb: IWeaponModel[] = [
     fuelRate: 200,
     range: 65,
     lethality: 0.85,
+    targetTypes: ["aircraft", "weapon"],
   },
   {
     className: "77N6 (S-500 Prometey)",
     speed: 4627,
     maxFuel: 2000,
     fuelRate: 500,
-    range: 216,
+    range: 324,
     lethality: 0.9,
+    targetTypes: ["weapon"],
   },
   {
     className: "9M317 (Buk-M3)",
@@ -919,6 +934,7 @@ export const WeaponDb: IWeaponModel[] = [
     fuelRate: 150,
     range: 38,
     lethality: 0.8,
+    targetTypes: ["aircraft", "weapon"],
   },
   {
     className: "9M331 (Tor-M2)",
@@ -927,6 +943,7 @@ export const WeaponDb: IWeaponModel[] = [
     fuelRate: 100,
     range: 8.6,
     lethality: 0.75,
+    targetTypes: ["aircraft", "weapon"],
   },
   {
     className: "57E6E (Pantsir-S1)",
@@ -935,6 +952,7 @@ export const WeaponDb: IWeaponModel[] = [
     fuelRate: 80,
     range: 10.8,
     lethality: 0.7,
+    targetTypes: ["aircraft", "weapon"],
   },
   {
     className: "HQ-9",
@@ -943,6 +961,7 @@ export const WeaponDb: IWeaponModel[] = [
     fuelRate: 400,
     range: 108,
     lethality: 0.85,
+    targetTypes: ["aircraft", "weapon"],
   },
   {
     className: "HQ-19",
@@ -951,14 +970,16 @@ export const WeaponDb: IWeaponModel[] = [
     fuelRate: 600,
     range: 162,
     lethality: 0.9,
+    targetTypes: ["weapon"],
   },
   {
     className: "HQ-16",
     speed: 1983,
     maxFuel: 600,
     fuelRate: 150,
-    range: 43,
+    range: 38,
     lethality: 0.8,
+    targetTypes: ["aircraft", "weapon"],
   },
   {
     className: "HQ-17",
@@ -967,6 +988,7 @@ export const WeaponDb: IWeaponModel[] = [
     fuelRate: 120,
     range: 8.1,
     lethality: 0.75,
+    targetTypes: ["aircraft", "weapon"],
   },
   {
     className: "HQ-7",
@@ -975,21 +997,24 @@ export const WeaponDb: IWeaponModel[] = [
     fuelRate: 70,
     range: 8.1,
     lethality: 0.7,
+    targetTypes: ["aircraft", "weapon"],
   },
   {
     className: "Aster 30",
     speed: 2975,
     maxFuel: 1600,
     fuelRate: 350,
-    range: 65,
+    range: 54,
     lethality: 0.85,
+    targetTypes: ["aircraft", "weapon"],
   },
   {
     className: "Barak 8",
     speed: 1851,
     maxFuel: 200,
     fuelRate: 150,
-    range: 43,
+    range: 38,
     lethality: 0.8,
+    targetTypes: ["aircraft", "weapon"],
   },
 ];

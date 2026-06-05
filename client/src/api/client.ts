@@ -5,9 +5,15 @@
 //  - Pick the right API base URL: explicit VITE_AI_SERVER_URL when set
 //    (local dev hitting :8000 directly), otherwise relative paths so the
 //    nginx reverse proxy in production rewrites `/api/*` to the server.
-//  - Centralise 401 handling: emit a `aicc:auth:logout` window event so the
+//  - Centralise 401 handling: emit a `tianshu:auth:logout` window event so the
 //    AuthProvider can clear state and the router can bounce to /login.
 //  - Throw `ApiError` carrying status + parsed detail for callers to format.
+
+import {
+  readStorageItem,
+  removeStorageItem,
+  writeStorageItem,
+} from "@/lib/legacyStorage";
 
 export class ApiError extends Error {
   status: number;
@@ -20,7 +26,7 @@ export class ApiError extends Error {
   }
 }
 
-const TOKEN_KEY = "aicc.auth.token";
+const TOKEN_KEY = "tianshu.auth.token";
 let runtimeScenarioContext = "";
 
 export function setRuntimeScenarioContext(
@@ -30,14 +36,14 @@ export function setRuntimeScenarioContext(
 }
 
 export function getStoredToken(): string | null {
-  return localStorage.getItem(TOKEN_KEY);
+  return readStorageItem(TOKEN_KEY);
 }
 
 export function setStoredToken(token: string | null): void {
   if (token) {
-    localStorage.setItem(TOKEN_KEY, token);
+    writeStorageItem(TOKEN_KEY, token);
   } else {
-    localStorage.removeItem(TOKEN_KEY);
+    removeStorageItem(TOKEN_KEY);
   }
 }
 
@@ -74,10 +80,11 @@ export async function apiCall<T = unknown>(
     runtimeScenarioContext &&
     (path.startsWith("/api/ai/runtime") ||
       path.startsWith("/api/ai/command") ||
+      path.startsWith("/api/ai/internal-skills") ||
       path.startsWith("/api/ai/chat") ||
       path.startsWith("/api/ai/skills"))
   ) {
-    headers.set("X-AICC-Scenario-Id", runtimeScenarioContext);
+    headers.set("X-TianShu-Scenario-Id", runtimeScenarioContext);
   }
 
   let body: BodyInit | undefined;
@@ -94,7 +101,7 @@ export async function apiCall<T = unknown>(
   if (response.status === 401) {
     // Token expired / invalid: nuke it and let the AuthProvider react.
     setStoredToken(null);
-    window.dispatchEvent(new Event("aicc:auth:logout"));
+    window.dispatchEvent(new Event("tianshu:auth:logout"));
     let detail: unknown = null;
     try {
       detail = await response.json();

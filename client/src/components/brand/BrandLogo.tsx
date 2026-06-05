@@ -16,11 +16,10 @@ export function BrandLogo({
     <div className={cn("relative", className)}>
       <div
         className={cn(
-          "relative grid place-items-center overflow-hidden rounded-2xl border border-cyan-200/20 bg-white/[0.04] shadow-[0_0_32px_rgba(56,189,248,0.16)] backdrop-blur-xl",
+          "relative grid place-items-center overflow-hidden rounded-lg border border-cyan-200/16 bg-cyan-300/[0.06]",
           frameClassName
         )}
       >
-        <div className="absolute inset-2 rounded-xl bg-gradient-to-br from-cyan-300/20 to-blue-500/16" />
         <img
           src={DubheMark}
           alt="天枢平台 Logo"

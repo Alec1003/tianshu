@@ -1,14 +1,62 @@
 from __future__ import annotations
 
+import math
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class SkillDefinition(BaseModel):
     name: str
     description: str
     parameters: dict[str, Any] = Field(default_factory=dict)
+
+
+class SkillSchemaField(BaseModel):
+    name: str = Field(min_length=1, max_length=80)
+    type: str = Field(default="string", max_length=80)
+    required: bool = False
+    description: str = Field(default="", max_length=1000)
+
+
+class CustomSkillCreateRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    description: str = Field(default="", max_length=2000)
+    prompt: str = Field(default="", max_length=12000)
+    inputSchema: list[SkillSchemaField] = Field(default_factory=list, max_length=32)
+    outputSchema: list[SkillSchemaField] = Field(default_factory=list, max_length=32)
+    enabled: bool = True
+
+
+class CustomSkillUpdateRequest(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=120)
+    description: str | None = Field(default=None, max_length=2000)
+    prompt: str | None = Field(default=None, max_length=12000)
+    inputSchema: list[SkillSchemaField] | None = Field(default=None, max_length=32)
+    outputSchema: list[SkillSchemaField] | None = Field(default=None, max_length=32)
+    enabled: bool | None = None
+
+
+class CustomSkillRead(BaseModel):
+    id: str
+    name: str
+    description: str = ""
+    prompt: str = ""
+    source: Literal["custom"] = "custom"
+    version: str = "custom-1"
+    enabled: bool = True
+    readonly: bool = False
+    inputSchema: list[SkillSchemaField] = Field(default_factory=list)
+    outputSchema: list[SkillSchemaField] = Field(default_factory=list)
+    usageCount: int = 0
+    lastUsedAt: str | None = None
+    createdBy: str = ""
+    updatedAt: str
+
+
+class CustomSkillListResponse(BaseModel):
+    skills: list[CustomSkillRead] = Field(default_factory=list)
+    skillsDir: str
 
 
 class SkillExecutionResult(BaseModel):
@@ -24,6 +72,44 @@ class MCPCallTrace(BaseModel):
     target: str
     status: Literal["pending", "ok", "error"] = "pending"
     message: str = ""
+
+
+class ExternalMcpValidateRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    transport: str = Field(default="stdio", max_length=40)
+    endpoint: str = Field(default="", max_length=4096)
+    command: str = Field(default="", max_length=1024)
+    args: list[str] = Field(default_factory=list, max_length=64)
+    url: str = Field(default="", max_length=4096)
+    env: dict[str, str] = Field(default_factory=dict)
+    headers: dict[str, str] = Field(default_factory=dict)
+    allowedTools: list[str] = Field(default_factory=list, max_length=128)
+    enabled: bool = True
+    timeoutSeconds: float = Field(default=10.0, ge=1.0)
+
+
+class ExternalMcpToolRead(BaseModel):
+    server: str
+    name: str
+    description: str = ""
+    inputSchema: dict[str, Any] = Field(default_factory=dict)
+    outputSchema: dict[str, Any] = Field(default_factory=dict)
+
+
+class ExternalMcpValidateResponse(BaseModel):
+    ok: bool
+    server: str
+    transport: Literal["stdio", "streamable_http"]
+    message: str
+    tools: list[ExternalMcpToolRead] = Field(default_factory=list)
+    trace: list[MCPCallTrace] = Field(default_factory=list)
+
+
+class BuiltinMcpToolsResponse(BaseModel):
+    ok: bool
+    server: str
+    message: str
+    tools: list[ExternalMcpToolRead] = Field(default_factory=list)
 
 
 class AgentExecutionSummary(BaseModel):
@@ -45,6 +131,60 @@ class StructuredCommandStep(BaseModel):
     writes_runtime: bool = True
 
 
+class TacticalPlanStepDraft(BaseModel):
+    skill: str = Field(
+        min_length=1,
+        max_length=80,
+        description="Backend runtime skill to execute after human approval.",
+    )
+    parameters: dict[str, Any] = Field(default_factory=dict)
+    summary: str = Field(default="", max_length=300)
+    rationale: str = Field(default="", max_length=1200)
+    risk: Literal["low", "medium", "high"] = "medium"
+
+
+class TacticalPlanOptionDraft(BaseModel):
+    title: str = Field(min_length=1, max_length=120)
+    label: str = Field(default="", max_length=40)
+    description: str = Field(default="", max_length=2000)
+    advantages: list[str] = Field(default_factory=list, max_length=8)
+    risks: list[str] = Field(default_factory=list, max_length=8)
+    steps: list[TacticalPlanStepDraft] = Field(
+        default_factory=list,
+        min_length=1,
+        max_length=16,
+    )
+
+
+class InternalSkillMissionDraft(BaseModel):
+    """One constrained mission/task inside a project-native tactical skill."""
+
+    type: Literal["patrol", "strike", "move"]
+    name: str = Field(min_length=1, max_length=120)
+    assigned_unit_ids: list[str] = Field(default_factory=list, max_length=32)
+    reference_point_ids: list[str] = Field(default_factory=list, max_length=16)
+    assigned_target_ids: list[str] = Field(default_factory=list, max_length=32)
+    route: list[list[float]] = Field(default_factory=list, max_length=32)
+    notes: str = Field(default="", max_length=1000)
+
+
+class InternalSkillDraft(BaseModel):
+    """A temporary in-app doctrine pack generated by an LLM or operator.
+
+    This is app data, not an executable Codex/Anthropic skill file.
+    """
+
+    name: str = Field(min_length=1, max_length=120)
+    description: str = Field(default="", max_length=2000)
+    side_id: str = Field(default="", max_length=120)
+    trigger_phrases: list[str] = Field(default_factory=list, max_length=16)
+    constraints: list[str] = Field(default_factory=list, max_length=24)
+    allowed_runtime_skills: list[str] = Field(default_factory=list, max_length=16)
+    missions: list[InternalSkillMissionDraft] = Field(default_factory=list, min_length=1, max_length=12)
+    expires_at: str | None = None
+    allow_duplicate_assignments: bool = False
+
+
 class CommandAdjudicationIssue(BaseModel):
     severity: Literal["info", "warning", "blocking"]
     code: str
@@ -63,7 +203,14 @@ class CommandAdjudicationResult(BaseModel):
 class CommandProposal(BaseModel):
     id: str
     command: str
-    source: Literal["regex", "llm_tool", "api", "mcp"] = "api"
+    source: Literal[
+        "regex",
+        "llm_tool",
+        "llm_plan",
+        "api",
+        "mcp",
+        "internal_skill",
+    ] = "api"
     status: Literal[
         "pending",
         "blocked",
@@ -77,12 +224,27 @@ class CommandProposal(BaseModel):
     updated_at: str
     steps: list[StructuredCommandStep] = Field(default_factory=list)
     adjudication: CommandAdjudicationResult
+    plan_metadata: dict[str, Any] = Field(default_factory=dict)
     execution: list[SkillExecutionResult] = Field(default_factory=list)
     error: str | None = None
 
 
 class CommandProposalListResponse(BaseModel):
     proposals: list[CommandProposal] = Field(default_factory=list)
+
+
+class InternalSkillProposalRequest(BaseModel):
+    draft: InternalSkillDraft
+    command: str = Field(
+        default="",
+        max_length=1000,
+        description="Operator-visible reason for creating this internal skill proposal.",
+    )
+
+
+class InternalSkillProposalResponse(BaseModel):
+    draft: InternalSkillDraft
+    proposal: CommandProposal
 
 
 class AICommandRequest(BaseModel):
@@ -150,7 +312,22 @@ class RuntimeDeployUnitRequest(BaseModel):
 class RuntimeMoveUnitRequest(BaseModel):
     unit_type: Literal["aircraft", "ship"]
     unit_id: str = Field(min_length=1)
-    route: list[list[float]] = Field(default_factory=list)
+    route: list[list[float]] = Field(default_factory=list, max_length=32)
+
+    @field_validator("route")
+    @classmethod
+    def validate_route(cls, route: list[list[float]]) -> list[list[float]]:
+        for index, point in enumerate(route):
+            if len(point) != 2:
+                raise ValueError(f"route[{index}] must be [latitude, longitude]")
+            latitude, longitude = point
+            if not math.isfinite(latitude) or not math.isfinite(longitude):
+                raise ValueError(f"route[{index}] coordinates must be finite")
+            if latitude < -90 or latitude > 90:
+                raise ValueError(f"route[{index}] latitude out of range")
+            if longitude < -180 or longitude > 180:
+                raise ValueError(f"route[{index}] longitude out of range")
+        return route
 
 
 class RuntimeSetUnitPositionRequest(BaseModel):

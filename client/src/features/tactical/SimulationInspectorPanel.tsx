@@ -1,3 +1,4 @@
+import { useCallback, useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import {
   Activity,
@@ -6,6 +7,9 @@ import {
   ShieldAlert,
   Terminal,
 } from "lucide-react";
+import { listRuntimeTimeline } from "@/api/ai";
+import { listScenarioTimeline } from "@/api/scenarios";
+import type { RuntimeTimelineEvent } from "@/api/types";
 import Game, { type Mission } from "@/game/Game";
 import { isHostileToCurrentSide } from "@/game/scenarioVisibility";
 import type { SimulationSnapshot } from "./SimulationSidebar";
@@ -13,6 +17,8 @@ import type { SimulationSnapshot } from "./SimulationSidebar";
 interface SimulationInspectorPanelProps {
   game: Game;
   snapshot: SimulationSnapshot;
+  scenarioId?: string;
+  runtimeScenarioId?: string;
 }
 
 const sideNameMap: Record<string, string> = {
@@ -63,6 +69,43 @@ function formatLogTime(timestamp: number, scenarioStartTime: number) {
   return formatElapsed(timestamp - scenarioStartTime);
 }
 
+function formatRuntimeTimelineTime(
+  event: RuntimeTimelineEvent,
+  scenarioStartTime: number
+) {
+  if (event.current_time !== null && event.current_time !== undefined) {
+    return formatLogTime(event.current_time, scenarioStartTime);
+  }
+
+  const createdAt = new Date(event.created_at);
+  if (!Number.isNaN(createdAt.getTime())) {
+    return createdAt.toLocaleTimeString("zh-CN", {
+      hour12: false,
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    });
+  }
+
+  return "--:--:--";
+}
+
+function runtimeTimelineLabel(event: RuntimeTimelineEvent) {
+  return (event.category || event.event_type.split(".")[0] || "event")
+    .toUpperCase()
+    .slice(0, 8);
+}
+
+function runtimeTimelineMessage(event: RuntimeTimelineEvent) {
+  return event.summary || event.action || event.event_type;
+}
+
+function runtimeTimelineMeta(event: RuntimeTimelineEvent) {
+  const changeCount = event.unit_changes?.length ?? 0;
+  if (changeCount > 0) return `${changeCount} unit changes`;
+  return event.event_type;
+}
+
 function statusLabel(snapshot: SimulationSnapshot) {
   if (snapshot.runState === "running") return "SIMULATION ACTIVE";
   if (snapshot.runState === "paused") return "SIMULATION PAUSED";
@@ -76,8 +119,15 @@ function missionTypeLabel(mission: Mission) {
 export default function SimulationInspectorPanel({
   game,
   snapshot,
+  scenarioId,
+  runtimeScenarioId,
 }: SimulationInspectorPanelProps) {
   const scenario = game.currentScenario;
+  const [runtimeTimelineEvents, setRuntimeTimelineEvents] = useState<
+    RuntimeTimelineEvent[]
+  >([]);
+  const timelineRequestRef = useRef(0);
+  const lastTimelineFetchAtRef = useRef(0);
   const runtimeSideVisibility =
     snapshot.visibility?.by_side[snapshot.currentSideId] ??
     snapshot.visibility?.by_side[snapshot.visibility.current_side_id] ??
@@ -142,6 +192,7 @@ export default function SimulationInspectorPanel({
     )
     .slice(-8)
     .reverse();
+  const recentRuntimeEvents = runtimeTimelineEvents.slice(-8).reverse();
   const activeMissions = scenario.missions
     .filter(
       (mission) =>
@@ -153,6 +204,56 @@ export default function SimulationInspectorPanel({
         )
     )
     .slice(0, 6);
+
+  const fetchRuntimeTimeline = useCallback(
+    async (force = false) => {
+      const now = Date.now();
+      const minIntervalMs = snapshot.runState === "running" ? 1200 : 2500;
+      if (!force && now - lastTimelineFetchAtRef.current < minIntervalMs) {
+        return;
+      }
+      lastTimelineFetchAtRef.current = now;
+      const requestId = timelineRequestRef.current + 1;
+      timelineRequestRef.current = requestId;
+
+      try {
+        const response = scenarioId
+          ? await listScenarioTimeline(scenarioId, {
+              latest: true,
+              limit: 8,
+            })
+          : await listRuntimeTimeline({
+              scenarioId: runtimeScenarioId || scenario.id,
+              latest: true,
+              limit: 8,
+            });
+        if (timelineRequestRef.current === requestId) {
+          setRuntimeTimelineEvents(response.events);
+        }
+      } catch (err) {
+        if (timelineRequestRef.current === requestId) {
+          console.error("[TianShu] mini timeline refresh failed:", err);
+        }
+      }
+    },
+    [runtimeScenarioId, scenario.id, scenarioId, snapshot.runState]
+  );
+
+  useEffect(() => {
+    void fetchRuntimeTimeline(true);
+    const timer = window.setInterval(
+      () => void fetchRuntimeTimeline(false),
+      snapshot.runState === "running" ? 1500 : 5000
+    );
+    return () => {
+      timelineRequestRef.current += 1;
+      window.clearInterval(timer);
+    };
+  }, [fetchRuntimeTimeline, snapshot.runState]);
+
+  useEffect(() => {
+    void fetchRuntimeTimeline(false);
+  }, [fetchRuntimeTimeline, snapshot.currentTime]);
 
   return (
     <motion.aside
@@ -212,7 +313,39 @@ export default function SimulationInspectorPanel({
 
         <div className="flex-1 overflow-y-auto pr-4 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-cyan-900/50">
           <div className="flex flex-col">
-            {recentLogs.length > 0 ? (
+            {recentRuntimeEvents.length > 0 ? (
+              recentRuntimeEvents.map((event) => (
+                <div
+                  key={event.id}
+                  className="group relative flex items-start gap-4"
+                >
+                  <div className="absolute bottom-[-16px] left-[3px] top-4 w-px bg-cyan-400/10 group-last:hidden" />
+
+                  <div className="relative z-10 mt-1.5 flex shrink-0 items-center justify-center bg-[#020610]">
+                    <div className="size-2 rounded-full border border-cyan-400/50 bg-cyan-950 transition-all group-hover:bg-cyan-400 group-hover:shadow-[0_0_8px_rgba(34,211,238,0.8)]" />
+                  </div>
+
+                  <div className="flex-1 pb-3">
+                    <div className="rounded-lg border border-white/[0.02] bg-white/[0.01] px-3 py-2 transition-colors group-hover:border-cyan-400/20 group-hover:bg-cyan-400/5">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-[10px] text-cyan-400/60">
+                          {formatRuntimeTimelineTime(event, scenario.startTime)}
+                        </span>
+                        <span className="rounded border border-emerald-400/20 bg-emerald-400/10 px-1.5 py-px text-[9px] text-emerald-300">
+                          {runtimeTimelineLabel(event)}
+                        </span>
+                        <span className="ml-auto truncate font-mono text-[10px] text-slate-600 opacity-0 transition-opacity group-hover:opacity-100">
+                          {runtimeTimelineMeta(event)}
+                        </span>
+                      </div>
+                      <div className="mt-1.5 text-xs leading-relaxed text-slate-300">
+                        {runtimeTimelineMessage(event)}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))
+            ) : recentLogs.length > 0 ? (
               recentLogs.map((log) => (
                 <div
                   key={log.id}

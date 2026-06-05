@@ -2,9 +2,12 @@
 node_modules/
 dist/
 dist-ssr/
+dist-electron/
+release/
 .npm-cache/
 *.local
 *.tsbuildinfo
+*.blockmap
 
 # --- Logs ---
 logs/

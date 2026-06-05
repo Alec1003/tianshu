@@ -4,24 +4,30 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-semibold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-45 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/55 focus-visible:ring-offset-2 focus-visible:ring-offset-[#050812] active:translate-y-px disabled:pointer-events-none disabled:opacity-45 motion-reduce:transition-none motion-reduce:active:translate-y-0 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
   {
     variants: {
       variant: {
         default:
-          "border border-cyan-300/20 bg-cyan-400/12 text-cyan-100 shadow-[0_0_28px_rgba(76,201,240,0.12)] hover:border-cyan-300/55 hover:bg-cyan-400/18",
+          "border-cyan-300/24 bg-cyan-300/10 text-cyan-50 hover:border-cyan-300/42 hover:bg-cyan-300/15",
+        secondary:
+          "border-slate-700/80 bg-slate-900/78 text-slate-200 hover:border-slate-600 hover:bg-slate-800/90",
+        outline:
+          "border-cyan-300/16 bg-transparent text-slate-200 hover:border-cyan-300/34 hover:bg-cyan-300/10 hover:text-cyan-50",
         ghost:
-          "text-slate-300 hover:bg-white/6 hover:text-cyan-100 hover:shadow-[inset_0_0_0_1px_rgba(76,201,240,0.18)]",
+          "border-transparent bg-transparent text-slate-400 hover:bg-white/[0.055] hover:text-slate-100",
         tactical:
-          "border border-cyan-300/25 bg-[#081523]/86 text-cyan-100 hover:border-cyan-300/55 hover:bg-cyan-400/12 hover:shadow-hud-cyan",
+          "border-cyan-300/20 bg-[#0b1826] text-cyan-100 hover:border-cyan-300/38 hover:bg-cyan-300/10",
         danger:
-          "border border-red-400/25 bg-red-500/10 text-red-100 hover:border-red-300/55 hover:bg-red-500/16 hover:shadow-hud-red",
+          "border-red-400/25 bg-red-500/10 text-red-100 hover:border-red-300/45 hover:bg-red-500/16",
+        destructive:
+          "border-red-400/25 bg-red-500/10 text-red-100 hover:border-red-300/45 hover:bg-red-500/16",
       },
       size: {
-        default: "h-10 px-4 py-2",
-        sm: "h-8 rounded-md px-3 text-xs",
-        lg: "h-12 rounded-lg px-5",
-        icon: "size-10",
+        default: "h-9 px-3 py-2",
+        sm: "h-8 px-2.5",
+        lg: "h-10 px-4",
+        icon: "size-9 p-0",
       },
     },
     defaultVariants: {

@@ -522,11 +522,11 @@ export default function ModelConfigCenter({ onSaved }: ModelConfigCenterProps) {
   const providerStatusLabel = selectedProviderVerified ? "已验证" : "未验证";
 
   return (
-    <div className="aicc-model-config-window flex h-[min(670px,calc(100vh-7rem))] w-full flex-col overflow-hidden rounded-xl border border-cyan-300/15 bg-[#050914]/95 shadow-[0_24px_90px_rgba(0,0,0,0.48),0_0_60px_rgba(34,211,238,0.08)] backdrop-blur-2xl md:flex-row">
+    <div className="tianshu-model-config-window flex h-[min(670px,calc(100vh-9rem))] w-full flex-col overflow-hidden rounded-lg border border-cyan-300/12 bg-[#08111c] md:flex-row">
       <aside className="flex w-full shrink-0 flex-col border-b border-cyan-300/10 bg-slate-950/45 md:w-[224px] md:border-b-0 md:border-r">
         <div className="relative border-b border-cyan-300/10 p-4">
           <div className="flex items-center gap-3">
-            <div className="grid size-8 place-items-center rounded-md border border-cyan-300/20 bg-cyan-300/10 text-cyan-100 shadow-[0_0_24px_rgba(34,211,238,0.10)]">
+            <div className="grid size-8 place-items-center rounded-md border border-cyan-300/16 bg-cyan-300/8 text-cyan-100">
               <Server className="size-4" />
             </div>
             <div className="min-w-0 flex-1">
@@ -551,7 +551,7 @@ export default function ModelConfigCenter({ onSaved }: ModelConfigCenterProps) {
           {addProviderOpen && (
             <motion.div
               animate={{ opacity: 1, y: 0 }}
-              className="absolute left-3 right-3 top-[62px] z-20 overflow-hidden rounded-lg border border-cyan-300/15 bg-[#07111f]/95 py-1 shadow-2xl shadow-black/40 backdrop-blur-xl"
+              className="absolute left-3 right-3 top-[62px] z-20 overflow-hidden rounded-lg border border-cyan-300/15 bg-[#08111c] py-1 shadow-[0_12px_32px_rgba(0,0,0,0.36)]"
               initial={{ opacity: 0, y: -6 }}
               transition={{ duration: 0.14 }}
             >
@@ -595,7 +595,7 @@ export default function ModelConfigCenter({ onSaved }: ModelConfigCenterProps) {
                     className={cn(
                       "flex w-full items-center gap-2.5 rounded-md border px-2.5 py-2.5 text-left transition-all",
                       selected
-                        ? "border-cyan-300/30 bg-cyan-300/[0.10] text-cyan-50 shadow-[0_0_28px_rgba(34,211,238,0.10)]"
+                        ? "border-cyan-300/30 bg-cyan-300/[0.10] text-cyan-50"
                         : "border-transparent text-slate-400 hover:bg-slate-900/70 hover:text-slate-100"
                     )}
                     key={definition.id}
@@ -654,7 +654,7 @@ export default function ModelConfigCenter({ onSaved }: ModelConfigCenterProps) {
         <div className="flex h-full min-h-0 flex-col">
           <header className="flex flex-col gap-4 border-b border-cyan-300/10 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex min-w-0 items-center gap-3">
-              <div className="grid size-11 shrink-0 place-items-center rounded-xl border border-cyan-300/15 bg-cyan-300/[0.08] text-sm font-semibold text-cyan-50 shadow-[0_0_30px_rgba(34,211,238,0.10)]">
+              <div className="grid size-10 shrink-0 place-items-center rounded-md border border-cyan-300/15 bg-cyan-300/[0.08] text-sm font-semibold text-cyan-50">
                 {providerGlyph(selectedProviderId)}
               </div>
               <div className="min-w-0">
@@ -705,7 +705,7 @@ export default function ModelConfigCenter({ onSaved }: ModelConfigCenterProps) {
                 )}
               </Button>
               <Button
-                className="h-9 rounded-md border border-cyan-300/20 bg-gradient-to-r from-cyan-500 to-blue-500 px-4 text-white shadow-[0_0_28px_rgba(34,211,238,0.18)] hover:from-cyan-400 hover:to-blue-400"
+                className="h-9 rounded-md border border-cyan-300/20 bg-cyan-300/12 px-4 text-cyan-50 hover:bg-cyan-300/18"
                 disabled={savingProvider}
                 type="submit"
               >
@@ -860,7 +860,7 @@ export default function ModelConfigCenter({ onSaved }: ModelConfigCenterProps) {
                     />
                     <button
                       aria-label="添加自定义模型"
-                      className="grid size-9 shrink-0 place-items-center rounded-md border border-cyan-300/15 bg-slate-950/65 text-slate-200 shadow-[0_10px_28px_rgba(0,0,0,0.16)] transition-colors hover:border-cyan-300/30 hover:bg-slate-900/80 disabled:opacity-40"
+                      className="grid size-9 shrink-0 place-items-center rounded-md border border-cyan-300/15 bg-slate-950/65 text-slate-200 transition-colors hover:border-cyan-300/30 hover:bg-slate-900/80 disabled:opacity-40"
                       disabled={!customModelDraft.trim()}
                       onClick={addCustomModelAndSelect}
                       title="添加自定义模型"
@@ -872,7 +872,7 @@ export default function ModelConfigCenter({ onSaved }: ModelConfigCenterProps) {
                 </div>
               </div>
 
-              <div className="overflow-hidden rounded-lg border border-cyan-300/12 bg-slate-950/45 shadow-[0_18px_50px_rgba(0,0,0,0.20)]">
+              <div className="overflow-hidden rounded-lg border border-cyan-300/12 bg-slate-950/45">
                 <div className="flex items-center justify-between border-b border-cyan-300/10 px-3 py-2 text-xs text-slate-500">
                   <span>{selectedDefinition.shortName}</span>
                   <span>{providerModels.length} 个模型</span>

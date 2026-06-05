@@ -1,4 +1,4 @@
-FROM docker.m.daocloud.io/library/python:3.12-slim AS base
+FROM python:3.12-slim AS base
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
@@ -20,7 +20,7 @@ RUN pip install -i https://pypi.tuna.tsinghua.edu.cn/simple \
     watchfiles==0.24.0
 
 # project layout: keep server/ and gym/ siblings under /app so
-# server/app/aicc_runtime/runtime.py can resolve parents[3]/gym
+# server/app/tianshu_runtime/runtime.py can resolve parents[3]/gym
 COPY server /app/server
 COPY gym /app/gym
 COPY client/src/scenarios /app/client/src/scenarios

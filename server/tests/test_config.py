@@ -6,6 +6,7 @@ from app.config import (
     DEFAULT_CORS_ORIGINS,
     DEFAULT_DATABASE_URL,
     DEFAULT_JWT_SECRET,
+    DEFAULT_SKILLS_DIR,
     MIN_PRODUCTION_MODEL_CONFIG_SECRET_LENGTH,
     MIN_PRODUCTION_JWT_SECRET_LENGTH,
     Settings,
@@ -19,6 +20,11 @@ def test_default_cors_origins_are_explicit_local_frontends() -> None:
 
     assert settings.cors_origin_list == parse_cors_origins(DEFAULT_CORS_ORIGINS)
     assert "*" not in settings.cors_origin_list
+
+
+def test_default_skills_dir_points_to_server_data_folder() -> None:
+    assert Settings().skills_dir == DEFAULT_SKILLS_DIR
+    assert DEFAULT_SKILLS_DIR == "./data/skills"
 
 
 def test_parse_cors_origins_trims_deduplicates_and_strips_trailing_slash() -> None:
@@ -45,19 +51,19 @@ def test_parse_cors_origins_rejects_wildcard_and_non_origin_values(raw: str) -> 
 def test_production_rejects_default_jwt_secret() -> None:
     settings = Settings(
         env="production",
-        database_url="postgresql+asyncpg://aicc:secret@db/aicc",
+        database_url="postgresql+asyncpg://tianshu:secret@db/tianshu",
         jwt_secret=DEFAULT_JWT_SECRET,
         first_user_is_superuser=False,
     )
 
-    with pytest.raises(RuntimeError, match="AICC_JWT_SECRET"):
+    with pytest.raises(RuntimeError, match="TIANSHU_JWT_SECRET"):
         validate_production_settings(settings)
 
 
 def test_production_rejects_short_jwt_secret() -> None:
     settings = Settings(
         env="production",
-        database_url="postgresql+asyncpg://aicc:secret@db/aicc",
+        database_url="postgresql+asyncpg://tianshu:secret@db/tianshu",
         jwt_secret="short-secret",
         first_user_is_superuser=False,
     )
@@ -69,12 +75,12 @@ def test_production_rejects_short_jwt_secret() -> None:
 def test_production_rejects_first_user_superuser_bootstrap() -> None:
     settings = Settings(
         env="production",
-        database_url="postgresql+asyncpg://aicc:secret@db/aicc",
+        database_url="postgresql+asyncpg://tianshu:secret@db/tianshu",
         jwt_secret="x" * MIN_PRODUCTION_JWT_SECRET_LENGTH,
         first_user_is_superuser=True,
     )
 
-    with pytest.raises(RuntimeError, match="AICC_FIRST_USER_IS_SUPERUSER"):
+    with pytest.raises(RuntimeError, match="TIANSHU_FIRST_USER_IS_SUPERUSER"):
         validate_production_settings(settings)
 
 
@@ -86,14 +92,35 @@ def test_production_rejects_sqlite_database() -> None:
         first_user_is_superuser=False,
     )
 
-    with pytest.raises(RuntimeError, match="AICC_DATABASE_URL"):
+    with pytest.raises(RuntimeError, match="TIANSHU_DATABASE_URL"):
+        validate_production_settings(settings)
+
+
+@pytest.mark.parametrize(
+    ("field", "message"),
+    [
+        ("mcp_http_dev_user_id", "TIANSHU_MCP_HTTP_DEV_USER_ID"),
+        ("mcp_user_id", "TIANSHU_MCP_USER_ID"),
+    ],
+)
+def test_production_rejects_mcp_dev_user_bypass(field: str, message: str) -> None:
+    settings = Settings(
+        env="production",
+        database_url="postgresql+asyncpg://tianshu:secret@db/tianshu",
+        jwt_secret="x" * MIN_PRODUCTION_JWT_SECRET_LENGTH,
+        model_config_secret="m" * MIN_PRODUCTION_MODEL_CONFIG_SECRET_LENGTH,
+        first_user_is_superuser=False,
+        **{field: "00000000-0000-0000-0000-000000000001"},
+    )
+
+    with pytest.raises(RuntimeError, match=message):
         validate_production_settings(settings)
 
 
 def test_production_accepts_hardened_settings() -> None:
     settings = Settings(
         env="production",
-        database_url="postgresql+asyncpg://aicc:secret@db/aicc",
+        database_url="postgresql+asyncpg://tianshu:secret@db/tianshu",
         jwt_secret="x" * MIN_PRODUCTION_JWT_SECRET_LENGTH,
         model_config_secret="m" * MIN_PRODUCTION_MODEL_CONFIG_SECRET_LENGTH,
         first_user_is_superuser=False,

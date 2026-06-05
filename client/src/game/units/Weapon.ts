@@ -20,6 +20,8 @@ interface IWeapon {
   lethality: number;
   maxQuantity: number;
   currentQuantity: number;
+  targetTypes?: string[];
+  target_types?: string[];
 }
 
 export default class Weapon {
@@ -42,6 +44,7 @@ export default class Weapon {
   lethality: number; // currently default -- need to reference from database
   maxQuantity: number;
   currentQuantity: number;
+  targetTypes: string[];
 
   constructor(parameters: IWeapon) {
     this.id = parameters.id;
@@ -63,6 +66,9 @@ export default class Weapon {
     this.lethality = parameters.lethality;
     this.maxQuantity = parameters.maxQuantity;
     this.currentQuantity = parameters.currentQuantity;
+    this.targetTypes = (parameters.targetTypes ?? parameters.target_types ?? [])
+      .map((targetType) => String(targetType).trim().toLowerCase())
+      .filter(Boolean);
   }
 
   getEngagementRange(): number {

@@ -1,13 +1,15 @@
+name: tianshu
+
 services:
   postgres:
     image: docker.m.daocloud.io/library/postgres:16-alpine
     environment:
-      POSTGRES_DB: "${POSTGRES_DB:-aicc}"
-      POSTGRES_USER: "${POSTGRES_USER:-aicc}"
+      POSTGRES_DB: "${POSTGRES_DB:-tianshu}"
+      POSTGRES_USER: "${POSTGRES_USER:-tianshu}"
       # Development default only; override in shared deployments.
-      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-aicc-dev-password}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-tianshu-dev-password}"
     volumes:
-      - aicc_postgres_data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
@@ -24,23 +26,26 @@ services:
       - "8000:8000"
     environment:
       PYTHONUNBUFFERED: "1"
-      AICC_ENV: "${AICC_ENV:-development}"
+      TIANSHU_ENV: "${TIANSHU_ENV:-development}"
       # JWT secret should be overridden in real deployments.
-      AICC_JWT_SECRET: "${AICC_JWT_SECRET:-aicc-dev-secret-change-me-in-production}"
-      AICC_FIRST_USER_IS_SUPERUSER: "${AICC_FIRST_USER_IS_SUPERUSER:-true}"
-      AICC_DATABASE_URL: "${AICC_DATABASE_URL:-postgresql+asyncpg://aicc:aicc-dev-password@postgres:5432/aicc}"
-      AICC_DATABASE_POOL_SIZE: "${AICC_DATABASE_POOL_SIZE:-5}"
-      AICC_DATABASE_MAX_OVERFLOW: "${AICC_DATABASE_MAX_OVERFLOW:-10}"
-      AICC_DATABASE_POOL_TIMEOUT_SECONDS: "${AICC_DATABASE_POOL_TIMEOUT_SECONDS:-30}"
-      AICC_DATABASE_POOL_RECYCLE_SECONDS: "${AICC_DATABASE_POOL_RECYCLE_SECONDS:-1800}"
-      AICC_CORS_ORIGINS: "${AICC_CORS_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}"
-      AICC_LLM_MODEL: "${AICC_LLM_MODEL:-}"
-      AICC_LLM_API_KEY: "${AICC_LLM_API_KEY:-}"
-      AICC_LLM_BASE_URL: "${AICC_LLM_BASE_URL:-}"
-      AICC_ALLOW_PRIVATE_MODEL_BASE_URLS: "${AICC_ALLOW_PRIVATE_MODEL_BASE_URLS:-false}"
-      AICC_EXTERNAL_MCP_SERVERS: "${AICC_EXTERNAL_MCP_SERVERS:-}"
+      TIANSHU_JWT_SECRET: "${TIANSHU_JWT_SECRET:-tianshu-dev-secret-change-me-in-production}"
+      TIANSHU_FIRST_USER_IS_SUPERUSER: "${TIANSHU_FIRST_USER_IS_SUPERUSER:-true}"
+      TIANSHU_DATABASE_URL: "${TIANSHU_DATABASE_URL:-postgresql+asyncpg://tianshu:tianshu-dev-password@postgres:5432/tianshu}"
+      TIANSHU_DATABASE_POOL_SIZE: "${TIANSHU_DATABASE_POOL_SIZE:-5}"
+      TIANSHU_DATABASE_MAX_OVERFLOW: "${TIANSHU_DATABASE_MAX_OVERFLOW:-10}"
+      TIANSHU_DATABASE_POOL_TIMEOUT_SECONDS: "${TIANSHU_DATABASE_POOL_TIMEOUT_SECONDS:-30}"
+      TIANSHU_DATABASE_POOL_RECYCLE_SECONDS: "${TIANSHU_DATABASE_POOL_RECYCLE_SECONDS:-1800}"
+      TIANSHU_RESOURCE_DIR: "${TIANSHU_RESOURCE_DIR:-/app}"
+      TIANSHU_USER_DATA_DIR: "${TIANSHU_USER_DATA_DIR:-/app/server/data}"
+      TIANSHU_SKILLS_DIR: "${TIANSHU_SKILLS_DIR:-./data/skills}"
+      TIANSHU_CORS_ORIGINS: "${TIANSHU_CORS_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}"
+      TIANSHU_LLM_MODEL: "${TIANSHU_LLM_MODEL:-}"
+      TIANSHU_LLM_API_KEY: "${TIANSHU_LLM_API_KEY:-}"
+      TIANSHU_LLM_BASE_URL: "${TIANSHU_LLM_BASE_URL:-}"
+      TIANSHU_ALLOW_PRIVATE_MODEL_BASE_URLS: "${TIANSHU_ALLOW_PRIVATE_MODEL_BASE_URLS:-false}"
+      TIANSHU_EXTERNAL_MCP_SERVERS: "${TIANSHU_EXTERNAL_MCP_SERVERS:-}"
     volumes:
-      - aicc_server_data:/app/server/data
+      - server_data:/app/server/data
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/health').status==200 else 1)"]
@@ -69,5 +74,5 @@ services:
 
 volumes:
   # Named volumes keep data across image rebuilds; use `down -v` to wipe.
-  aicc_server_data: {}
-  aicc_postgres_data: {}
+  server_data: {}
+  postgres_data: {}

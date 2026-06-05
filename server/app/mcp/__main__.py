@@ -6,12 +6,12 @@
 - 鉴权失败时要给出明确退出码 + stderr 提示，方便用户调试。
 
 启动前置：
-    set AICC_MCP_TOKEN=<jwt>   # 推荐
+    set TIANSHU_MCP_TOKEN=<jwt>   # 推荐
     或
-    set AICC_MCP_USER_ID=<uuid>  # 开发模式
+    set TIANSHU_MCP_USER_ID=<uuid>  # 开发模式
 
-环境变量 ``AICC_DATABASE_URL`` 与 fastapi 后端共享同一份 SQLite 文件，
-所以 server 不必先起，但要保证 ``server/data/aicc.db`` 存在。
+环境变量 ``TIANSHU_DATABASE_URL`` 与 fastapi 后端共享同一份 SQLite 文件，
+所以 server 不必先起，但要保证 ``server/data/tianshu.db`` 存在。
 """
 
 from __future__ import annotations

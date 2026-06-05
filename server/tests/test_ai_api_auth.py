@@ -5,7 +5,8 @@ from types import SimpleNamespace
 from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
 
-from app.ai.models import AgentExecutionSummary, SkillDefinition
+from app.ai.mcp_client import MCPClientSkeleton
+from app.ai.models import AgentExecutionSummary, MCPCallTrace, SkillDefinition
 from app.api.ai import router as ai_router
 from app.auth.users import current_active_user
 
@@ -314,15 +315,34 @@ def test_ai_routes_reject_unauthenticated_requests() -> None:
             },
         ),
         ("get", "/api/ai/skills", None),
+        ("get", "/api/ai/custom-skills", None),
+        (
+            "post",
+            "/api/ai/custom-skills",
+            {"name": "Skill", "description": "desc", "prompt": "prompt"},
+        ),
+        ("patch", "/api/ai/custom-skills/skill-1", {"enabled": False}),
+        ("delete", "/api/ai/custom-skills/skill-1", None),
         ("post", "/api/ai/command", {"command": "pause"}),
         ("get", "/api/ai/command/proposals", None),
         ("post", "/api/ai/command/proposals/proposal-1/approve", None),
         ("post", "/api/ai/command/proposals/proposal-1/reject", None),
         (
             "post",
+            "/api/ai/internal-skills/proposals",
+            {"draft": {"name": "CAP", "missions": []}},
+        ),
+        (
+            "post",
             "/api/ai/model/check",
             {"provider": "openai", "baseUrl": "https://example.test"},
         ),
+        (
+            "post",
+            "/api/ai/mcp/validate",
+            {"name": "planner", "transport": "stdio", "command": "python"},
+        ),
+        ("get", "/api/ai/mcp/builtin/tools", None),
         ("post", "/api/ai/chat", None),
     ]
 
@@ -347,6 +367,77 @@ def test_ai_command_and_runtime_work_for_authenticated_user() -> None:
     runtime_response = client.get("/api/ai/runtime/scenario")
     assert runtime_response.status_code == 200
     assert runtime_response.json() == {"currentScenario": {"id": "demo"}}
+
+
+def test_validate_external_mcp_server_returns_tools_without_secrets(monkeypatch) -> None:
+    client = _build_client(authenticated=True)
+    captured = {}
+
+    async def fake_list_tools(self, server_name=None):
+        server = self.list_servers()[0]
+        captured["server"] = server
+        return (
+            [
+                MCPCallTrace(
+                    action="list_tools",
+                    target=server_name or server.name,
+                    status="ok",
+                    message="1 tools available",
+                )
+            ],
+            [
+                {
+                    "server": server.name,
+                    "name": "plan_route",
+                    "description": "Plan a route.",
+                    "inputSchema": {"type": "object"},
+                }
+            ],
+        )
+
+    monkeypatch.setattr(MCPClientSkeleton, "list_tools", fake_list_tools)
+
+    response = client.post(
+        "/api/ai/mcp/validate",
+        json={
+            "name": "planner",
+            "transport": "stdio",
+            "endpoint": "python -m planner_mcp",
+            "env": {"PLANNER_TOKEN": "secret"},
+            "headers": {"Authorization": "Bearer secret"},
+            "timeoutSeconds": 60,
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["ok"] is True
+    assert payload["transport"] == "stdio"
+    assert payload["tools"][0]["name"] == "plan_route"
+    assert "secret" not in response.text
+    server = captured["server"]
+    assert server.command == "python"
+    assert server.args == ["-m", "planner_mcp"]
+    assert server.timeout_seconds == 15.0
+
+
+def test_list_builtin_mcp_tools_returns_registered_tianshu_tools() -> None:
+    client = _build_client(authenticated=True)
+
+    response = client.get("/api/ai/mcp/builtin/tools")
+
+    assert response.status_code == 200
+    payload = response.json()
+    tool_names = {tool["name"] for tool in payload["tools"]}
+    assert payload["ok"] is True
+    assert payload["server"] == "TianShu MCP"
+    assert "runtime_status" in tool_names
+    assert "list_scenarios" in tool_names
+    assert len(payload["tools"]) >= 20
+    assert payload["tools"][0]["server"] == "TianShu MCP"
+    assert isinstance(payload["tools"][0]["inputSchema"], dict)
+    assert isinstance(payload["tools"][0]["outputSchema"], dict)
+    assert ("AI" + "CC") not in response.text
 
 
 def test_ai_runtime_control_endpoints_return_authoritative_snapshot() -> None:
@@ -451,8 +542,26 @@ def test_ai_runtime_control_endpoints_return_authoritative_snapshot() -> None:
 def test_ai_runtime_step_rejects_invalid_step_count() -> None:
     client = _build_client(authenticated=True)
 
+    zero = client.post("/api/ai/runtime/step", json={"steps": 0})
+    assert zero.status_code == 422
+
     too_large = client.post("/api/ai/runtime/step", json={"steps": 7201})
     assert too_large.status_code == 422
+
+
+def test_ai_runtime_move_unit_rejects_invalid_route_coordinates() -> None:
+    client = _build_client(authenticated=True)
+
+    response = client.patch(
+        "/api/ai/runtime/units/route",
+        json={
+            "unit_type": "aircraft",
+            "unit_id": "aircraft-1",
+            "route": [[999, -999]],
+        },
+    )
+
+    assert response.status_code == 422
 
 
 def test_ai_runtime_uses_user_scoped_bridge_registry() -> None:
@@ -486,11 +595,11 @@ def test_ai_runtime_uses_scenario_scoped_bridge_registry() -> None:
 
     alpha_response = client.get(
         "/api/ai/runtime/scenario",
-        headers={"x-test-user": "user-a", "x-aicc-scenario-id": "alpha"},
+        headers={"x-test-user": "user-a", "x-tianshu-scenario-id": "alpha"},
     )
     bravo_response = client.get(
         "/api/ai/runtime/scenario",
-        headers={"x-test-user": "user-a", "x-aicc-scenario-id": "bravo"},
+        headers={"x-test-user": "user-a", "x-tianshu-scenario-id": "bravo"},
     )
 
     assert alpha_response.status_code == 200

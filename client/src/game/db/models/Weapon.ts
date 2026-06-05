@@ -5,4 +5,5 @@ export interface IWeaponModel {
   fuelRate: number;
   range: number;
   lethality: number;
+  targetTypes?: string[];
 }

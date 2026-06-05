@@ -1,4 +1,4 @@
-FROM docker.m.daocloud.io/library/node:20-alpine AS build
+FROM node:20-alpine AS build
 
 WORKDIR /app
 
@@ -18,7 +18,7 @@ RUN npm ci
 COPY . .
 RUN npm run build
 
-FROM docker.m.daocloud.io/library/nginx:1.27-alpine
+FROM nginx:1.27-alpine
 
 EXPOSE 3000
 

@@ -15,7 +15,7 @@
 - `app/ai/skill_registry.py`: Skill definitions and registration.
 - `app/ai/mcp_client.py`: external MCP client for stdio / Streamable HTTP servers.
 - `app/ai/bridge.py`: Unified OpenClaw bridge module.
-- `app/aicc_runtime/runtime.py`: Native engine runtime adapter (calls `gym/blade` in-process).
+- `app/tianshu_runtime/runtime.py`: Native engine runtime adapter (calls `gym/blade` in-process).
 
 ## Install
 ```bash
@@ -52,12 +52,12 @@ Response fields:
   - `app/ai/agent.py` in `_plan_with_sdk()`
 - MCP external services:
   - `app/ai/mcp_client.py`
-  - `AICC_EXTERNAL_MCP_SERVERS` JSON config
+  - `TIANSHU_EXTERNAL_MCP_SERVERS` JSON config
 
 Example external MCP config:
 
 ```powershell
-$env:AICC_EXTERNAL_MCP_SERVERS='[
+$env:TIANSHU_EXTERNAL_MCP_SERVERS='[
   {
     "name": "planner",
     "transport": "stdio",
@@ -92,7 +92,7 @@ Protocol](https://modelcontextprotocol.io) 暴露给任意 MCP 客户端
 - **写**：`create_scenario` / `update_scenario_meta` /
   `update_scenario_data` / `delete_scenario`
 - **AAR**：`list_aar_records` / `post_aar_record`
-- **资源**：`aicc://scenarios`（清单）、`aicc://scenario/{id}`（详情）
+- **资源**：`tianshu://scenarios`（清单）、`tianshu://scenario/{id}`（详情）
 
 #### B. Runtime组（活想定、面向 AI 推演控制，15 tools）
 
@@ -105,11 +105,11 @@ Protocol](https://modelcontextprotocol.io) 暴露给任意 MCP 客户端
 - **单位控制**：`runtime_move_unit` / `runtime_delete_unit`
 - **事件**：`runtime_set_relationship` / `runtime_set_current_side`
 - **胜负**：`runtime_get_outcome`
-- **资源**：`aicc://runtime`（活想定实时快照）
+- **资源**：`tianshu://runtime`（活想定实时快照）
 
 > **两组不同源，不会自动同步**：
 > - DB 组读写 ``Scenario`` 表（静态快照）
-> - Runtime 组读写进程内 ``AICCRuntime``（内存活想定）
+> - Runtime 组读写进程内 ``TianShuRuntime``（内存活想定）
 > - 要把 DB 中的一个想定接管进推演，调 ``runtime_load_scenario_from_db``。
 > - 要把当前推演中的活想定持久化，调 ``runtime_save_to_db``。
 
@@ -121,23 +121,23 @@ stdio 模式启动前要给两条凭证之一：
 
 | 变量 | 说明 |
 | --- | --- |
-| `AICC_MCP_TOKEN` | （推荐）fastapi-users 签发的 JWT，复用 `/api/auth/jwt/login` 的返回值 |
-| `AICC_MCP_USER_ID` | （开发模式）直接用 user UUID，跳过 JWT；上线后不建议使用 |
+| `TIANSHU_MCP_TOKEN` | （推荐）fastapi-users 签发的 JWT，复用 `/api/auth/jwt/login` 的返回值 |
+| `TIANSHU_MCP_USER_ID` | （开发模式）直接用 user UUID，跳过 JWT；上线后不建议使用 |
 
-`AICC_DATABASE_URL` / `AICC_JWT_SECRET` 必须与 FastAPI 后端使用同一份值，
+`TIANSHU_DATABASE_URL` / `TIANSHU_JWT_SECRET` 必须与 FastAPI 后端使用同一份值，
 否则 token 解码失败。
 
 启动命令：
 
 ```powershell
 # 用 token
-$env:AICC_MCP_TOKEN = "<jwt-from-login>"
-& "C:\Users\11631\Desktop\AICC-master\.python312\python.exe" -m app.mcp
+$env:TIANSHU_MCP_TOKEN = "<jwt-from-login>"
+& "..\.python312\python.exe" -m app.mcp
 ```
 
 ```bash
 # Linux/macOS 同理
-AICC_MCP_TOKEN=<jwt> python -m app.mcp
+TIANSHU_MCP_TOKEN=<jwt> python -m app.mcp
 ```
 
 stdout 是协议通道（不要 print），日志走 stderr。
@@ -151,13 +151,13 @@ stdout 是协议通道（不要 print），日志走 stderr。
 {
   "mcpServers": {
     "tianshu": {
-      "command": "C:\\Users\\11631\\Desktop\\AICC-master\\.python312\\python.exe",
+      "command": "<repo>\\.python312\\python.exe",
       "args": ["-m", "app.mcp"],
-      "cwd": "C:\\Users\\11631\\Desktop\\AICC-master\\server",
+      "cwd": "<repo>\\server",
       "env": {
-        "AICC_MCP_TOKEN": "<jwt>",
-        "AICC_DATABASE_URL": "sqlite+aiosqlite:///./data/aicc.db",
-        "AICC_JWT_SECRET": "<same-as-fastapi>"
+        "TIANSHU_MCP_TOKEN": "<jwt>",
+        "TIANSHU_DATABASE_URL": "sqlite+aiosqlite:///./data/tianshu.db",
+        "TIANSHU_JWT_SECRET": "<same-as-fastapi>"
       }
     }
   }
@@ -189,7 +189,7 @@ agent）可以走这条决策环完成一场推演，不需人介入：
 8. runtime_start
 9. while True:                               # 主循环
      runtime_step(steps=30)
-     situation = query_threats(side_id=...) # 或 read aicc://runtime
+     situation = query_threats(side_id=...) # 或 read tianshu://runtime
      # AI 看新态势 → 决策 → runtime_move_unit / runtime_deploy_*
      outcome = runtime_get_outcome
      if outcome.time_up or outcome.inferred_winner_side_id: break
@@ -209,7 +209,7 @@ agent）可以走这条决策环完成一场推演，不需人介入：
   调用共享同一份活想定。多用户 / 多想定 SaaS 隔离要等 runtime
   registry 切片。
 - 启动时默认加载 ``client/src/scenarios/SCS.json``；可用
-  ``AICC_MCP_RUNTIME_SCENARIO`` 环境变量指向别的想定 JSON。
+  ``TIANSHU_MCP_RUNTIME_SCENARIO`` 环境变量指向别的想定 JSON。
 
 ### Streamable HTTP（已完成 ✅）
 
@@ -217,13 +217,13 @@ MCP 现在 **同时** 支持两种传输：
 
 | 传输 | 适用场景 | 端点 | 鉴权 |
 |---|---|---|---|
-| **stdio** | Claude Desktop / Cursor / 本地 agent | `python -m app.mcp` | ENV `AICC_MCP_TOKEN` 或 `AICC_MCP_USER_ID` |
+| **stdio** | Claude Desktop / Cursor / 本地 agent | `python -m app.mcp` | ENV `TIANSHU_MCP_TOKEN` 或 `TIANSHU_MCP_USER_ID` |
 | **HTTP** | 前端 AI Sidebar / 远程 agent / mcp-inspector | `POST /api/mcp/` | `Authorization: Bearer <jwt>` per-request |
 
 HTTP 模式核心特性：
 
 - **共享 runtime**：MCP tool 与 `/api/ai/command` 操作 **同一个**
-  `AICCRuntime` 实例（`app.state.bridge.runtime`）。AI 通过 MCP
+  `TianShuRuntime` 实例（`app.state.bridge.runtime`）。AI 通过 MCP
   部署 / step → 后端 runtime 立即更新。
   > **注意**：前端浏览器有自己的 client-side `Game`（`client/src/game/Game.ts`），
   > 地图从 `game.currentScenario` 渲染，**不会自动轮询后端**。要让前端看到
@@ -232,9 +232,9 @@ HTTP 模式核心特性：
 - **per-request JWT**：复用 fastapi-users 签发的 JWT（`/api/auth/jwt/login`
   的返回值）；每个 HTTP 请求独立校验，无 token / 过期 token 返回 401 +
   `WWW-Authenticate`。
-- **CORS**：继承 FastAPI 的 `CORSMiddleware`（当前 `allow_origins=["*"]`）。
+- **CORS**：FastAPI `CORSMiddleware` 从 `TIANSHU_CORS_ORIGINS` 读取显式 origin；配置层会拒绝 wildcard origin。
 - **session**：MCP 会话 ID 在 `Mcp-Session-Id` 响应头返回；后续请求需回传。
-- **dev 捷径**：设 `AICC_MCP_HTTP_DEV_USER_ID=<uuid>` 可跳过 token 校验
+- **dev 捷径**：设 `TIANSHU_MCP_HTTP_DEV_USER_ID=<uuid>` 可跳过 token 校验
   （仅限本地调试，日志会 warning）。
 
 #### Claude Desktop HTTP 接入（新版 ≥1.x）
@@ -266,7 +266,7 @@ npx @anthropic-ai/mcp-inspector --url http://localhost:8000/api/mcp/ \
 
 ```powershell
 cd server
-& "C:\Users\11631\Desktop\AICC-master\.python312\python.exe" -m pytest tests/ -v
+& "..\.python312\python.exe" -m pytest tests/ -v
 ```
 
 当前覆盖（38 passed）：
@@ -276,7 +276,7 @@ cd server
   严格走线程池（避免阻塞 event loop）
 
 端到端验证已覆盖：
-- **stdio lifespan 烟雾**：AICCRuntime 加载 SCS 想定（3 sides / 14
+- **stdio lifespan 烟雾**：TianShuRuntime 加载 SCS 想定（3 sides / 14
   aircraft / 5 airbases），`runtime_step` 推进仿真时间。
 - **HTTP 8 步烟雾**：①无 token 401 ②假 token 401 ③注册+登录拿 JWT
   ④ JSON-RPC initialize ⑤ tools/list=29 ⑥ runtime_status ⑦

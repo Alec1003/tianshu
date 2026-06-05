@@ -55,6 +55,11 @@ import SCSScenarioJson from "@/scenarios/SCS.json";
 import blankScenarioJson from "@/scenarios/blank_scenario.json";
 import defaultScenarioJson from "@/scenarios/default_scenario.json";
 import { cn } from "@/lib/utils";
+import {
+  readStorageItem,
+  removeStorageItem,
+  writeStorageItem,
+} from "@/lib/legacyStorage";
 import { randomUUID } from "@/utils/generateUUID";
 import AISidebar from "./AISidebar";
 import SimulationInspectorPanel from "./SimulationInspectorPanel";
@@ -128,7 +133,17 @@ function scenarioSignature(scenario: Record<string, unknown>): string {
   }
 }
 
-function createAiccGameFromJson(scenarioJson: object | null | undefined): Game {
+function cloneScenarioRecord(raw: unknown): Record<string, unknown> {
+  const cloned = JSON.parse(JSON.stringify(raw)) as Record<string, unknown>;
+  if (!cloned || typeof cloned !== "object") {
+    throw new Error("Scenario payload must be an object");
+  }
+  return cloned;
+}
+
+function createTianShuGameFromJson(
+  scenarioJson: object | null | undefined
+): Game {
   const now = Math.floor(Date.now() / 1000);
   const currentScenario = new Scenario({
     id: randomUUID(),
@@ -143,7 +158,7 @@ function createAiccGameFromJson(scenarioJson: object | null | undefined): Game {
     game.loadScenario(JSON.stringify(source));
   } catch (err) {
     console.error(
-      "[AICC] createAiccGameFromJson: loadScenario failed, falling back to SCS",
+      "[TianShu] createTianShuGameFromJson: loadScenario failed, falling back to SCS",
       err
     );
     game.loadScenario(
@@ -290,7 +305,6 @@ export interface AITacticalCommandPlatformProps {
   onSave?: (data: Record<string, unknown>) => Promise<void> | void;
   /** 另存为新 scenario；平台仅负责报上当前 JSON，名称/跳转由上层处理。 */
   onRequestSaveAs?: (data: Record<string, unknown>) => void;
-  onCreateBranch?: (data: Record<string, unknown>) => void;
   /** 返回想定列表。 */
   onExit?: () => void;
   /** 推演结束时异步归档 AAR。可选；失败不阻断 UI。 */
@@ -302,14 +316,21 @@ export default function AITacticalCommandPlatform({
   initialScenarioData,
   onSave,
   onRequestSaveAs,
-  onCreateBranch,
   onExit,
   onPostAar,
 }: AITacticalCommandPlatformProps = {}) {
   // game 是引用型，useState 仅初始化一次；实际切换想定走下面 useEffect
   // 调 loadScenario，避免重建 Cesium。
   const [game] = useState<Game>(() =>
-    createAiccGameFromJson(initialScenarioData ?? null)
+    createTianShuGameFromJson(initialScenarioData ?? null)
+  );
+  const initialRuntimeScenarioRef = useRef<Record<string, unknown>>(
+    cloneScenarioRecord(
+      initialScenarioData ?? cloneDefaultScenarioWithNow(SCSScenarioJson)
+    )
+  );
+  const latestRuntimeScenarioRef = useRef<Record<string, unknown>>(
+    initialRuntimeScenarioRef.current
   );
   const runtimeControllerRef = useRef<RuntimeController | null>(null);
   if (runtimeControllerRef.current === null) {
@@ -333,9 +354,9 @@ export default function AITacticalCommandPlatform({
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
   const [showRoutes, setShowRoutes] = useState(false);
   const [showRanges, setShowRanges] = useState(false);
-  const [mapSceneMode, setMapSceneMode] = useState<CesiumSceneModeKey>("2d");
+  const [mapSceneMode, setMapSceneMode] = useState<CesiumSceneModeKey>("3d");
   const [mapBaseLayer, setMapBaseLayer] =
-    useState<CesiumBaseLayerKey>("satellite");
+    useState<CesiumBaseLayerKey>("arcgisImagery");
   const [placement, setPlacement] = useState<CesiumPlacement | null>(null);
   const runStateRef = useRef<SimulationRunState>("idle");
   const playLoopRunning = useRef(false);
@@ -389,6 +410,7 @@ export default function AITacticalCommandPlatform({
       runtimeVisibilityRef.current = runtimeSnapshot.visibility ?? null;
       game.scenarioPaused = runtimeSnapshot.paused;
       game.gameOutcome = runtimeOutcomeToGameOutcome(runtimeSnapshot.outcome);
+      latestRuntimeScenarioRef.current = runtimeSnapshot.scenario;
       runtimeScenarioSignatureRef.current = scenarioSignature(
         runtimeSnapshot.scenario
       );
@@ -408,7 +430,7 @@ export default function AITacticalCommandPlatform({
           preserveTimeCompression: true,
         })
       )
-      .catch((err) => console.error("[AICC] runtime pause failed:", err));
+      .catch((err) => console.error("[TianShu] runtime pause failed:", err));
   }, [applyRuntimeSnapshot, game, refreshSnapshot]);
 
   const playSimulation = useCallback(async () => {
@@ -445,7 +467,7 @@ export default function AITacticalCommandPlatform({
         await new Promise((resolve) => window.setTimeout(resolve, 80));
       }
     } catch (err) {
-      console.error("[AICC] runtime play failed:", err);
+      console.error("[TianShu] runtime play failed:", err);
       window.alert("后端推演启动失败，请稍后重试。");
     } finally {
       playLoopRunning.current = false;
@@ -458,7 +480,7 @@ export default function AITacticalCommandPlatform({
             });
           }
         } catch (err) {
-          console.error("[AICC] runtime pause after play failed:", err);
+          console.error("[TianShu] runtime pause after play failed:", err);
           game.scenarioPaused = true;
           refreshSnapshot("paused");
         }
@@ -478,64 +500,52 @@ export default function AITacticalCommandPlatform({
         })
       )
       .catch((err) => {
-        console.error("[AICC] runtime step failed:", err);
+        console.error("[TianShu] runtime step failed:", err);
         window.alert("后端单步推演失败，请稍后重试。");
       });
   }, [applyRuntimeSnapshot, game, refreshSnapshot]);
 
-  // Tracks the most recently activated scenario source so 重置 can reload
-  // whatever the user is currently sandboxing in (SCS / Demo / 自建 / 导入)
-  // instead of always falling back to SCS. Initialized to SCS to match the
-  // `createAiccGame()` boot scenario.
-  const lastLoadedScenarioRef = useRef<unknown>(SCSScenarioJson);
+  // Tracks the latest backend-accepted scenario so reset can reload the same
+  // source without treating the browser render adapter as authoritative.
+  const lastLoadedScenarioRef = useRef<unknown>(
+    initialRuntimeScenarioRef.current
+  );
 
-  // Shared loader: applies a parsed scenario object to the live Game while
-  // resetting transient UI (placement / mission dialogs) so stale ids from the
-  // previous scenario can't leak into the editor flow.
+  // Shared loader: sends the parsed scenario to the backend runtime first, then
+  // applies the canonical snapshot returned by that runtime.
   const loadScenarioFromObject = useCallback(
     async (raw: unknown) => {
       let cloned: { currentScenario?: { id?: string } };
       try {
         cloned = JSON.parse(JSON.stringify(raw));
       } catch (err) {
-        console.error("[AICC] scenario clone failed:", err);
+        console.error("[TianShu] scenario clone failed:", err);
         window.alert("场景数据无效，无法加载。");
         return;
       }
       if (cloned?.currentScenario && cloned.currentScenario.id) {
         cloned.currentScenario.id = randomUUID();
       }
-      try {
-        game.scenarioPaused = true;
-        game.loadScenario(JSON.stringify(cloned));
-        runtimeVisibilityRef.current = null;
-      } catch (err) {
-        console.error("[AICC] loadScenario failed:", err);
-        window.alert("场景加载失败：文件可能不是合法的天枢平台场景。");
-        return;
-      }
-      // Remember the (cloned) source so 重置 can re-apply the same scenario
-      // again without reusing the stale ids that loadScenario consumed.
-      lastLoadedScenarioRef.current = cloned;
+      runtimeVisibilityRef.current = null;
       setPlacement(null);
       setMissionCreatorOpen(false);
       setMissionEditorMissionId(null);
-      refreshSnapshot("idle");
       try {
         const runtimeSnapshot =
           await runtimeControllerRef.current?.loadScenario(
             cloned as Record<string, unknown>
           );
         if (runtimeSnapshot) {
+          lastLoadedScenarioRef.current = runtimeSnapshot.scenario;
           applyRuntimeSnapshot(runtimeSnapshot, "idle");
           runtimeReadyRef.current = true;
         }
       } catch (err) {
-        console.error("[AICC] runtime scenario load failed:", err);
-        window.alert("场景已在前端打开，但同步到后端推演引擎失败。");
+        console.error("[TianShu] runtime scenario load failed:", err);
+        window.alert("后端推演引擎加载场景失败，请检查场景数据后重试。");
       }
     },
-    [applyRuntimeSnapshot, game, refreshSnapshot]
+    [applyRuntimeSnapshot]
   );
 
   const resetSimulation = useCallback(() => {
@@ -546,7 +556,7 @@ export default function AITacticalCommandPlatform({
       ?.reset()
       .then((runtimeSnapshot) => applyRuntimeSnapshot(runtimeSnapshot, "idle"))
       .catch((err) => {
-        console.error("[AICC] runtime reset failed:", err);
+        console.error("[TianShu] runtime reset failed:", err);
         void loadScenarioFromObject(lastLoadedScenarioRef.current);
       });
   }, [applyRuntimeSnapshot, game, loadScenarioFromObject, refreshSnapshot]);
@@ -555,16 +565,7 @@ export default function AITacticalCommandPlatform({
     if (runtimeBootstrappedRef.current) return;
     runtimeBootstrappedRef.current = true;
 
-    let currentScenario: Record<string, unknown>;
-    try {
-      currentScenario = JSON.parse(game.exportCurrentScenario()) as Record<
-        string,
-        unknown
-      >;
-    } catch (err) {
-      console.error("[AICC] initial scenario export failed:", err);
-      return;
-    }
+    const currentScenario = initialRuntimeScenarioRef.current;
 
     lastLoadedScenarioRef.current = currentScenario;
     void runtimeControllerRef.current
@@ -574,10 +575,10 @@ export default function AITacticalCommandPlatform({
         runtimeReadyRef.current = true;
       })
       .catch((err) => {
-        console.error("[AICC] initial runtime sync failed:", err);
+        console.error("[TianShu] initial runtime sync failed:", err);
         window.alert("当前场景同步到后端推演引擎失败，推演控制暂不可用。");
       });
-  }, [applyRuntimeSnapshot, game]);
+  }, [applyRuntimeSnapshot]);
 
   const handleNewScenario = useCallback(() => {
     if (
@@ -616,12 +617,12 @@ export default function AITacticalCommandPlatform({
           const parsed = JSON.parse(txt);
           void loadScenarioFromObject(parsed);
         } catch (err) {
-          console.error("[AICC] import parse failed:", err);
+          console.error("[TianShu] import parse failed:", err);
           window.alert("场景文件解析失败：不是合法的 JSON。");
         }
       };
       reader.onerror = () => {
-        console.error("[AICC] import read failed:", reader.error);
+        console.error("[TianShu] import read failed:", reader.error);
         window.alert("场景文件读取失败，请重试。");
       };
       reader.readAsText(file, "UTF-8");
@@ -632,14 +633,18 @@ export default function AITacticalCommandPlatform({
 
   const handleExportScenario = useCallback(() => {
     try {
-      const json = game.exportCurrentScenario();
+      const scenario = latestRuntimeScenarioRef.current;
+      const json = JSON.stringify(scenario, null, 2);
       const blob = new Blob([json], {
         type: "application/json;charset=utf-8",
       });
       const url = URL.createObjectURL(blob);
       const ts = new Date().toISOString().replace(/[:.]/g, "_");
+      const currentScenario = scenario.currentScenario as
+        | { name?: unknown }
+        | undefined;
       const safeName =
-        (game.currentScenario.name || "tianshu_scenario")
+        String(currentScenario?.name || "tianshu_scenario")
           .trim()
           .replace(/[^A-Za-z0-9_-]+/g, "_")
           .slice(0, 60) || "tianshu_scenario";
@@ -651,50 +656,17 @@ export default function AITacticalCommandPlatform({
       a.remove();
       window.setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch (err) {
-      console.error("[AICC] export failed:", err);
+      console.error("[TianShu] export failed:", err);
       window.alert("场景导出失败，请稍后重试。");
     }
-  }, [game]);
+  }, []);
 
   const exportCurrentScenarioObject = useCallback((): Record<
     string,
     unknown
   > | null => {
-    try {
-      return JSON.parse(game.exportCurrentScenario()) as Record<
-        string,
-        unknown
-      >;
-    } catch (err) {
-      console.error("[AICC] export scenario JSON parse failed", err);
-      return null;
-    }
-  }, [game]);
-
-  const syncCurrentScenarioToRuntime = useCallback(
-    async (runState: SimulationRunState = runStateRef.current) => {
-      const currentScenario = exportCurrentScenarioObject();
-      if (!currentScenario) return;
-
-      lastLoadedScenarioRef.current = currentScenario;
-      const runtimeSnapshot =
-        await runtimeControllerRef.current?.loadScenario(currentScenario);
-      if (runtimeSnapshot) {
-        applyRuntimeSnapshot(runtimeSnapshot, runState, {
-          preserveTimeCompression: true,
-        });
-        runtimeReadyRef.current = true;
-      }
-    },
-    [applyRuntimeSnapshot, exportCurrentScenarioObject]
-  );
-
-  const handleLocalScenarioMutation = useCallback(() => {
-    refreshSnapshot();
-    void syncCurrentScenarioToRuntime().catch((err) =>
-      console.error("[AICC] runtime mutation sync failed:", err)
-    );
-  }, [refreshSnapshot, syncCurrentScenarioToRuntime]);
+    return latestRuntimeScenarioRef.current;
+  }, []);
 
   const applyRuntimeMutation = useCallback(
     async (
@@ -918,7 +890,7 @@ export default function AITacticalCommandPlatform({
         openMissionId === missionId ? null : openMissionId
       );
       void deleteRuntimeMission(missionId).catch((err) => {
-        console.error("[AICC] runtime mission delete failed:", err);
+        console.error("[TianShu] runtime mission delete failed:", err);
         window.alert("后端删除任务失败，请稍后重试。");
       });
     },
@@ -934,7 +906,7 @@ export default function AITacticalCommandPlatform({
       void runtimeControllerRef.current
         ?.pause()
         .catch((err) =>
-          console.error("[AICC] runtime cleanup pause failed", err)
+          console.error("[TianShu] runtime cleanup pause failed", err)
         );
     };
   }, [game, refreshSnapshot]);
@@ -1001,7 +973,7 @@ export default function AITacticalCommandPlatform({
             sides: snapshot.sideStats,
           },
         })
-      ).catch((err) => console.warn("[AICC] onPostAar failed", err));
+      ).catch((err) => console.warn("[TianShu] onPostAar failed", err));
     }
   }, [
     snapshot.outcome.ended,
@@ -1015,13 +987,13 @@ export default function AITacticalCommandPlatform({
   ]);
 
   const SIDEBAR_MIN = 240;
-  const SIDEBAR_STORAGE_KEY = "aicc.commandSidebarWidth";
+  const SIDEBAR_STORAGE_KEY = "tianshu.commandSidebarWidth";
 
   const [commandSidebarWidth, setCommandSidebarWidth] = useState<number | null>(
     () => {
       if (typeof window === "undefined") return null;
       try {
-        const raw = window.localStorage.getItem(SIDEBAR_STORAGE_KEY);
+        const raw = readStorageItem(SIDEBAR_STORAGE_KEY);
         if (!raw) return null;
         const value = Number(raw);
         return Number.isFinite(value) && value >= SIDEBAR_MIN ? value : null;
@@ -1035,9 +1007,9 @@ export default function AITacticalCommandPlatform({
     if (typeof window === "undefined") return;
     try {
       if (commandSidebarWidth === null) {
-        window.localStorage.removeItem(SIDEBAR_STORAGE_KEY);
+        removeStorageItem(SIDEBAR_STORAGE_KEY);
       } else {
-        window.localStorage.setItem(
+        writeStorageItem(
           SIDEBAR_STORAGE_KEY,
           String(Math.round(commandSidebarWidth))
         );
@@ -1103,20 +1075,14 @@ export default function AITacticalCommandPlatform({
           )
         )
         .catch((err) => {
-          console.error("[AICC] AI runtime refresh failed", err);
-          try {
-            game.loadScenario(JSON.stringify(data));
-            refreshSnapshot();
-          } catch (loadErr) {
-            console.error("[AICC] AI scenario apply failed", loadErr);
-          }
+          console.error("[TianShu] AI runtime refresh failed", err);
+          latestRuntimeScenarioRef.current = data;
         });
     },
-    [applyRuntimeSnapshot, game, refreshSnapshot]
+    [applyRuntimeSnapshot]
   );
 
-  // 当前 game JSON 快照，供保存/另存为按钮提取。
-  // game.exportCurrentScenario() 返回字符串，这里再 parse 成 object 与后端契约对齐。
+  // Save / Save As use the authoritative backend runtime snapshot.
   const captureCurrentScenarioData = useCallback((): Record<
     string,
     unknown
@@ -1142,11 +1108,6 @@ export default function AITacticalCommandPlatform({
     onRequestSaveAs(captureCurrentScenarioData());
   }, [onRequestSaveAs, captureCurrentScenarioData]);
 
-  const handleCreateBranchClick = useCallback(() => {
-    if (!onCreateBranch) return;
-    onCreateBranch(captureCurrentScenarioData());
-  }, [onCreateBranch, captureCurrentScenarioData]);
-
   const toggleTimelinePanel = useCallback(() => {
     if (!timelinePanelOpen) setAiSidebarOpen(false);
     setTimelinePanelOpen((value) => !value);
@@ -1167,7 +1128,7 @@ export default function AITacticalCommandPlatform({
 
   // 是否需要渲染顶部 mini bar（路由模式才显示；standalone 兼容老入口）。
   const showRouterChrome = Boolean(
-    scenarioMeta && (onSave || onRequestSaveAs || onCreateBranch || onExit)
+    scenarioMeta && (onSave || onRequestSaveAs || onExit)
   );
 
   return (
@@ -1185,12 +1146,12 @@ export default function AITacticalCommandPlatform({
     >
       <motion.nav
         animate={{ opacity: 1 }}
-        className="hidden border-r border-cyan-300/10 bg-[#030912]/95 px-2 py-5 backdrop-blur-2xl lg:flex lg:flex-col"
+        className="hidden border-r border-cyan-300/10 bg-[#030912]/95 px-2 py-5 shadow-[inset_-1px_0_0_rgba(125,211,252,0.03)] backdrop-blur-xl lg:flex lg:flex-col"
         initial={{ opacity: 0 }}
         style={{ gridColumn: "1 / 2", gridRow: "1 / 3" }}
       >
         <div className="mb-7 flex justify-center">
-          <div className="grid size-11 place-items-center rounded-2xl border border-cyan-300/18 bg-cyan-300/8 text-cyan-100 shadow-hud-cyan">
+          <div className="grid size-11 place-items-center rounded-lg border border-cyan-300/16 bg-cyan-300/8 text-cyan-100">
             <Shield className="size-6" />
           </div>
         </div>
@@ -1200,10 +1161,10 @@ export default function AITacticalCommandPlatform({
             <button
               aria-label={label}
               className={cn(
-                "group grid size-11 place-items-center rounded-xl border text-slate-500 transition-all",
+                "group grid size-11 place-items-center rounded-lg border text-slate-400 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/55",
                 activeRailItem === id
-                  ? "border-cyan-300/25 bg-cyan-300/12 text-cyan-100 shadow-hud-cyan"
-                  : "border-transparent hover:border-cyan-300/12 hover:bg-white/5 hover:text-slate-200"
+                  ? "border-cyan-300/24 bg-cyan-300/10 text-cyan-100"
+                  : "border-transparent hover:border-cyan-300/12 hover:bg-white/5 hover:text-slate-100"
               )}
               key={id}
               onClick={() => setActiveRailItem(id)}
@@ -1220,7 +1181,7 @@ export default function AITacticalCommandPlatform({
             aria-label={aiSidebarOpen ? "关闭 AI 侧栏" : "打开 AI 侧栏"}
             className={cn(
               "size-10",
-              aiSidebarOpen ? "text-cyan-100 shadow-hud-cyan" : "text-slate-400"
+              aiSidebarOpen ? "text-cyan-100" : "text-slate-300"
             )}
             onClick={toggleAiSidebar}
             size="icon"
@@ -1246,9 +1207,7 @@ export default function AITacticalCommandPlatform({
             aria-label="AI / 系统设置"
             className={cn(
               "size-10",
-              settingsModalOpen
-                ? "text-cyan-100 shadow-hud-cyan"
-                : "text-slate-400"
+              settingsModalOpen ? "text-cyan-100" : "text-slate-300"
             )}
             onClick={() => setSettingsModalOpen((value) => !value)}
             size="icon"
@@ -1325,9 +1284,6 @@ export default function AITacticalCommandPlatform({
           onRequestSaveAs={
             onRequestSaveAs ? () => handleSaveAsClick() : undefined
           }
-          onCreateBranch={
-            onCreateBranch ? () => handleCreateBranchClick() : undefined
-          }
           savingState={savingState}
           timelineOpen={timelinePanelOpen}
           onToggleTimeline={toggleTimelinePanel}
@@ -1339,7 +1295,7 @@ export default function AITacticalCommandPlatform({
       </div>
 
       <main
-        className="relative flex min-h-0 min-w-0 flex-col overflow-hidden bg-[#050914]"
+        className="relative isolate z-0 flex min-h-0 min-w-0 flex-col overflow-hidden bg-[#050914]"
         style={{ gridColumn: "3 / 4", gridRow: "2 / 3" }}
       >
         {/*
@@ -1363,7 +1319,6 @@ export default function AITacticalCommandPlatform({
             onPause={pauseSimulation}
             onStep={stepSimulation}
             onReset={resetSimulation}
-            onScenarioMutation={handleLocalScenarioMutation}
             onDeployUnit={deployRuntimeUnit}
             onDeleteUnit={deleteRuntimeUnit}
             onMoveUnit={moveRuntimeUnit}
@@ -1385,7 +1340,7 @@ export default function AITacticalCommandPlatform({
             showRoutes={showRoutes}
           />
 
-          <div className="pointer-events-none absolute inset-0 z-[1] tactical-grid opacity-45" />
+          <div className="pointer-events-none absolute inset-0 z-[1] tactical-grid opacity-30" />
           <div className="pointer-events-none absolute inset-x-0 top-0 z-[2] h-28 bg-gradient-to-b from-[#050914] via-[#050914]/55 to-transparent" />
         </div>
 
@@ -1394,7 +1349,12 @@ export default function AITacticalCommandPlatform({
           现搬到地图列底部，4 个核心卡片在 lg+ 横向 4 列铺开，腾出右侧
           槽位给后续 AI 工具栏。
         */}
-        <SimulationInspectorPanel game={game} snapshot={snapshot} />
+        <SimulationInspectorPanel
+          game={game}
+          runtimeScenarioId={scenarioId}
+          scenarioId={scenarioMeta?.id}
+          snapshot={snapshot}
+        />
       </main>
 
       <AISidebar

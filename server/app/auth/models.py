@@ -18,7 +18,7 @@ from app.db.base import Base
 
 
 class User(SQLAlchemyBaseUserTableUUID, Base):
-    """AICC user. id/email/hashed_password/is_active/is_superuser/is_verified
+    """TianShu user. id/email/hashed_password/is_active/is_superuser/is_verified
     are inherited from fastapi-users base."""
 
     display_name: Mapped[str] = mapped_column(String(80), default="", nullable=False)

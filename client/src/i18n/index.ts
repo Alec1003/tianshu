@@ -4,6 +4,13 @@ import { initReactI18next } from "react-i18next";
 
 import en from "@/i18n/locales/en.json";
 import zh from "@/i18n/locales/zh.json";
+import { readStorageItem } from "@/lib/legacyStorage";
+
+const LANGUAGE_STORAGE_KEY = "tianshu.lng";
+
+if (typeof window !== "undefined") {
+  readStorageItem(LANGUAGE_STORAGE_KEY);
+}
 
 // Single source of truth for runtime translations.
 // - `lng` is auto-detected (querystring `?lng=zh|en`, then localStorage, then
@@ -29,7 +36,7 @@ void i18n
     detection: {
       order: ["querystring", "localStorage", "navigator"],
       lookupQuerystring: "lng",
-      lookupLocalStorage: "aicc.lng",
+      lookupLocalStorage: LANGUAGE_STORAGE_KEY,
       caches: ["localStorage"],
     },
     returnNull: false,

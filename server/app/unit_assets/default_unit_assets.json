@@ -9,15 +9,23 @@
       "dataSource": {
         "speedSrc": "https://www.af.mil/About-Us/Fact-Sheets/Display/Article/478441/f-35a-lightning-ii/",
         "maxFuelSrc": "https://www.af.mil/About-Us/Fact-Sheets/Display/Article/478441/f-35a-lightning-ii/",
-        "fuelRateSrc": "missing",
-        "rangeSrc": "https://www.af.mil/About-Us/Fact-Sheets/Display/Article/478441/f-35a-lightning-ii/"
+        "fuelRateSrc": "simulation fuel-burn estimate; exact hourly fuel burn varies by loadout, altitude, throttle, and mission profile",
+        "rangeSrc": "simulation detection-range estimate; public sensor range not available",
+        "ferryRangeSrc": "USAF F-35A fact sheet"
       },
       "units": {
         "speedUnit": "knots",
         "maxFuelUnit": "lbs",
         "fuelRateUnit": "lbs/hr",
-        "rangeUnit": "nm"
-      }
+        "rangeUnit": "nm",
+        "ferryRangeUnit": "nm",
+        "combatRadiusUnit": "nm"
+      },
+      "rangeRole": "detectionRangeNm",
+      "rangeConfidence": "simulation-estimate",
+      "rangeNotes": "Used by the simulator as sensor/detection radius; exact military sensor ranges are not public. Ferry/combat range is stored separately when public data is available.",
+      "ferryRangeNm": 1200,
+      "combatRadiusNm": 669
     },
     {
       "className": "KC-135R Stratotanker",
@@ -32,15 +40,23 @@
       "dataSource": {
         "speedSrc": "https://www.af.mil/About-Us/Fact-Sheets/Display/Article/174560/kc-135r-stratotanker/",
         "maxFuelSrc": "https://www.af.mil/About-Us/Fact-Sheets/Display/Article/174560/kc-135r-stratotanker/",
-        "fuelRateSrc": "missing",
-        "rangeSrc": "https://www.af.mil/About-Us/Fact-Sheets/Display/Article/174560/kc-135r-stratotanker/"
+        "fuelRateSrc": "simulation fuel-burn estimate; exact hourly fuel burn varies by loadout, altitude, throttle, and mission profile",
+        "rangeSrc": "simulation detection-range estimate; public sensor range not available",
+        "ferryRangeSrc": "USAF KC-135R fact sheet"
       },
       "units": {
         "speedUnit": "knots",
         "maxFuelUnit": "lbs",
         "fuelRateUnit": "lbs/hr",
-        "rangeUnit": "nm"
-      }
+        "rangeUnit": "nm",
+        "ferryRangeUnit": "nm",
+        "missionRangeUnit": "nm"
+      },
+      "rangeRole": "detectionRangeNm",
+      "rangeConfidence": "simulation-estimate",
+      "rangeNotes": "Used by the simulator as sensor/detection radius; exact military sensor ranges are not public. Ferry/combat range is stored separately when public data is available.",
+      "ferryRangeNm": 9569,
+      "missionRangeNm": 1303
     },
     {
       "className": "A-10C Thunderbolt II",
@@ -51,15 +67,23 @@
       "dataSource": {
         "speedSrc": "https://www.af.mil/About-Us/Fact-Sheets/Display/Article/104490/a-10c-thunderbolt-ii/",
         "maxFuelSrc": "https://www.af.mil/About-Us/Fact-Sheets/Display/Article/104490/a-10c-thunderbolt-ii/",
-        "fuelRateSrc": "missing",
-        "rangeSrc": "https://www.af.mil/About-Us/Fact-Sheets/Display/Article/104490/a-10c-thunderbolt-ii/"
+        "fuelRateSrc": "simulation fuel-burn estimate; exact hourly fuel burn varies by loadout, altitude, throttle, and mission profile",
+        "rangeSrc": "simulation detection-range estimate; public sensor range not available",
+        "ferryRangeSrc": "USAF A-10C fact sheet"
       },
       "units": {
         "speedUnit": "knots",
         "maxFuelUnit": "lbs",
         "fuelRateUnit": "lbs/hr",
-        "rangeUnit": "nm"
-      }
+        "rangeUnit": "nm",
+        "ferryRangeUnit": "nm",
+        "combatRadiusUnit": "nm"
+      },
+      "rangeRole": "detectionRangeNm",
+      "rangeConfidence": "simulation-estimate",
+      "rangeNotes": "Used by the simulator as sensor/detection radius; exact military sensor ranges are not public. Ferry/combat range is stored separately when public data is available.",
+      "ferryRangeNm": 2240,
+      "combatRadiusNm": 250
     },
     {
       "className": "B-2 Spirit",
@@ -70,15 +94,21 @@
       "dataSource": {
         "speedSrc": "high subsonic, https://www.af.mil/About-Us/Fact-Sheets/Display/Article/104481/b-2-spirit/",
         "maxFuelSrc": "https://www.af.mil/About-Us/Fact-Sheets/Display/Article/104481/b-2-spirit/",
-        "fuelRateSrc": "missing",
-        "rangeSrc": "intercontinental, https://www.af.mil/About-Us/Fact-Sheets/Display/Article/104481/b-2-spirit/"
+        "fuelRateSrc": "simulation fuel-burn estimate; exact hourly fuel burn varies by loadout, altitude, throttle, and mission profile",
+        "rangeSrc": "simulation detection-range estimate; public sensor range not available",
+        "ferryRangeSrc": "USAF B-2 fact sheet"
       },
       "units": {
         "speedUnit": "knots",
         "maxFuelUnit": "lbs",
         "fuelRateUnit": "lbs/hr",
-        "rangeUnit": "nm"
-      }
+        "rangeUnit": "nm",
+        "ferryRangeUnit": "nm"
+      },
+      "rangeRole": "detectionRangeNm",
+      "rangeConfidence": "simulation-estimate",
+      "rangeNotes": "Used by the simulator as sensor/detection radius; exact military sensor ranges are not public. Ferry/combat range is stored separately when public data is available.",
+      "ferryRangeNm": 6000
     },
     {
       "className": "F-22 Raptor",
@@ -89,15 +119,23 @@
       "dataSource": {
         "speedSrc": "https://www.af.mil/About-Us/Fact-Sheets/Display/Article/104506/f-22-raptor/",
         "maxFuelSrc": "https://www.af.mil/About-Us/Fact-Sheets/Display/Article/104506/f-22-raptor/",
-        "fuelRateSrc": "missing",
-        "rangeSrc": "https://www.af.mil/About-Us/Fact-Sheets/Display/Article/104506/f-22-raptor/"
+        "fuelRateSrc": "simulation fuel-burn estimate; exact hourly fuel burn varies by loadout, altitude, throttle, and mission profile",
+        "rangeSrc": "simulation detection-range estimate; public sensor range not available",
+        "ferryRangeSrc": "USAF F-22 fact sheet"
       },
       "units": {
         "speedUnit": "knots",
         "maxFuelUnit": "lbs",
         "fuelRateUnit": "lbs/hr",
-        "rangeUnit": "nm"
-      }
+        "rangeUnit": "nm",
+        "ferryRangeUnit": "nm",
+        "combatRadiusUnit": "nm"
+      },
+      "rangeRole": "detectionRangeNm",
+      "rangeConfidence": "simulation-estimate",
+      "rangeNotes": "Used by the simulator as sensor/detection radius; exact military sensor ranges are not public. Ferry/combat range is stored separately when public data is available.",
+      "ferryRangeNm": 1600,
+      "combatRadiusNm": 460
     },
     {
       "className": "C-130 Hercules",
@@ -107,35 +145,47 @@
       "range": 40,
       "dataSource": {
         "speedSrc": "https://www.af.mil/About-Us/Fact-Sheets/Display/Article/1555054/c-130-hercules/",
-        "maxFuelSrc": "missing",
-        "fuelRateSrc": "missing",
-        "rangeSrc": "https://www.af.mil/About-Us/Fact-Sheets/Display/Article/1555054/c-130-hercules/"
+        "maxFuelSrc": "public/representative fuel-capacity estimate; verify for exact block or configuration",
+        "fuelRateSrc": "simulation fuel-burn estimate; exact hourly fuel burn varies by loadout, altitude, throttle, and mission profile",
+        "rangeSrc": "simulation detection-range estimate; public sensor range not available",
+        "ferryRangeSrc": "USAF C-130 fact sheet"
       },
       "units": {
         "speedUnit": "knots",
         "maxFuelUnit": "lbs",
         "fuelRateUnit": "lbs/hr",
-        "rangeUnit": "nm"
-      }
+        "rangeUnit": "nm",
+        "ferryRangeUnit": "nm"
+      },
+      "rangeRole": "detectionRangeNm",
+      "rangeConfidence": "simulation-estimate",
+      "rangeNotes": "Used by the simulator as sensor/detection radius; exact military sensor ranges are not public. Ferry/combat range is stored separately when public data is available.",
+      "ferryRangeNm": 1700
     },
     {
       "className": "C-17 Globemaster III",
-      "speed": 496,
+      "speed": 450,
       "maxFuel": 181054,
       "fuelRate": 33500,
       "range": 40,
       "dataSource": {
         "speedSrc": "https://www.af.mil/About-Us/Fact-Sheets/Display/Article/1529726/c-17-globemaster-iii/",
-        "maxFuelSrc": "missing",
-        "fuelRateSrc": "missing",
-        "rangeSrc": "Global with in-flight refueling, https://www.af.mil/About-Us/Fact-Sheets/Display/Article/478441/f-35a-lightning-ii/"
+        "maxFuelSrc": "public/representative fuel-capacity estimate; verify for exact block or configuration",
+        "fuelRateSrc": "simulation fuel-burn estimate; exact hourly fuel burn varies by loadout, altitude, throttle, and mission profile",
+        "rangeSrc": "simulation detection-range estimate; public sensor range not available",
+        "ferryRangeSrc": "USAF C-17 fact sheet"
       },
       "units": {
         "speedUnit": "knots",
         "maxFuelUnit": "lbs",
         "fuelRateUnit": "lbs/hr",
-        "rangeUnit": "nm"
-      }
+        "rangeUnit": "nm",
+        "ferryRangeUnit": "nm"
+      },
+      "rangeRole": "detectionRangeNm",
+      "rangeConfidence": "simulation-estimate",
+      "rangeNotes": "Used by the simulator as sensor/detection radius; exact military sensor ranges are not public. Ferry/combat range is stored separately when public data is available.",
+      "ferryRangeNm": 2400
     },
     {
       "className": "F-16 Fighting Falcon",
@@ -146,15 +196,23 @@
       "dataSource": {
         "speedSrc": "https://www.af.mil/About-Us/Fact-Sheets/Display/Article/104505/f-16-fighting-falcon/",
         "maxFuelSrc": "https://www.af.mil/About-Us/Fact-Sheets/Display/Article/104505/f-16-fighting-falcon/",
-        "fuelRateSrc": "missing",
-        "rangeSrc": "https://www.af.mil/About-Us/Fact-Sheets/Display/Article/104505/f-16-fighting-falcon/"
+        "fuelRateSrc": "simulation fuel-burn estimate; exact hourly fuel burn varies by loadout, altitude, throttle, and mission profile",
+        "rangeSrc": "simulation detection-range estimate; public sensor range not available",
+        "ferryRangeSrc": "USAF F-16 fact sheet"
       },
       "units": {
         "speedUnit": "knots",
         "maxFuelUnit": "lbs",
         "fuelRateUnit": "lbs/hr",
-        "rangeUnit": "nm"
-      }
+        "rangeUnit": "nm",
+        "ferryRangeUnit": "nm",
+        "combatRadiusUnit": "nm"
+      },
+      "rangeRole": "detectionRangeNm",
+      "rangeConfidence": "simulation-estimate",
+      "rangeNotes": "Used by the simulator as sensor/detection radius; exact military sensor ranges are not public. Ferry/combat range is stored separately when public data is available.",
+      "ferryRangeNm": 1740,
+      "combatRadiusNm": 500
     },
     {
       "className": "F-15 Eagle",
@@ -165,15 +223,23 @@
       "dataSource": {
         "speedSrc": "https://www.af.mil/About-Us/Fact-Sheets/Display/Article/104501/f-15-eagle/",
         "maxFuelSrc": "https://www.af.mil/About-Us/Fact-Sheets/Display/Article/104501/f-15-eagle/",
-        "fuelRateSrc": "missing",
-        "rangeSrc": "https://www.af.mil/About-Us/Fact-Sheets/Display/Article/104501/f-15-eagle/"
+        "fuelRateSrc": "simulation fuel-burn estimate; exact hourly fuel burn varies by loadout, altitude, throttle, and mission profile",
+        "rangeSrc": "simulation detection-range estimate; public sensor range not available",
+        "ferryRangeSrc": "USAF F-15 fact sheet"
       },
       "units": {
         "speedUnit": "knots",
         "maxFuelUnit": "lbs",
         "fuelRateUnit": "lbs/hr",
-        "rangeUnit": "nm"
-      }
+        "rangeUnit": "nm",
+        "ferryRangeUnit": "nm",
+        "combatRadiusUnit": "nm"
+      },
+      "rangeRole": "detectionRangeNm",
+      "rangeConfidence": "simulation-estimate",
+      "rangeNotes": "Used by the simulator as sensor/detection radius; exact military sensor ranges are not public. Ferry/combat range is stored separately when public data is available.",
+      "ferryRangeNm": 3000,
+      "combatRadiusNm": 1061
     },
     {
       "className": "F/A-18 Hornet",
@@ -183,16 +249,22 @@
       "range": 100,
       "dataSource": {
         "speedSrc": "https://www.navy.mil/Resources/Fact-Files/Display-FactFiles/Article/2383479/fa-18a-d-hornet-and-fa-18ef-super-hornet-strike-fighter/",
-        "maxFuelSrc": "missing",
-        "fuelRateSrc": "missing",
-        "rangeSrc": "https://www.navy.mil/Resources/Fact-Files/Display-FactFiles/Article/2383479/fa-18a-d-hornet-and-fa-18ef-super-hornet-strike-fighter/"
+        "maxFuelSrc": "public/representative fuel-capacity estimate; verify for exact block or configuration",
+        "fuelRateSrc": "simulation fuel-burn estimate; exact hourly fuel burn varies by loadout, altitude, throttle, and mission profile",
+        "rangeSrc": "simulation detection-range estimate; public sensor range not available",
+        "ferryRangeSrc": "US Navy F/A-18 fact file"
       },
       "units": {
         "speedUnit": "knots",
         "maxFuelUnit": "lbs",
         "fuelRateUnit": "lbs/hr",
-        "rangeUnit": "nm"
-      }
+        "rangeUnit": "nm",
+        "ferryRangeUnit": "nm"
+      },
+      "rangeRole": "detectionRangeNm",
+      "rangeConfidence": "simulation-estimate",
+      "rangeNotes": "Used by the simulator as sensor/detection radius; exact military sensor ranges are not public. Ferry/combat range is stored separately when public data is available.",
+      "ferryRangeNm": 1275
     },
     {
       "className": "B-52 Stratofortress",
@@ -203,15 +275,21 @@
       "dataSource": {
         "speedSrc": "https://www.af.mil/About-Us/Fact-Sheets/Display/Article/104465/b-52h-stratofortress/",
         "maxFuelSrc": "https://www.af.mil/About-Us/Fact-Sheets/Display/Article/104465/b-52h-stratofortress/",
-        "fuelRateSrc": "missing",
-        "rangeSrc": "https://www.af.mil/About-Us/Fact-Sheets/Display/Article/104465/b-52h-stratofortress/"
+        "fuelRateSrc": "simulation fuel-burn estimate; exact hourly fuel burn varies by loadout, altitude, throttle, and mission profile",
+        "rangeSrc": "simulation detection-range estimate; public sensor range not available",
+        "ferryRangeSrc": "USAF B-52H fact sheet"
       },
       "units": {
         "speedUnit": "knots",
         "maxFuelUnit": "lbs",
         "fuelRateUnit": "lbs/hr",
-        "rangeUnit": "nm"
-      }
+        "rangeUnit": "nm",
+        "ferryRangeUnit": "nm"
+      },
+      "rangeRole": "detectionRangeNm",
+      "rangeConfidence": "simulation-estimate",
+      "rangeNotes": "Used by the simulator as sensor/detection radius; exact military sensor ranges are not public. Ferry/combat range is stored separately when public data is available.",
+      "ferryRangeNm": 8800
     },
     {
       "className": "F-4 Phantom II",
@@ -221,16 +299,22 @@
       "range": 50,
       "dataSource": {
         "speedSrc": "https://www.holloman.af.mil/About/Fact-Sheets/Display/Article/317295/f-4-phantom-ii/",
-        "maxFuelSrc": "missing",
-        "fuelRateSrc": "missing",
-        "rangeSrc": "https://www.holloman.af.mil/About/Fact-Sheets/Display/Article/317295/f-4-phantom-ii/"
+        "maxFuelSrc": "public/representative fuel-capacity estimate; verify for exact block or configuration",
+        "fuelRateSrc": "simulation fuel-burn estimate; exact hourly fuel burn varies by loadout, altitude, throttle, and mission profile",
+        "rangeSrc": "simulation detection-range estimate; public sensor range not available",
+        "ferryRangeSrc": "USAF F-4 fact sheet"
       },
       "units": {
         "speedUnit": "knots",
         "maxFuelUnit": "lbs",
         "fuelRateUnit": "lbs/hr",
-        "rangeUnit": "nm"
-      }
+        "rangeUnit": "nm",
+        "ferryRangeUnit": "nm"
+      },
+      "rangeRole": "detectionRangeNm",
+      "rangeConfidence": "simulation-estimate",
+      "rangeNotes": "Used by the simulator as sensor/detection radius; exact military sensor ranges are not public. Ferry/combat range is stored separately when public data is available.",
+      "ferryRangeNm": 1750
     },
     {
       "className": "B-1B Lancer",
@@ -241,15 +325,21 @@
       "dataSource": {
         "speedSrc": "https://www.af.mil/About-Us/Fact-Sheets/Display/Article/104500/b-1b-lancer/",
         "maxFuelSrc": "https://www.af.mil/About-Us/Fact-Sheets/Display/Article/104500/b-1b-lancer/",
-        "fuelRateSrc": "missing",
-        "rangeSrc": "intercontinental, https://www.af.mil/About-Us/Fact-Sheets/Display/Article/104500/b-1b-lancer/"
+        "fuelRateSrc": "simulation fuel-burn estimate; exact hourly fuel burn varies by loadout, altitude, throttle, and mission profile",
+        "rangeSrc": "simulation detection-range estimate; public sensor range not available",
+        "ferryRangeSrc": "USAF B-1B fact sheet"
       },
       "units": {
         "speedUnit": "knots",
         "maxFuelUnit": "lbs",
         "fuelRateUnit": "lbs/hr",
-        "rangeUnit": "nm"
-      }
+        "rangeUnit": "nm",
+        "ferryRangeUnit": "nm"
+      },
+      "rangeRole": "detectionRangeNm",
+      "rangeConfidence": "simulation-estimate",
+      "rangeNotes": "Used by the simulator as sensor/detection radius; exact military sensor ranges are not public. Ferry/combat range is stored separately when public data is available.",
+      "ferryRangeNm": 5100
     },
     {
       "className": "C-12 Huron",
@@ -260,15 +350,21 @@
       "dataSource": {
         "speedSrc": "https://www.5af.pacaf.af.mil/About-Us/Fact-Sheets/Display/Article/1482851/c-12-huron/",
         "maxFuelSrc": "https://www.5af.pacaf.af.mil/About-Us/Fact-Sheets/Display/Article/1482851/c-12-huron/",
-        "fuelRateSrc": "missing",
-        "rangeSrc": "https://www.5af.pacaf.af.mil/About-Us/Fact-Sheets/Display/Article/1482851/c-12-huron/"
+        "fuelRateSrc": "simulation fuel-burn estimate; exact hourly fuel burn varies by loadout, altitude, throttle, and mission profile",
+        "rangeSrc": "simulation detection-range estimate; public sensor range not available",
+        "ferryRangeSrc": "USAF C-12 fact sheet"
       },
       "units": {
         "speedUnit": "knots",
         "maxFuelUnit": "lbs",
         "fuelRateUnit": "lbs/hr",
-        "rangeUnit": "nm"
-      }
+        "rangeUnit": "nm",
+        "ferryRangeUnit": "nm"
+      },
+      "rangeRole": "detectionRangeNm",
+      "rangeConfidence": "simulation-estimate",
+      "rangeNotes": "Used by the simulator as sensor/detection radius; exact military sensor ranges are not public. Ferry/combat range is stored separately when public data is available.",
+      "ferryRangeNm": 1450
     },
     {
       "className": "F-14 Tomcat",
@@ -278,16 +374,22 @@
       "range": 200,
       "dataSource": {
         "speedSrc": "https://www.history.navy.mil/content/history/museums/nnam/explore/collections/aircraft/f/f-14a-tomcat.html",
-        "maxFuelSrc": "missing",
-        "fuelRateSrc": "missing",
-        "rangeSrc": "https://www.history.navy.mil/content/history/museums/nnam/explore/collections/aircraft/f/f-14a-tomcat.html"
+        "maxFuelSrc": "public/representative fuel-capacity estimate; verify for exact block or configuration",
+        "fuelRateSrc": "simulation fuel-burn estimate; exact hourly fuel burn varies by loadout, altitude, throttle, and mission profile",
+        "rangeSrc": "simulation detection-range estimate; public sensor range not available",
+        "ferryRangeSrc": "US Navy F-14 historical fact file"
       },
       "units": {
         "speedUnit": "knots",
         "maxFuelUnit": "lbs",
         "fuelRateUnit": "lbs/hr",
-        "rangeUnit": "nm"
-      }
+        "rangeUnit": "nm",
+        "ferryRangeUnit": "nm"
+      },
+      "rangeRole": "detectionRangeNm",
+      "rangeConfidence": "simulation-estimate",
+      "rangeNotes": "Used by the simulator as sensor/detection radius; exact military sensor ranges are not public. Ferry/combat range is stored separately when public data is available.",
+      "ferryRangeNm": 2085
     },
     {
       "className": "EA-18G Growler",
@@ -298,21 +400,30 @@
       "isElectronicWarfare": true,
       "jammingRange": 150,
       "jammingStrength": 0.55,
-      "jammingModes": ["radar", "communications"],
+      "jammingModes": [
+        "radar",
+        "communications"
+      ],
       "communicationDisruption": 0.35,
       "dataSource": {
-        "speedSrc": "public approximate simulator value",
-        "maxFuelSrc": "public approximate simulator value",
-        "fuelRateSrc": "AI estimate; verify before use",
-        "rangeSrc": "public approximate simulator value"
+        "speedSrc": "public representative maximum-speed estimate",
+        "maxFuelSrc": "public representative fuel-capacity estimate",
+        "fuelRateSrc": "simulation fuel-burn estimate; exact hourly fuel burn varies by loadout, altitude, throttle, and mission profile",
+        "rangeSrc": "simulation detection-range estimate; public sensor range not available",
+        "ferryRangeSrc": "US Navy EA-18G public fact file / Super Hornet representative"
       },
       "units": {
         "speedUnit": "knots",
         "maxFuelUnit": "lbs",
         "fuelRateUnit": "lbs/hr",
         "rangeUnit": "nm",
-        "jammingRangeUnit": "nm"
-      }
+        "jammingRangeUnit": "nm",
+        "ferryRangeUnit": "nm"
+      },
+      "rangeRole": "detectionRangeNm",
+      "rangeConfidence": "simulation-estimate",
+      "rangeNotes": "Used by the simulator as sensor/detection radius; exact military sensor ranges are not public. Ferry/combat range is stored separately when public data is available.",
+      "ferryRangeNm": 1275
     },
     {
       "className": "EF-111A Raven",
@@ -323,21 +434,30 @@
       "isElectronicWarfare": true,
       "jammingRange": 140,
       "jammingStrength": 0.5,
-      "jammingModes": ["radar", "communications"],
+      "jammingModes": [
+        "radar",
+        "communications"
+      ],
       "communicationDisruption": 0.3,
       "dataSource": {
-        "speedSrc": "public approximate simulator value",
-        "maxFuelSrc": "public approximate simulator value",
-        "fuelRateSrc": "AI estimate; verify before use",
-        "rangeSrc": "public approximate simulator value"
+        "speedSrc": "public representative maximum-speed estimate",
+        "maxFuelSrc": "public representative fuel-capacity estimate",
+        "fuelRateSrc": "simulation fuel-burn estimate; exact hourly fuel burn varies by loadout, altitude, throttle, and mission profile",
+        "rangeSrc": "simulation detection-range estimate; public sensor range not available",
+        "ferryRangeSrc": "public historical estimate"
       },
       "units": {
         "speedUnit": "knots",
         "maxFuelUnit": "lbs",
         "fuelRateUnit": "lbs/hr",
         "rangeUnit": "nm",
-        "jammingRangeUnit": "nm"
-      }
+        "jammingRangeUnit": "nm",
+        "ferryRangeUnit": "nm"
+      },
+      "rangeRole": "detectionRangeNm",
+      "rangeConfidence": "simulation-estimate",
+      "rangeNotes": "Used by the simulator as sensor/detection radius; exact military sensor ranges are not public. Ferry/combat range is stored separately when public data is available.",
+      "ferryRangeNm": 2000
     }
   ],
   "airbaseDb": [
@@ -627,67 +747,200 @@
   "facilityDb": [
     {
       "className": "S-400 Triumf",
-      "range": 200
+      "range": 216,
+      "rangeRole": "engagementRangeNm",
+      "rangeConfidence": "public-estimate",
+      "dataSource": {
+        "rangeSrc": "public missile-system engagement-range estimate; exact configuration varies by interceptor and radar"
+      },
+      "units": {
+        "rangeUnit": "nm"
+      }
     },
     {
       "className": "S-300V4",
-      "range": 200
+      "range": 200,
+      "rangeRole": "engagementRangeNm",
+      "rangeConfidence": "public-estimate",
+      "dataSource": {
+        "rangeSrc": "public missile-system engagement-range estimate; exact configuration varies by interceptor and radar"
+      },
+      "units": {
+        "rangeUnit": "nm"
+      }
     },
     {
       "className": "S-500 Prometey",
-      "range": 200
+      "range": 324,
+      "rangeRole": "engagementRangeNm",
+      "rangeConfidence": "public-estimate-low",
+      "rangeNotes": "Public S-500 engagement-range claims vary and are not independently verifiable; simulator uses 600 km converted to nautical miles.",
+      "dataSource": {
+        "rangeSrc": "public missile-system engagement-range estimate; exact configuration varies by interceptor and radar"
+      },
+      "units": {
+        "rangeUnit": "nm"
+      }
     },
     {
       "className": "Buk-M3",
-      "range": 50
+      "range": 38,
+      "rangeRole": "engagementRangeNm",
+      "rangeConfidence": "public-estimate",
+      "dataSource": {
+        "rangeSrc": "public missile-system engagement-range estimate; exact configuration varies by interceptor and radar"
+      },
+      "units": {
+        "rangeUnit": "nm"
+      }
     },
     {
       "className": "Tor-M2",
-      "range": 10
+      "range": 8.6,
+      "rangeRole": "engagementRangeNm",
+      "rangeConfidence": "public-estimate",
+      "dataSource": {
+        "rangeSrc": "public missile-system engagement-range estimate; exact configuration varies by interceptor and radar"
+      },
+      "units": {
+        "rangeUnit": "nm"
+      }
     },
     {
       "className": "Pantsir-S1",
-      "range": 10
+      "range": 10.8,
+      "rangeRole": "engagementRangeNm",
+      "rangeConfidence": "public-estimate",
+      "dataSource": {
+        "rangeSrc": "public missile-system engagement-range estimate; exact configuration varies by interceptor and radar"
+      },
+      "units": {
+        "rangeUnit": "nm"
+      }
     },
     {
       "className": "HQ-9",
-      "range": 200
+      "range": 108,
+      "rangeRole": "engagementRangeNm",
+      "rangeConfidence": "public-estimate",
+      "dataSource": {
+        "rangeSrc": "public missile-system engagement-range estimate; exact configuration varies by interceptor and radar"
+      },
+      "units": {
+        "rangeUnit": "nm"
+      }
     },
     {
       "className": "HQ-19",
-      "range": 200
+      "range": 162,
+      "rangeRole": "engagementRangeNm",
+      "rangeConfidence": "public-estimate-low",
+      "rangeNotes": "HQ-19 public performance figures are speculative; model as a low-confidence high-altitude/anti-missile interceptor.",
+      "dataSource": {
+        "rangeSrc": "public missile-system engagement-range estimate; exact configuration varies by interceptor and radar"
+      },
+      "units": {
+        "rangeUnit": "nm"
+      }
     },
     {
       "className": "HQ-16",
-      "range": 50
+      "range": 38,
+      "rangeRole": "engagementRangeNm",
+      "rangeConfidence": "public-estimate",
+      "rangeNotes": "Representative HQ-16B/LY-80 engagement range, converted from 70 km to nautical miles.",
+      "dataSource": {
+        "rangeSrc": "public missile-system engagement-range estimate; exact configuration varies by interceptor and radar"
+      },
+      "units": {
+        "rangeUnit": "nm"
+      }
     },
     {
       "className": "HQ-17",
-      "range": 10
+      "range": 8.1,
+      "rangeRole": "engagementRangeNm",
+      "rangeConfidence": "public-estimate",
+      "dataSource": {
+        "rangeSrc": "public missile-system engagement-range estimate; exact configuration varies by interceptor and radar"
+      },
+      "units": {
+        "rangeUnit": "nm"
+      }
     },
     {
       "className": "HQ-7",
-      "range": 10
+      "range": 8.1,
+      "rangeRole": "engagementRangeNm",
+      "rangeConfidence": "public-estimate",
+      "dataSource": {
+        "rangeSrc": "public missile-system engagement-range estimate; exact configuration varies by interceptor and radar"
+      },
+      "units": {
+        "rangeUnit": "nm"
+      }
     },
     {
       "className": "MIM-104 Patriot",
-      "range": 200
+      "range": 86,
+      "rangeRole": "engagementRangeNm",
+      "rangeConfidence": "public-estimate",
+      "dataSource": {
+        "rangeSrc": "public missile-system engagement-range estimate; exact configuration varies by interceptor and radar"
+      },
+      "units": {
+        "rangeUnit": "nm"
+      }
     },
     {
       "className": "THAAD",
-      "range": 200
+      "range": 108,
+      "rangeRole": "engagementRangeNm",
+      "rangeConfidence": "public-estimate",
+      "dataSource": {
+        "rangeSrc": "public missile-system engagement-range estimate; exact configuration varies by interceptor and radar"
+      },
+      "units": {
+        "rangeUnit": "nm"
+      }
     },
     {
       "className": "Aster 30",
-      "range": 50
+      "range": 54,
+      "rangeRole": "engagementRangeNm",
+      "rangeConfidence": "public-estimate",
+      "rangeNotes": "Representative Aster 30 engagement range, converted from approximately 100 km to nautical miles.",
+      "dataSource": {
+        "rangeSrc": "public missile-system engagement-range estimate; exact configuration varies by interceptor and radar"
+      },
+      "units": {
+        "rangeUnit": "nm"
+      }
     },
     {
       "className": "Barak 8",
-      "range": 50
+      "range": 38,
+      "rangeRole": "engagementRangeNm",
+      "rangeConfidence": "public-estimate",
+      "rangeNotes": "Representative Barak 8 LR engagement range, converted from 70 km to nautical miles.",
+      "dataSource": {
+        "rangeSrc": "public missile-system engagement-range estimate; exact configuration varies by interceptor and radar"
+      },
+      "units": {
+        "rangeUnit": "nm"
+      }
     },
     {
       "className": "NASAMS",
-      "range": 50
+      "range": 25,
+      "rangeRole": "engagementRangeNm",
+      "rangeConfidence": "public-estimate",
+      "dataSource": {
+        "rangeSrc": "public missile-system engagement-range estimate; exact configuration varies by interceptor and radar"
+      },
+      "units": {
+        "rangeUnit": "nm"
+      }
     }
   ],
   "shipDb": [
@@ -696,42 +949,150 @@
       "speed": 30.4,
       "maxFuel": 25200000,
       "fuelRate": 1000000,
-      "range": 8000
+      "range": 250,
+      "rangeRole": "detectionRangeNm",
+      "enduranceRangeNm": 8000,
+      "rangeConfidence": "simulation-estimate",
+      "rangeNotes": "Simulator detection radius, not ship endurance range. Endurance is stored in enduranceRangeNm.",
+      "dataSource": {
+        "speedSrc": "public representative class estimate",
+        "maxFuelSrc": "simulation representative fuel capacity",
+        "fuelRateSrc": "simulation representative fuel burn",
+        "rangeSrc": "carrier group air-search estimate",
+        "enduranceRangeSrc": "public representative endurance estimate"
+      },
+      "units": {
+        "speedUnit": "knots",
+        "maxFuelUnit": "lbs",
+        "fuelRateUnit": "lbs/hr",
+        "rangeUnit": "nm",
+        "enduranceRangeUnit": "nm"
+      }
     },
     {
       "className": "Destroyer",
       "speed": 34.8,
       "maxFuel": 3500000,
       "fuelRate": 100000,
-      "range": 5000
+      "range": 220,
+      "rangeRole": "detectionRangeNm",
+      "enduranceRangeNm": 5000,
+      "rangeConfidence": "simulation-estimate",
+      "rangeNotes": "Simulator detection radius, not ship endurance range. Endurance is stored in enduranceRangeNm.",
+      "dataSource": {
+        "speedSrc": "public representative class estimate",
+        "maxFuelSrc": "simulation representative fuel capacity",
+        "fuelRateSrc": "simulation representative fuel burn",
+        "rangeSrc": "Aegis destroyer representative air-search estimate",
+        "enduranceRangeSrc": "public representative endurance estimate"
+      },
+      "units": {
+        "speedUnit": "knots",
+        "maxFuelUnit": "lbs",
+        "fuelRateUnit": "lbs/hr",
+        "rangeUnit": "nm",
+        "enduranceRangeUnit": "nm"
+      }
     },
     {
       "className": "Frigate",
       "speed": 30.4,
       "maxFuel": 2800000,
       "fuelRate": 80000,
-      "range": 4500
+      "range": 120,
+      "rangeRole": "detectionRangeNm",
+      "enduranceRangeNm": 4500,
+      "rangeConfidence": "simulation-estimate",
+      "rangeNotes": "Simulator detection radius, not ship endurance range. Endurance is stored in enduranceRangeNm.",
+      "dataSource": {
+        "speedSrc": "public representative class estimate",
+        "maxFuelSrc": "simulation representative fuel capacity",
+        "fuelRateSrc": "simulation representative fuel burn",
+        "rangeSrc": "frigate representative sensor estimate",
+        "enduranceRangeSrc": "public representative endurance estimate"
+      },
+      "units": {
+        "speedUnit": "knots",
+        "maxFuelUnit": "lbs",
+        "fuelRateUnit": "lbs/hr",
+        "rangeUnit": "nm",
+        "enduranceRangeUnit": "nm"
+      }
     },
     {
       "className": "Corvette",
       "speed": 27.8,
       "maxFuel": 1400000,
       "fuelRate": 60000,
-      "range": 3500
+      "range": 80,
+      "rangeRole": "detectionRangeNm",
+      "enduranceRangeNm": 3500,
+      "rangeConfidence": "simulation-estimate",
+      "rangeNotes": "Simulator detection radius, not ship endurance range. Endurance is stored in enduranceRangeNm.",
+      "dataSource": {
+        "speedSrc": "public representative class estimate",
+        "maxFuelSrc": "simulation representative fuel capacity",
+        "fuelRateSrc": "simulation representative fuel burn",
+        "rangeSrc": "corvette representative sensor estimate",
+        "enduranceRangeSrc": "public representative endurance estimate"
+      },
+      "units": {
+        "speedUnit": "knots",
+        "maxFuelUnit": "lbs",
+        "fuelRateUnit": "lbs/hr",
+        "rangeUnit": "nm",
+        "enduranceRangeUnit": "nm"
+      }
     },
     {
       "className": "Amphibious Assault Ship",
       "speed": 21.7,
       "maxFuel": 8400000,
       "fuelRate": 200000,
-      "range": 6000
+      "range": 150,
+      "rangeRole": "detectionRangeNm",
+      "enduranceRangeNm": 6000,
+      "rangeConfidence": "simulation-estimate",
+      "rangeNotes": "Simulator detection radius, not ship endurance range. Endurance is stored in enduranceRangeNm.",
+      "dataSource": {
+        "speedSrc": "public representative class estimate",
+        "maxFuelSrc": "simulation representative fuel capacity",
+        "fuelRateSrc": "simulation representative fuel burn",
+        "rangeSrc": "amphibious assault ship representative sensor estimate",
+        "enduranceRangeSrc": "public representative endurance estimate"
+      },
+      "units": {
+        "speedUnit": "knots",
+        "maxFuelUnit": "lbs",
+        "fuelRateUnit": "lbs/hr",
+        "rangeUnit": "nm",
+        "enduranceRangeUnit": "nm"
+      }
     },
     {
       "className": "Patrol Boat",
       "speed": 34.8,
       "maxFuel": 350000,
       "fuelRate": 30000,
-      "range": 1500
+      "range": 25,
+      "rangeRole": "detectionRangeNm",
+      "enduranceRangeNm": 1500,
+      "rangeConfidence": "simulation-estimate",
+      "rangeNotes": "Simulator detection radius, not ship endurance range. Endurance is stored in enduranceRangeNm.",
+      "dataSource": {
+        "speedSrc": "public representative class estimate",
+        "maxFuelSrc": "simulation representative fuel capacity",
+        "fuelRateSrc": "simulation representative fuel burn",
+        "rangeSrc": "patrol craft representative sensor estimate",
+        "enduranceRangeSrc": "public representative endurance estimate"
+      },
+      "units": {
+        "speedUnit": "knots",
+        "maxFuelUnit": "lbs",
+        "fuelRateUnit": "lbs/hr",
+        "rangeUnit": "nm",
+        "enduranceRangeUnit": "nm"
+      }
     }
   ],
   "weaponDb": [
@@ -741,15 +1102,53 @@
       "maxFuel": 480,
       "fuelRate": 350,
       "range": 86,
-      "lethality": 0.65
+      "lethality": 0.65,
+      "rangeRole": "engagementRangeNm",
+      "variant": "AIM-120D public representative",
+      "rangeConfidence": "public-estimate",
+      "rangeNotes": "Official AMRAAM variant ranges are not consistently public; simulator uses a representative AIM-120D maximum engagement range.",
+      "targetTypes": [
+        "aircraft"
+      ],
+      "units": {
+        "speedUnit": "knots",
+        "maxFuelUnit": "lbs",
+        "fuelRateUnit": "lbs/hr",
+        "rangeUnit": "nm"
+      },
+      "dataSource": {
+        "speedSrc": "public/simulation representative estimate",
+        "maxFuelSrc": "simulation missile fuel model",
+        "fuelRateSrc": "simulation missile fuel model",
+        "rangeSrc": "public representative AIM-120D engagement-range estimate; official variant range not consistently published"
+      }
     },
     {
       "className": "AIM-9 Sidewinder",
       "speed": 1500,
       "maxFuel": 100,
       "fuelRate": 80,
-      "range": 19,
-      "lethality": 0.6
+      "range": 15.6,
+      "lethality": 0.6,
+      "rangeRole": "engagementRangeNm",
+      "variant": "AIM-9M",
+      "rangeConfidence": "official-public",
+      "rangeNotes": "NAVAIR lists AIM-9M range as 10-18 statute miles; simulator stores the maximum converted to nautical miles.",
+      "targetTypes": [
+        "aircraft"
+      ],
+      "units": {
+        "speedUnit": "knots",
+        "maxFuelUnit": "lbs",
+        "fuelRateUnit": "lbs/hr",
+        "rangeUnit": "nm"
+      },
+      "dataSource": {
+        "speedSrc": "public/simulation representative estimate",
+        "maxFuelSrc": "simulation missile fuel model",
+        "fuelRateSrc": "simulation missile fuel model",
+        "rangeSrc": "https://www.navair.navy.mil/product/AIM-9M-Sidewinder"
+      }
     },
     {
       "className": "AIM-54 Phoenix",
@@ -757,7 +1156,26 @@
       "maxFuel": 1000,
       "fuelRate": 300,
       "range": 100,
-      "lethality": 0.85
+      "lethality": 0.85,
+      "rangeRole": "engagementRangeNm",
+      "variant": "AIM-54 Phoenix",
+      "rangeConfidence": "official-public",
+      "rangeNotes": "NAVAIR lists AIM-54 range in excess of 100 nautical miles; simulator keeps 100 nm as a conservative public value.",
+      "targetTypes": [
+        "aircraft"
+      ],
+      "units": {
+        "speedUnit": "knots",
+        "maxFuelUnit": "lbs",
+        "fuelRateUnit": "lbs/hr",
+        "rangeUnit": "nm"
+      },
+      "dataSource": {
+        "speedSrc": "public/simulation representative estimate",
+        "maxFuelSrc": "simulation missile fuel model",
+        "fuelRateSrc": "simulation missile fuel model",
+        "rangeSrc": "https://www.navair.navy.mil/product/AIM-54-Phoenix"
+      }
     },
     {
       "className": "AGM-65 Maverick",
@@ -765,7 +1183,28 @@
       "maxFuel": 200,
       "fuelRate": 120,
       "range": 12,
-      "lethality": 0.7
+      "lethality": 0.7,
+      "rangeRole": "engagementRangeNm",
+      "variant": "AGM-65 representative",
+      "rangeConfidence": "official-public",
+      "rangeNotes": "Public AGM-65 range is altitude and variant dependent; simulator keeps a conservative representative value close to USAF public figures.",
+      "targetTypes": [
+        "facility",
+        "airbase",
+        "ship"
+      ],
+      "units": {
+        "speedUnit": "knots",
+        "maxFuelUnit": "lbs",
+        "fuelRateUnit": "lbs/hr",
+        "rangeUnit": "nm"
+      },
+      "dataSource": {
+        "speedSrc": "public/simulation representative estimate",
+        "maxFuelSrc": "simulation missile fuel model",
+        "fuelRateSrc": "simulation missile fuel model",
+        "rangeSrc": "https://www.af.mil/About-Us/Fact-Sheets/Display/Article/104577/agm-65-maverick/"
+      }
     },
     {
       "className": "AGM-84 Harpoon",
@@ -773,7 +1212,26 @@
       "maxFuel": 700,
       "fuelRate": 150,
       "range": 67,
-      "lethality": 0.8
+      "lethality": 0.8,
+      "rangeRole": "engagementRangeNm",
+      "variant": "AGM-84 Harpoon Block II representative",
+      "rangeConfidence": "official-public",
+      "rangeNotes": "Boeing public Harpoon material lists a range in excess of 67 nautical miles; simulator uses 67 nm.",
+      "targetTypes": [
+        "ship"
+      ],
+      "units": {
+        "speedUnit": "knots",
+        "maxFuelUnit": "lbs",
+        "fuelRateUnit": "lbs/hr",
+        "rangeUnit": "nm"
+      },
+      "dataSource": {
+        "speedSrc": "public/simulation representative estimate",
+        "maxFuelSrc": "simulation missile fuel model",
+        "fuelRateSrc": "simulation missile fuel model",
+        "rangeSrc": "https://www.boeing.com/content/dam/boeing/boeingdotcom/defense/weapons-weapons/images/harpoon_product_card.pdf"
+      }
     },
     {
       "className": "AGM-86 ALCM",
@@ -781,15 +1239,56 @@
       "maxFuel": 9000,
       "fuelRate": 600,
       "range": 1300,
-      "lethality": 0.75
+      "lethality": 0.75,
+      "rangeRole": "engagementRangeNm",
+      "variant": "AGM-86B ALCM",
+      "rangeConfidence": "official-public",
+      "rangeNotes": "USAF lists AGM-86B range as more than 1,500 statute miles; simulator stores the converted nautical-mile value.",
+      "targetTypes": [
+        "facility",
+        "airbase"
+      ],
+      "units": {
+        "speedUnit": "knots",
+        "maxFuelUnit": "lbs",
+        "fuelRateUnit": "lbs/hr",
+        "rangeUnit": "nm"
+      },
+      "dataSource": {
+        "speedSrc": "public/simulation representative estimate",
+        "maxFuelSrc": "simulation missile fuel model",
+        "fuelRateSrc": "simulation missile fuel model",
+        "rangeSrc": "https://www.af.mil/About-Us/Fact-Sheets/Display/Article/104612/agm-86bcd-missiles/"
+      }
     },
     {
       "className": "AGM-158 JASSM",
       "speed": 1200,
       "maxFuel": 18498,
       "fuelRate": 1000,
-      "range": 500,
-      "lethality": 0.8
+      "range": 200,
+      "lethality": 0.8,
+      "rangeRole": "engagementRangeNm",
+      "variant": "AGM-158A JASSM baseline",
+      "rangeConfidence": "official-public",
+      "rangeNotes": "Baseline JASSM is modeled here. JASSM-ER and later variants exceed 500 statute miles and should be separate assets.",
+      "targetTypes": [
+        "facility",
+        "airbase",
+        "ship"
+      ],
+      "units": {
+        "speedUnit": "knots",
+        "maxFuelUnit": "lbs",
+        "fuelRateUnit": "lbs/hr",
+        "rangeUnit": "nm"
+      },
+      "dataSource": {
+        "speedSrc": "public/simulation representative estimate",
+        "maxFuelSrc": "simulation missile fuel model",
+        "fuelRateSrc": "simulation missile fuel model",
+        "rangeSrc": "https://comptroller.defense.gov/Portals/45/Documents/defbudget/FY2025/FY2025_Weapons.pdf"
+      }
     },
     {
       "className": "BGM-109 Tomahawk",
@@ -797,7 +1296,28 @@
       "maxFuel": 10600,
       "fuelRate": 850,
       "range": 900,
-      "lethality": 0.75
+      "lethality": 0.75,
+      "rangeRole": "engagementRangeNm",
+      "variant": "Tomahawk Block IV/V TLAM representative",
+      "rangeConfidence": "official-public",
+      "rangeNotes": "US Navy lists Tomahawk range as more than 900 nautical miles; simulator uses 900 nm.",
+      "targetTypes": [
+        "facility",
+        "airbase",
+        "ship"
+      ],
+      "units": {
+        "speedUnit": "knots",
+        "maxFuelUnit": "lbs",
+        "fuelRateUnit": "lbs/hr",
+        "rangeUnit": "nm"
+      },
+      "dataSource": {
+        "speedSrc": "public/simulation representative estimate",
+        "maxFuelSrc": "simulation missile fuel model",
+        "fuelRateSrc": "simulation missile fuel model",
+        "rangeSrc": "https://www.navy.mil/Resources/Fact-Files/Display-FactFiles/Article/2169229/tomahawk-cruise-missile/"
+      }
     },
     {
       "className": "RIM-66 Standard SM-2",
@@ -805,7 +1325,27 @@
       "maxFuel": 500,
       "fuelRate": 200,
       "range": 90,
-      "lethality": 0.85
+      "lethality": 0.85,
+      "rangeRole": "engagementRangeNm",
+      "variant": "SM-2 representative",
+      "rangeConfidence": "official-public",
+      "rangeNotes": "Raytheon public SM-2 material lists a 90 nautical mile range; simulator uses that value.",
+      "targetTypes": [
+        "aircraft",
+        "weapon"
+      ],
+      "units": {
+        "speedUnit": "knots",
+        "maxFuelUnit": "lbs",
+        "fuelRateUnit": "lbs/hr",
+        "rangeUnit": "nm"
+      },
+      "dataSource": {
+        "speedSrc": "public/simulation representative estimate",
+        "maxFuelSrc": "simulation missile fuel model",
+        "fuelRateSrc": "simulation missile fuel model",
+        "rangeSrc": "https://www.rtx.com/raytheon/what-we-do/sea/sm-2-missile"
+      }
     },
     {
       "className": "RIM-174 Standard SM-6",
@@ -813,7 +1353,28 @@
       "maxFuel": 1100,
       "fuelRate": 300,
       "range": 130,
-      "lethality": 0.9
+      "lethality": 0.9,
+      "rangeRole": "engagementRangeNm",
+      "variant": "SM-6 public representative",
+      "rangeConfidence": "public-estimate",
+      "rangeNotes": "Official SM-6 pages describe extended-range capability without a single unclassified range; simulator uses a common public estimate.",
+      "targetTypes": [
+        "aircraft",
+        "weapon",
+        "ship"
+      ],
+      "units": {
+        "speedUnit": "knots",
+        "maxFuelUnit": "lbs",
+        "fuelRateUnit": "lbs/hr",
+        "rangeUnit": "nm"
+      },
+      "dataSource": {
+        "speedSrc": "public/simulation representative estimate",
+        "maxFuelSrc": "simulation missile fuel model",
+        "fuelRateSrc": "simulation missile fuel model",
+        "rangeSrc": "https://www.navy.mil/Resources/Fact-Files/Display-FactFiles/Article/2169011/standard-missile/"
+      }
     },
     {
       "className": "RGM-84 Harpoon",
@@ -821,7 +1382,26 @@
       "maxFuel": 700,
       "fuelRate": 150,
       "range": 67,
-      "lethality": 0.8
+      "lethality": 0.8,
+      "rangeRole": "engagementRangeNm",
+      "variant": "RGM-84 Harpoon Block II representative",
+      "rangeConfidence": "official-public",
+      "rangeNotes": "Boeing public Harpoon material lists a range in excess of 67 nautical miles; simulator uses 67 nm.",
+      "targetTypes": [
+        "ship"
+      ],
+      "units": {
+        "speedUnit": "knots",
+        "maxFuelUnit": "lbs",
+        "fuelRateUnit": "lbs/hr",
+        "rangeUnit": "nm"
+      },
+      "dataSource": {
+        "speedSrc": "public/simulation representative estimate",
+        "maxFuelSrc": "simulation missile fuel model",
+        "fuelRateSrc": "simulation missile fuel model",
+        "rangeSrc": "https://www.boeing.com/content/dam/boeing/boeingdotcom/defense/weapons-weapons/images/harpoon_product_card.pdf"
+      }
     },
     {
       "className": "RIM-116 RAM",
@@ -829,7 +1409,27 @@
       "maxFuel": 250,
       "fuelRate": 100,
       "range": 5.5,
-      "lethality": 0.8
+      "lethality": 0.8,
+      "rangeRole": "engagementRangeNm",
+      "variant": "RIM-116 RAM representative",
+      "rangeConfidence": "public-estimate",
+      "rangeNotes": "Point-defense range varies by block and source; simulator uses a conservative public estimate.",
+      "targetTypes": [
+        "aircraft",
+        "weapon"
+      ],
+      "units": {
+        "speedUnit": "knots",
+        "maxFuelUnit": "lbs",
+        "fuelRateUnit": "lbs/hr",
+        "rangeUnit": "nm"
+      },
+      "dataSource": {
+        "speedSrc": "public/simulation representative estimate",
+        "maxFuelSrc": "simulation missile fuel model",
+        "fuelRateSrc": "simulation missile fuel model",
+        "rangeSrc": "public representative close-in defense engagement-range estimate"
+      }
     },
     {
       "className": "48N6 (S-400 Triumf)",
@@ -837,7 +1437,27 @@
       "maxFuel": 1543,
       "fuelRate": 300,
       "range": 135,
-      "lethality": 0.9
+      "lethality": 0.9,
+      "rangeRole": "engagementRangeNm",
+      "variant": "48N6 family representative",
+      "rangeConfidence": "public-estimate",
+      "rangeNotes": "CSIS reports the S-400 48N6 family at up to 250 km; simulator stores the converted nautical-mile value.",
+      "targetTypes": [
+        "aircraft",
+        "weapon"
+      ],
+      "units": {
+        "speedUnit": "knots",
+        "maxFuelUnit": "lbs",
+        "fuelRateUnit": "lbs/hr",
+        "rangeUnit": "nm"
+      },
+      "dataSource": {
+        "speedSrc": "public/simulation representative estimate",
+        "maxFuelSrc": "simulation missile fuel model",
+        "fuelRateSrc": "simulation missile fuel model",
+        "rangeSrc": "https://missilethreat.csis.org/defsys/s-400-triumf/"
+      }
     },
     {
       "className": "9M96 (S-300V4)",
@@ -845,15 +1465,54 @@
       "maxFuel": 1000,
       "fuelRate": 200,
       "range": 65,
-      "lethality": 0.85
+      "lethality": 0.85,
+      "rangeRole": "engagementRangeNm",
+      "variant": "9M96E2 representative",
+      "rangeConfidence": "public-estimate-low",
+      "rangeNotes": "9M96E2 is publicly associated with S-400/S-350 more than S-300V4; className keeps S-300V4 for legacy scenario compatibility.",
+      "targetTypes": [
+        "aircraft",
+        "weapon"
+      ],
+      "units": {
+        "speedUnit": "knots",
+        "maxFuelUnit": "lbs",
+        "fuelRateUnit": "lbs/hr",
+        "rangeUnit": "nm"
+      },
+      "dataSource": {
+        "speedSrc": "public/simulation representative estimate",
+        "maxFuelSrc": "simulation missile fuel model",
+        "fuelRateSrc": "simulation missile fuel model",
+        "rangeSrc": "https://missilethreat.csis.org/defsys/s-400-triumf/"
+      }
     },
     {
       "className": "77N6 (S-500 Prometey)",
       "speed": 4627,
       "maxFuel": 2000,
       "fuelRate": 500,
-      "range": 216,
-      "lethality": 0.9
+      "range": 324,
+      "lethality": 0.9,
+      "rangeRole": "engagementRangeNm",
+      "variant": "77N6 public representative",
+      "rangeConfidence": "public-estimate-low",
+      "rangeNotes": "Public S-500/77N6 range claims vary and are not independently verifiable; simulator uses 600 km converted to nautical miles.",
+      "targetTypes": [
+        "weapon"
+      ],
+      "units": {
+        "speedUnit": "knots",
+        "maxFuelUnit": "lbs",
+        "fuelRateUnit": "lbs/hr",
+        "rangeUnit": "nm"
+      },
+      "dataSource": {
+        "speedSrc": "public/simulation representative estimate",
+        "maxFuelSrc": "simulation missile fuel model",
+        "fuelRateSrc": "simulation missile fuel model",
+        "rangeSrc": "public low-confidence S-500/77N6 engagement-range estimate"
+      }
     },
     {
       "className": "9M317 (Buk-M3)",
@@ -861,7 +1520,27 @@
       "maxFuel": 700,
       "fuelRate": 150,
       "range": 38,
-      "lethality": 0.8
+      "lethality": 0.8,
+      "rangeRole": "engagementRangeNm",
+      "variant": "9M317M/Buk-M3 representative",
+      "rangeConfidence": "public-estimate",
+      "rangeNotes": "Representative Buk-M3 engagement range, converted from approximately 70 km to nautical miles.",
+      "targetTypes": [
+        "aircraft",
+        "weapon"
+      ],
+      "units": {
+        "speedUnit": "knots",
+        "maxFuelUnit": "lbs",
+        "fuelRateUnit": "lbs/hr",
+        "rangeUnit": "nm"
+      },
+      "dataSource": {
+        "speedSrc": "public/simulation representative estimate",
+        "maxFuelSrc": "simulation missile fuel model",
+        "fuelRateSrc": "simulation missile fuel model",
+        "rangeSrc": "public representative Buk-M3 engagement-range estimate"
+      }
     },
     {
       "className": "9M331 (Tor-M2)",
@@ -869,7 +1548,27 @@
       "maxFuel": 300,
       "fuelRate": 100,
       "range": 8.6,
-      "lethality": 0.75
+      "lethality": 0.75,
+      "rangeRole": "engagementRangeNm",
+      "variant": "9M331/Tor-M2 representative",
+      "rangeConfidence": "public-estimate",
+      "rangeNotes": "Representative Tor-M2 short-range engagement value, converted from approximately 16 km to nautical miles.",
+      "targetTypes": [
+        "aircraft",
+        "weapon"
+      ],
+      "units": {
+        "speedUnit": "knots",
+        "maxFuelUnit": "lbs",
+        "fuelRateUnit": "lbs/hr",
+        "rangeUnit": "nm"
+      },
+      "dataSource": {
+        "speedSrc": "public/simulation representative estimate",
+        "maxFuelSrc": "simulation missile fuel model",
+        "fuelRateSrc": "simulation missile fuel model",
+        "rangeSrc": "public representative Tor-M2 engagement-range estimate"
+      }
     },
     {
       "className": "57E6E (Pantsir-S1)",
@@ -877,7 +1576,27 @@
       "maxFuel": 250,
       "fuelRate": 80,
       "range": 10.8,
-      "lethality": 0.7
+      "lethality": 0.7,
+      "rangeRole": "engagementRangeNm",
+      "variant": "57E6E representative",
+      "rangeConfidence": "public-estimate",
+      "rangeNotes": "Representative Pantsir-S1 57E6E engagement value, converted from approximately 20 km to nautical miles.",
+      "targetTypes": [
+        "aircraft",
+        "weapon"
+      ],
+      "units": {
+        "speedUnit": "knots",
+        "maxFuelUnit": "lbs",
+        "fuelRateUnit": "lbs/hr",
+        "rangeUnit": "nm"
+      },
+      "dataSource": {
+        "speedSrc": "public/simulation representative estimate",
+        "maxFuelSrc": "simulation missile fuel model",
+        "fuelRateSrc": "simulation missile fuel model",
+        "rangeSrc": "public representative Pantsir-S1 engagement-range estimate"
+      }
     },
     {
       "className": "HQ-9",
@@ -885,7 +1604,27 @@
       "maxFuel": 2000,
       "fuelRate": 400,
       "range": 108,
-      "lethality": 0.85
+      "lethality": 0.85,
+      "rangeRole": "engagementRangeNm",
+      "variant": "HQ-9/FD-2000 representative",
+      "rangeConfidence": "public-estimate",
+      "rangeNotes": "Representative HQ-9 engagement value, converted from approximately 200 km to nautical miles.",
+      "targetTypes": [
+        "aircraft",
+        "weapon"
+      ],
+      "units": {
+        "speedUnit": "knots",
+        "maxFuelUnit": "lbs",
+        "fuelRateUnit": "lbs/hr",
+        "rangeUnit": "nm"
+      },
+      "dataSource": {
+        "speedSrc": "public/simulation representative estimate",
+        "maxFuelSrc": "simulation missile fuel model",
+        "fuelRateSrc": "simulation missile fuel model",
+        "rangeSrc": "public representative HQ-9 engagement-range estimate"
+      }
     },
     {
       "className": "HQ-19",
@@ -893,15 +1632,54 @@
       "maxFuel": 3000,
       "fuelRate": 600,
       "range": 162,
-      "lethality": 0.9
+      "lethality": 0.9,
+      "rangeRole": "engagementRangeNm",
+      "variant": "HQ-19 public representative",
+      "rangeConfidence": "public-estimate-low",
+      "rangeNotes": "HQ-19 public performance figures are speculative; model as a low-confidence high-altitude/anti-missile interceptor.",
+      "targetTypes": [
+        "weapon"
+      ],
+      "units": {
+        "speedUnit": "knots",
+        "maxFuelUnit": "lbs",
+        "fuelRateUnit": "lbs/hr",
+        "rangeUnit": "nm"
+      },
+      "dataSource": {
+        "speedSrc": "public/simulation representative estimate",
+        "maxFuelSrc": "simulation missile fuel model",
+        "fuelRateSrc": "simulation missile fuel model",
+        "rangeSrc": "public low-confidence HQ-19 engagement-range estimate"
+      }
     },
     {
       "className": "HQ-16",
       "speed": 1983,
       "maxFuel": 600,
       "fuelRate": 150,
-      "range": 43,
-      "lethality": 0.8
+      "range": 38,
+      "lethality": 0.8,
+      "rangeRole": "engagementRangeNm",
+      "variant": "HQ-16B/LY-80 representative",
+      "rangeConfidence": "public-estimate",
+      "rangeNotes": "Representative HQ-16B/LY-80 engagement value, converted from approximately 70 km to nautical miles.",
+      "targetTypes": [
+        "aircraft",
+        "weapon"
+      ],
+      "units": {
+        "speedUnit": "knots",
+        "maxFuelUnit": "lbs",
+        "fuelRateUnit": "lbs/hr",
+        "rangeUnit": "nm"
+      },
+      "dataSource": {
+        "speedSrc": "public/simulation representative estimate",
+        "maxFuelSrc": "simulation missile fuel model",
+        "fuelRateSrc": "simulation missile fuel model",
+        "rangeSrc": "public representative HQ-16 engagement-range estimate"
+      }
     },
     {
       "className": "HQ-17",
@@ -909,7 +1687,27 @@
       "maxFuel": 400,
       "fuelRate": 120,
       "range": 8.1,
-      "lethality": 0.75
+      "lethality": 0.75,
+      "rangeRole": "engagementRangeNm",
+      "variant": "HQ-17 representative",
+      "rangeConfidence": "public-estimate",
+      "rangeNotes": "Representative HQ-17 short-range engagement value, converted from approximately 15 km to nautical miles.",
+      "targetTypes": [
+        "aircraft",
+        "weapon"
+      ],
+      "units": {
+        "speedUnit": "knots",
+        "maxFuelUnit": "lbs",
+        "fuelRateUnit": "lbs/hr",
+        "rangeUnit": "nm"
+      },
+      "dataSource": {
+        "speedSrc": "public/simulation representative estimate",
+        "maxFuelSrc": "simulation missile fuel model",
+        "fuelRateSrc": "simulation missile fuel model",
+        "rangeSrc": "public representative HQ-17 engagement-range estimate"
+      }
     },
     {
       "className": "HQ-7",
@@ -917,23 +1715,83 @@
       "maxFuel": 200,
       "fuelRate": 70,
       "range": 8.1,
-      "lethality": 0.7
+      "lethality": 0.7,
+      "rangeRole": "engagementRangeNm",
+      "variant": "HQ-7B/FM-90 representative",
+      "rangeConfidence": "public-estimate",
+      "rangeNotes": "Representative HQ-7B/FM-90 engagement value, converted from approximately 15 km to nautical miles.",
+      "targetTypes": [
+        "aircraft",
+        "weapon"
+      ],
+      "units": {
+        "speedUnit": "knots",
+        "maxFuelUnit": "lbs",
+        "fuelRateUnit": "lbs/hr",
+        "rangeUnit": "nm"
+      },
+      "dataSource": {
+        "speedSrc": "public/simulation representative estimate",
+        "maxFuelSrc": "simulation missile fuel model",
+        "fuelRateSrc": "simulation missile fuel model",
+        "rangeSrc": "public representative HQ-7 engagement-range estimate"
+      }
     },
     {
       "className": "Aster 30",
       "speed": 2975,
       "maxFuel": 1600,
       "fuelRate": 350,
-      "range": 65,
-      "lethality": 0.85
+      "range": 54,
+      "lethality": 0.85,
+      "rangeRole": "engagementRangeNm",
+      "variant": "Aster 30 representative",
+      "rangeConfidence": "official-public",
+      "rangeNotes": "MBDA public material describes Aster 30 engagement around 100 km; simulator stores the converted nautical-mile value.",
+      "targetTypes": [
+        "aircraft",
+        "weapon"
+      ],
+      "units": {
+        "speedUnit": "knots",
+        "maxFuelUnit": "lbs",
+        "fuelRateUnit": "lbs/hr",
+        "rangeUnit": "nm"
+      },
+      "dataSource": {
+        "speedSrc": "public/simulation representative estimate",
+        "maxFuelSrc": "simulation missile fuel model",
+        "fuelRateSrc": "simulation missile fuel model",
+        "rangeSrc": "https://newsroom.mbda-systems.com/?p=9032"
+      }
     },
     {
       "className": "Barak 8",
       "speed": 1851,
       "maxFuel": 200,
       "fuelRate": 150,
-      "range": 43,
-      "lethality": 0.8
+      "range": 38,
+      "lethality": 0.8,
+      "rangeRole": "engagementRangeNm",
+      "variant": "Barak 8 LR representative",
+      "rangeConfidence": "official-public",
+      "rangeNotes": "IAI public material lists Barak 8 LR at up to 70 km; simulator stores the converted nautical-mile value.",
+      "targetTypes": [
+        "aircraft",
+        "weapon"
+      ],
+      "units": {
+        "speedUnit": "knots",
+        "maxFuelUnit": "lbs",
+        "fuelRateUnit": "lbs/hr",
+        "rangeUnit": "nm"
+      },
+      "dataSource": {
+        "speedSrc": "public/simulation representative estimate",
+        "maxFuelSrc": "simulation missile fuel model",
+        "fuelRateSrc": "simulation missile fuel model",
+        "rangeSrc": "https://www.iai.co.il/p/barak-lr"
+      }
     }
   ]
 }

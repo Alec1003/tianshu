@@ -12,6 +12,7 @@ import os
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any, Literal
+from uuid import uuid4
 
 from pydantic_ai import Agent, RunContext
 from pydantic_ai.models.anthropic import AnthropicModel
@@ -20,8 +21,17 @@ from pydantic_ai.providers.anthropic import AnthropicProvider
 from pydantic_ai.providers.openai import OpenAIProvider
 
 from app.ai.model_endpoint_policy import normalize_model_base_url
-from app.ai.models import AgentExecutionSummary, MCPCallTrace, SkillExecutionResult
-from app.ai.skill_registry import AICCSkillRegistry
+from app.ai.internal_skills import build_internal_skill_steps
+from app.ai.models import (
+    AgentExecutionSummary,
+    InternalSkillDraft,
+    InternalSkillMissionDraft,
+    MCPCallTrace,
+    SkillExecutionResult,
+    StructuredCommandStep,
+    TacticalPlanOptionDraft,
+)
+from app.ai.skill_registry import TianShuSkillRegistry
 
 
 SYSTEM_PROMPT = """
@@ -48,6 +58,13 @@ Rules:
   allocations, or analysis from operator-configured external servers; they are
   not the authoritative 天枢平台 simulation engine.
 - Tool calls create command proposals for human approval; they do not directly mutate the simulation.
+- For generated operational plans, prefer propose_tactical_plan_skill so unit
+  task assignments become a reviewed proposal instead of arbitrary code.
+- When asked to generate multiple operational plans or courses of action,
+  first inspect the current scenario, optionally call advisory MCP tools, then
+  call propose_tactical_plan_options once. Put all executable runtime actions
+  for one plan inside that plan option. Do not scatter one plan across multiple
+  individual write-tool calls.
 - After all tools have been called, respond with a concise single-sentence summary of what was proposed.
 - If a tool fails, note the failure in your summary but continue with remaining operations.
 """.strip()
@@ -55,7 +72,7 @@ Rules:
 
 @dataclass
 class AgentDeps:
-    registry: AICCSkillRegistry
+    registry: TianShuSkillRegistry
     chat_mode: Literal["ask", "command"] = "command"
     call_log: list[SkillExecutionResult] = field(default_factory=list)
     mcp_traces: list[MCPCallTrace] = field(default_factory=list)
@@ -63,6 +80,10 @@ class AgentDeps:
     proposal_recorder: Callable[[Any], None] | None = None
     source_command: str = ""
     mcp_client: Any | None = None
+    session: Any | None = None
+    user: Any | None = None
+    scenario_id: str | None = None
+    bridge_provider: Callable[[Any, str | None], Any] | None = None
 
 
 def _exec(deps: AgentDeps, skill: str, params: dict[str, Any]) -> dict[str, Any]:
@@ -113,6 +134,255 @@ def _exec(deps: AgentDeps, skill: str, params: dict[str, Any]) -> dict[str, Any]
             SkillExecutionResult(skill=skill, status="error", parameters=params, error=str(exc))
         )
         raise
+
+
+def _propose_internal_skill(
+    deps: AgentDeps,
+    draft: InternalSkillDraft,
+) -> dict[str, Any]:
+    parameters = draft.model_dump(mode="json")
+    if deps.chat_mode == "ask":
+        return _log_tool_error(
+            deps,
+            skill="propose_tactical_plan_skill",
+            parameters=parameters,
+            error="Internal skill proposals are disabled in Ask mode.",
+        )
+    if deps.approval_queue is None:
+        return _log_tool_error(
+            deps,
+            skill="propose_tactical_plan_skill",
+            parameters=parameters,
+            error="Approval queue is unavailable.",
+        )
+    try:
+        steps = build_internal_skill_steps(deps.registry.runtime, draft)
+        proposal = deps.approval_queue.create_proposal(
+            command=deps.source_command or draft.name,
+            steps=steps,
+            source="internal_skill",
+        )
+        if deps.proposal_recorder is not None:
+            deps.proposal_recorder(proposal)
+        output = {
+            "ok": True,
+            "kind": "internal_skill_proposal",
+            "proposalId": proposal.id,
+            "proposalStatus": proposal.status,
+            "requiresApproval": True,
+            "draft": parameters,
+            "adjudication": proposal.adjudication.model_dump(mode="json"),
+        }
+        return _log_tool_success(
+            deps,
+            skill="propose_tactical_plan_skill",
+            parameters=parameters,
+            output=output,
+        )
+    except Exception as exc:
+        return _log_tool_error(
+            deps,
+            skill="propose_tactical_plan_skill",
+            parameters=parameters,
+            error=str(exc),
+        )
+
+
+def _propose_tactical_plan_options(
+    deps: AgentDeps,
+    options: list[TacticalPlanOptionDraft],
+    command: str = "",
+) -> dict[str, Any]:
+    parameters = {
+        "command": command,
+        "options": [option.model_dump(mode="json") for option in options],
+    }
+    if deps.chat_mode == "ask":
+        return _log_tool_error(
+            deps,
+            skill="propose_tactical_plan_options",
+            parameters=parameters,
+            error="Tactical plan proposals are disabled in Ask mode.",
+        )
+    if deps.approval_queue is None:
+        return _log_tool_error(
+            deps,
+            skill="propose_tactical_plan_options",
+            parameters=parameters,
+            error="Approval queue is unavailable.",
+        )
+    if not options:
+        return _log_tool_error(
+            deps,
+            skill="propose_tactical_plan_options",
+            parameters=parameters,
+            error="At least one tactical plan option is required.",
+        )
+
+    proposals = []
+    try:
+        for option_index, option in enumerate(options):
+            steps = [
+                StructuredCommandStep(
+                    id=f"plan-{option_index + 1}-step-{step_index + 1}-{uuid4()}",
+                    skill=step.skill,
+                    parameters=step.parameters,
+                    source_text=step.rationale or option.description or step.summary,
+                    summary=step.summary or step.skill.replace("_", " "),
+                    risk=step.risk,
+                    writes_runtime=True,
+                )
+                for step_index, step in enumerate(option.steps)
+            ]
+            metadata = {
+                "kind": "tactical_plan_option",
+                "title": option.title,
+                "label": option.label,
+                "description": option.description,
+                "advantages": option.advantages,
+                "risks": option.risks,
+                "optionIndex": option_index + 1,
+                "toolCount": len(steps),
+            }
+            proposal = deps.approval_queue.create_proposal(
+                command=command or option.title,
+                steps=steps,
+                source="llm_plan",
+                plan_metadata=metadata,
+            )
+            if deps.proposal_recorder is not None:
+                deps.proposal_recorder(proposal)
+            proposals.append(
+                {
+                    "proposalId": proposal.id,
+                    "proposalStatus": proposal.status,
+                    "title": option.title,
+                    "label": option.label,
+                    "stepCount": len(steps),
+                    "adjudication": proposal.adjudication.model_dump(mode="json"),
+                }
+            )
+    except Exception as exc:
+        return _log_tool_error(
+            deps,
+            skill="propose_tactical_plan_options",
+            parameters=parameters,
+            error=str(exc),
+        )
+
+    return _log_tool_success(
+        deps,
+        skill="propose_tactical_plan_options",
+        parameters=parameters,
+        output={
+            "ok": True,
+            "kind": "tactical_plan_options",
+            "requiresApproval": True,
+            "proposalCount": len(proposals),
+            "proposals": proposals,
+        },
+    )
+
+
+def _log_tool_success(
+    deps: AgentDeps,
+    *,
+    skill: str,
+    parameters: dict[str, Any],
+    output: dict[str, Any],
+) -> dict[str, Any]:
+    deps.call_log.append(
+        SkillExecutionResult(
+            skill=skill,
+            status="ok",
+            parameters=parameters,
+            output=output,
+        )
+    )
+    return output
+
+
+def _log_tool_error(
+    deps: AgentDeps,
+    *,
+    skill: str,
+    parameters: dict[str, Any],
+    error: str,
+) -> dict[str, Any]:
+    deps.call_log.append(
+        SkillExecutionResult(
+            skill=skill,
+            status="error",
+            parameters=parameters,
+            error=error,
+        )
+    )
+    return {"ok": False, "error": error}
+
+
+def _require_plan_workspace(
+    deps: AgentDeps,
+    *,
+    skill: str,
+    parameters: dict[str, Any],
+) -> bool:
+    if deps.session is not None and deps.user is not None and deps.scenario_id:
+        return True
+    _log_tool_error(
+        deps,
+        skill=skill,
+        parameters=parameters,
+        error="This tool requires an active scenario workspace.",
+    )
+    return False
+
+
+async def _inspect_current_scenario(deps: AgentDeps) -> dict[str, Any]:
+    parameters: dict[str, Any] = {}
+    if deps.bridge_provider is None or deps.user is None:
+        return _log_tool_error(
+            deps,
+            skill="inspect_current_scenario",
+            parameters=parameters,
+            error="Scenario inspector is unavailable.",
+        )
+    bridge = deps.bridge_provider(deps.user, deps.scenario_id)
+    scenario = bridge.exported_scenario()
+    current = (
+        scenario.get("currentScenario")
+        if isinstance(scenario, dict) and isinstance(scenario.get("currentScenario"), dict)
+        else scenario
+    )
+    sides = current.get("sides") if isinstance(current, dict) else []
+    output = {
+        "ok": True,
+        "kind": "scenario_brief",
+        "scenarioId": deps.scenario_id or "",
+        "scenarioName": str(current.get("name") or "") if isinstance(current, dict) else "",
+        "counts": {
+            "aircraft": len(current.get("aircraft") or []) if isinstance(current, dict) else 0,
+            "ships": len(current.get("ships") or []) if isinstance(current, dict) else 0,
+            "facilities": len(current.get("facilities") or []) if isinstance(current, dict) else 0,
+            "airbases": len(current.get("airbases") or []) if isinstance(current, dict) else 0,
+            "missions": len(current.get("missions") or []) if isinstance(current, dict) else 0,
+            "obstacles": len(current.get("obstacles") or []) if isinstance(current, dict) else 0,
+        },
+        "sides": [
+            {
+                "id": str(side.get("id") or ""),
+                "name": str(side.get("name") or ""),
+                "color": side.get("color"),
+            }
+            for side in sides
+            if isinstance(side, dict)
+        ],
+    }
+    return _log_tool_success(
+        deps,
+        skill="inspect_current_scenario",
+        parameters=parameters,
+        output=output,
+    )
 
 
 async def _external_mcp_list_tools(
@@ -371,7 +641,7 @@ def build_agent(
         side: str = "BLUE",
         name: str = "",
     ) -> dict[str, Any]:
-        """Deploy an aircraft unit at the given lat/lon. side: BLUE | RED | ALLY."""
+        """Deploy an existing aircraft class only; never invent missing aircraft."""
         params: dict[str, Any] = {
             "class_name": class_name,
             "latitude": latitude,
@@ -533,6 +803,34 @@ def build_agent(
     # ── Tactical events / scenario loading ───────────────────────────────────
 
     @agent.tool
+    def create_patrol_mission(
+        ctx: RunContext[AgentDeps],
+        name: str,
+        assigned_unit_ids: list[str],
+        reference_point_ids: list[str],
+    ) -> dict[str, Any]:
+        """Create a patrol mission from assigned units and reference points."""
+        return _exec(ctx.deps, "create_patrol_mission", {
+            "name": name,
+            "assigned_unit_ids": assigned_unit_ids,
+            "reference_point_ids": reference_point_ids,
+        })
+
+    @agent.tool
+    def create_strike_mission(
+        ctx: RunContext[AgentDeps],
+        name: str,
+        assigned_unit_ids: list[str],
+        assigned_target_ids: list[str],
+    ) -> dict[str, Any]:
+        """Create a strike mission from assigned attacker units and targets."""
+        return _exec(ctx.deps, "create_strike_mission", {
+            "name": name,
+            "assigned_unit_ids": assigned_unit_ids,
+            "assigned_target_ids": assigned_target_ids,
+        })
+
+    @agent.tool
     def trigger_tactical_event(
         ctx: RunContext[AgentDeps],
         event_name: str,
@@ -605,6 +903,93 @@ def build_agent(
     # ── External MCP advisory integrations ────────────────────────────────────
 
     @agent.tool
+    def propose_tactical_plan_skill(
+        ctx: RunContext[AgentDeps],
+        name: str,
+        missions: list[InternalSkillMissionDraft],
+        description: str = "",
+        side_id: str = "",
+        trigger_phrases: list[str] | None = None,
+        constraints: list[str] | None = None,
+        allowed_runtime_skills: list[str] | None = None,
+        expires_at: str | None = None,
+        allow_duplicate_assignments: bool = False,
+    ) -> dict[str, Any]:
+        """Create a temporary in-app tactical skill as a human-approved mission proposal."""
+        draft = InternalSkillDraft(
+            name=name,
+            description=description,
+            side_id=side_id,
+            trigger_phrases=trigger_phrases or [],
+            constraints=constraints or [],
+            allowed_runtime_skills=allowed_runtime_skills or [],
+            missions=missions,
+            expires_at=expires_at,
+            allow_duplicate_assignments=allow_duplicate_assignments,
+        )
+        return _propose_internal_skill(ctx.deps, draft)
+
+    @agent.tool
+    def propose_tactical_plan_options(
+        ctx: RunContext[AgentDeps],
+        options: list[TacticalPlanOptionDraft],
+        command: str = "",
+    ) -> dict[str, Any]:
+        """Create approval cards for multiple tactical plan options.
+
+        Use this when the operator asks for several courses of action. Each
+        option becomes one card and may contain multiple backend runtime steps,
+        such as move_unit, create_patrol_mission, create_strike_mission,
+        attack_unit, update_weapon_quantity, simulation_step, or
+        simulation_start. The steps execute only after human approval.
+        """
+        return _propose_tactical_plan_options(ctx.deps, options, command)
+
+    @agent.tool
+    def attack_unit(
+        ctx: RunContext[AgentDeps],
+        attacker_type: str,
+        attacker_id: str,
+        target_id: str,
+        weapon_id: str = "",
+        weapon_quantity: int = 1,
+        auto: bool = False,
+    ) -> dict[str, Any]:
+        """Create an approval proposal for an aircraft or ship attack."""
+        return _exec(
+            ctx.deps,
+            "attack_unit",
+            {
+                "attacker_type": attacker_type,
+                "attacker_id": attacker_id,
+                "target_id": target_id,
+                "weapon_id": weapon_id,
+                "weapon_quantity": weapon_quantity,
+                "auto": auto,
+            },
+        )
+
+    @agent.tool
+    def update_weapon_quantity(
+        ctx: RunContext[AgentDeps],
+        unit_type: str,
+        unit_id: str,
+        weapon_id: str,
+        increment: int,
+    ) -> dict[str, Any]:
+        """Create an approval proposal to adjust a unit weapon load quantity."""
+        return _exec(
+            ctx.deps,
+            "update_weapon_quantity",
+            {
+                "unit_type": unit_type,
+                "unit_id": unit_id,
+                "weapon_id": weapon_id,
+                "increment": increment,
+            },
+        )
+
+    @agent.tool
     async def external_mcp_list_tools(
         ctx: RunContext[AgentDeps],
         server: str = "",
@@ -622,16 +1007,27 @@ def build_agent(
         """Call a configured external MCP tool with JSON arguments."""
         return await _external_mcp_call(ctx.deps, server, tool_name, arguments)
 
+    @agent.tool
+    async def inspect_current_scenario(
+        ctx: RunContext[AgentDeps],
+    ) -> dict[str, Any]:
+        """Read the current scenario summary."""
+        return await _inspect_current_scenario(ctx.deps)
+
     return agent
 
 
 async def run_agent(
     agent: Agent[AgentDeps, str],
     command: str,
-    registry: AICCSkillRegistry,
+    registry: TianShuSkillRegistry,
     approval_queue: Any | None = None,
     chat_mode: Literal["ask", "command"] = "command",
     mcp_client: Any | None = None,
+    session: Any | None = None,
+    user: Any | None = None,
+    scenario_id: str | None = None,
+    bridge_provider: Callable[[Any, str | None], Any] | None = None,
 ) -> AgentExecutionSummary:
     """Run the pydantic-ai agent and wrap the result in AgentExecutionSummary."""
     deps = AgentDeps(
@@ -640,6 +1036,10 @@ async def run_agent(
         approval_queue=approval_queue,
         source_command=command,
         mcp_client=mcp_client,
+        session=session,
+        user=user,
+        scenario_id=scenario_id,
+        bridge_provider=bridge_provider,
     )
     summary = AgentExecutionSummary(command=command, decomposition=[command])
 

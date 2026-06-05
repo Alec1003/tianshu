@@ -2,7 +2,7 @@
 
 Client/gui for BLADE Gymnasium environment.
 
-> Please review the AICC client project structure to get familiar with the folder and file organization and their intended context.
+> Please review the TianShu client project structure to get familiar with the folder and file organization and their intended context.
 
 ---
 
@@ -19,11 +19,11 @@ Client/gui for BLADE Gymnasium environment.
 ### [Clone Repository](#clone-repository)
 
 ```bash
-git clone git@github.com:Alec1003/AICC.git
+git clone git@github.com:Alec1003/TianShu.git
 ```
 
 ```bash
-cd AICC/client
+cd TianShu/client
 ```
 
 ```bash

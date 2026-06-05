@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timedelta, timezone
 
-from app.aicc_runtime.models import RuntimeEvent
+from app.tianshu_runtime.models import RuntimeEvent
 from app.scenarios.models import AarRecord, Scenario
 from app.scenarios.training_score import build_training_score
 

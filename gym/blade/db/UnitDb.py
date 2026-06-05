@@ -629,7 +629,7 @@ AirbaseDb = [
 FacilityDb = [
     {
         "class_name": "S-400 Triumf",
-        "range": 200,  # No official source available, using 200 as the range
+        "range": 216,  # public representative S-400 system estimate
     },
     {
         "class_name": "S-300V4",
@@ -637,59 +637,59 @@ FacilityDb = [
     },
     {
         "class_name": "S-500 Prometey",
-        "range": 200,  # No official source available, using 200 as the range
+        "range": 324,  # public low-confidence S-500 estimate, converted from 600 km
     },
     {
         "class_name": "Buk-M3",
-        "range": 50,  # No official source available, using 50 as the range
+        "range": 38,  # public representative Buk-M3 estimate
     },
     {
         "class_name": "Tor-M2",
-        "range": 10,  # No official source available, using 10 as the range
+        "range": 8.6,  # public representative Tor-M2 estimate
     },
     {
         "class_name": "Pantsir-S1",
-        "range": 10,  # No official source available, using 10 as the range
+        "range": 10.8,  # public representative Pantsir-S1 estimate
     },
     {
         "class_name": "HQ-9",
-        "range": 200,  # No official source available, using 200 as the range
+        "range": 108,  # public representative HQ-9 estimate
     },
     {
         "class_name": "HQ-19",
-        "range": 200,  # No official source available, using 200 as the range
+        "range": 162,  # public low-confidence HQ-19 estimate
     },
     {
         "class_name": "HQ-16",
-        "range": 50,  # No official source available, using 50 as the range
+        "range": 38,  # public representative HQ-16B/LY-80 estimate
     },
     {
         "class_name": "HQ-17",
-        "range": 10,  # No official source available, using 10 as the range
+        "range": 8.1,  # public representative HQ-17 estimate
     },
     {
         "class_name": "HQ-7",
-        "range": 10,  # No official source available, using 10 as the range
+        "range": 8.1,  # public representative HQ-7 estimate
     },
     {
         "class_name": "MIM-104 Patriot",
-        "range": 200,  # No official source available, using 200 as the range
+        "range": 86,  # public representative Patriot PAC-2/PAC-3 family estimate
     },
     {
         "class_name": "THAAD",
-        "range": 200,  # No official source available, using 200 as the range
+        "range": 108,  # public representative THAAD estimate
     },
     {
         "class_name": "Aster 30",
-        "range": 50,  # No official source available, using 50 as the range
+        "range": 54,  # MBDA public Aster 30 estimate, converted from 100 km
     },
     {
         "class_name": "Barak 8",
-        "range": 50,  # No official source available, using 50 as the range
+        "range": 38,  # IAI public Barak 8 LR estimate, converted from 70 km
     },
     {
         "class_name": "NASAMS",
-        "range": 50,  # No official source available, using 50 as the range
+        "range": 25,  # public representative NASAMS estimate
     },
 ]
 

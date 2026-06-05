@@ -74,13 +74,11 @@ async def create_db_and_tables() -> None:
         CommandProposalStepRecord,
     )
     from app.ai.model_config_models import AIModelProviderConfig  # noqa: F401
-    from app.aicc_runtime.models import RuntimeEvent, RuntimeState  # noqa: F401
+    from app.tianshu_runtime.models import RuntimeEvent, RuntimeState  # noqa: F401
     from app.auth.models import User  # noqa: F401
     from app.scenarios.models import (  # noqa: F401
         AarRecord,
         Scenario,
-        ScenarioCompareReport,
-        ScenarioCompareSession,
         TrainingScoreRecord,
     )
     from app.unit_assets.models import UnitAsset  # noqa: F401
@@ -174,6 +172,13 @@ async def _migrate_command_proposal_scope_postgres(conn) -> None:
     )
     await conn.execute(
         text(
+            "ALTER TABLE command_proposal "
+            "ADD COLUMN IF NOT EXISTS plan_metadata JSONB "
+            "NOT NULL DEFAULT '{}'::jsonb"
+        )
+    )
+    await conn.execute(
+        text(
             "CREATE INDEX IF NOT EXISTS ix_command_proposal_owner_scenario_status "
             "ON command_proposal (owner_id, scenario_id, status)"
         )
@@ -253,7 +258,7 @@ async def _migrate_runtime_state_scope_sqlite(conn) -> None:
     if has_scenario_id and not has_old_unique_owner:
         return
 
-    from app.aicc_runtime.models import RuntimeState
+    from app.tianshu_runtime.models import RuntimeState
 
     scenario_expr = "scenario_id" if has_scenario_id else "'__default__'"
     await conn.execute(text("ALTER TABLE runtime_state RENAME TO runtime_state_legacy"))
@@ -286,6 +291,13 @@ async def _migrate_command_proposal_scope_sqlite(conn) -> None:
             text(
                 "ALTER TABLE command_proposal ADD COLUMN scenario_id VARCHAR(120) "
                 "NOT NULL DEFAULT '__default__'"
+            )
+        )
+    if "plan_metadata" not in existing_cols:
+        await conn.execute(
+            text(
+                "ALTER TABLE command_proposal ADD COLUMN plan_metadata JSON "
+                "NOT NULL DEFAULT '{}'"
             )
         )
     await conn.execute(

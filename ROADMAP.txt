@@ -1,5 +1,5 @@
 ================================================================================
-AICC 后续开发路线图（ROADMAP）
+TianShu 后续开发路线图（ROADMAP）
 ================================================================================
 基线时间：2026-05-20
 作者：Cascade（与用户结对）
@@ -18,7 +18,7 @@ AICC 后续开发路线图（ROADMAP）
       - Agent(..., output_type=str, deps_type=AgentDeps)
   [x] Bridge LLM 接入
       - server/app/ai/bridge.py：__init__ 接受 llm_model/llm_api_key/
-        llm_base_url；from_env 读 AICC_ 前缀
+        llm_base_url；from_env 读 TIANSHU_ 前缀
       - process_command_async 优先走 pydantic agent，未配置时回退 regex
   [x] API 端点
       - POST /api/ai/command 改 async，兼容现有 schema
@@ -43,7 +43,7 @@ AICC 后续开发路线图（ROADMAP）
 
 A1. /api/ai/chat smoke 脚本
     [ ] 创建 server/_pai_chat_smoke.py
-        - 设 AICC_LLM_MODEL + AICC_LLM_API_KEY 后调 POST /api/ai/chat
+        - 设 TIANSHU_LLM_MODEL + TIANSHU_LLM_API_KEY 后调 POST /api/ai/chat
         - 收 SSE 流并断言至少一个 tool_call delta 落入 runtime
         - 调 /api/ai/runtime/scenario 复核单位是否真的部署/移动
     [ ] 提供 2 个 provider 路径：openai:gpt-4o-mini + anthropic:haiku
@@ -52,9 +52,9 @@ A1. /api/ai/chat smoke 脚本
 
 A2. README/CLAUDE.md S4 小节
     [ ] env 变量表
-        AICC_LLM_MODEL（示例：openai:gpt-4o / anthropic:claude-3-5-sonnet）
-        AICC_LLM_API_KEY
-        AICC_LLM_BASE_URL（可选）
+        TIANSHU_LLM_MODEL（示例：openai:gpt-4o / anthropic:claude-3-5-sonnet）
+        TIANSHU_LLM_API_KEY
+        TIANSHU_LLM_BASE_URL（可选）
     [ ] /api/ai/chat 请求/响应示例（curl + SSE 输出片段）
     [ ] /api/ai/command vs /api/ai/chat 取舍说明
     [ ] 前端 Vercel AI SDK useChat 接入片段
@@ -179,7 +179,7 @@ E1. 推演 loop
     [ ] server/app/ai/dual_agent_runner.py
         - 每个 step：blue_agent.run() → 应用 → red_agent.run() → 应用 →
           game.step() → 检查胜负
-        - 共享同一个 MCP server（同一个 AICCRuntime 实例）
+        - 共享同一个 MCP server（同一个 TianShuRuntime 实例）
     [ ] CLI：python -m app.ai.dual_agent --scenario default.json --max-steps 500
 
 E2. 评估指标
@@ -288,7 +288,7 @@ E4. 测试
                     (POST /api/ai/model/check)
                   · MCP Servers：增删改 + enable toggle + 项目内置 MCP 开关
                   · Skills：后端 /api/ai/skills 只读列表 + 用户自定义增删
-              - 持久化：localStorage 沿用 aicc.ai.* 老 keys
+              - 持久化：localStorage 沿用 tianshu.ai.* 老 keys
               - 主题：cyan/slate tactical + shadcn Card/Button +
                 tailwind，无新依赖
             AITacticalCommandPlatform.tsx：
@@ -304,7 +304,7 @@ E4. 测试
             前端：
               - AISidebar.tsx 切到 @ai-sdk/react useChat + ai v5
                 DefaultChatTransport，接 POST /api/ai/chat（SSE）
-              - ModelConfig 通过 X-AICC-Model-* header 动态下发后端
+              - ModelConfig 通过 X-TianShu-Model-* header 动态下发后端
                 (provider / model / apiKey / baseUrl)，per-request 生效
               - 消息渲染 UIMessage.parts：text 增量 + reasoning 折叠 +
                 tool-invocation 卡片（toolName/state/input/output/error）
@@ -313,7 +313,7 @@ E4. 测试
               - ChatPanel 加停止按钮（Square icon + stop()）
               - 状态栏 busy/error 双态显示
             后端：
-              - /api/ai/chat 路由读 X-AICC-Model-* header → resolve_model
+              - /api/ai/chat 路由读 X-TianShu-Model-* header → resolve_model
                 → VercelAIAdapter.dispatch_request(model=...) 生效
               - resolve_model 扩展：deepseek/qwen/ollama/google/custom
             设置面板：amber 警告替换为 emerald 提示"header 实时生效"。
@@ -322,14 +322,14 @@ E4. 测试
                   POST /api/ai/chat 503（无 key 时正确拒绝）。
 
 2026-05-20  修复"红蓝方不自主交战"关键 bug
-            根因：server AICCRuntime._normalize_scenario_payload 在
+            根因：server TianShuRuntime._normalize_scenario_payload 在
             scenario 缺 doctrine 字段时回填空 `{}`，前端 Scenario 构造的
             `?? getDefaultDoctrine()` 不触发（`{}` truthy），导致
             checkSideDoctrine 全 false，所有自主交战函数静默 noop。
             修复：
-              - server/app/aicc_runtime/_doctrine.py（新）：抽出
+              - server/app/tianshu_runtime/_doctrine.py（新）：抽出
                 _DEFAULT_SIDE_DOCTRINE + normalize_scenario_payload
-              - server/app/aicc_runtime/runtime.py：委托给新模块
+              - server/app/tianshu_runtime/runtime.py：委托给新模块
               - client/src/game/Scenario.ts：构造函数对空 doctrine 或缺
                 sideId 条目走默认条令兜底
             回归测试：

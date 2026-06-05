@@ -12,15 +12,14 @@ from __future__ import annotations
 
 import asyncio
 import json
-from datetime import datetime, timezone
 from typing import Any, NoReturn, Sequence
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.aicc_runtime.persistence import save_runtime_state
-from app.aicc_runtime.schemas import RuntimeTimelineResponse
-from app.aicc_runtime.timeline import (
+from app.tianshu_runtime.persistence import save_runtime_state
+from app.tianshu_runtime.schemas import RuntimeTimelineResponse
+from app.tianshu_runtime.timeline import (
     list_runtime_events,
     record_runtime_event,
     runtime_scenario_id,
@@ -40,14 +39,6 @@ from app.scenarios.models import AarRecord, Scenario
 from app.scenarios.schemas import (
     AarRecordCreate,
     AarRecordRead,
-    ScenarioBranchCreate,
-    ScenarioCompareForkCreate,
-    ScenarioCompareResponse,
-    ScenarioCompareReportCreate,
-    ScenarioCompareReportRead,
-    ScenarioCompareSessionCreate,
-    ScenarioCompareSessionRead,
-    ScenarioCompareSessionUpdate,
     ScenarioCreate,
     ScenarioDetail,
     ScenarioListItem,
@@ -101,208 +92,6 @@ async def list_scenarios(
     )
 
 
-@router.get("/compare", response_model=ScenarioCompareResponse)
-async def compare_scenarios(
-    scenario_id: list[str] = Query(...),
-    baseline_id: str | None = None,
-    user: User = Depends(current_active_user),
-    session: AsyncSession = Depends(get_async_session),
-) -> ScenarioCompareResponse:
-    ordered_ids = list(dict.fromkeys(scenario_id))
-    if len(ordered_ids) < 2:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail={
-                "code": "scenario_compare_invalid",
-                "message": "comparison requires at least two distinct scenarios",
-            },
-        )
-    if len(ordered_ids) > 4:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail={
-                "code": "scenario_compare_invalid",
-                "message": "comparison supports up to four scenarios at a time",
-            },
-        )
-    effective_baseline = baseline_id or ordered_ids[0]
-    if effective_baseline not in ordered_ids:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail={
-                "code": "scenario_compare_invalid",
-                "message": "baseline must be included in scenario_id",
-            },
-        )
-    try:
-        items = await scenario_service.build_scenario_compare_items(
-            session,
-            user,
-            ordered_ids,
-        )
-    except ScenarioServiceError as exc:
-        _raise_scenario_http(exc)
-    return ScenarioCompareResponse(
-        baseline_id=effective_baseline,
-        generated_at=datetime.now(timezone.utc),
-        items=items,
-    )
-
-
-@router.get("/compare/reports", response_model=list[ScenarioCompareReportRead])
-async def list_compare_reports(
-    limit: int = 50,
-    user: User = Depends(current_active_user),
-    session: AsyncSession = Depends(get_async_session),
-):
-    try:
-        return await scenario_service.list_compare_reports(
-            session,
-            user,
-            limit=limit,
-        )
-    except ScenarioServiceError as exc:
-        _raise_scenario_http(exc)
-
-
-@router.post(
-    "/compare/reports",
-    response_model=ScenarioCompareReportRead,
-    status_code=status.HTTP_201_CREATED,
-)
-async def create_compare_report(
-    payload: ScenarioCompareReportCreate,
-    user: User = Depends(current_active_user),
-    session: AsyncSession = Depends(get_async_session),
-):
-    try:
-        return await scenario_service.create_compare_report(
-            session,
-            user,
-            payload=payload,
-        )
-    except ScenarioServiceError as exc:
-        _raise_scenario_http(exc)
-
-
-@router.get("/compare/sessions", response_model=list[ScenarioCompareSessionRead])
-async def list_compare_sessions(
-    limit: int = 50,
-    user: User = Depends(current_active_user),
-    session: AsyncSession = Depends(get_async_session),
-):
-    try:
-        return await scenario_service.list_compare_sessions(
-            session,
-            user,
-            limit=limit,
-        )
-    except ScenarioServiceError as exc:
-        _raise_scenario_http(exc)
-
-
-@router.post(
-    "/compare/sessions",
-    response_model=ScenarioCompareSessionRead,
-    status_code=status.HTTP_201_CREATED,
-)
-async def create_compare_session(
-    payload: ScenarioCompareSessionCreate,
-    user: User = Depends(current_active_user),
-    session: AsyncSession = Depends(get_async_session),
-):
-    try:
-        return await scenario_service.create_compare_session(
-            session,
-            user,
-            payload=payload,
-        )
-    except ScenarioServiceError as exc:
-        _raise_scenario_http(exc)
-
-
-@router.get(
-    "/compare/sessions/{compare_session_id}",
-    response_model=ScenarioCompareSessionRead,
-)
-async def get_compare_session(
-    compare_session_id: str,
-    user: User = Depends(current_active_user),
-    session: AsyncSession = Depends(get_async_session),
-):
-    try:
-        return await scenario_service.get_compare_session(
-            session,
-            user,
-            compare_session_id,
-        )
-    except ScenarioServiceError as exc:
-        _raise_scenario_http(exc)
-
-
-@router.patch(
-    "/compare/sessions/{compare_session_id}",
-    response_model=ScenarioCompareSessionRead,
-)
-async def update_compare_session(
-    compare_session_id: str,
-    payload: ScenarioCompareSessionUpdate,
-    user: User = Depends(current_active_user),
-    session: AsyncSession = Depends(get_async_session),
-):
-    try:
-        return await scenario_service.update_compare_session(
-            session,
-            user,
-            compare_session_id,
-            payload=payload,
-        )
-    except ScenarioServiceError as exc:
-        _raise_scenario_http(exc)
-
-
-@router.delete(
-    "/compare/sessions/{compare_session_id}",
-    status_code=status.HTTP_204_NO_CONTENT,
-    response_class=Response,
-)
-async def delete_compare_session(
-    compare_session_id: str,
-    user: User = Depends(current_active_user),
-    session: AsyncSession = Depends(get_async_session),
-) -> Response:
-    try:
-        await scenario_service.delete_compare_session(
-            session,
-            user,
-            compare_session_id,
-        )
-    except ScenarioServiceError as exc:
-        _raise_scenario_http(exc)
-    return Response(status_code=status.HTTP_204_NO_CONTENT)
-
-
-@router.delete(
-    "/compare/reports/{report_id}",
-    status_code=status.HTTP_204_NO_CONTENT,
-    response_class=Response,
-)
-async def delete_compare_report(
-    report_id: str,
-    user: User = Depends(current_active_user),
-    session: AsyncSession = Depends(get_async_session),
-) -> Response:
-    try:
-        await scenario_service.delete_compare_report(
-            session,
-            user,
-            report_id,
-        )
-    except ScenarioServiceError as exc:
-        _raise_scenario_http(exc)
-    return Response(status_code=status.HTTP_204_NO_CONTENT)
-
-
 @router.get("/{scenario_id}", response_model=ScenarioDetail)
 async def get_scenario(
     scenario_id: str,
@@ -330,54 +119,6 @@ async def create_scenario(
             description=payload.description,
             data=payload.data,
             status=payload.status,
-        )
-    except ScenarioServiceError as exc:
-        _raise_scenario_http(exc)
-
-
-@router.post(
-    "/{scenario_id}/branch",
-    response_model=ScenarioDetail,
-    status_code=status.HTTP_201_CREATED,
-)
-async def create_scenario_branch(
-    scenario_id: str,
-    payload: ScenarioBranchCreate,
-    user: User = Depends(current_active_user),
-    session: AsyncSession = Depends(get_async_session),
-) -> Scenario:
-    try:
-        return await scenario_service.create_branch_scenario(
-            session,
-            user,
-            scenario_id,
-            name=payload.name,
-            description=payload.description,
-            branch_label=payload.branch_label,
-            status=payload.status,
-            data=payload.data,
-        )
-    except ScenarioServiceError as exc:
-        _raise_scenario_http(exc)
-
-
-@router.post(
-    "/{scenario_id}/compare-session/fork",
-    response_model=ScenarioCompareSessionRead,
-    status_code=status.HTTP_201_CREATED,
-)
-async def fork_compare_session(
-    scenario_id: str,
-    payload: ScenarioCompareForkCreate,
-    user: User = Depends(current_active_user),
-    session: AsyncSession = Depends(get_async_session),
-) -> ScenarioCompareSessionRead:
-    try:
-        return await scenario_service.fork_compare_session(
-            session,
-            user,
-            scenario_id,
-            payload=payload,
         )
     except ScenarioServiceError as exc:
         _raise_scenario_http(exc)
@@ -501,6 +242,7 @@ async def list_scenario_timeline(
     event_type: str | None = None,
     category: str | None = None,
     limit: int = 200,
+    latest: bool = False,
     user: User = Depends(current_active_user),
     session: AsyncSession = Depends(get_async_session),
 ) -> RuntimeTimelineResponse:
@@ -519,6 +261,7 @@ async def list_scenario_timeline(
         event_type=event_type,
         category=category,
         limit=limit,
+        latest=latest,
     )
     return RuntimeTimelineResponse(events=list(events))
 

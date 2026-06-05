@@ -10,6 +10,7 @@ import type {
   UnitAssetType,
   UnitAssetUpdatePayload,
 } from "./types";
+import { readStorageItem } from "@/lib/legacyStorage";
 
 interface StoredModelConfig {
   provider?: string;
@@ -24,10 +25,8 @@ interface StoredModelProfile {
 
 function readActiveModelProviderId(fallbackProvider?: string): string {
   try {
-    const activeId = window.localStorage.getItem(
-      "aicc.ai.activeModelProfileId"
-    );
-    const rawProfiles = window.localStorage.getItem("aicc.ai.modelProfiles");
+    const activeId = readStorageItem("tianshu.ai.activeModelProfileId");
+    const rawProfiles = readStorageItem("tianshu.ai.modelProfiles");
     const profiles = rawProfiles
       ? (JSON.parse(rawProfiles) as StoredModelProfile[])
       : [];
@@ -43,15 +42,15 @@ function readActiveModelProviderId(fallbackProvider?: string): string {
 function readModelHeaders(): HeadersInit {
   if (typeof window === "undefined") return {};
   try {
-    const raw = window.localStorage.getItem("aicc.ai.model");
+    const raw = readStorageItem("tianshu.ai.model");
     if (!raw) return {};
     const config = JSON.parse(raw) as StoredModelConfig;
     const headers: Record<string, string> = {};
     const providerId = readActiveModelProviderId(config.provider);
-    if (providerId) headers["X-AICC-Model-Provider-Id"] = providerId;
-    if (config.provider) headers["X-AICC-Model-Provider"] = config.provider;
-    if (config.model) headers["X-AICC-Model-Name"] = config.model;
-    if (config.baseUrl) headers["X-AICC-Model-Base-Url"] = config.baseUrl;
+    if (providerId) headers["X-TianShu-Model-Provider-Id"] = providerId;
+    if (config.provider) headers["X-TianShu-Model-Provider"] = config.provider;
+    if (config.model) headers["X-TianShu-Model-Name"] = config.model;
+    if (config.baseUrl) headers["X-TianShu-Model-Base-Url"] = config.baseUrl;
     return headers;
   } catch {
     return {};

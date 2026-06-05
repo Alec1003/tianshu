@@ -1,23 +1,23 @@
 from __future__ import annotations
 
-import os
 from pathlib import Path
 from threading import RLock
 from typing import Protocol
 
-from app.ai.bridge import AICCOpenClawBridge, DEFAULT_SCENARIO_PATH
-from app.aicc_runtime.runtime import AICCRuntime
-from app.aicc_runtime.persistence import runtime_context_id
+from app.ai.bridge import TianShuOpenClawBridge, DEFAULT_SCENARIO_PATH
+from app.tianshu_runtime.runtime import TianShuRuntime
+from app.tianshu_runtime.persistence import runtime_context_id
+from app.platform.paths import default_scenario_path
 
 
 class UserRef(Protocol):
     id: object
 
 
-class AICCBridgeRegistry:
+class TianShuBridgeRegistry:
     """Per-user bridge/runtime registry for the FastAPI process.
 
-    Each bridge owns a skill registry, commander agent, and AICCRuntime. Keeping
+    Each bridge owns a skill registry, commander agent, and TianShuRuntime. Keeping
     one bridge per user prevents live scenario mutations from crossing account
     boundaries while preserving the current single-runtime programming model
     inside each user session.
@@ -36,17 +36,15 @@ class AICCBridgeRegistry:
         self._llm_model = llm_model
         self._llm_api_key = llm_api_key
         self._llm_base_url = llm_base_url
-        self._bridges: dict[tuple[str, str], AICCOpenClawBridge] = {}
+        self._bridges: dict[tuple[str, str], TianShuOpenClawBridge] = {}
 
     @classmethod
-    def from_env(cls) -> "AICCBridgeRegistry":
+    def from_env(cls) -> "TianShuBridgeRegistry":
         from app.config import get_settings  # noqa: PLC0415
 
         settings = get_settings()
-        scenario_env = os.environ.get("AICC_MCP_RUNTIME_SCENARIO")
-        scenario_path = Path(scenario_env) if scenario_env else DEFAULT_SCENARIO_PATH
         return cls(
-            scenario_path=scenario_path,
+            scenario_path=default_scenario_path(),
             llm_model=settings.llm_model,
             llm_api_key=settings.llm_api_key,
             llm_base_url=settings.llm_base_url,
@@ -60,14 +58,14 @@ class AICCBridgeRegistry:
         self,
         user: UserRef,
         scenario_id: str | None = None,
-    ) -> AICCOpenClawBridge:
+    ) -> TianShuOpenClawBridge:
         user_key = self._user_key(user)
         context_key = runtime_context_id(scenario_id)
         bridge_key = (user_key, context_key)
         with self._lock:
             bridge = self._bridges.get(bridge_key)
             if bridge is None:
-                bridge = AICCOpenClawBridge(
+                bridge = TianShuOpenClawBridge(
                     scenario_path=self._scenario_path,
                     llm_model=self._llm_model,
                     llm_api_key=self._llm_api_key,
@@ -80,7 +78,7 @@ class AICCBridgeRegistry:
         self,
         user: UserRef,
         scenario_id: str | None = None,
-    ) -> AICCRuntime:
+    ) -> TianShuRuntime:
         return self.get_bridge_for_user(user, scenario_id=scenario_id).runtime
 
     def clear(self) -> None:

@@ -1,4 +1,4 @@
-"""FastMCP server: AICC scenario / units / AAR exposed over MCP.
+"""FastMCP server: TianShu scenario / units / AAR exposed over MCP.
 
 Tools 设计原则（来自 api 技能 "AI tool calling API"）：
 - 每个工具参数 schema 严格（Pydantic 模型/函数签名注解）；
@@ -8,7 +8,7 @@ Tools 设计原则（来自 api 技能 "AI tool calling API"）：
   到 MCP 协议层（否则 LLM 只会看到 stack 报错，丢失结构化信息）；
 - session 作用域 per-tool（pyd 反例 4 "全局复用 session"）。
 
-Lifespan 注入：启动时通过 env (``AICC_MCP_TOKEN`` 或 ``AICC_MCP_USER_ID``)
+Lifespan 注入：启动时通过 env (``TIANSHU_MCP_TOKEN`` 或 ``TIANSHU_MCP_USER_ID``)
 解析 ``User``，注入到 ``Context.request_context.lifespan_context.user``，
 后续所有 tool 调用都拿这个 user 走 service 层权限。
 """
@@ -29,9 +29,9 @@ from mcp.server.fastmcp import Context, FastMCP
 
 from app.ai.command_governance import CommandApprovalQueue
 from app.ai.command_service import save_command_proposal
-from app.ai.skill_registry import AICCSkillRegistry
-from app.aicc_runtime.persistence import ensure_runtime_state_loaded
-from app.aicc_runtime.timeline import record_runtime_event
+from app.ai.skill_registry import TianShuSkillRegistry
+from app.tianshu_runtime.persistence import ensure_runtime_state_loaded
+from app.tianshu_runtime.timeline import record_runtime_event
 from app.auth.models import User
 from app.db.session import async_session_maker, create_db_and_tables
 from app.mcp.auth import McpAuthError, resolve_user_from_env
@@ -62,13 +62,22 @@ from app.mcp.utils import (
     iter_units,
     unit_brief,
 )
-from app.aicc_runtime.runtime import AICCRuntime
+from app.tianshu_runtime.runtime import TianShuRuntime
 from app.scenarios import service as scenario_service
 from app.scenarios.errors import ScenarioServiceError
 from app.scenarios.models import Scenario
+from app.unit_assets.service import find_accessible_unit_asset_by_name
 
 
 logger = logging.getLogger(__name__)
+
+
+_KNOWN_UNIT_CHECKS: dict[str, Callable[[str], bool]] = {
+    "aircraft": TianShuRuntime.is_known_aircraft_class,
+    "ship": TianShuRuntime.is_known_ship_class,
+    "facility": TianShuRuntime.is_known_facility_class,
+    "airbase": TianShuRuntime.is_known_airbase_class,
+}
 
 
 # ---------- lifespan ----------------------------------------------------------
@@ -76,7 +85,7 @@ logger = logging.getLogger(__name__)
 
 # ----- Cross-mode injection points ------------------------------------------
 # Two MCP transports share one tool surface:
-#   - stdio  : user resolved once from ENV at lifespan; new AICCRuntime
+#   - stdio  : user resolved once from ENV at lifespan; new TianShuRuntime
 #              created per process (single-user scope).
 #   - http   : runtime is resolved per request from FastAPI's per-user bridge
 #              registry; user is resolved per-request from the Bearer token
@@ -87,16 +96,16 @@ logger = logging.getLogger(__name__)
 # the lifespan or the tool registry.
 # ---------------------------------------------------------------------------
 
-_shared_runtime: AICCRuntime | None = None
-_shared_runtime_provider: Callable[[User], AICCRuntime] | None = None
+_shared_runtime: TianShuRuntime | None = None
+_shared_runtime_provider: Callable[[User], TianShuRuntime] | None = None
 _shared_bridge_provider: Callable[[User], Any] | None = None
 _request_user_var: contextvars.ContextVar[User | None] = contextvars.ContextVar(
-    "_aicc_mcp_request_user", default=None
+    "_tianshu_mcp_request_user", default=None
 )
 
 
-def set_shared_runtime(runtime: AICCRuntime | None) -> None:
-    """Bind a long-lived ``AICCRuntime`` for HTTP transport.
+def set_shared_runtime(runtime: TianShuRuntime | None) -> None:
+    """Bind a long-lived ``TianShuRuntime`` for HTTP transport.
 
     Must be called **before** ``mcp_lifespan`` enters (i.e. before the FastAPI
     lifespan hands control to ``session_manager.run()``); after that the
@@ -106,19 +115,19 @@ def set_shared_runtime(runtime: AICCRuntime | None) -> None:
     _shared_runtime = runtime
 
 
-def get_shared_runtime() -> AICCRuntime | None:
+def get_shared_runtime() -> TianShuRuntime | None:
     return _shared_runtime
 
 
 def set_shared_runtime_provider(
-    provider: Callable[[User], AICCRuntime] | None,
+    provider: Callable[[User], TianShuRuntime] | None,
 ) -> None:
     """Bind a per-user runtime provider for HTTP transport."""
     global _shared_runtime_provider
     _shared_runtime_provider = provider
 
 
-def get_shared_runtime_provider() -> Callable[[User], AICCRuntime] | None:
+def get_shared_runtime_provider() -> Callable[[User], TianShuRuntime] | None:
     return _shared_runtime_provider
 
 
@@ -159,7 +168,7 @@ class McpAppContext:
     """
 
     user: User | None
-    runtime: AICCRuntime | None
+    runtime: TianShuRuntime | None
     command_approvals: CommandApprovalQueue | None = None
 
 
@@ -201,7 +210,7 @@ async def mcp_lifespan(server: FastMCP) -> AsyncIterator[McpAppContext]:  # noqa
     if runtime is not None:
         command_approvals = CommandApprovalQueue(
             runtime=runtime,
-            registry=AICCSkillRegistry(runtime),
+            registry=TianShuSkillRegistry(runtime),
         )
     try:
         yield McpAppContext(
@@ -210,7 +219,7 @@ async def mcp_lifespan(server: FastMCP) -> AsyncIterator[McpAppContext]:  # noqa
             command_approvals=command_approvals,
         )
     finally:
-        # No explicit shutdown hook on AICCRuntime; in stdio mode GC
+        # No explicit shutdown hook on TianShuRuntime; in stdio mode GC
         # reclaims it when the process exits, in HTTP mode the FastAPI host
         # owns its lifecycle.
         pass
@@ -228,6 +237,31 @@ mcp = FastMCP(
     # independently, so server restarts never invalidate client connections.
     stateless_http=True,
 )
+
+
+def _mcp_tool_description(description: str | None) -> str:
+    if not description:
+        return ""
+    for line in description.splitlines():
+        text = line.strip()
+        if text:
+            return text
+    return ""
+
+
+async def list_builtin_mcp_tool_definitions() -> list[dict[str, Any]]:
+    """Return the real tool registry exposed by the built-in TianShu MCP."""
+    tools = await mcp.list_tools()
+    return [
+        {
+            "server": "TianShu MCP",
+            "name": tool.name,
+            "description": _mcp_tool_description(tool.description),
+            "inputSchema": tool.inputSchema or {},
+            "outputSchema": tool.outputSchema or {},
+        }
+        for tool in tools
+    ]
 
 
 # ---------- helpers -----------------------------------------------------------
@@ -262,7 +296,7 @@ def _get_user(ctx: Context) -> User:
     )
 
 
-def _get_runtime(ctx: Context) -> AICCRuntime:
+def _get_runtime(ctx: Context) -> TianShuRuntime:
     provider = get_shared_runtime_provider()
     if provider is not None:
         return provider(_get_user(ctx))
@@ -274,7 +308,7 @@ def _get_runtime(ctx: Context) -> AICCRuntime:
     return app_ctx.runtime
 
 
-async def _get_runtime_loaded(ctx: Context) -> AICCRuntime:
+async def _get_runtime_loaded(ctx: Context) -> TianShuRuntime:
     user = _get_user(ctx)
     provider = get_shared_runtime_provider()
     if provider is not None:
@@ -375,6 +409,43 @@ def _err(exc: ScenarioServiceError) -> dict[str, Any]:
     ).model_dump()
 
 
+async def _deployment_template_or_error(
+    ctx: Context,
+    *,
+    asset_type: str,
+    class_name: str,
+) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
+    try:
+        user = _get_user(ctx)
+    except _UnauthenticatedError as exc:
+        return None, ToolError(
+            code="unauthenticated",
+            message=str(exc),
+        ).model_dump()
+
+    async with async_session_maker() as session:
+        asset = await find_accessible_unit_asset_by_name(
+            session,
+            user,
+            asset_type=asset_type,
+            name=class_name,
+        )
+        if asset is not None:
+            return dict(asset.data), None
+
+    known_check = _KNOWN_UNIT_CHECKS[asset_type]
+    if not known_check(class_name):
+        return None, ToolError(
+            code=f"unknown_{asset_type}_class",
+            message=(
+                "Unit type is not present in the asset database; "
+                "placeholder deployment is forbidden."
+            ),
+            details={"class_name": class_name},
+        ).model_dump()
+    return None, None
+
+
 def _scenario_summary(sc: Scenario) -> dict[str, Any]:
     return {
         "ok": True,
@@ -396,7 +467,7 @@ def _scenario_full(sc: Scenario) -> dict[str, Any]:
 # ---------- resources --------------------------------------------------------
 
 
-@mcp.resource("aicc://scenarios", name="scenarios-index")
+@mcp.resource("tianshu://scenarios", name="scenarios-index")
 async def resource_scenarios_index() -> str:
     """所有当前用户可见的想定（自己的 + 系统模板）的轻量列表。
 
@@ -414,7 +485,7 @@ async def resource_scenarios_index() -> str:
     return json.dumps({"scenarios": items}, ensure_ascii=False, indent=2)
 
 
-@mcp.resource("aicc://scenario/{scenario_id}", name="scenario-detail")
+@mcp.resource("tianshu://scenario/{scenario_id}", name="scenario-detail")
 async def resource_scenario_detail(scenario_id: str) -> str:
     """单个想定的完整 JSON（含 ``data``）。"""
     ctx: Context = mcp.get_context()
@@ -844,12 +915,12 @@ def _nearest_distance_km(
 
 
 # ===========================================================================
-# Runtime tools: live scenario driven by authoritative AICCRuntime.
+# Runtime tools: live scenario driven by authoritative TianShuRuntime.
 # Note: the per-user live runtime now restores from/saves to ``runtime_state``;
 # ``runtime_save_to_db`` still creates a separate static Scenario row.
 #
 # 边界（重要，给 LLM 看也给运维看）：
-# - "Runtime" 是 stdio 进程内一个 AICCRuntime 实例，跑的是活想定；
+# - "Runtime" 是 stdio 进程内一个 TianShuRuntime 实例，跑的是活想定；
 #   这一组工具改变的状态**不会自动写回 DB**。
 # - "DB scenarios" 是 ``Scenario`` 表，是用户保存的静态快照。
 #   要把当前 runtime 状态持久化，必须显式调用 ``runtime_save_to_db``。
@@ -869,7 +940,7 @@ _RUNTIME_UNIT_FIELDS: tuple[tuple[str, str], ...] = (
 )
 
 
-def _runtime_unit_counts(runtime: AICCRuntime) -> dict[str, int]:
+def _runtime_unit_counts(runtime: TianShuRuntime) -> dict[str, int]:
     scenario = runtime.game.current_scenario
     counts: dict[str, int] = {}
     for attr, key in _RUNTIME_UNIT_FIELDS:
@@ -878,7 +949,7 @@ def _runtime_unit_counts(runtime: AICCRuntime) -> dict[str, int]:
     return counts
 
 
-def _runtime_side_stats(runtime: AICCRuntime) -> list[RuntimeSideStat]:
+def _runtime_side_stats(runtime: TianShuRuntime) -> list[RuntimeSideStat]:
     out: list[RuntimeSideStat] = []
     for s in runtime.game.current_scenario.sides:
         color = getattr(s.color, "value", s.color)
@@ -893,7 +964,7 @@ def _runtime_side_stats(runtime: AICCRuntime) -> list[RuntimeSideStat]:
     return out
 
 
-def _runtime_status_payload(runtime: AICCRuntime) -> dict[str, Any]:
+def _runtime_status_payload(runtime: TianShuRuntime) -> dict[str, Any]:
     scenario = runtime.game.current_scenario
     start = int(scenario.start_time or 0)
     duration = int(scenario.duration or 0)
@@ -915,11 +986,11 @@ def _runtime_status_payload(runtime: AICCRuntime) -> dict[str, Any]:
     return status.model_dump(mode="json")
 
 
-@mcp.resource("aicc://runtime", name="runtime-status")
+@mcp.resource("tianshu://runtime", name="runtime-status")
 async def resource_runtime_status() -> str:
     """正在跑的内存活想定的实时快照。
 
-    与 ``aicc://scenarios`` / ``aicc://scenario/{id}`` 不同源 —— 那两个读
+    与 ``tianshu://scenarios`` / ``tianshu://scenario/{id}`` 不同源 —— 那两个读
     DB 静态行，这个读 runtime 内存态。AI 在做推演决策时应该读这个。
     """
     ctx: Context = mcp.get_context()
@@ -1106,23 +1177,53 @@ async def runtime_deploy_aircraft(
     name: str | None = None,
     altitude: float = 10000.0,
 ) -> dict[str, Any]:
-    """在活想定中部署一架飞机。``side`` 可传 side_id 或 side 名（如 "RED"）。
+    """Deploy an aircraft from built-in or user unit-asset data only.
 
-    ``class_name`` 必须命中后端 AircraftDb（默认未命中会回落到首行）；建
-    议先用 DB 工具读 SCS 模板看可选机型，再传入这里。
+    Unknown class names are rejected; this tool never invents aircraft templates
+    or creates map placeholders for missing database rows.
     """
+    try:
+        user = _get_user(ctx)
+    except _UnauthenticatedError as exc:
+        return ToolError(
+            code="unauthenticated",
+            message=str(exc),
+        ).model_dump()
+
+    template: dict[str, Any] | None = None
+    async with async_session_maker() as session:
+        asset = await find_accessible_unit_asset_by_name(
+            session,
+            user,
+            asset_type="aircraft",
+            name=class_name,
+        )
+        if asset is not None:
+            template = dict(asset.data)
+
+    if template is None and not TianShuRuntime.is_known_aircraft_class(class_name):
+        return ToolError(
+            code="unknown_aircraft_class",
+            message="数据库中不存在该飞机型号，禁止由大模型生成占位飞机。请先录入单位资产库。",
+            details={"class_name": class_name},
+        ).model_dump()
+
+    parameters: dict[str, Any] = {
+        "class_name": class_name,
+        "latitude": latitude,
+        "longitude": longitude,
+        "side": side,
+        "name": name,
+        "altitude": altitude,
+    }
+    if template is not None:
+        parameters["template"] = template
+
     return await _create_runtime_proposal(
         ctx,
         command=f"MCP runtime_deploy_aircraft class_name={class_name}",
         skill="deploy_aircraft",
-        parameters={
-            "class_name": class_name,
-            "latitude": latitude,
-            "longitude": longitude,
-            "side": side,
-            "name": name,
-            "altitude": altitude,
-        },
+        parameters=parameters,
     )
 
 
@@ -1136,17 +1237,29 @@ async def runtime_deploy_ship(
     name: str | None = None,
 ) -> dict[str, Any]:
     """在活想定中部署一艘舰艇。"""
+    template, error_payload = await _deployment_template_or_error(
+        ctx,
+        asset_type="ship",
+        class_name=class_name,
+    )
+    if error_payload is not None:
+        return error_payload
+
+    parameters: dict[str, Any] = {
+        "class_name": class_name,
+        "latitude": latitude,
+        "longitude": longitude,
+        "side": side,
+        "name": name,
+    }
+    if template is not None:
+        parameters["template"] = template
+
     return await _create_runtime_proposal(
         ctx,
         command=f"MCP runtime_deploy_ship class_name={class_name}",
         skill="deploy_ship",
-        parameters={
-            "class_name": class_name,
-            "latitude": latitude,
-            "longitude": longitude,
-            "side": side,
-            "name": name,
-        },
+        parameters=parameters,
     )
 
 
@@ -1160,17 +1273,29 @@ async def runtime_deploy_facility(
     name: str | None = None,
 ) -> dict[str, Any]:
     """在活想定中部署一处地面设施（防空 / 雷达 / 指挥所等）。"""
+    template, error_payload = await _deployment_template_or_error(
+        ctx,
+        asset_type="facility",
+        class_name=class_name,
+    )
+    if error_payload is not None:
+        return error_payload
+
+    parameters: dict[str, Any] = {
+        "class_name": class_name,
+        "latitude": latitude,
+        "longitude": longitude,
+        "side": side,
+        "name": name,
+    }
+    if template is not None:
+        parameters["template"] = template
+
     return await _create_runtime_proposal(
         ctx,
         command=f"MCP runtime_deploy_facility class_name={class_name}",
         skill="deploy_facility",
-        parameters={
-            "class_name": class_name,
-            "latitude": latitude,
-            "longitude": longitude,
-            "side": side,
-            "name": name,
-        },
+        parameters=parameters,
     )
 
 
@@ -1184,17 +1309,29 @@ async def runtime_deploy_airbase(
     name: str | None = None,
 ) -> dict[str, Any]:
     """在活想定中部署一座机场（aircraft 的 homeBase）。"""
+    template, error_payload = await _deployment_template_or_error(
+        ctx,
+        asset_type="airbase",
+        class_name=class_name,
+    )
+    if error_payload is not None:
+        return error_payload
+
+    parameters: dict[str, Any] = {
+        "class_name": class_name,
+        "latitude": latitude,
+        "longitude": longitude,
+        "side": side,
+        "name": name,
+    }
+    if template is not None:
+        parameters["template"] = template
+
     return await _create_runtime_proposal(
         ctx,
         command=f"MCP runtime_deploy_airbase class_name={class_name}",
         skill="deploy_airbase",
-        parameters={
-            "class_name": class_name,
-            "latitude": latitude,
-            "longitude": longitude,
-            "side": side,
-            "name": name,
-        },
+        parameters=parameters,
     )
 
 
@@ -1339,7 +1476,7 @@ async def runtime_set_current_side(ctx: Context, side: str) -> dict[str, Any]:
 # ---------- runtime: outcome ------------------------------------------------
 
 
-def _runtime_outcome_payload(runtime: AICCRuntime) -> dict[str, Any]:
+def _runtime_outcome_payload(runtime: TianShuRuntime) -> dict[str, Any]:
     """Return authoritative runtime outcome plus survival signals."""
     scenario = runtime.game.current_scenario
     start = int(scenario.start_time or 0)

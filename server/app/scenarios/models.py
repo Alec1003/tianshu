@@ -4,8 +4,6 @@ v1 schema (flat, single-user-owned):
     Scenario              -- player-saved or system-template scenario JSON
     AarRecord             -- post-game After-Action-Review record per played session
     TrainingScoreRecord   -- immutable score snapshot for a played session
-    ScenarioCompareReport -- persisted scenario comparison snapshot
-    ScenarioCompareSession -- persisted compare workspace session
 
 Workspace / WorkspaceMember tables are intentionally deferred to S4 when we
 introduce multi-user collaboration. Adding them now would only inflate the
@@ -16,7 +14,6 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Any
 
 from fastapi_users_db_sqlalchemy.generics import GUID
 from sqlalchemy import (
@@ -46,53 +43,6 @@ def _uuid_pk():
 
 
 SCENARIO_JSON = JSON().with_variant(JSONB, "postgresql")
-BRANCH_META_KEY = "_tianshu_branch"
-
-
-def extract_branch_meta(data: dict[str, Any] | None) -> dict[str, Any] | None:
-    if not isinstance(data, dict):
-        return None
-    raw = data.get(BRANCH_META_KEY)
-    if not isinstance(raw, dict):
-        return None
-
-    parent_scenario_id = str(raw.get("parent_scenario_id", "")).strip()
-    root_scenario_id = str(raw.get("root_scenario_id", "")).strip()
-    parent_scenario_name = str(raw.get("parent_scenario_name", "")).strip()
-    root_scenario_name = str(raw.get("root_scenario_name", "")).strip()
-    branch_label = str(raw.get("branch_label", "")).strip()
-    if not parent_scenario_id or not root_scenario_id:
-        return None
-
-    branch_depth_raw = raw.get("branch_depth", 1)
-    try:
-        branch_depth = max(1, int(branch_depth_raw))
-    except (TypeError, ValueError):
-        branch_depth = 1
-
-    created_from_version_raw = raw.get("created_from_version")
-    try:
-        created_from_version = (
-            int(created_from_version_raw)
-            if created_from_version_raw is not None
-            else None
-        )
-    except (TypeError, ValueError):
-        created_from_version = None
-
-    created_at = raw.get("created_at")
-    created_at_value = str(created_at).strip() if created_at is not None else None
-
-    return {
-        "parent_scenario_id": parent_scenario_id,
-        "parent_scenario_name": parent_scenario_name,
-        "root_scenario_id": root_scenario_id,
-        "root_scenario_name": root_scenario_name or parent_scenario_name,
-        "branch_label": branch_label or f"分支 {branch_depth}",
-        "branch_depth": branch_depth,
-        "created_from_version": created_from_version,
-        "created_at": created_at_value or None,
-    }
 
 
 class Scenario(Base):
@@ -196,10 +146,6 @@ class Scenario(Base):
             + self._list_len(root, "airbases")
         )
 
-    @property
-    def branch_meta(self) -> dict[str, Any] | None:
-        return extract_branch_meta(self.data)
-
     aar_records: Mapped[list["AarRecord"]] = relationship(
         back_populates="scenario", cascade="all, delete-orphan", lazy="selectin"
     )
@@ -250,7 +196,7 @@ class AarRecord(Base):
 
 
 class TrainingScoreRecord(Base):
-    """Immutable training score snapshot for score history and comparison."""
+    """Immutable training score snapshot for score history."""
 
     __tablename__ = "training_score_record"
 
@@ -292,79 +238,4 @@ class TrainingScoreRecord(Base):
 
     scenario: Mapped["Scenario | None"] = relationship(
         back_populates="training_score_records"
-    )
-
-
-class ScenarioCompareReport(Base):
-    """Persisted scenario comparison snapshot for later review/export."""
-
-    __tablename__ = "scenario_compare_report"
-
-    id: Mapped[str] = _uuid_pk()
-
-    owner_id: Mapped[uuid.UUID | None] = mapped_column(
-        GUID(),
-        ForeignKey("user.id", ondelete="CASCADE"),
-        nullable=True,
-        index=True,
-    )
-    title: Mapped[str] = mapped_column(String(120), nullable=False)
-    baseline_scenario_id: Mapped[str] = mapped_column(
-        String(36),
-        nullable=False,
-        index=True,
-    )
-    scenario_ids: Mapped[list[str]] = mapped_column(
-        SCENARIO_JSON,
-        default=list,
-        nullable=False,
-    )
-    snapshot: Mapped[dict] = mapped_column(SCENARIO_JSON, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
-    )
-
-
-class ScenarioCompareSession(Base):
-    """Persisted compare workspace session for multi-branch evaluation."""
-
-    __tablename__ = "scenario_compare_session"
-
-    id: Mapped[str] = _uuid_pk()
-
-    owner_id: Mapped[uuid.UUID | None] = mapped_column(
-        GUID(),
-        ForeignKey("user.id", ondelete="CASCADE"),
-        nullable=True,
-        index=True,
-    )
-    title: Mapped[str] = mapped_column(String(120), nullable=False)
-    source_scenario_id: Mapped[str | None] = mapped_column(
-        String(36),
-        nullable=True,
-        index=True,
-    )
-    baseline_scenario_id: Mapped[str] = mapped_column(
-        String(36),
-        nullable=False,
-        index=True,
-    )
-    scenario_ids: Mapped[list[str]] = mapped_column(
-        SCENARIO_JSON,
-        default=list,
-        nullable=False,
-    )
-    state: Mapped[dict] = mapped_column(
-        SCENARIO_JSON,
-        default=dict,
-        nullable=False,
-    )
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        server_default=func.now(),
-        onupdate=func.now(),
-        nullable=False,
     )

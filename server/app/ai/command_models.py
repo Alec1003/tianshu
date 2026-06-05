@@ -69,6 +69,9 @@ class CommandProposalRecord(Base):
     source: Mapped[str] = mapped_column(String(24), nullable=False)
     status: Mapped[str] = mapped_column(String(24), nullable=False, index=True)
     adjudication: Mapped[dict] = mapped_column(COMMAND_JSON, nullable=False)
+    plan_metadata: Mapped[dict] = mapped_column(
+        COMMAND_JSON, default=dict, nullable=False
+    )
     execution: Mapped[list] = mapped_column(COMMAND_JSON, default=list, nullable=False)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
 

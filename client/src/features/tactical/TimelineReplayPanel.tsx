@@ -89,7 +89,7 @@ const fieldLabels: Record<string, string> = {
   maxFuel: "最大油量",
   maxQuantity: "最大数量",
   name: "名称",
-  range: "航程/射程",
+  range: "探测/射程半径",
   refuelRange: "加油范围",
   route: "航线",
   rtb: "返航",

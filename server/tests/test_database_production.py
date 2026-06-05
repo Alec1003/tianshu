@@ -8,7 +8,7 @@ from sqlalchemy.schema import CreateIndex, CreateTable
 
 from app.ai.command_models import CommandProposalRecord
 from app.ai.model_config_models import AIModelProviderConfig
-from app.aicc_runtime.models import RuntimeEvent, RuntimeState
+from app.tianshu_runtime.models import RuntimeEvent, RuntimeState
 from app.auth.models import User
 from app.db import session as db_session_mod
 from app.scenarios.models import AarRecord, Scenario, TrainingScoreRecord
@@ -29,7 +29,7 @@ def test_engine_kwargs_skip_pool_options_for_sqlite(monkeypatch) -> None:
     monkeypatch.setattr(
         db_session_mod,
         "_settings",
-        _settings("sqlite+aiosqlite:///./data/aicc.db"),
+        _settings("sqlite+aiosqlite:///./data/tianshu.db"),
     )
 
     kwargs = db_session_mod._engine_kwargs()
@@ -41,7 +41,7 @@ def test_engine_kwargs_enable_pool_options_for_postgres(monkeypatch) -> None:
     monkeypatch.setattr(
         db_session_mod,
         "_settings",
-        _settings("postgresql+asyncpg://aicc:secret@db/aicc"),
+        _settings("postgresql+asyncpg://tianshu:secret@db/tianshu"),
     )
 
     kwargs = db_session_mod._engine_kwargs()
@@ -91,6 +91,7 @@ def test_scenario_json_columns_compile_as_jsonb_for_postgres() -> None:
     assert "metrics JSONB NOT NULL" in training_score_ddl
     assert "scenario_id VARCHAR(120) NOT NULL" in command_proposal_ddl
     assert "adjudication JSONB NOT NULL" in command_proposal_ddl
+    assert "plan_metadata JSONB NOT NULL" in command_proposal_ddl
     assert "execution JSONB NOT NULL" in command_proposal_ddl
     assert "custom_models JSONB NOT NULL" in model_config_ddl
 

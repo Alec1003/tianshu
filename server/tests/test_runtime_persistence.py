@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from app.aicc_runtime.persistence import (
+from app.tianshu_runtime.persistence import (
     ensure_runtime_state_loaded,
     load_runtime_state,
     restore_runtime_state,

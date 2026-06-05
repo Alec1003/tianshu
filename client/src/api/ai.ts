@@ -1,7 +1,17 @@
 import { apiCall } from "./client";
 import type {
+  BuiltinMcpToolsResponse,
   CommandApprovalResponse,
   CommandProposalListResponse,
+  CustomSkill,
+  CustomSkillCreatePayload,
+  CustomSkillListResponse,
+  CustomSkillUpdatePayload,
+  ExternalMcpValidateRequest,
+  ExternalMcpValidateResponse,
+  InternalSkillProposalRequest,
+  InternalSkillProposalResponse,
+  RegisteredSkill,
   RuntimeAttackRequest,
   RuntimeAddWeaponRequest,
   RuntimeCreateSideRequest,
@@ -32,12 +42,14 @@ export async function listRuntimeTimeline(params?: {
   eventType?: string;
   category?: string;
   limit?: number;
+  latest?: boolean;
 }): Promise<RuntimeTimelineResponse> {
   const query = new URLSearchParams();
   if (params?.scenarioId) query.set("scenario_id", params.scenarioId);
   if (params?.eventType) query.set("event_type", params.eventType);
   if (params?.category) query.set("category", params.category);
   if (params?.limit !== undefined) query.set("limit", String(params.limit));
+  if (params?.latest !== undefined) query.set("latest", String(params.latest));
   const suffix = query.toString() ? `?${query.toString()}` : "";
   return apiCall<RuntimeTimelineResponse>(`/api/ai/runtime/timeline${suffix}`);
 }
@@ -69,6 +81,67 @@ export async function rejectCommandProposal(
     `/api/ai/command/proposals/${encodeURIComponent(proposalId)}/reject`,
     { method: "POST" }
   );
+}
+
+export async function createInternalSkillProposal(
+  payload: InternalSkillProposalRequest
+): Promise<InternalSkillProposalResponse> {
+  return apiCall<InternalSkillProposalResponse>(
+    "/api/ai/internal-skills/proposals",
+    { method: "POST", json: payload }
+  );
+}
+
+export async function listBackendSkills(): Promise<RegisteredSkill[]> {
+  const payload = await apiCall<{ skills?: RegisteredSkill[] }>(
+    "/api/ai/skills"
+  );
+  return payload.skills ?? [];
+}
+
+export async function listCustomSkills(): Promise<CustomSkillListResponse> {
+  return apiCall<CustomSkillListResponse>("/api/ai/custom-skills");
+}
+
+export async function createCustomSkill(
+  payload: CustomSkillCreatePayload
+): Promise<CustomSkill> {
+  return apiCall<CustomSkill>("/api/ai/custom-skills", {
+    method: "POST",
+    json: payload,
+  });
+}
+
+export async function updateCustomSkill(
+  skillId: string,
+  payload: CustomSkillUpdatePayload
+): Promise<CustomSkill> {
+  return apiCall<CustomSkill>(
+    `/api/ai/custom-skills/${encodeURIComponent(skillId)}`,
+    {
+      method: "PATCH",
+      json: payload,
+    }
+  );
+}
+
+export async function deleteCustomSkill(skillId: string): Promise<void> {
+  await apiCall<void>(`/api/ai/custom-skills/${encodeURIComponent(skillId)}`, {
+    method: "DELETE",
+  });
+}
+
+export async function validateExternalMcpServer(
+  payload: ExternalMcpValidateRequest
+): Promise<ExternalMcpValidateResponse> {
+  return apiCall<ExternalMcpValidateResponse>("/api/ai/mcp/validate", {
+    method: "POST",
+    json: payload,
+  });
+}
+
+export async function listBuiltinMcpTools(): Promise<BuiltinMcpToolsResponse> {
+  return apiCall<BuiltinMcpToolsResponse>("/api/ai/mcp/builtin/tools");
 }
 
 export async function loadRuntimeScenario(

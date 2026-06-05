@@ -5,7 +5,7 @@ from datetime import UTC, datetime
 import pytest
 
 from app.ai.agent import PlannedSkillCall
-from app.ai.bridge import AICCOpenClawBridge
+from app.ai.bridge import TianShuOpenClawBridge
 from app.ai.models import (
     AgentExecutionSummary,
     CommandAdjudicationResult,
@@ -81,7 +81,7 @@ async def test_propose_command_does_not_fallback_when_llm_skips_tools(
         )
 
     monkeypatch.setattr("app.ai.pydantic_agent.run_agent", fake_run_agent)
-    bridge = object.__new__(AICCOpenClawBridge)
+    bridge = object.__new__(TianShuOpenClawBridge)
     regex_agent = RecordingRegexAgent()
     queue = FakeApprovalQueue()
     bridge.agent = regex_agent

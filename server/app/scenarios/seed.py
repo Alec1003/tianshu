@@ -17,17 +17,10 @@ from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import async_session_maker
+from app.platform.paths import scenario_dir_candidates
 from app.scenarios.models import Scenario
 
 logger = logging.getLogger(__name__)
-
-
-# Resolution order (first existing wins). Both prod (Docker) and local dev
-# layouts are covered.
-_CANDIDATE_DIRS = [
-    Path("/app/client/src/scenarios"),  # docker image
-    Path(__file__).resolve().parents[3] / "client" / "src" / "scenarios",  # repo
-]
 
 
 # Template ids retired from the template center. The JSON files still exist
@@ -60,7 +53,7 @@ _TEMPLATES: tuple[tuple[str, str, str], ...] = (
 
 
 def _resolve_scenarios_dir() -> Path | None:
-    for path in _CANDIDATE_DIRS:
+    for path in scenario_dir_candidates():
         if path.is_dir():
             return path
     return None
@@ -117,7 +110,10 @@ async def _seed_one(
 async def seed_system_templates() -> None:
     base_dir = _resolve_scenarios_dir()
     if base_dir is None:
-        logger.warning("seed: no scenarios dir found in candidates: %s", _CANDIDATE_DIRS)
+        logger.warning(
+            "seed: no scenarios dir found in candidates: %s",
+            scenario_dir_candidates(),
+        )
         return
     async with async_session_maker() as session:
         await _retire_legacy_templates(session)

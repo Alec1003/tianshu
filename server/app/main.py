@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.ai.bridge_registry import AICCBridgeRegistry
+from app.ai.bridge_registry import TianShuBridgeRegistry
 from app.api.ai import router as ai_router
 from app.auth.router import router as auth_router
 from app.config import get_settings, validate_production_settings
@@ -32,7 +32,7 @@ async def lifespan(app: FastAPI):
 
     The MCP runtime intentionally piggy-backs on the FastAPI bridge:
     ``set_shared_runtime`` makes ``app.mcp.server.mcp_lifespan`` skip its
-    own ``AICCRuntime`` boot and reuse the one driving
+    own ``TianShuRuntime`` boot and reuse the one driving
     ``/api/ai/command``. That single shared instance is the whole reason
     HTTP-mounted MCP can let an external LLM see / mutate the same live
     scenario the browser front-end is looking at.
@@ -58,7 +58,7 @@ async def lifespan(app: FastAPI):
     except Exception:
         logger.exception("seed_system_unit_assets failed; continuing without units")
 
-    app.state.bridge_registry = AICCBridgeRegistry.from_env()
+    app.state.bridge_registry = TianShuBridgeRegistry.from_env()
     set_shared_bridge_provider(app.state.bridge_registry.get_bridge_for_user)
     set_shared_runtime_provider(app.state.bridge_registry.get_runtime_for_user)
 

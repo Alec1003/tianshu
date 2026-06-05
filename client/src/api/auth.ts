@@ -50,5 +50,5 @@ export async function updateMe(patch: {
  * is a no-op for stateless bearer tokens. */
 export function logout(): void {
   setStoredToken(null);
-  window.dispatchEvent(new Event("aicc:auth:logout"));
+  window.dispatchEvent(new Event("tianshu:auth:logout"));
 }

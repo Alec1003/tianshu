@@ -8,7 +8,7 @@ from typing import Any
 from app.ai.mcp_client import MCPClientSkeleton
 from app.ai.models import AgentExecutionSummary, SkillExecutionResult
 from app.ai.openclaw_sdk_adapter import OpenClawSDKAdapter
-from app.ai.skill_registry import AICCSkillRegistry
+from app.ai.skill_registry import TianShuSkillRegistry
 
 
 UUID_RE = re.compile(
@@ -37,7 +37,7 @@ class PlannedSkillCall:
     source_text: str
 
 
-class AICCCommanderAgent:
+class TianShuCommanderAgent:
     """天枢平台指挥智能体（OpenClaw 嵌入式适配层）。"""
 
     SYSTEM_PROMPT = """
@@ -56,7 +56,7 @@ class AICCCommanderAgent:
 
     def __init__(
         self,
-        skill_registry: AICCSkillRegistry,
+        skill_registry: TianShuSkillRegistry,
         mcp_client: MCPClientSkeleton,
         sdk_adapter: OpenClawSDKAdapter | None = None,
     ) -> None:

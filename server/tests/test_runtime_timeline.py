@@ -4,8 +4,8 @@ import asyncio
 
 import pytest
 
-from app.aicc_runtime.schemas import RuntimeTimelineEventRead
-from app.aicc_runtime.timeline import (
+from app.tianshu_runtime.schemas import RuntimeTimelineEventRead
+from app.tianshu_runtime.timeline import (
     diff_runtime_unit_changes,
     list_runtime_events,
     record_runtime_event,
@@ -133,6 +133,55 @@ async def test_runtime_events_are_listed_in_replay_order(db_session, user) -> No
     assert first is not None
     assert second is not None
     assert [row.id for row in rows] == [first.id, second.id]
+
+
+@pytest.mark.anyio
+async def test_runtime_events_can_list_latest_window_in_replay_order(
+    db_session,
+    user,
+) -> None:
+    first = await record_runtime_event(
+        db_session,
+        user,
+        event_type="runtime.start",
+        action="start",
+        summary="first",
+        before_scenario=_scenario(1, []),
+        after_scenario=_scenario(1, []),
+    )
+    await asyncio.sleep(0.001)
+    second = await record_runtime_event(
+        db_session,
+        user,
+        event_type="runtime.step",
+        action="step",
+        summary="second",
+        before_scenario=_scenario(2, []),
+        after_scenario=_scenario(2, []),
+    )
+    await asyncio.sleep(0.001)
+    third = await record_runtime_event(
+        db_session,
+        user,
+        event_type="runtime.pause",
+        action="pause",
+        summary="third",
+        before_scenario=_scenario(3, []),
+        after_scenario=_scenario(3, []),
+    )
+
+    rows = await list_runtime_events(
+        db_session,
+        user,
+        scenario_id="scenario-a",
+        limit=2,
+        latest=True,
+    )
+
+    assert first is not None
+    assert second is not None
+    assert third is not None
+    assert [row.id for row in rows] == [second.id, third.id]
 
 
 @pytest.mark.anyio

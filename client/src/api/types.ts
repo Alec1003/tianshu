@@ -17,17 +17,6 @@ export interface AuthTokenResponse {
 
 export type ScenarioStatus = "draft" | "running" | "completed";
 
-export interface ScenarioBranchMeta {
-  parent_scenario_id: string;
-  parent_scenario_name: string;
-  root_scenario_id: string;
-  root_scenario_name: string;
-  branch_label: string;
-  branch_depth: number;
-  created_from_version?: number | null;
-  created_at?: string | null;
-}
-
 export interface ScenarioListItem {
   id: string;
   name: string;
@@ -36,7 +25,6 @@ export interface ScenarioListItem {
   owner_id: string | null;
   version: number;
   status: ScenarioStatus;
-  branch_meta?: ScenarioBranchMeta | null;
   mission_count: number;
   unit_count: number;
   side_count: number;
@@ -164,130 +152,112 @@ export interface TrainingScoreRecord {
   created_at: string;
 }
 
-export interface ScenarioBranchCreatePayload {
-  name?: string;
-  description?: string;
-  branch_label?: string;
-  status?: ScenarioStatus;
-  data?: Record<string, unknown>;
-}
-
-export interface ScenarioCompareItem extends ScenarioListItem {
-  training_score: TrainingScoreResponse;
-  timeline_event_count: number;
-  latest_event_at?: string | null;
-  aar_count: number;
-  latest_aar_at?: string | null;
-}
-
-export interface ScenarioCompareResponse {
-  baseline_id: string;
-  generated_at: string;
-  items: ScenarioCompareItem[];
-}
-
-export interface ScenarioCompareSnapshotSource {
-  id: string;
-  label: string;
-  archived_record_id: string | null;
-}
-
-export interface ScenarioCompareSnapshotScore {
-  overall_score: number;
-  grade: string;
-  confidence: string;
-  generated_at: string;
-}
-
-export interface ScenarioCompareSnapshotDeltas {
-  versus_baseline: number | null;
-  versus_latest_archived: number | null;
-  versus_live: number | null;
-}
-
-export interface ScenarioCompareSnapshotSummary {
-  mission_count: number;
-  unit_count: number;
-  timeline_event_count: number;
-  aar_count: number;
-}
-
-export interface ScenarioCompareSnapshotItem {
-  id: string;
-  name: string;
-  baseline: boolean;
-  source: ScenarioCompareSnapshotSource;
-  score: ScenarioCompareSnapshotScore;
-  score_deltas: ScenarioCompareSnapshotDeltas;
-  summary: ScenarioCompareSnapshotSummary;
-}
-
-export interface ScenarioCompareSnapshot {
-  generated_at: string;
-  baseline_id: string;
-  baseline_name: string;
-  items: ScenarioCompareSnapshotItem[];
-}
-
-export interface ScenarioCompareReportCreatePayload {
-  title?: string;
-  baseline_id: string;
-  scenario_ids: string[];
-  snapshot: ScenarioCompareSnapshot;
-}
-
-export interface ScenarioCompareReport {
-  id: string;
-  owner_id: string | null;
-  title: string;
-  baseline_scenario_id: string;
-  scenario_ids: string[];
-  snapshot: ScenarioCompareSnapshot;
-  created_at: string;
-}
-
-export interface ScenarioCompareSessionState {
-  baseline_id: string;
-  selected_sources: Record<string, string>;
-}
-
-export interface ScenarioCompareSessionCreatePayload {
-  title?: string;
-  source_scenario_id?: string | null;
-  baseline_id: string;
-  scenario_ids: string[];
-  state: ScenarioCompareSessionState;
-}
-
-export interface ScenarioCompareSessionUpdatePayload {
-  title?: string;
-  baseline_id?: string;
-  scenario_ids?: string[];
-  state?: ScenarioCompareSessionState;
-}
-
-export interface ScenarioCompareSession {
-  id: string;
-  owner_id: string | null;
-  title: string;
-  source_scenario_id: string | null;
-  baseline_scenario_id: string;
-  scenario_ids: string[];
-  state: ScenarioCompareSessionState;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface ScenarioCompareForkCreatePayload {
-  branch_count?: number;
-}
-
 export interface SkillExecutionResult {
   skill: string;
   status: "ok" | "error";
   parameters: Record<string, unknown>;
   output?: Record<string, unknown>;
   error?: string | null;
+}
+
+export interface RegisteredSkill {
+  name: string;
+  description: string;
+  parameters?: Record<string, unknown>;
+}
+
+export interface SkillSchemaField {
+  name: string;
+  type: string;
+  required: boolean;
+  description: string;
+}
+
+export interface CustomSkill {
+  id: string;
+  name: string;
+  description: string;
+  prompt: string;
+  source: "custom";
+  version: string;
+  enabled: boolean;
+  readonly: boolean;
+  inputSchema: SkillSchemaField[];
+  outputSchema: SkillSchemaField[];
+  usageCount: number;
+  lastUsedAt: string | null;
+  createdBy: string;
+  updatedAt: string;
+}
+
+export interface CustomSkillCreatePayload {
+  name: string;
+  description?: string;
+  prompt?: string;
+  inputSchema?: SkillSchemaField[];
+  outputSchema?: SkillSchemaField[];
+  enabled?: boolean;
+}
+
+export interface CustomSkillUpdatePayload {
+  name?: string;
+  description?: string;
+  prompt?: string;
+  inputSchema?: SkillSchemaField[];
+  outputSchema?: SkillSchemaField[];
+  enabled?: boolean;
+}
+
+export interface CustomSkillListResponse {
+  skills: CustomSkill[];
+  skillsDir: string;
+}
+
+export type ExternalMcpTransport = "stdio" | "sse" | "http";
+
+export interface ExternalMcpValidateRequest {
+  name: string;
+  transport: ExternalMcpTransport;
+  endpoint?: string;
+  command?: string;
+  args?: string[];
+  url?: string;
+  env?: Record<string, string>;
+  headers?: Record<string, string>;
+  allowedTools?: string[];
+  enabled?: boolean;
+  timeoutSeconds?: number;
+}
+
+export interface ExternalMcpTool {
+  server: string;
+  name: string;
+  description: string;
+  inputSchema: Record<string, unknown>;
+  outputSchema?: Record<string, unknown>;
+}
+
+export interface ExternalMcpTrace {
+  action: string;
+  target: string;
+  status: "pending" | "ok" | "error";
+  message: string;
+}
+
+export interface ExternalMcpValidateResponse {
+  ok: boolean;
+  server: string;
+  transport: "stdio" | "streamable_http";
+  message: string;
+  tools: ExternalMcpTool[];
+  trace: ExternalMcpTrace[];
+}
+
+export interface BuiltinMcpToolsResponse {
+  ok: boolean;
+  server: string;
+  message: string;
+  tools: ExternalMcpTool[];
 }
 
 export interface StructuredCommandStep {
@@ -298,6 +268,33 @@ export interface StructuredCommandStep {
   summary: string;
   risk: "low" | "medium" | "high";
   writes_runtime: boolean;
+}
+
+export interface InternalSkillMissionDraft {
+  type: "patrol" | "strike" | "move";
+  name: string;
+  assigned_unit_ids: string[];
+  reference_point_ids?: string[];
+  assigned_target_ids?: string[];
+  route?: number[][];
+  notes?: string;
+}
+
+export interface InternalSkillDraft {
+  name: string;
+  description?: string;
+  side_id?: string;
+  trigger_phrases?: string[];
+  constraints?: string[];
+  allowed_runtime_skills?: string[];
+  missions: InternalSkillMissionDraft[];
+  expires_at?: string | null;
+  allow_duplicate_assignments?: boolean;
+}
+
+export interface InternalSkillProposalRequest {
+  draft: InternalSkillDraft;
+  command?: string;
 }
 
 export interface CommandAdjudicationIssue {
@@ -318,7 +315,7 @@ export interface CommandAdjudicationResult {
 export interface CommandProposal {
   id: string;
   command: string;
-  source: "regex" | "llm_tool" | "api" | "mcp";
+  source: "regex" | "llm_tool" | "llm_plan" | "api" | "mcp" | "internal_skill";
   status:
     | "pending"
     | "blocked"
@@ -331,12 +328,18 @@ export interface CommandProposal {
   updated_at: string;
   steps: StructuredCommandStep[];
   adjudication: CommandAdjudicationResult;
+  plan_metadata?: Record<string, unknown>;
   execution: SkillExecutionResult[];
   error?: string | null;
 }
 
 export interface CommandProposalListResponse {
   proposals: CommandProposal[];
+}
+
+export interface InternalSkillProposalResponse {
+  draft: InternalSkillDraft;
+  proposal: CommandProposal;
 }
 
 export interface CommandApprovalResponse {

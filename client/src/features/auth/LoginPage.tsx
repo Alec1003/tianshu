@@ -19,6 +19,7 @@ import {
 
 import { ApiError } from "@/api/client";
 import BrandLogo from "@/components/brand/BrandLogo";
+import ThemeModeToggle from "@/components/theme/ThemeModeToggle";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -102,7 +103,7 @@ export default function LoginPage() {
   const isRegister = tab === "register";
 
   return (
-    <main className="dark min-h-dvh overflow-y-auto overflow-x-hidden bg-tactical-bg text-slate-100 lg:overflow-hidden">
+    <main className="min-h-dvh overflow-y-auto overflow-x-hidden bg-tactical-bg text-slate-100 lg:overflow-hidden">
       <div className="relative min-h-dvh overflow-hidden">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_16%,rgba(103,199,216,0.07),transparent_30%),radial-gradient(circle_at_74%_24%,rgba(148,163,184,0.06),transparent_34%),linear-gradient(135deg,#0a1018_0%,#04070d_54%,#02050a_100%)]" />
         <div className="absolute inset-0 tactical-grid" />
@@ -110,7 +111,10 @@ export default function LoginPage() {
 
         <div className="relative grid min-h-dvh w-full grid-cols-1 lg:grid-cols-[minmax(0,7fr)_minmax(430px,3fr)]">
           <section className="relative flex min-h-[360px] flex-col px-6 py-6 sm:min-h-[520px] sm:px-10 lg:min-h-dvh lg:px-16 xl:px-20 2xl:px-24">
-            <BrandMark />
+            <div className="relative z-20 flex items-center justify-between gap-4">
+              <BrandMark />
+              <ThemeModeToggle />
+            </div>
 
             <div className="relative z-10 mt-9 max-w-4xl lg:mt-14 xl:mt-16">
               <div className="inline-flex rounded-md border border-tactical-line bg-white/[0.04] px-4 py-1 text-[11px] font-medium tracking-[0.12em] text-slate-300 sm:text-xs">

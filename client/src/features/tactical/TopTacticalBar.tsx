@@ -13,6 +13,7 @@ import {
   UserCircle,
 } from "lucide-react";
 import BrandLogo from "@/components/brand/BrandLogo";
+import ThemeModeToggle from "@/components/theme/ThemeModeToggle";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/features/auth/useAuth";
 import type { SimulationSnapshot } from "./SimulationSidebar";
@@ -346,6 +347,8 @@ export default function TopTacticalBar({
             AI 助手
           </span>
         </button>
+
+        <ThemeModeToggle className="size-8 text-slate-300 hover:text-slate-100" />
 
         <button
           aria-label={settingsOpen ? "关闭战术配置中心" : "打开战术配置中心"}

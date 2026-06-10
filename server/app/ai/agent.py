@@ -9,6 +9,7 @@ from app.ai.mcp_client import MCPClientSkeleton
 from app.ai.models import AgentExecutionSummary, SkillExecutionResult
 from app.ai.openclaw_sdk_adapter import OpenClawSDKAdapter
 from app.ai.skill_registry import TianShuSkillRegistry
+from app.tianshu_runtime.matching import canonical_aircraft_class_name
 
 
 UUID_RE = re.compile(
@@ -24,11 +25,6 @@ AIRCRAFT_MODEL_RE = re.compile(
     r"\b(?:F|J|Su|SU|MiG|MIG|KC|E|EA|A|B|H)-?\s?\d{1,3}[A-Za-z]?\b",
     flags=re.I,
 )
-AIRCRAFT_MODEL_ALIASES = {
-    "F-16": "F-16C",
-    "F16": "F-16C",
-}
-
 
 @dataclass
 class PlannedSkillCall:
@@ -481,7 +477,7 @@ class TianShuCommanderAgent:
             model_match = AIRCRAFT_MODEL_RE.search(text)
             if model_match:
                 model = model_match.group(0).replace(" ", "").upper()
-                return AIRCRAFT_MODEL_ALIASES.get(model, model)
+                return canonical_aircraft_class_name(model)
         return defaults.get(unit_type or "", "Unknown")
 
     @staticmethod

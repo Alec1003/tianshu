@@ -15,6 +15,7 @@ from app.ai.models import (
     StructuredCommandStep,
 )
 from app.ai.skill_registry import TianShuSkillRegistry
+from app.tianshu_runtime.matching import resolve_side_id as resolve_side_reference_id
 from app.tianshu_runtime.runtime import TianShuRuntime
 
 ALLOWED_SKILLS = {
@@ -694,9 +695,11 @@ class CommandRuleEngine:
     def _validate_side(
         self, step_id: str, side_ref: str
     ) -> list[CommandAdjudicationIssue]:
-        for side in self.runtime.game.current_scenario.sides:
-            if side.id == side_ref or side.name.lower() == side_ref.lower():
-                return []
+        if (
+            resolve_side_reference_id(self.runtime.game.current_scenario.sides, side_ref)
+            is not None
+        ):
+            return []
         return [
             self._issue(
                 "blocking",

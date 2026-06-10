@@ -31,6 +31,12 @@ export const ThemeModeProvider = ({
     if (typeof window !== "undefined") {
       writeStorageItem(STORAGE_KEY, mode);
     }
+    if (typeof document !== "undefined") {
+      const root = document.documentElement;
+      root.classList.toggle("dark", mode === "dark");
+      root.dataset.theme = mode;
+      root.style.colorScheme = mode;
+    }
   }, [mode]);
 
   const setMode = useCallback((next: TianShuThemeMode) => {

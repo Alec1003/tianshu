@@ -38,6 +38,10 @@ from app.tianshu_runtime._doctrine import (  # noqa: E402
     default_doctrine_for_sides as _default_doctrine_for_sides,
     normalize_scenario_payload as _normalize_scenario_payload_impl,
 )
+from app.tianshu_runtime.matching import (  # noqa: E402
+    canonical_aircraft_class_name,
+    resolve_side_id as resolve_side_reference_id,
+)
 
 
 DEFAULT_AIRCRAFT_WEAPON_KEYS = {
@@ -249,9 +253,12 @@ class TianShuRuntime:
 
     def _resolve_side_id(self, side_ref: str | None) -> str:
         if side_ref:
-            for side in self.game.current_scenario.sides:
-                if side.id == side_ref or side.name.lower() == side_ref.lower():
-                    return side.id
+            side_id = resolve_side_reference_id(
+                self.game.current_scenario.sides, side_ref
+            )
+            if side_id is not None:
+                return side_id
+            raise ValueError(f"Side not found in current scenario: {side_ref}")
         if self.game.current_side_id:
             return self.game.current_side_id
         if self.game.current_scenario.sides:
@@ -283,7 +290,7 @@ class TianShuRuntime:
 
     @classmethod
     def is_known_aircraft_class(cls, class_name: str) -> bool:
-        return cls._find_exact_db_row(AircraftDb, "class_name", class_name) is not None
+        return cls._resolve_aircraft_db_row(class_name) is not None
 
     @classmethod
     def is_known_ship_class(cls, class_name: str) -> bool:
@@ -296,6 +303,16 @@ class TianShuRuntime:
     @classmethod
     def is_known_airbase_class(cls, class_name: str) -> bool:
         return cls._find_exact_db_row(AirbaseDb, "name", class_name) is not None
+
+    @classmethod
+    def _resolve_aircraft_db_row(cls, class_name: str) -> dict[str, Any] | None:
+        row = cls._find_exact_db_row(AircraftDb, "class_name", class_name)
+        if row is not None:
+            return row
+        canonical_name = canonical_aircraft_class_name(class_name)
+        if canonical_name.lower() == class_name.strip().lower():
+            return None
+        return cls._find_exact_db_row(AircraftDb, "class_name", canonical_name)
 
     @staticmethod
     def _row_value(row: dict[str, Any], *keys: str, default: Any = None) -> Any:
@@ -729,17 +746,20 @@ class TianShuRuntime:
             row = (
                 template
                 if template is not None
-                else self._find_exact_db_row(AircraftDb, "class_name", class_name)
+                else self._resolve_aircraft_db_row(class_name)
             )
             if row is None:
                 raise ValueError(
                     f"Unknown aircraft class: {class_name}. Add it to the unit asset database before deployment."
                 )
+            resolved_class_name = str(
+                self._row_value(row, "class_name", "className", default=class_name)
+            )
             is_tanker = self._row_bool(row, "is_tanker", "isTanker")
             is_electronic_warfare = self._row_bool(
                 row, "is_electronic_warfare", "isElectronicWarfare"
             ) or any(
-                token in class_name.lower()
+                token in resolved_class_name.lower()
                 for token in (
                     "electronic",
                     "ewar",
@@ -753,9 +773,10 @@ class TianShuRuntime:
             )
             aircraft = Aircraft(
                 id=str(uuid4()),
-                name=name or f"{class_name} #{len(self.game.current_scenario.aircraft) + 1}",
+                name=name
+                or f"{resolved_class_name} #{len(self.game.current_scenario.aircraft) + 1}",
                 side_id=side_id,
-                class_name=class_name,
+                class_name=resolved_class_name,
                 latitude=latitude,
                 longitude=longitude,
                 altitude=altitude,

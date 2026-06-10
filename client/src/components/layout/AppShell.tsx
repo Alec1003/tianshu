@@ -45,7 +45,7 @@ function AppShell({
   return (
     <div
       className={cn(
-        "dark min-h-dvh overflow-hidden bg-tactical-bg bg-[radial-gradient(circle_at_18%_0%,rgba(103,199,216,0.045),transparent_32%),linear-gradient(180deg,#04070d_0%,#02050a_100%)] text-slate-100",
+        "min-h-dvh overflow-hidden bg-tactical-bg bg-[radial-gradient(circle_at_18%_0%,rgba(103,199,216,0.045),transparent_32%),linear-gradient(180deg,#04070d_0%,#02050a_100%)] text-slate-100",
         className
       )}
     >

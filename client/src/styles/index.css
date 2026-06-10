@@ -41,6 +41,44 @@
     color-scheme: dark;
   }
 
+  :root[data-theme="light"] {
+    --background: 42 31% 94%;
+    --foreground: 220 22% 13%;
+    --card: 42 28% 98%;
+    --card-foreground: 220 22% 13%;
+    --popover: 42 28% 98%;
+    --popover-foreground: 220 22% 13%;
+    --primary: 188 37% 42%;
+    --primary-foreground: 42 28% 98%;
+    --secondary: 215 22% 88%;
+    --secondary-foreground: 220 22% 13%;
+    --muted: 215 20% 88%;
+    --muted-foreground: 219 13% 38%;
+    --accent: 188 37% 42%;
+    --accent-foreground: 42 28% 98%;
+    --destructive: 7 52% 48%;
+    --destructive-foreground: 42 28% 98%;
+    --border: 215 18% 76%;
+    --input: 215 22% 89%;
+    --ring: 188 37% 42%;
+    --surface-base: #eef1f3;
+    --surface-panel: #f8faf9;
+    --surface-panel-strong: #ffffff;
+    --surface-control: #e8edf0;
+    --surface-control-muted: rgba(226, 232, 240, 0.72);
+    --border-subtle: rgba(71, 85, 105, 0.2);
+    --border-active: rgba(45, 130, 145, 0.38);
+    --text-muted: #475569;
+    --text-subtle: #64748b;
+    --accent-command: #2d8291;
+    --shadow-panel: 0 18px 44px rgba(15, 23, 42, 0.12);
+    --state-live: #3f8f5c;
+    --state-warning: #a3711f;
+    --state-danger: #b4493a;
+    --state-info: #2d8291;
+    color-scheme: light;
+  }
+
   * {
     @apply border-border;
   }

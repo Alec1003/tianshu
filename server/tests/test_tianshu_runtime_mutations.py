@@ -107,6 +107,39 @@ def test_deploy_aircraft_rejects_unknown_class_without_template() -> None:
     assert runtime.game.current_scenario.aircraft == []
 
 
+def test_deploy_aircraft_accepts_alias_and_localized_blue_side() -> None:
+    runtime = _runtime()
+    runtime.game.current_scenario.sides = [
+        Side(id="blue-localized", name="蓝方", color="blue"),
+        Side(id="red", name="RED", color="red"),
+    ]
+    runtime.game.current_side_id = "blue-localized"
+
+    state = runtime.deploy_aircraft(
+        "F-22",
+        latitude=10.0,
+        longitude=20.0,
+        side="BLUE",
+    )
+
+    aircraft = runtime.game.current_scenario.get_aircraft(state["unitId"])
+    assert aircraft is not None
+    assert aircraft.side_id == "blue-localized"
+    assert aircraft.class_name == "F-22 Raptor"
+
+
+def test_deploy_aircraft_rejects_unknown_side_reference() -> None:
+    runtime = _runtime()
+
+    with pytest.raises(ValueError, match="Side not found in current scenario"):
+        runtime.deploy_aircraft(
+            "F-35A Lightning II",
+            latitude=10.0,
+            longitude=20.0,
+            side="purple",
+        )
+
+
 @pytest.mark.parametrize(
     ("method_name", "collection_name", "message"),
     [

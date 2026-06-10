@@ -6,11 +6,12 @@ import pytest
 
 from app.ai.command_governance import CommandApprovalQueue
 from app.ai.models import StructuredCommandStep
+from app.tianshu_runtime.matching import canonical_aircraft_class_name
 
 
 class FakeScenario:
     def __init__(self) -> None:
-        self.sides = [SimpleNamespace(id="blue", name="BLUE")]
+        self.sides = [SimpleNamespace(id="blue", name="BLUE", color="blue")]
         self.aircraft = [
             SimpleNamespace(
                 id="air-1",
@@ -57,7 +58,10 @@ class FakeRuntime:
         self.game = SimpleNamespace(current_scenario=FakeScenario())
 
     def is_known_aircraft_class(self, class_name: str) -> bool:
-        return class_name == "F-35A Lightning II"
+        return canonical_aircraft_class_name(class_name) in {
+            "F-35A Lightning II",
+            "F-22 Raptor",
+        }
 
     def is_known_ship_class(self, class_name: str) -> bool:
         return class_name == "Destroyer"
@@ -169,6 +173,39 @@ def test_unknown_aircraft_deploy_is_blocked_before_approval() -> None:
     with pytest.raises(ValueError):
         queue.approve_and_execute(proposal.id)
     assert registry.calls == []
+
+
+def test_aircraft_alias_and_localized_blue_side_pass_governance() -> None:
+    registry = FakeRegistry()
+    runtime = FakeRuntime()
+    runtime.game.current_scenario.sides = [
+        SimpleNamespace(id="blue", name="蓝方", color="blue")
+    ]
+    queue = CommandApprovalQueue(runtime, registry)  # type: ignore[arg-type]
+
+    proposal = queue.create_proposal(
+        command="deploy blue-side f-22",
+        source="llm_tool",
+        steps=[
+            StructuredCommandStep(
+                id="s1",
+                skill="deploy_aircraft",
+                parameters={
+                    "class_name": "F-22",
+                    "latitude": 10.0,
+                    "longitude": 20.0,
+                    "side": "BLUE",
+                },
+            )
+        ],
+    )
+
+    assert proposal.status == "pending"
+    assert proposal.adjudication.status == "needs_review"
+    assert not any(
+        issue.code in {"unknown_aircraft_class", "side_not_found"}
+        for issue in proposal.adjudication.issues
+    )
 
 
 def test_unknown_ship_deploy_is_blocked_before_approval() -> None:

@@ -74,6 +74,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { SearchInput } from "@/components/ui/search-input";
 import { StatCard } from "@/components/ui/stat-card";
 import { TabButton, Tabs } from "@/components/ui/tabs";
+import ThemeModeToggle from "@/components/theme/ThemeModeToggle";
 import { Toolbar, ToolbarGroup } from "@/components/ui/toolbar";
 import { useAuth } from "@/features/auth/useAuth";
 import Dba from "@/game/db/Dba";
@@ -563,15 +564,18 @@ export default function ScenarioListPage() {
       }
       title={activeCopy.title}
       topRight={
-        <AccountMenu
-          userEmail={user?.email}
-          displayName={user?.display_name || user?.email || "Operator"}
-          isSuperuser={Boolean(user?.is_superuser)}
-          accountOpen={accountOpen}
-          setAccountOpen={setAccountOpen}
-          accountRef={accountRef}
-          onLogout={logout}
-        />
+        <div className="flex items-center gap-2">
+          <ThemeModeToggle />
+          <AccountMenu
+            userEmail={user?.email}
+            displayName={user?.display_name || user?.email || "Operator"}
+            isSuperuser={Boolean(user?.is_superuser)}
+            accountOpen={accountOpen}
+            setAccountOpen={setAccountOpen}
+            accountRef={accountRef}
+            onLogout={logout}
+          />
+        </div>
       }
     >
       <div className="space-y-4">

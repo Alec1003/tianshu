@@ -96,6 +96,10 @@ import {
   writeStorageItem,
 } from "@/lib/legacyStorage";
 import TacticalSettingsModal from "./TacticalSettingsModal";
+import {
+  buildChatRequestHeaders,
+  formatChatError as formatChatTransportError,
+} from "./chatTransport";
 
 export type AISidebarTab = "chat" | "settings";
 type AIChatMode = "ask" | "command";
@@ -741,21 +745,14 @@ export default function AISidebar({
       new DefaultChatTransport({
         api: "/api/ai/chat",
         headers: () => {
-          const m = modelConfigRef.current;
-          const h: Record<string, string> = {};
           const token = getStoredToken();
-          if (token) h.Authorization = `Bearer ${token}`;
-          if (modelProviderIdRef.current) {
-            h["X-TianShu-Model-Provider-Id"] = modelProviderIdRef.current;
-          }
-          if (m.provider) h["X-TianShu-Model-Provider"] = m.provider;
-          if (m.model) h["X-TianShu-Model-Name"] = m.model;
-          if (m.baseUrl) h["X-TianShu-Model-Base-Url"] = m.baseUrl;
-          if (scenarioIdRef.current) {
-            h["X-TianShu-Scenario-Id"] = scenarioIdRef.current;
-          }
-          h["X-TianShu-Chat-Mode"] = chatModeRef.current;
-          return h;
+          return buildChatRequestHeaders({
+            chatMode: chatModeRef.current,
+            modelConfig: modelConfigRef.current,
+            modelProviderId: modelProviderIdRef.current,
+            scenarioId: scenarioIdRef.current,
+            token,
+          });
         },
       }),
     []
@@ -1723,7 +1720,7 @@ function ChatPanel({
   onRejectProposal,
   onSubmit,
 }: ChatPanelProps) {
-  const chatErrorMessage = chatError ? formatChatError(chatError) : "";
+  const chatErrorMessage = chatError ? formatChatTransportError(chatError) : "";
   const proposalById = useMemo(
     () => new Map(commandProposals.map((proposal) => [proposal.id, proposal])),
     [commandProposals]

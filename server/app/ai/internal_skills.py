@@ -8,6 +8,7 @@ from app.ai.models import (
     InternalSkillMissionDraft,
     StructuredCommandStep,
 )
+from app.tianshu_runtime.matching import resolve_side_id as resolve_side_reference_id
 from app.tianshu_runtime.runtime import TianShuRuntime
 
 INTERNAL_SKILL_ALLOWED_RUNTIME_SKILLS = {
@@ -122,9 +123,9 @@ def _step(
 def _resolve_side_id(scenario: Any, side_ref: str) -> str:
     if not side_ref:
         return ""
-    for side in scenario.sides:
-        if side.id == side_ref or side.name.lower() == side_ref.lower():
-            return side.id
+    side_id = resolve_side_reference_id(scenario.sides, side_ref)
+    if side_id is not None:
+        return side_id
     raise ValueError(f"Side not found in current scenario: {side_ref}")
 
 

@@ -1133,7 +1133,7 @@ export default function AITacticalCommandPlatform({
 
   return (
     <div
-      className="dark h-dvh overflow-hidden bg-tactical-bg text-tactical-text lg:grid"
+      className="h-dvh overflow-hidden bg-tactical-bg text-tactical-text lg:grid"
       style={{
         gridTemplateColumns: [
           "64px",

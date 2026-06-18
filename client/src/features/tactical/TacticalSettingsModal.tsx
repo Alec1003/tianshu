@@ -302,7 +302,7 @@ function getImportedEndpoint(
   const commandLine = [command, ...args].filter(Boolean).join(" ");
   if (commandLine) return commandLine;
 
-  return transport === "stdio" ? "" : "http://localhost:3000/mcp";
+  return transport === "stdio" ? "" : "http://localhost:3002/api/mcp/";
 }
 
 function parseMcpServerConfigJson(raw: string): MCPServerImportPayload[] {

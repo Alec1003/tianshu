@@ -4,7 +4,7 @@ This file provides guidance to Codex (Codex.ai/code) when working with code in t
 
 ## Project overview
 
-TianShu is a tactical scenario / wargame platform: a React + Cesium frontend on port 3000 talks to a FastAPI backend on port 8000 that wraps a Python `gym/blade` simulation engine. Natural-language commands flow through an OpenClaw-style "TianShu" bridge into a skill registry that mutates the live scenario. The same backend also exposes an MCP server (stdio + Streamable HTTP at `/api/mcp/`) so external LLMs (Codex Desktop, Cursor) drive the *same* runtime instance the browser is rendering.
+TianShu is a tactical scenario / wargame platform: a React + Cesium frontend on port 3002 talks to a FastAPI backend on port 8000 that wraps a Python `gym/blade` simulation engine. Natural-language commands flow through an OpenClaw-style "TianShu" bridge into a skill registry that mutates the live scenario. The same backend also exposes an MCP server (stdio + Streamable HTTP at `/api/mcp/`) so external LLMs (Codex Desktop, Cursor) drive the *same* runtime instance the browser is rendering.
 
 ## Common commands
 
@@ -12,10 +12,10 @@ Run from `client/` unless noted.
 
 | Command | Purpose |
 | --- | --- |
-| `docker compose up --build` (repo root) | Build + run frontend (`:3000`) and backend (`:8000`). |
+| `docker compose up --build` (repo root) | Build + run frontend (`:3002`) and backend (`:8000`). |
 | `docker compose up --build -d client` (repo root) | Rebuild the Nginx-served frontend bundle after client source/UI changes, then restart the client container. |
 | `.\server\start-ai-server.ps1` / `.\server\stop-ai-server.ps1` | Launch / kill backend via in-repo `.python312\python.exe`. PID + logs land under `server\.ai_server.*`. |
-| `npm run dev` | Vite dev server on port 3000. Copy `.env.example` to `.env.local` first. |
+| `npm run dev` | Vite dev server on port 3002. Copy `.env.example` to `.env.local` first. |
 | `npm run build` | TS check (`tsc -b`) + production Vite build. |
 | `npm run lint` | ESLint. |
 | `npm run test` | Vitest (single run); `npm run test:watch` for watch mode. |
@@ -72,7 +72,7 @@ The MCP server and `/api/ai/command` operate on the **same** `TianShuRuntime` in
 
 ### Frontend ↔ backend URL plumbing
 
-- Dev: Vite serves on `:3000`, frontend reads `VITE_AI_SERVER_URL=http://127.0.0.1:8000` from `.env.local`, and hits the backend cross-origin. Backend CORS is explicit and comes from `TIANSHU_CORS_ORIGINS`; wildcard origins are rejected.
+- Dev: Vite serves on `:3002`, frontend reads `VITE_AI_SERVER_URL=http://127.0.0.1:8000` from `.env.local`, and hits the backend cross-origin. Backend CORS is explicit and comes from `TIANSHU_CORS_ORIGINS`; wildcard origins are rejected.
 - Prod (docker-compose): `VITE_AI_SERVER_URL=""` in the build args; nginx in the client container reverse-proxies `/api/*` to the server.
 
 ### Electron desktop package
@@ -109,10 +109,10 @@ Frontend (see `client/.env.example`): `VITE_AI_SERVER_URL`, `VITE_API_SERVER_URL
 
 ## Development notes
 
-- Platform entry point is `http://localhost:3000/` — no `?map=ol` query param needed; default map is `CesiumScenarioMap`.
+- Platform entry point is `http://localhost:3002/` — no `?map=ol` query param needed; default map is `CesiumScenarioMap`.
 - Cesium can double-initialize under React `StrictMode` (WebGL); the current entry deliberately omits StrictMode.
 - On Windows + Docker bind mounts, file watching can be flaky; Vite is configured with polling for HMR.
-- When the user is viewing the Docker-served frontend, client source/UI changes are not visible after `docker compose restart client` alone. The client container serves static Nginx assets built into the image, so run `npm.cmd run build` from `client/` when useful, then `docker compose up --build -d client`, and verify `docker compose ps`, `http://localhost:3000/`, and `http://localhost:8000/health`.
+- When the user is viewing the Docker-served frontend, client source/UI changes are not visible after `docker compose restart client` alone. The client container serves static Nginx assets built into the image, so run `npm.cmd run build` from `client/` when useful, then `docker compose up --build -d client`, and verify `docker compose ps`, `http://localhost:3002/`, and `http://localhost:8000/health`.
 - `runtime_step(steps=N)` is capped at 7200 (= 2 simulation hours) per call. Loop for longer runs.
 - Single-process / single-runtime: each `python -m app.mcp` invocation owns its own runtime; HTTP MCP shares the FastAPI bridge runtime. There is no multi-tenant runtime registry yet.
 - Coding style is enforced by ESLint + Prettier (client) and pytest's `filterwarnings = ignore::DeprecationWarning` (server, to silence fastapi-users 14 + SQLAlchemy 2 noise). Match underscore-prefix conventions for private members and follow the existing camelCase / snake_case split (TS vs Python).

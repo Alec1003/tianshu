@@ -15,7 +15,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from app.compat import install_legacy_env_aliases
 
-DEFAULT_CORS_ORIGINS = "http://localhost:3000,http://127.0.0.1:3000"
+DEFAULT_CORS_ORIGINS = "http://localhost:3002,http://127.0.0.1:3002"
 DEFAULT_DATABASE_URL = "sqlite+aiosqlite:///./data/tianshu.db"
 DEFAULT_SKILLS_DIR = "./data/skills"
 DEFAULT_JWT_SECRET = "tianshu-dev-secret-change-me-in-production"

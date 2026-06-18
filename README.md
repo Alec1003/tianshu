@@ -1,6 +1,6 @@
 # 天枢平台
 
-天枢平台是一个面向作战想定推演、态势显示和大模型辅助指挥的 Web 平台。当前主入口是 `http://localhost:3000/`，前端以 Cesium 地图为核心承载想定场景，后端提供嵌入式 AI 指令执行能力。
+天枢平台是一个面向作战想定推演、态势显示和大模型辅助指挥的 Web 平台。当前主入口是 `http://localhost:3002/`，前端以 Cesium 地图为核心承载想定场景，后端提供嵌入式 AI 指令执行能力。
 
 本 README 以当前仓库代码为准，已移除旧平台官网、Discord 和过期本地路径说明。
 
@@ -22,7 +22,7 @@
 | 前端 | React 18、Vite 6、TypeScript、Cesium、MUI、i18next、Vitest |
 | 后端 | Python 3.12、FastAPI、Uvicorn、Pydantic、Gymnasium |
 | AI/指挥 | 天枢平台 command bridge、runtime skill registry |
-| 部署 | Docker Compose、前端端口 `3000`、后端端口 `8000` |
+| 部署 | Docker Compose、前端端口 `3002`、后端端口 `8000` |
 
 ## 快速启动
 
@@ -38,7 +38,7 @@ docker compose up --build
 
 | 服务 | 地址 |
 | --- | --- |
-| 前端平台 | `http://localhost:3000/` |
+| 前端平台 | `http://localhost:3002/` |
 | AI 后端健康检查 | `http://localhost:8000/health` |
 
 停止服务：
@@ -70,7 +70,7 @@ Copy-Item .env.example .env.local
 npm run dev
 ```
 
-前端默认运行在 `http://localhost:3000/`。如果 AI 后端端口调整，请同步修改 `client/.env.local` 中的 `VITE_AI_SERVER_URL`。
+前端默认运行在 `http://localhost:3002/`。如果 AI 后端端口调整，请同步修改 `client/.env.local` 中的 `VITE_AI_SERVER_URL`。
 
 ## 环境变量
 
@@ -110,7 +110,7 @@ FastAPI 后端默认监听 `8000`：
 | 根目录 | `docker compose down` | 停止 Docker 服务。 |
 | 根目录 | `.\server\start-ai-server.ps1` | 使用仓库内 Python 运行 AI 后端。 |
 | 根目录 | `.\server\stop-ai-server.ps1` | 停止脚本启动的 AI 后端。 |
-| `client` | `npm run dev` | 启动前端开发服务，端口 `3000`。 |
+| `client` | `npm run dev` | 启动前端开发服务，端口 `3002`。 |
 | `client` | `npm run build` | TypeScript 检查并构建生产包。 |
 | `client` | `npm run lint` | 运行 ESLint。 |
 | `client` | `npm run test` | 运行 Vitest 测试。 |
@@ -138,7 +138,7 @@ FastAPI 后端默认监听 `8000`：
 
 ## 开发注意事项
 
-- 平台主入口是 `http://localhost:3000/`，不需要额外的 `?map=ol` 参数。
+- 平台主入口是 `http://localhost:3002/`，不需要额外的 `?map=ol` 参数。
 - 当前主地图由 `CesiumScenarioMap` 承载，底图默认使用中文矢量图层。
 - Cesium 在 React 严格模式下可能触发 WebGL 双初始化问题，当前前端入口保留了非 StrictMode 集成方式。
 - Windows + Docker bind mount 下文件监听可能不稳定，Vite 配置已开启 polling 以保证 HMR。

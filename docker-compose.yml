@@ -38,7 +38,7 @@ services:
       TIANSHU_RESOURCE_DIR: "${TIANSHU_RESOURCE_DIR:-/app}"
       TIANSHU_USER_DATA_DIR: "${TIANSHU_USER_DATA_DIR:-/app/server/data}"
       TIANSHU_SKILLS_DIR: "${TIANSHU_SKILLS_DIR:-./data/skills}"
-      TIANSHU_CORS_ORIGINS: "${TIANSHU_CORS_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}"
+      TIANSHU_CORS_ORIGINS: "${TIANSHU_CORS_ORIGINS:-http://localhost:3002,http://127.0.0.1:3002}"
       TIANSHU_LLM_MODEL: "${TIANSHU_LLM_MODEL:-}"
       TIANSHU_LLM_API_KEY: "${TIANSHU_LLM_API_KEY:-}"
       TIANSHU_LLM_BASE_URL: "${TIANSHU_LLM_BASE_URL:-}"
@@ -66,7 +66,7 @@ services:
         VITE_API_SERVER_URL: ""
         VITE_AI_SERVER_URL: ""
     ports:
-      - "3000:3000"
+      - "3002:3002"
     restart: unless-stopped
     depends_on:
       server:

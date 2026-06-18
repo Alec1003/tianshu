@@ -48,7 +48,7 @@ export function setStoredToken(token: string | null): void {
 }
 
 function resolveBaseUrl(): string {
-  // In production the client is served by nginx (port 3000) and `/api/*` is
+  // In production the client is served by nginx (port 3002) and `/api/*` is
   // proxied to the server. In `npm run dev`, vite is the dev server and
   // there is NO proxy yet -- we fall back to the explicit AI server URL.
   const explicit = import.meta.env.VITE_AI_SERVER_URL as string | undefined;

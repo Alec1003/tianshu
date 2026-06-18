@@ -8,9 +8,9 @@
     "npm": "9.6.3 || >=10.5.0 <=10.9.2"
   },
   "scripts": {
-    "standalone": "vite --port 3000 --mode standalone",
-    "start": "vite --port 3000 --mode development",
-    "dev": "vite --port 3000 --mode development",
+    "standalone": "vite --port 3002 --mode standalone",
+    "start": "vite --port 3002 --mode development",
+    "dev": "vite --port 3002 --mode development",
     "build": "tsc -b && vite build --mode production",
     "lint": "eslint .",
     "format": "prettier --write .",

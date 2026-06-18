@@ -29,8 +29,8 @@ def test_default_skills_dir_points_to_server_data_folder() -> None:
 
 def test_parse_cors_origins_trims_deduplicates_and_strips_trailing_slash() -> None:
     assert parse_cors_origins(
-        " http://localhost:3000/ , https://app.example.com, http://localhost:3000 "
-    ) == ["http://localhost:3000", "https://app.example.com"]
+        " http://localhost:3002/ , https://app.example.com, http://localhost:3002 "
+    ) == ["http://localhost:3002", "https://app.example.com"]
 
 
 @pytest.mark.parametrize(
@@ -38,7 +38,7 @@ def test_parse_cors_origins_trims_deduplicates_and_strips_trailing_slash() -> No
     [
         "*",
         "https://app.example.com,*",
-        "localhost:3000",
+        "localhost:3002",
         "https://app.example.com/path",
         "https://app.example.com?x=1",
     ],
@@ -124,6 +124,8 @@ def test_production_accepts_hardened_settings() -> None:
         jwt_secret="x" * MIN_PRODUCTION_JWT_SECRET_LENGTH,
         model_config_secret="m" * MIN_PRODUCTION_MODEL_CONFIG_SECRET_LENGTH,
         first_user_is_superuser=False,
+        mcp_http_dev_user_id="",
+        mcp_user_id="",
     )
 
     validate_production_settings(settings)

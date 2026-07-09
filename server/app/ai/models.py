@@ -85,7 +85,7 @@ class ExternalMcpValidateRequest(BaseModel):
     headers: dict[str, str] = Field(default_factory=dict)
     allowedTools: list[str] = Field(default_factory=list, max_length=128)
     enabled: bool = True
-    timeoutSeconds: float = Field(default=10.0, ge=1.0)
+    timeoutSeconds: float = Field(default=240.0, ge=1.0)
 
 
 class ExternalMcpToolRead(BaseModel):

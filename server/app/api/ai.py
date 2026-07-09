@@ -1521,7 +1521,7 @@ def _external_mcp_config_from_payload(
         headers=dict(payload.headers),
         allowed_tools=list(payload.allowedTools),
         enabled=payload.enabled,
-        timeout_seconds=min(max(float(payload.timeoutSeconds), 1.0), 15.0),
+        timeout_seconds=min(max(float(payload.timeoutSeconds), 1.0), 300.0),
     )
 
 

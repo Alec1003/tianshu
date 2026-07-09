@@ -3,13 +3,18 @@ FROM python:3.12-slim AS base
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    NPM_CONFIG_REGISTRY=https://registry.npmmirror.com
 
 WORKDIR /app
 
-# system deps for shapely (libgeos)
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends build-essential libgeos-dev \
+# system deps for shapely (libgeos), plus node/npm/npx for external stdio MCP servers
+RUN sed -i \
+        -e 's#http://deb.debian.org/debian-security#https://mirrors.tuna.tsinghua.edu.cn/debian-security#g' \
+        -e 's#http://deb.debian.org/debian#https://mirrors.tuna.tsinghua.edu.cn/debian#g' \
+        /etc/apt/sources.list.d/debian.sources \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends build-essential libgeos-dev nodejs npm \
     && rm -rf /var/lib/apt/lists/*
 
 # install python deps first for layer caching

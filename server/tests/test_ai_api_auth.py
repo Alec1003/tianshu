@@ -405,7 +405,7 @@ def test_validate_external_mcp_server_returns_tools_without_secrets(monkeypatch)
             "endpoint": "python -m planner_mcp",
             "env": {"PLANNER_TOKEN": "secret"},
             "headers": {"Authorization": "Bearer secret"},
-            "timeoutSeconds": 60,
+            "timeoutSeconds": 240,
         },
     )
 
@@ -418,7 +418,7 @@ def test_validate_external_mcp_server_returns_tools_without_secrets(monkeypatch)
     server = captured["server"]
     assert server.command == "python"
     assert server.args == ["-m", "planner_mcp"]
-    assert server.timeout_seconds == 15.0
+    assert server.timeout_seconds == 240.0
 
 
 def test_list_builtin_mcp_tools_returns_registered_tianshu_tools() -> None:

@@ -46,6 +46,7 @@ services:
       TIANSHU_EXTERNAL_MCP_SERVERS: "${TIANSHU_EXTERNAL_MCP_SERVERS:-}"
     volumes:
       - server_data:/app/server/data
+      - npm_cache:/root/.npm
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/health').status==200 else 1)"]
@@ -76,3 +77,4 @@ volumes:
   # Named volumes keep data across image rebuilds; use `down -v` to wipe.
   server_data: {}
   postgres_data: {}
+  npm_cache: {}

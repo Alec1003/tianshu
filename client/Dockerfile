@@ -2,6 +2,8 @@ FROM node:20-alpine AS build
 
 WORKDIR /app
 
+ENV NPM_CONFIG_REGISTRY=https://registry.npmmirror.com
+
 ARG VITE_ENV=standalone
 ARG VITE_API_SERVER_URL=
 ARG VITE_AI_SERVER_URL=
@@ -13,7 +15,7 @@ ENV VITE_ENV=$VITE_ENV \
     VITE_CESIUM_ION_TOKEN=$VITE_CESIUM_ION_TOKEN
 
 COPY package*.json ./
-RUN npm ci
+RUN npm install --registry=https://registry.npmmirror.com --no-audit --no-fund
 
 COPY . .
 RUN npm run build

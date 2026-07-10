@@ -56,10 +56,11 @@ import {
   localizeSideName,
   localizeUnitName,
 } from "@/i18n/entityNames";
+import DocPanel from "./DocPanel";
 import { cn } from "@/lib/utils";
 
 export type SimulationRunState = "idle" | "running" | "paused";
-export type SimulationPanelId = "command" | "simulation" | "layers" | "assets";
+export type SimulationPanelId = "command" | "simulation" | "layers" | "assets" | "documents";
 
 export interface SimulationSideStats {
   id: string;
@@ -135,6 +136,8 @@ interface SimulationSidebarProps {
   onNewScenario: () => void;
   onLoadDemoScenario: () => void;
   onLoadSCSScenario: () => void;
+  previewFile: string | null;
+  onPreview: (filename: string) => void;
   onImportScenario: () => void;
   onExportScenario: () => void;
 }
@@ -171,6 +174,11 @@ const panelMeta: Record<
     eyebrow: "Assets",
     title: "作战单位",
     description: "天枢平台场景对象和可见单位统计",
+  },
+  documents: {
+    eyebrow: "Documents",
+    title: "文档中心",
+    description: "AI 生成的 Word 文档",
   },
 };
 
@@ -1097,6 +1105,8 @@ export default function SimulationSidebar({
   onLoadSCSScenario,
   onImportScenario,
   onExportScenario,
+  previewFile,
+  onPreview,
 }: SimulationSidebarProps) {
   const scenario = game.currentScenario;
   const meta = panelMeta[activePanel];
@@ -1684,6 +1694,15 @@ export default function SimulationSidebar({
     );
   }
 
+  function renderDocumentsPanel() {
+    return (
+      <DocPanel
+        previewFile={previewFile}
+        onPreview={onPreview}
+      />
+    );
+  }
+
   function renderAssetsPanel() {
     return (
       <>
@@ -1771,6 +1790,7 @@ export default function SimulationSidebar({
           {activePanel === "simulation" && renderSimulationPanel()}
           {activePanel === "layers" && renderLayersPanel()}
           {activePanel === "assets" && renderAssetsPanel()}
+          {activePanel === "documents" && renderDocumentsPanel()}
         </div>
       </div>
 

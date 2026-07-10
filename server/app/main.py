@@ -113,6 +113,72 @@ def create_app() -> FastAPI:
     def health() -> dict:
         return {"status": "ok"}
 
+    @app.get("/api/doc/download/{filename}")
+    async def download_doc(filename: str):
+        from pathlib import Path
+        from fastapi.responses import FileResponse, JSONResponse
+        filepath = Path("/doc_output") / filename
+        if not filepath.exists():
+            return JSONResponse({"error": "File not found"}, status_code=404)
+        return FileResponse(str(filepath), filename=filename)
+
+    @app.get("/api/doc/list")
+    async def list_docs():
+        from pathlib import Path
+        from datetime import datetime
+        output_dir = Path("/doc_output")
+        if not output_dir.exists():
+            return {"files": []}
+        files = []
+        for f in sorted(output_dir.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True):
+            if f.is_file():
+                stat = f.stat()
+                files.append({
+                    "name": f.name,
+                    "size_bytes": stat.st_size,
+                    "size_kb": round(stat.st_size / 1024, 1),
+                    "modified": datetime.fromtimestamp(stat.st_mtime).isoformat(),
+                })
+        return {"files": files}
+
+    @app.get("/api/doc/preview/{filename}")
+    async def preview_doc(filename: str):
+        from pathlib import Path
+        from fastapi.responses import JSONResponse
+        from html import escape
+        from docx import Document as DocxDocument
+        filepath = Path("/doc_output") / filename
+        if not filepath.exists():
+            return JSONResponse({"error": "File not found"}, status_code=404)
+        try:
+            doc = DocxDocument(str(filepath))
+            html_parts = []
+            for para in doc.paragraphs:
+                text = escape(para.text)
+                style = para.style.name if para.style else ""
+                if style.startswith("Heading"):
+                    level = style.replace("Heading ", "")
+                    try:
+                        hl = min(int(level), 6)
+                    except ValueError:
+                        hl = 1
+                    html_parts.append(f"<h{hl}>{text}</h{hl}>")
+                elif not text.strip():
+                    html_parts.append("<p><br/></p>")
+                else:
+                    html_parts.append(f"<p>{text}</p>")
+            for table in doc.tables:
+                html_parts.append('<table class="doc-table">')
+                for row in table.rows:
+                    html_parts.append("<tr>")
+                    for cell in row.cells:
+                        html_parts.append(f"<td>{escape(cell.text)}</td>")
+                    html_parts.append("</tr>")
+                html_parts.append("</table>")
+            return {"html": "\n".join(html_parts), "filename": filename, "pages": 1}
+        except Exception as e:
+            return JSONResponse({"error": str(e)}, status_code=500)
+
     return app
 
 

@@ -69,3 +69,10 @@ server/data/
 *.db-journal
 *.sqlite
 *.sqlite3
+
+# Generated files
+AI_Output/
+*.docx
+fix_layout.py
+.tools/
+

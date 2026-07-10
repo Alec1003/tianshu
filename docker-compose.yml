@@ -1,4 +1,4 @@
-name: tianshu
+﻿name: tianshu
 
 services:
   postgres:
@@ -43,10 +43,12 @@ services:
       TIANSHU_LLM_API_KEY: "${TIANSHU_LLM_API_KEY:-}"
       TIANSHU_LLM_BASE_URL: "${TIANSHU_LLM_BASE_URL:-}"
       TIANSHU_ALLOW_PRIVATE_MODEL_BASE_URLS: "${TIANSHU_ALLOW_PRIVATE_MODEL_BASE_URLS:-false}"
-      TIANSHU_EXTERNAL_MCP_SERVERS: "${TIANSHU_EXTERNAL_MCP_SERVERS:-}"
+      TIANSHU_EXTERNAL_MCP_SERVERS: >-
+        [{"name":"doc-tools-mcp","transport":"streamable_http","url":"http://doc-tools-mcp:3010/","enabled":true}]
     volumes:
       - server_data:/app/server/data
       - npm_cache:/root/.npm
+      - ./AI_Output:/doc_output
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/health').status==200 else 1)"]
@@ -57,6 +59,24 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      doc-tools-mcp:
+        condition: service_started
+
+  doc-tools-mcp:
+    build:
+      context: ./doc-tools-mcp
+    container_name: doc-tools-mcp
+    ports:
+      - "3010:3010"
+    volumes:
+      - ./AI_Output:/output
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:3010/health').status==200 else 1)"]
+      interval: 15s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
 
   client:
     build:

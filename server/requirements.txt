@@ -25,3 +25,5 @@ mcp>=1.25,<2
 # Use pydantic-ai-slim (not the meta-package) to avoid pulling in all extras.
 # [openai,anthropic] extras pull in the provider SDKs.
 pydantic-ai-slim[openai,anthropic]>=1.90,<2
+
+python-docx>=1.1.0

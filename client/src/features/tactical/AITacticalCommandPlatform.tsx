@@ -15,6 +15,7 @@ import {
   Command,
   Copy,
   Crosshair,
+  FileText,
   Layers3,
   Map,
   Save,
@@ -71,6 +72,7 @@ import SimulationSidebar, {
   type SimulationSideStats,
   type SimulationSnapshot,
 } from "./SimulationSidebar";
+import DocPreview from "./DocPreview";
 import AARDialog, { type AARSideEntry } from "./AARDialog";
 import { SIDE_COLOR } from "@/utils/colors";
 import type { SideDoctrine } from "@/game/Doctrine";
@@ -84,6 +86,7 @@ const railItems: Array<{
   { id: "simulation", label: "仿真", icon: Crosshair },
   { id: "layers", label: "图层", icon: Layers3 },
   { id: "assets", label: "单位", icon: Boxes },
+  { id: "documents", label: "文档", icon: FileText },
 ];
 
 function cloneDefaultScenarioWithNow(scenarioJson: object): object {
@@ -352,6 +355,7 @@ export default function AITacticalCommandPlatform({
   const [aiSidebarOpen, setAiSidebarOpen] = useState(false);
   const [timelinePanelOpen, setTimelinePanelOpen] = useState(false);
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
+  const [previewDocFile, setPreviewDocFile] = useState<string | null>(null);
   const [showRoutes, setShowRoutes] = useState(false);
   const [showRanges, setShowRanges] = useState(false);
   const [mapSceneMode, setMapSceneMode] = useState<CesiumSceneModeKey>("3d");
@@ -1251,6 +1255,8 @@ export default function AITacticalCommandPlatform({
             onNewScenario={handleNewScenario}
             onLoadDemoScenario={handleLoadDemoScenario}
             onLoadSCSScenario={handleLoadSCSScenario}
+            previewFile={previewDocFile}
+            onPreview={setPreviewDocFile}
             onImportScenario={handleImportScenario}
             onExportScenario={handleExportScenario}
           />
@@ -1298,6 +1304,15 @@ export default function AITacticalCommandPlatform({
         className="relative isolate z-0 flex min-h-0 min-w-0 flex-col overflow-hidden bg-tactical-bg"
         style={{ gridColumn: "3 / 4", gridRow: "2 / 3" }}
       >
+        {previewDocFile ? (
+          <div className="relative min-h-0 flex-1">
+            <DocPreview
+              filename={previewDocFile}
+              onClose={() => setPreviewDocFile(null)}
+            />
+          </div>
+        ) : (
+          <>
         {/*
           地图区域：占据 main 列剩余高度。Cesium 在 embedded 模式下用
           position:absolute 填满父容器，所以这里必须 relative + 显式高度。
@@ -1355,6 +1370,9 @@ export default function AITacticalCommandPlatform({
           scenarioId={scenarioMeta?.id}
           snapshot={snapshot}
         />
+      
+          </>
+        )}
       </main>
 
       <AISidebar

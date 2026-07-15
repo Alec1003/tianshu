@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Download, FileText, Loader2 } from "lucide-react";
+import { FileText, Folder, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface DocFile {
@@ -10,20 +10,30 @@ interface DocFile {
 }
 
 interface DocPanelProps {
+  docFolder?: string;
   onPreview: (filename: string) => void;
   previewFile: string | null;
 }
 
-export default function DocPanel({ onPreview, previewFile }: DocPanelProps) {
+export default function DocPanel({ docFolder, onPreview, previewFile }: DocPanelProps) {
   const [files, setFiles] = useState<DocFile[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
+    if (!docFolder) {
+      setFiles([]);
+      setLoading(false);
+      setError(null);
+      return () => {
+        cancelled = true;
+      };
+    }
     setLoading(true);
     setError(null);
-    fetch("/api/doc/list")
+    const params = `?doc_folder=${encodeURIComponent(docFolder)}`;
+    fetch(`/api/doc/list${params}`)
       .then((r) => (r.ok ? r.json() : Promise.reject("Failed to load")))
       .then((data) => {
         if (!cancelled) setFiles(data.files ?? []);
@@ -34,10 +44,8 @@ export default function DocPanel({ onPreview, previewFile }: DocPanelProps) {
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+    return () => { cancelled = true; };
+  }, [docFolder]);
 
   const formatDate = (iso: string) => {
     try {
@@ -57,7 +65,7 @@ export default function DocPanel({ onPreview, previewFile }: DocPanelProps) {
     return (
       <div className="flex items-center justify-center py-12 text-xs text-slate-500">
         <Loader2 className="mr-2 size-4 animate-spin text-cyan-300" />
-        ???...
+        加载中...
       </div>
     );
   }
@@ -73,8 +81,11 @@ export default function DocPanel({ onPreview, previewFile }: DocPanelProps) {
   if (files.length === 0) {
     return (
       <div className="flex flex-col items-center gap-2 py-12 text-xs text-slate-500">
-        <FileText className="size-8 text-slate-600" />
-        ????
+        <Folder className="size-8 text-slate-600" />
+        <span className="max-w-full truncate text-slate-400">
+          {docFolder ?? "未绑定项目文件夹"}
+        </span>
+        <span>暂无文档</span>
       </div>
     );
   }
@@ -99,7 +110,7 @@ export default function DocPanel({ onPreview, previewFile }: DocPanelProps) {
               {file.name}
             </div>
             <div className="mt-0.5 text-[11px] text-slate-500">
-              {file.size_kb} KB ? {formatDate(file.modified)}
+              {file.size_kb} KB · {formatDate(file.modified)}
             </div>
           </div>
         </button>

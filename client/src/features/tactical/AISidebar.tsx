@@ -208,6 +208,7 @@ interface AISidebarProps {
    * 可选：未提供时降级为单一全局会话。
    */
   scenarioId?: string;
+  docFolder?: string;
   panelClassName?: string;
   panelStyle?: CSSProperties;
 }
@@ -655,6 +656,7 @@ export default function AISidebar({
   mapBaseLayer,
   onMapBaseLayerChange,
   scenarioId,
+  docFolder,
   panelClassName,
   panelStyle,
 }: AISidebarProps) {
@@ -734,6 +736,10 @@ export default function AISidebar({
   useEffect(() => {
     scenarioIdRef.current = scenarioId;
   }, [scenarioId]);
+  const docFolderRef = useRef<string | undefined>(docFolder);
+  useEffect(() => {
+    docFolderRef.current = docFolder;
+  }, [docFolder]);
   const chatModeRef = useRef<AIChatMode>(chatMode);
   useEffect(() => {
     chatModeRef.current = chatMode;
@@ -750,6 +756,7 @@ export default function AISidebar({
             chatMode: chatModeRef.current,
             modelConfig: modelConfigRef.current,
             modelProviderId: modelProviderIdRef.current,
+            docFolder: docFolderRef.current,
             scenarioId: scenarioIdRef.current,
             token,
           });

@@ -108,6 +108,7 @@ async def _bootstrap_schema_migrations(conn) -> None:
         await _migrate_command_proposal_scope_postgres(conn)
         await _migrate_unit_asset_scope_postgres(conn)
         await _migrate_runtime_state_scope_postgres(conn)
+        await _migrate_scenario_doc_folder_postgres(conn)
         return
 
     from sqlalchemy import text
@@ -123,6 +124,11 @@ async def _bootstrap_schema_migrations(conn) -> None:
             "status",
             "ALTER TABLE scenario ADD COLUMN status VARCHAR(16) "
             "NOT NULL DEFAULT 'draft'",
+        ),
+        (
+            "scenario",
+            "doc_folder",
+            "ALTER TABLE scenario ADD COLUMN doc_folder VARCHAR(120)",
         ),
     ]
 
@@ -306,3 +312,14 @@ async def _migrate_command_proposal_scope_sqlite(conn) -> None:
             "ON command_proposal (owner_id, scenario_id, status)"
         )
     )
+
+async def _migrate_scenario_doc_folder_postgres(conn) -> None:
+    """Add doc_folder column to scenario table for project file isolation."""
+    from sqlalchemy import text
+    await conn.execute(
+        text(
+            "ALTER TABLE scenario "
+            "ADD COLUMN IF NOT EXISTS doc_folder VARCHAR(120)"
+        )
+    )
+

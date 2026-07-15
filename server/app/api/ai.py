@@ -90,6 +90,7 @@ router = APIRouter(
 )
 
 RUNTIME_SCENARIO_HEADER = "x-tianshu-scenario-id"
+DOC_FOLDER_HEADER = "x-tianshu-doc-folder"
 HEADER_PREFIX = "x-tianshu-"
 LEGACY_HEADER_PREFIX = "x-" + "ai" + "cc" + "-"
 
@@ -110,6 +111,10 @@ def _header_value(request: Request, name: str) -> str:
 
 def _runtime_context_from_request(request: Request) -> str | None:
     return _header_value(request, RUNTIME_SCENARIO_HEADER).strip() or None
+
+
+def _doc_folder_from_request(request: Request) -> str | None:
+    return _header_value(request, DOC_FOLDER_HEADER).strip() or None
 
 
 def _bridge_for_user(request: Request, user: User) -> Any:
@@ -1776,6 +1781,7 @@ async def chat(
         session=session,
         user=user,
         scenario_id=_runtime_context_from_request(request),
+        doc_folder=_doc_folder_from_request(request),
         bridge_provider=lambda owner, scenario_ctx=None: _bridge_for_user(
             request,
             owner,

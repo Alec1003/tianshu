@@ -80,6 +80,11 @@ class Scenario(Base):
         String(16), default="draft", nullable=False
     )
 
+    # Human-readable project folder name in AI_Output (e.g. "a1b2c3d4_projectname")
+    doc_folder: Mapped[str | None] = mapped_column(
+        String(120), default=None, nullable=True, index=True
+    )
+
     owner_id: Mapped[uuid.UUID | None] = mapped_column(
         GUID(),
         ForeignKey("user.id", ondelete="CASCADE"),

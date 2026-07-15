@@ -11,6 +11,8 @@
 from __future__ import annotations
 
 from datetime import datetime
+from pathlib import Path
+import shutil
 from typing import Any, Sequence
 
 from sqlalchemy import select
@@ -38,6 +40,8 @@ from app.scenarios.schemas import (
 )
 from app.scenarios.training_score import build_training_score
 
+DOC_OUTPUT_ROOT = Path("/doc_output")
+
 
 # ---------- helpers ----------------------------------------------------------
 
@@ -62,6 +66,19 @@ def _ensure_can_write(sc: Scenario, user: User) -> None:
         return
     if str(sc.owner_id) != str(user.id):
         raise ScenarioForbiddenError(sc.id, "not the owner")
+
+
+def _delete_doc_folder(doc_folder: str | None) -> None:
+    if not doc_folder:
+        return
+
+    root = DOC_OUTPUT_ROOT.resolve()
+    target = (root / doc_folder).resolve()
+    if target == root or root not in target.parents:
+        return
+    if not target.exists() or not target.is_dir():
+        return
+    shutil.rmtree(target)
 
 
 # ---------- list / detail ----------------------------------------------------
@@ -125,9 +142,26 @@ async def create_scenario(
         owner_id=user.id,
         status=safe_status,
     )
+
+    # Generate human-readable project folder name (sc.id from Python-side default)
+    import re as _re
+    safe = _re.sub(r"[^一-齏\w\-_. ]", "_", name)[:80].strip()
+    safe = _re.sub(r"\s+", "_", safe) if safe else "project"
+    short_id = sc.id[:8] if sc.id else "new"
+    doc_folder = f"{short_id}_{safe}" if safe else short_id
+    sc.doc_folder = doc_folder
+
     session.add(sc)
     await session.commit()
     await session.refresh(sc)
+
+    # Create the project folder on disk (idempotent)
+    try:
+        fdir = DOC_OUTPUT_ROOT / doc_folder
+        fdir.mkdir(parents=True, exist_ok=True)
+    except Exception:
+        pass
+
     return sc
 
 async def update_scenario(
@@ -185,8 +219,13 @@ async def delete_scenario(
         raise ScenarioForbiddenError(sc.id, "templates cannot be deleted")
     if str(sc.owner_id) != str(user.id):
         raise ScenarioForbiddenError(sc.id, "not the owner")
+    doc_folder = sc.doc_folder
     await session.delete(sc)
     await session.commit()
+    try:
+        _delete_doc_folder(doc_folder)
+    except Exception:
+        pass
 
 
 # ---------- AAR --------------------------------------------------------------

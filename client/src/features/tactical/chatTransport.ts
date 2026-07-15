@@ -5,6 +5,7 @@ interface BuildChatRequestHeadersOptions {
   modelConfig: ModelConfig;
   modelProviderId?: string;
   scenarioId?: string;
+  docFolder?: string;
   token?: string | null;
 }
 
@@ -21,6 +22,7 @@ export function buildChatRequestHeaders({
   modelConfig,
   modelProviderId,
   scenarioId,
+  docFolder,
   token,
 }: BuildChatRequestHeadersOptions): Record<string, string> {
   const headers: Record<string, string> = {
@@ -45,6 +47,9 @@ export function buildChatRequestHeaders({
   }
   if (scenarioId) {
     headers["X-TianShu-Scenario-Id"] = scenarioId;
+  }
+  if (docFolder) {
+    headers["X-TianShu-Doc-Folder"] = docFolder;
   }
 
   return headers;

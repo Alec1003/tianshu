@@ -291,6 +291,7 @@ export interface ScenarioMeta {
   name: string;
   isTemplate: boolean;
   version: number;
+  doc_folder?: string;
 }
 
 export interface SaveAarPayload {
@@ -1230,6 +1231,7 @@ export default function AITacticalCommandPlatform({
           style={{ gridColumn: "2 / 3", gridRow: "1 / 3" }}
         >
           <SimulationSidebar
+            docFolder={scenarioMeta?.doc_folder}
             activePanel={activeRailItem}
             game={game}
             snapshot={snapshot}
@@ -1307,6 +1309,7 @@ export default function AITacticalCommandPlatform({
         {previewDocFile ? (
           <div className="relative min-h-0 flex-1">
             <DocPreview
+              docFolder={scenarioMeta?.doc_folder}
               filename={previewDocFile}
               onClose={() => setPreviewDocFile(null)}
             />
@@ -1385,6 +1388,7 @@ export default function AITacticalCommandPlatform({
         mapBaseLayer={mapBaseLayer}
         open={aiSidebarOpen}
         onMapBaseLayerChange={setMapBaseLayer}
+        docFolder={scenarioMeta?.doc_folder}
         scenarioId={chatScenarioId}
         settingsOpen={settingsModalOpen}
         panelClassName="shadow-[-24px_0_70px_rgba(0,0,0,0.35)]"

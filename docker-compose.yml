@@ -43,6 +43,10 @@ services:
       TIANSHU_LLM_API_KEY: "${TIANSHU_LLM_API_KEY:-}"
       TIANSHU_LLM_BASE_URL: "${TIANSHU_LLM_BASE_URL:-}"
       TIANSHU_ALLOW_PRIVATE_MODEL_BASE_URLS: "${TIANSHU_ALLOW_PRIVATE_MODEL_BASE_URLS:-false}"
+      HTTP_PROXY: "${HTTP_PROXY:-}"
+      HTTPS_PROXY: "${HTTPS_PROXY:-}"
+      ALL_PROXY: "${ALL_PROXY:-}"
+      NO_PROXY: "${NO_PROXY:-localhost,127.0.0.1,postgres,server,worker,frontend,doc-tools-mcp}"
       TIANSHU_EXTERNAL_MCP_SERVERS: >-
         [{"name":"doc-tools-mcp","transport":"streamable_http","url":"http://doc-tools-mcp:3010/","enabled":true}]
     volumes:

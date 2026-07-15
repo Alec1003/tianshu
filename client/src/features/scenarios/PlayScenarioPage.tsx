@@ -71,6 +71,7 @@ export default function PlayScenarioPage() {
       name: scenario.name,
       isTemplate: scenario.is_template,
       version: scenario.version,
+      doc_folder: scenario.doc_folder ?? scenario.id,
     };
   }, [scenario]);
 

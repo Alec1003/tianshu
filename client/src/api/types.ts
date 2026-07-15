@@ -21,6 +21,7 @@ export interface ScenarioListItem {
   id: string;
   name: string;
   description: string;
+  doc_folder?: string | null;
   is_template: boolean;
   owner_id: string | null;
   version: number;

@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import logging
 from contextlib import asynccontextmanager
@@ -50,8 +50,6 @@ async def lifespan(app: FastAPI):
     try:
         await seed_system_templates()
     except Exception:
-        # Seeding is best-effort; missing JSON files shouldn't take the API
-        # down. We log so dev can spot the problem.
         logger.exception("seed_system_templates failed; continuing without templates")
     try:
         await seed_system_unit_assets()
@@ -62,13 +60,9 @@ async def lifespan(app: FastAPI):
     set_shared_bridge_provider(app.state.bridge_registry.get_bridge_for_user)
     set_shared_runtime_provider(app.state.bridge_registry.get_runtime_for_user)
 
-    # First call lazily creates ``mcp._session_manager``; we must trigger it
-    # before entering the run() context below.
     mcp.streamable_http_app()
     async with mcp.session_manager.run():
-        logger.info(
-            "mcp.http: mounted at /api/mcp (per-user runtime registry)",
-        )
+        logger.info("mcp.http: mounted at /api/mcp (per-user runtime registry)")
         yield
     set_shared_runtime_provider(None)
     set_shared_bridge_provider(None)
@@ -82,10 +76,7 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title="天枢平台后端",
         version="0.2.0",
-        description=(
-            "FastAPI backend: AI skill bridge + user auth + scenario "
-            "persistence + MCP HTTP transport (S1+S2+S3)."
-        ),
+        description="FastAPI backend: AI skill bridge + user auth + scenario persistence + MCP HTTP transport (S1+S2+S3).",
         lifespan=lifespan,
     )
 
@@ -97,16 +88,11 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    # Order: existing AI routes first (kept untouched), then auth + scenarios.
     app.include_router(ai_router)
     app.include_router(auth_router)
     app.include_router(scenarios_router)
     app.include_router(unit_assets_router)
 
-    # Mount the MCP Streamable HTTP transport at /api/mcp behind a Bearer
-    # gate. We pull ``mcp.streamable_http_app()`` *after* ``include_router``
-    # so the auto-generated OpenAPI schema (which only walks include_router'd
-    # routers) stays clean -- mounted ASGI apps don't show up there anyway.
     app.mount("/api/mcp", BearerAuthASGI(mcp.streamable_http_app()))
 
     @app.get("/health")
@@ -114,23 +100,27 @@ def create_app() -> FastAPI:
         return {"status": "ok"}
 
     @app.get("/api/doc/download/{filename}")
-    async def download_doc(filename: str):
+    async def download_doc(filename: str, scenario_id: str = "", doc_folder: str = ""):
         from pathlib import Path
         from fastapi.responses import FileResponse, JSONResponse
-        filepath = Path("/doc_output") / filename
+        folder = doc_folder or scenario_id
+        doc_root = Path("/doc_output")
+        filepath = doc_root / folder / filename if folder else doc_root / filename
         if not filepath.exists():
             return JSONResponse({"error": "File not found"}, status_code=404)
         return FileResponse(str(filepath), filename=filename)
 
     @app.get("/api/doc/list")
-    async def list_docs():
+    async def list_docs(scenario_id: str = "", doc_folder: str = ""):
         from pathlib import Path
         from datetime import datetime
-        output_dir = Path("/doc_output")
-        if not output_dir.exists():
+        folder = doc_folder or scenario_id
+        doc_root = Path("/doc_output")
+        target_dir = doc_root / folder if folder else doc_root
+        if not target_dir.exists():
             return {"files": []}
         files = []
-        for f in sorted(output_dir.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True):
+        for f in sorted(target_dir.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True):
             if f.is_file():
                 stat = f.stat()
                 files.append({
@@ -142,12 +132,13 @@ def create_app() -> FastAPI:
         return {"files": files}
 
     @app.get("/api/doc/preview/{filename}")
-    async def preview_doc(filename: str):
+    async def preview_doc(filename: str, scenario_id: str = ""):
         from pathlib import Path
         from fastapi.responses import JSONResponse
         from html import escape
         from docx import Document as DocxDocument
-        filepath = Path("/doc_output") / filename
+        doc_root = Path("/doc_output")
+        filepath = doc_root / scenario_id / filename if scenario_id else doc_root / filename
         if not filepath.exists():
             return JSONResponse({"error": "File not found"}, status_code=404)
         try:
@@ -183,4 +174,3 @@ def create_app() -> FastAPI:
 
 
 app = create_app()
-

@@ -17,6 +17,7 @@ describe("chatTransport", () => {
         baseUrl: "https://api.openai.com/v1",
       },
       modelProviderId: "openai-responses",
+      docFolder: "folder-1",
       scenarioId: "scenario-1",
       token: "jwt-token",
     });
@@ -29,6 +30,7 @@ describe("chatTransport", () => {
       "X-TianShu-Model-Name": "gpt-5",
       "X-TianShu-Model-Api-Key": "sk-test",
       "X-TianShu-Model-Base-Url": "https://api.openai.com/v1",
+      "X-TianShu-Doc-Folder": "folder-1",
       "X-TianShu-Scenario-Id": "scenario-1",
     });
   });

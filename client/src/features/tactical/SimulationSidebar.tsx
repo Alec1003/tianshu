@@ -136,6 +136,7 @@ interface SimulationSidebarProps {
   onNewScenario: () => void;
   onLoadDemoScenario: () => void;
   onLoadSCSScenario: () => void;
+  docFolder?: string;
   previewFile: string | null;
   onPreview: (filename: string) => void;
   onImportScenario: () => void;
@@ -1105,6 +1106,7 @@ export default function SimulationSidebar({
   onLoadSCSScenario,
   onImportScenario,
   onExportScenario,
+  docFolder,
   previewFile,
   onPreview,
 }: SimulationSidebarProps) {
@@ -1697,6 +1699,7 @@ export default function SimulationSidebar({
   function renderDocumentsPanel() {
     return (
       <DocPanel
+        docFolder={docFolder}
         previewFile={previewFile}
         onPreview={onPreview}
       />

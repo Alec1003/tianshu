@@ -195,6 +195,19 @@ async def test_delete_own_ok(db_session, user):
         await svc.get_scenario(db_session, user, sc.id)
 
 
+async def test_delete_own_removes_doc_folder(db_session, user, tmp_path, monkeypatch):
+    monkeypatch.setattr(svc, "DOC_OUTPUT_ROOT", tmp_path)
+    sc = await svc.create_scenario(db_session, user, name="doc project", data={})
+    assert sc.doc_folder
+    project_dir = tmp_path / sc.doc_folder
+    project_dir.mkdir(parents=True, exist_ok=True)
+    (project_dir / "report.md").write_text("draft", encoding="utf-8")
+
+    await svc.delete_scenario(db_session, user, sc.id)
+
+    assert not project_dir.exists()
+
+
 async def test_delete_template_forbidden_even_for_superuser(db_session, superuser):
     tpl = Scenario(
         id="tpl-nodelete",

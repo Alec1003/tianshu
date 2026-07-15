@@ -1,4 +1,4 @@
-"""Pydantic AI agent runtime for 天枢平台 tactical skill execution.
+﻿"""Pydantic AI agent runtime for 澶╂灑骞冲彴 tactical skill execution.
 
 Each registered skill becomes a typed pydantic-ai tool so the LLM receives
 proper JSON-schema descriptions and can call them with validated arguments.
@@ -35,28 +35,32 @@ from app.ai.skill_registry import TianShuSkillRegistry
 
 
 SYSTEM_PROMPT = """
-You are the 天枢平台 Commander Agent — an AI operator for a tactical simulation platform.
+You are the 澶╂灑骞冲彴 Commander Agent 鈥?an AI operator for a tactical simulation platform.
 Your job: parse natural-language tactical commands and execute them via the available tools.
 
 Rules:
 - Only call the registered tools; never invent tool names.
-- For compound commands (separated by "then", ";", "然后"), call tools in sequence.
+- For compound commands (separated by "then", ";", "鐒跺悗"), call tools in sequence.
 - When a required parameter is ambiguous, make the most tactically sensible assumption.
 - After all tools have been called, respond with a concise single-sentence summary of what was done.
 - If a tool fails, note the failure in your summary but continue with remaining operations.
 """.strip()
 
 SYSTEM_PROMPT = """
-You are the 天枢平台 Commander Agent, an AI operator for a tactical simulation and training platform.
+You are the 澶╂灑骞冲彴 Commander Agent, an AI operator for a tactical simulation and training platform.
 Your job is to parse natural-language tactical intent into structured simulation actions.
 
 Rules:
 - Only call the registered tools; never invent tool names.
-- For compound commands separated by "then", ";", or "然后", call tools in sequence.
+- For compound commands separated by "then", ";", or "鐒跺悗", call tools in sequence.
 - When a required parameter is ambiguous, make the most tactically sensible simulation assumption.
 - External MCP tools are advisory integrations. Use them to obtain plans,
   allocations, or analysis from operator-configured external servers; they are
-  not the authoritative 天枢平台 simulation engine.
+  not the authoritative 澶╂灑骞冲彴 simulation engine.
+- When the user asks to generate, save, export, or list documents, use
+  external_mcp_call against server "doc-tools-mcp" with tool_name
+  "create_docx", "save_file", or "list_documents". Do not ask the user for a
+  project_id; the platform injects the current project's document folder.
 - Tool calls create command proposals for human approval; they do not directly mutate the simulation.
 - For generated operational plans, prefer propose_tactical_plan_skill so unit
   task assignments become a reviewed proposal instead of arbitrary code.
@@ -83,6 +87,7 @@ class AgentDeps:
     session: Any | None = None
     user: Any | None = None
     scenario_id: str | None = None
+    doc_folder: str | None = None
     bridge_provider: Callable[[Any, str | None], Any] | None = None
 
 
@@ -451,6 +456,26 @@ async def _external_mcp_call(
         )
         return {"ok": False, "error": error}
 
+    # Inject project/scenario doc_folder into doc-tools MCP calls for file isolation
+    _DOC_TOOLS = {"save_file", "create_docx", "list_documents"}
+    normalized_tool_name = tool_name.rsplit(".", 1)[-1].rsplit("/", 1)[-1]
+    _pid = deps.doc_folder or deps.scenario_id
+    if not _pid and deps.scenario_id:
+        # Fallback: query the DB for doc_folder
+        try:
+            from app.scenarios.models import Scenario
+            if deps.session:
+                sc = await deps.session.get(Scenario, deps.scenario_id)
+                if sc and sc.doc_folder:
+                    _pid = sc.doc_folder
+        except Exception:
+            pass
+    if _pid and normalized_tool_name in _DOC_TOOLS:
+        if arguments is None:
+            arguments = {"project_id": _pid}
+        elif "project_id" not in arguments:
+            arguments["project_id"] = _pid
+
     trace, result = await deps.mcp_client.call_tool(server, tool_name, arguments or {})
     deps.mcp_traces.append(trace)
     output = {
@@ -574,7 +599,7 @@ def resolve_model(model_id: str, api_key: str, base_url: str) -> Any:
             else _OPENAI_COMPAT_DEFAULT_BASE_URL.get(provider, "")
         )
         if not effective_base:
-            # ``custom`` without an explicit base_url is unusable — bail out so
+            # ``custom`` without an explicit base_url is unusable 鈥?bail out so
             # the bridge can fall back to the global agent / regex planner.
             return model_id
         kwargs = {"base_url": effective_base}
@@ -582,7 +607,7 @@ def resolve_model(model_id: str, api_key: str, base_url: str) -> Any:
             kwargs["api_key"] = api_key
         return OpenAIModel(name or "gpt-4o-mini", provider=OpenAIProvider(**kwargs))
 
-    # Unknown provider prefix — pass string through and let pydantic-ai handle it.
+    # Unknown provider prefix 鈥?pass string through and let pydantic-ai handle it.
     return model_id
 
 
@@ -592,7 +617,7 @@ def build_agent(
     base_url: str = "",
     enable_tools: bool = True,
 ) -> Agent[AgentDeps, str]:
-    """Build a pydantic-ai Agent with all 天枢平台 skills registered as tools."""
+    """Build a pydantic-ai Agent with all 澶╂灑骞冲彴 skills registered as tools."""
     model = resolve_model(model_id, api_key, base_url)
     agent: Agent[AgentDeps, str] = Agent(
         model=model,
@@ -603,7 +628,7 @@ def build_agent(
     if not enable_tools:
         return agent
 
-    # ── Simulation lifecycle ──────────────────────────────────────────────────
+    # 鈹€鈹€ Simulation lifecycle 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
     @agent.tool
     def simulation_start(ctx: RunContext[AgentDeps]) -> dict[str, Any]:
@@ -630,7 +655,7 @@ def build_agent(
         """Advance the simulation by N time steps. Maximum 7200 steps per call (~2 sim-hours)."""
         return _exec(ctx.deps, "simulation_step", {"steps": steps})
 
-    # ── Unit deployment ───────────────────────────────────────────────────────
+    # 鈹€鈹€ Unit deployment 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
     @agent.tool
     def deploy_aircraft(
@@ -761,7 +786,7 @@ def build_agent(
             "side": side,
         })
 
-    # ── Unit manipulation ─────────────────────────────────────────────────────
+    # 鈹€鈹€ Unit manipulation 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
     @agent.tool
     def delete_unit(
@@ -800,7 +825,7 @@ def build_agent(
             "patch": patch,
         })
 
-    # ── Tactical events / scenario loading ───────────────────────────────────
+    # 鈹€鈹€ Tactical events / scenario loading 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
     @agent.tool
     def create_patrol_mission(
@@ -900,7 +925,7 @@ def build_agent(
         """Load a scenario from an absolute or repo-relative file path on the server."""
         return _exec(ctx.deps, "load_scenario_file", {"scenario_path": scenario_path})
 
-    # ── External MCP advisory integrations ────────────────────────────────────
+    # 鈹€鈹€ External MCP advisory integrations 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
     @agent.tool
     def propose_tactical_plan_skill(
@@ -1027,6 +1052,7 @@ async def run_agent(
     session: Any | None = None,
     user: Any | None = None,
     scenario_id: str | None = None,
+    doc_folder: str | None = None,
     bridge_provider: Callable[[Any, str | None], Any] | None = None,
 ) -> AgentExecutionSummary:
     """Run the pydantic-ai agent and wrap the result in AgentExecutionSummary."""
@@ -1039,6 +1065,7 @@ async def run_agent(
         session=session,
         user=user,
         scenario_id=scenario_id,
+        doc_folder=doc_folder,
         bridge_provider=bridge_provider,
     )
     summary = AgentExecutionSummary(command=command, decomposition=[command])

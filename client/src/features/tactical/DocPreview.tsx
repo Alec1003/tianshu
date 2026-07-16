@@ -12,7 +12,11 @@ interface DocPreviewProps {
   docFolder?: string;
 }
 
-export default function DocPreview({ filename, onClose, docFolder }: DocPreviewProps) {
+export default function DocPreview({
+  filename,
+  onClose,
+  docFolder,
+}: DocPreviewProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [markdown, setMarkdown] = useState<string>("");
@@ -62,15 +66,17 @@ export default function DocPreview({ filename, onClose, docFolder }: DocPreviewP
       }
     })();
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [docFolder, downloadUrl, filename]);
 
   const isMd = filename.toLowerCase().endsWith(".md");
 
   return (
-    <div className="absolute inset-0 z-50 flex flex-col bg-[#525659]">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-[24px] border border-white/[0.08] bg-[#101721]">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-white/[0.06] px-4 py-2.5 backdrop-blur-sm">
+      <div className="flex items-center justify-between border-b border-white/[0.06] px-4 py-3 backdrop-blur-sm">
         <div className="flex items-center gap-2 text-sm">
           <span className="text-cyan-300 font-medium">文档预览</span>
           <span className="text-slate-600">/</span>
@@ -97,7 +103,7 @@ export default function DocPreview({ filename, onClose, docFolder }: DocPreviewP
       </div>
 
       {/* Content area */}
-      <div className="flex min-h-0 flex-1 justify-center overflow-y-auto bg-[#1e2127]">
+      <div className="flex min-h-0 flex-1 justify-center overflow-y-auto bg-[#161d28]">
         {loading && (
           <div className="flex items-center justify-center py-20">
             <Loader2 className="size-6 animate-spin text-cyan-300/50" />
@@ -120,21 +126,39 @@ export default function DocPreview({ filename, onClose, docFolder }: DocPreviewP
 
         {/* Markdown rendered with react-markdown */}
         {!loading && !error && isMd && (
-          <div className="w-full max-w-4xl px-10 py-10">
-            <div className="markdown-body">
+          <div className="w-full max-w-4xl px-6 py-6 xl:px-8">
+            <div className="markdown-body rounded-[20px] border border-white/[0.06] bg-[#0c1118] px-6 py-6 shadow-[0_24px_60px_rgba(0,0,0,0.24)]">
               <ReactMarkdown
                 remarkPlugins={[remarkGfm]}
                 rehypePlugins={[rehypeHighlight]}
                 components={{
                   a: ({ href, children, ...props }) => (
-                    <a href={href} target="_blank" rel="noopener noreferrer" {...props}>{children}</a>
+                    <a
+                      href={href}
+                      rel="noopener noreferrer"
+                      target="_blank"
+                      {...props}
+                    >
+                      {children}
+                    </a>
                   ),
                   img: ({ src, alt, ...props }) => (
-                    <img src={src} alt={alt ?? ""} loading="lazy" className="rounded-lg border border-white/[0.08] max-w-full h-auto" {...props} />
+                    <img
+                      alt={alt ?? ""}
+                      className="h-auto max-w-full rounded-lg border border-white/[0.08]"
+                      loading="lazy"
+                      src={src}
+                      {...props}
+                    />
                   ),
                   table: ({ children, ...props }) => (
-                    <div className="overflow-x-auto mb-4">
-                      <table className="min-w-full border-collapse" {...props}>{children}</table>
+                    <div className="mb-4 overflow-x-auto">
+                      <table
+                        className="min-w-full border-collapse"
+                        {...props}
+                      >
+                        {children}
+                      </table>
                     </div>
                   ),
                 }}
@@ -148,8 +172,8 @@ export default function DocPreview({ filename, onClose, docFolder }: DocPreviewP
         {/* DOCX rendered content */}
         <div
           ref={docxContainerRef}
-          className="docx-preview-container mx-auto"
-          style={{ display: (loading || error || isMd) ? "none" : "block" }}
+          className="docx-preview-container mx-auto px-4 py-4"
+          style={{ display: loading || error || isMd ? "none" : "block" }}
         />
       </div>
     </div>

@@ -1,19 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import {
-  Activity,
   ArrowLeft,
   BrainCircuit,
   Copy,
-  Cpu,
-  History,
   LogOut,
   Save,
   Settings,
-  Signal,
   UserCircle,
 } from "lucide-react";
 import BrandLogo from "@/components/brand/BrandLogo";
-import ThemeModeToggle from "@/components/theme/ThemeModeToggle";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/features/auth/useAuth";
 import type { SimulationSnapshot } from "./SimulationSidebar";
@@ -38,6 +33,13 @@ interface TopTacticalBarProps {
   onToggleTimeline?: () => void;
   mapSceneMode?: "2d" | "3d";
   onToggleMapSceneMode?: () => void;
+  uiVisibility?: {
+    showTimelineEntry?: boolean;
+    showAdvancedSimulationControls?: boolean;
+    showAarEntry?: boolean;
+    showAdvisorBadge?: boolean;
+    showStatusBus?: boolean;
+  };
 }
 
 export default function TopTacticalBar({
@@ -51,9 +53,7 @@ export default function TopTacticalBar({
   onSave,
   onRequestSaveAs,
   savingState,
-  timelineOpen,
-  onToggleTimeline,
-  mapSceneMode = "2d",
+  mapSceneMode,
   onToggleMapSceneMode,
 }: TopTacticalBarProps) {
   const { user, logout } = useAuth();
@@ -61,7 +61,7 @@ export default function TopTacticalBar({
   const userMenuRef = useRef<HTMLDivElement | null>(null);
   const isRunning = snapshot.runState === "running";
   const operatorName =
-    user?.display_name?.trim() || user?.email?.split("@")[0] || "操作员";
+    user?.display_name?.trim() || user?.email?.split("@")[0] || "Operator";
   const operatorInitial = operatorName.trim().slice(0, 1).toUpperCase();
 
   useEffect(() => {
@@ -84,32 +84,14 @@ export default function TopTacticalBar({
     };
   }, [userMenuOpen]);
 
-  // Calculate generic tactical balance (Active Units)
-  const totalUnits = snapshot.aircraft + snapshot.ships + snapshot.facilities;
-
-  // Find BLUE and RED for a generic advantage bar if possible
-  const blueSide = snapshot.sideStats.find((s) =>
-    s.id.toUpperCase().includes("BLUE")
-  );
-  const redSide = snapshot.sideStats.find((s) =>
-    s.id.toUpperCase().includes("RED")
-  );
-  const blueUnits = blueSide ? blueSide.aircraft + blueSide.ships : 0;
-  const redUnits = redSide ? redSide.aircraft + redSide.ships : 0;
-  const showBalance = blueUnits > 0 || redUnits > 0;
-  const blueRatio = showBalance
-    ? (blueUnits / (blueUnits + redUnits)) * 100
-    : 50;
-
   return (
     <header className="relative z-40 flex h-14 shrink-0 items-center justify-between border-b border-tactical-line bg-tactical-panel/96 px-4 shadow-[inset_0_-1px_0_rgba(255,255,255,0.025),0_10px_34px_rgba(0,0,0,0.22)] backdrop-blur-xl">
-      {/* 1. LEFT: Platform Identity */}
       <div className="flex items-center gap-4">
         {onExit && (
           <button
             aria-label="返回想定列表"
-            onClick={onExit}
             className="group flex size-8 items-center justify-center rounded-lg border border-tactical-line bg-white/[0.03] text-slate-400 transition-all hover:border-tactical-active hover:bg-tactical-accent/8 hover:text-slate-100"
+            onClick={onExit}
             title="返回想定列表"
             type="button"
           >
@@ -163,101 +145,15 @@ export default function TopTacticalBar({
                 推演中
               </span>
             )}
-            <span className="ml-1 flex items-center gap-1.5 rounded-md border border-tactical-line bg-white/[0.035] px-2 py-0.5 text-[9px] text-slate-300">
-              <BrainCircuit className="size-3 text-tactical-accent" />
-              参谋工具
-            </span>
           </div>
         </div>
       </div>
 
-      {/* 2. MIDDLE: Tactical Status Bus */}
-      <div className="hidden flex-1 justify-center xl:flex">
-        <div className="flex items-center gap-5 rounded-md border border-tactical-line bg-white/[0.025] px-5 py-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]">
-          <div className="flex items-center gap-2">
-            <Activity className="size-3 text-tactical-accent" />
-            <span className="font-mono text-[10px] text-slate-400">态势</span>
-            <span className="font-mono text-xs font-bold text-amber-400">
-              三级
-            </span>
-          </div>
-
-          <div className="h-3 w-px bg-white/10" />
-
-          <div className="flex items-center gap-2">
-            <Cpu className="size-3 text-tactical-accent" />
-            <span className="font-mono text-[10px] text-slate-400">AI</span>
-            <span className="font-mono text-xs font-bold text-tactical-accent">
-              在线
-            </span>
-          </div>
-
-          <div className="h-3 w-px bg-white/10" />
-
-          <div className="flex items-center gap-2">
-            <Signal
-              className={cn(
-                "size-3",
-                isRunning ? "text-emerald-400 animate-pulse" : "text-slate-400"
-              )}
-            />
-            <span className="font-mono text-[10px] text-slate-400">状态</span>
-            <span
-              className={cn(
-                "font-mono text-xs font-bold",
-                isRunning ? "text-emerald-400" : "text-amber-400"
-              )}
-            >
-              {isRunning ? "运行" : "待命"}
-            </span>
-          </div>
-
-          <div className="h-3 w-px bg-white/10" />
-
-          <div className="flex items-center gap-2">
-            <span className="font-mono text-[10px] text-slate-400">倍速</span>
-            <span className="font-mono text-xs font-bold text-slate-200">
-              {snapshot.timeCompression}x
-            </span>
-          </div>
-
-          {showBalance && (
-            <>
-              <div className="h-3 w-px bg-white/10" />
-              <div className="flex w-24 items-center gap-2">
-                <span className="font-mono text-[9px] text-blue-400">蓝方</span>
-                <div className="relative h-1.5 flex-1 overflow-hidden rounded-full bg-red-900/50">
-                  <div
-                    className="absolute inset-y-0 left-0 bg-blue-500"
-                    style={{ width: `${blueRatio}%` }}
-                  />
-                </div>
-                <span className="font-mono text-[9px] text-red-400">红方</span>
-              </div>
-            </>
-          )}
-
-          <div className="h-3 w-px bg-white/10" />
-
-          <div className="flex items-center gap-2">
-            <span className="font-mono text-[10px] text-slate-400">单位</span>
-            <span className="font-mono text-xs font-bold text-slate-200">
-              {totalUnits}
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* 3. RIGHT: Quick Actions & Save */}
       <div className="flex items-center gap-3">
-        {/* Router actions (Save / Save As) */}
         {(onSave || onRequestSaveAs) && (
           <div className="flex items-center gap-2 border-r border-tactical-line pr-3">
             {onSave && !scenarioMeta?.isTemplate && (
               <button
-                type="button"
-                onClick={onSave}
-                disabled={savingState === "saving"}
                 className={cn(
                   "flex items-center gap-1.5 rounded-md border px-3 py-1 font-mono text-[10px] font-bold uppercase tracking-widest transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-tactical-accent/55",
                   savingState === "saved"
@@ -266,7 +162,10 @@ export default function TopTacticalBar({
                       ? "border-red-500/30 bg-red-500/10 text-red-300"
                       : "border-tactical-active bg-tactical-accent/10 text-slate-100 hover:border-tactical-accent/55 hover:bg-tactical-accent/14"
                 )}
+                disabled={savingState === "saving"}
+                onClick={onSave}
                 title="保存到当前想定"
+                type="button"
               >
                 <Save className="size-3.5" />
                 <span className="hidden sm:inline">
@@ -282,63 +181,39 @@ export default function TopTacticalBar({
             )}
             {onRequestSaveAs && (
               <button
-                type="button"
-                onClick={onRequestSaveAs}
                 className="flex items-center gap-1.5 rounded-md border border-tactical-line bg-white/[0.03] px-3 py-1 text-[10px] font-semibold text-slate-300 transition-colors hover:border-tactical-active hover:bg-tactical-accent/8 hover:text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-tactical-accent/55"
+                onClick={onRequestSaveAs}
                 title="另存为新想定"
+                type="button"
               >
                 <Copy className="size-3.5" />
-                <span className="hidden sm:inline">另存</span>
+                <span className="hidden sm:inline">另存为</span>
               </button>
             )}
           </div>
         )}
 
-        <div className="hidden items-center gap-1 md:flex">
+        {onToggleMapSceneMode && (
           <button
-            aria-label={mapSceneMode === "3d" ? "切换二维地图" : "切换三维地图"}
-            className="grid size-8 place-items-center rounded-md bg-transparent text-slate-300 transition-colors hover:bg-white/5 hover:text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-tactical-accent/55 disabled:cursor-not-allowed disabled:opacity-40"
-            disabled={!onToggleMapSceneMode}
+            aria-label={mapSceneMode === "3d" ? "切换到 2D 地图" : "切换到 3D 地图"}
+            className="flex h-8 items-center gap-2 rounded-md border border-tactical-line bg-white/[0.03] px-3 font-mono text-[10px] font-bold uppercase tracking-wider text-slate-300 transition-colors hover:border-tactical-active hover:bg-tactical-accent/8 hover:text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-tactical-accent/55"
             onClick={onToggleMapSceneMode}
-            title={mapSceneMode === "3d" ? "切换为二维地图" : "切换为三维地图"}
+            title={mapSceneMode === "3d" ? "切换到 2D 地图" : "切换到 3D 地图"}
             type="button"
           >
-            <span className="font-mono text-[10px] font-bold">
-              {mapSceneMode === "3d" ? "2D" : "3D"}
-            </span>
+            <span>{mapSceneMode === "3d" ? "2D" : "3D"}</span>
           </button>
-        </div>
-
-        <div className="hidden h-6 w-px bg-tactical-line md:block" />
-
-        <button
-          aria-label={timelineOpen ? "关闭推演回放" : "打开推演回放"}
-          disabled={!onToggleTimeline}
-          onClick={() => onToggleTimeline && onToggleTimeline()}
-          className={cn(
-            "flex h-8 items-center gap-2 rounded-md border px-3 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-tactical-accent/55",
-            timelineOpen
-              ? "border-tactical-active bg-tactical-accent/10 text-slate-100"
-              : "border-tactical-line bg-white/[0.03] text-slate-300 hover:border-tactical-active hover:bg-tactical-accent/8 hover:text-slate-100"
-          )}
-          title={timelineOpen ? "关闭推演回放" : "打开推演回放"}
-          type="button"
-        >
-          <History className="size-4" />
-          <span className="hidden font-mono text-[10px] font-bold uppercase tracking-wider sm:inline">
-            回放
-          </span>
-        </button>
+        )}
 
         <button
           aria-label={aiSidebarOpen ? "关闭 AI 助手" : "打开 AI 助手"}
-          onClick={() => onToggleAiSidebar()}
           className={cn(
             "flex h-8 items-center gap-2 rounded-md border px-3 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-tactical-accent/55",
             aiSidebarOpen
               ? "border-tactical-active bg-tactical-accent/10 text-slate-100"
               : "border-tactical-line bg-white/[0.03] text-slate-300 hover:border-tactical-active hover:bg-tactical-accent/8 hover:text-slate-100"
           )}
+          onClick={() => onToggleAiSidebar()}
           title={aiSidebarOpen ? "关闭 AI 助手" : "打开 AI 助手"}
           type="button"
         >
@@ -348,18 +223,16 @@ export default function TopTacticalBar({
           </span>
         </button>
 
-        <ThemeModeToggle className="size-8 text-slate-300 hover:text-slate-100" />
-
         <button
           aria-label={settingsOpen ? "关闭战术配置中心" : "打开战术配置中心"}
-          disabled={!onToggleSettings}
-          onClick={() => onToggleSettings && onToggleSettings()}
           className={cn(
             "grid size-8 place-items-center rounded-md border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-tactical-accent/55",
             settingsOpen
               ? "border-tactical-active bg-tactical-accent/10 text-slate-100"
               : "border-transparent bg-transparent text-slate-300 hover:bg-white/5 hover:text-slate-100"
           )}
+          disabled={!onToggleSettings}
+          onClick={() => onToggleSettings && onToggleSettings()}
           title={settingsOpen ? "关闭战术配置中心" : "打开战术配置中心"}
           type="button"
         >

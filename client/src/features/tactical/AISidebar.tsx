@@ -189,6 +189,7 @@ interface AISidebarProps {
   activeTab: AISidebarTab;
   onOpenChange: (open: boolean) => void;
   onTabChange: (tab: AISidebarTab) => void;
+  layout?: "sidebar" | "workspace";
   settingsOpen?: boolean;
   onSettingsOpenChange?: (open: boolean) => void;
   /** AI command 返回的 scenario JSON 应用回 game。 */
@@ -211,6 +212,10 @@ interface AISidebarProps {
   docFolder?: string;
   panelClassName?: string;
   panelStyle?: CSSProperties;
+  previewView?: "map" | "document";
+  previewFile?: string | null;
+  onOpenMapPreview?: () => void;
+  onOpenDocumentPreview?: (filename?: string | null) => void;
 }
 
 const STORAGE_KEY = {
@@ -649,6 +654,7 @@ export default function AISidebar({
   activeTab,
   onOpenChange,
   onTabChange,
+  layout = "sidebar",
   settingsOpen = false,
   onSettingsOpenChange,
   onApplyScenario,
@@ -659,6 +665,10 @@ export default function AISidebar({
   docFolder,
   panelClassName,
   panelStyle,
+  previewView = "map",
+  previewFile,
+  onOpenMapPreview,
+  onOpenDocumentPreview,
 }: AISidebarProps) {
   const navigate = useNavigate();
   const modelConfig = useModelConfigStore((state) => state.activeModelConfig);
@@ -1543,22 +1553,48 @@ export default function AISidebar({
         skillsError={skillsError}
         skillsLoading={skillsLoading}
       />
-      {open && (
+      {(layout === "workspace" || open) && (
         <aside
           className={cn(
-            "relative hidden h-full min-h-0 min-w-0 flex-col border-l",
-            "border-tactical-line bg-tactical-panel/96 backdrop-blur-2xl lg:flex",
+            "relative hidden h-full min-h-0 min-w-0 flex-col overflow-hidden lg:flex",
+            layout === "workspace"
+              ? "rounded-[28px] border border-white/[0.08] bg-[#08111a] shadow-[0_28px_90px_rgba(0,0,0,0.32)]"
+              : "border-l border-tactical-line bg-tactical-panel/96 backdrop-blur-2xl",
             panelClassName
           )}
           style={panelStyle}
         >
           {/* 顶部：标题 + tabs + 关闭 */}
-          <header className="flex items-center justify-between gap-2 border-b border-tactical-line px-3 py-2.5">
+          <header
+            className={cn(
+              "flex items-center justify-between gap-2 px-4 py-3",
+              layout === "workspace"
+                ? "border-b border-white/[0.08] bg-[linear-gradient(180deg,rgba(13,24,36,0.96),rgba(8,17,26,0.9))]"
+                : "border-b border-tactical-line"
+            )}
+          >
             <div className="flex items-center gap-2">
-              <div className="grid size-7 place-items-center rounded-lg border border-tactical-line bg-white/[0.035] text-tactical-accent">
+              <div
+                className={cn(
+                  "grid size-8 place-items-center rounded-xl text-tactical-accent",
+                  layout === "workspace"
+                    ? "border border-cyan-300/12 bg-cyan-300/[0.08]"
+                    : "border border-tactical-line bg-white/[0.035]"
+                )}
+              >
                 <Sparkles className="size-3.5" />
               </div>
               <div>
+                {layout === "workspace" && (
+                  <div className="mb-1.5">
+                    <div className="text-[10px] uppercase tracking-[0.32em] text-slate-500">
+                      Agent Workspace
+                    </div>
+                    <div className="mt-1 text-sm font-semibold text-slate-100">
+                      AI 作战智能体
+                    </div>
+                  </div>
+                )}
                 <div className="text-[10px] uppercase tracking-[0.32em] text-slate-500">
                   情报参谋席
                 </div>
@@ -1601,7 +1637,14 @@ export default function AISidebar({
             </div>
           </header>
 
-          <div className="flex items-center gap-1 border-b border-tactical-line px-3 py-1.5">
+          <div
+            className={cn(
+              "flex items-center gap-1 px-3 py-1.5",
+              layout === "workspace"
+                ? "border-b border-white/[0.08] bg-white/[0.02]"
+                : "border-b border-tactical-line"
+            )}
+          >
             <TabButton
               active={activeTab === "chat"}
               icon={<MessageSquare className="size-3.5" />}
@@ -1639,6 +1682,11 @@ export default function AISidebar({
                 onQuickCommand={sendChat}
                 onRejectProposal={(id) => void handleRejectProposal(id)}
                 onSubmit={onSubmitChat}
+                layout={layout}
+                onOpenDocumentPreview={onOpenDocumentPreview}
+                onOpenMapPreview={onOpenMapPreview}
+                previewFile={previewFile}
+                previewView={previewView}
                 busy={busy}
                 stop={stop}
               />
@@ -1691,6 +1739,7 @@ interface ChatPanelProps {
   chatLogRef: React.MutableRefObject<HTMLDivElement | null>;
   chatError?: Error;
   chatRunSummary: ChatRunSummary;
+  layout: "sidebar" | "workspace";
   chatMode: AIChatMode;
   commandInput: string;
   commandProposals: CommandProposal[];
@@ -1705,6 +1754,10 @@ interface ChatPanelProps {
   onQuickCommand: (cmd: string) => void;
   onRejectProposal: (proposalId: string) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  previewView: "map" | "document";
+  previewFile?: string | null;
+  onOpenMapPreview?: () => void;
+  onOpenDocumentPreview?: (filename?: string | null) => void;
 }
 
 function ChatPanel({
@@ -1712,6 +1765,7 @@ function ChatPanel({
   chatLogRef,
   chatError,
   chatRunSummary,
+  layout,
   chatMode,
   commandInput,
   commandProposals,
@@ -1726,6 +1780,10 @@ function ChatPanel({
   onQuickCommand,
   onRejectProposal,
   onSubmit,
+  previewView,
+  previewFile,
+  onOpenMapPreview,
+  onOpenDocumentPreview,
 }: ChatPanelProps) {
   const chatErrorMessage = chatError ? formatChatTransportError(chatError) : "";
   const proposalById = useMemo(
@@ -1737,13 +1795,84 @@ function ChatPanel({
       [...messages].reverse().find((message) => message.role === "user")?.id,
     [messages]
   );
+  const hasDocumentPreview = Boolean(previewFile);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div
         ref={chatLogRef}
-        className="flex-1 space-y-1 overflow-y-auto px-3 py-3"
+        className={cn(
+          "flex-1 overflow-y-auto",
+          layout === "workspace" ? "space-y-3 px-5 py-5" : "space-y-1 px-3 py-3"
+        )}
       >
+        {layout === "workspace" && (
+          <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_16rem]">
+            <div className="rounded-[24px] border border-white/[0.08] bg-[linear-gradient(180deg,rgba(18,30,45,0.92),rgba(10,18,27,0.9))] px-5 py-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+              <div className="text-[11px] uppercase tracking-[0.28em] text-cyan-300/65">
+                Mission Copilot
+              </div>
+              <div className="mt-3 max-w-xl text-3xl font-semibold tracking-tight text-slate-100">
+                以对话驱动推演、方案生成和运行时操作。
+              </div>
+              <div className="mt-3 max-w-2xl text-sm leading-6 text-slate-400">
+                中央对话区负责主交互，右侧工作台负责地图、文档和结果预览。现有 Runtime 与后端链路保持不变。
+              </div>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button
+                  className={cn(
+                    "rounded-full border px-3 py-1.5 text-xs transition-colors",
+                    previewView === "map"
+                      ? "border-cyan-300/40 bg-cyan-300/12 text-cyan-100"
+                      : "border-white/[0.08] bg-white/[0.03] text-slate-300 hover:border-cyan-300/25 hover:text-slate-100"
+                  )}
+                  onClick={() => onOpenMapPreview?.()}
+                  type="button"
+                >
+                  打开地图预览
+                </button>
+                <button
+                  className={cn(
+                    "rounded-full border px-3 py-1.5 text-xs transition-colors",
+                    previewView === "document"
+                      ? "border-cyan-300/40 bg-cyan-300/12 text-cyan-100"
+                      : "border-white/[0.08] bg-white/[0.03] text-slate-300 hover:border-cyan-300/25 hover:text-slate-100",
+                    !hasDocumentPreview && "opacity-70"
+                  )}
+                  onClick={() => onOpenDocumentPreview?.(previewFile ?? null)}
+                  type="button"
+                >
+                  {hasDocumentPreview ? "打开当前文档" : "切到文档工作台"}
+                </button>
+              </div>
+            </div>
+            <div className="rounded-[24px] border border-white/[0.08] bg-[#0b121a] px-4 py-4">
+              <div className="text-[11px] uppercase tracking-[0.24em] text-slate-500">
+                Workspace State
+              </div>
+              <div className="mt-3 space-y-2 text-xs text-slate-400">
+                <div className="flex items-center justify-between rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-2">
+                  <span>预览栏</span>
+                  <span className="text-slate-100">
+                    {previewView === "map" ? "地图" : "文档"}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-2">
+                  <span>文档绑定</span>
+                  <span className="max-w-[9rem] truncate text-slate-100">
+                    {previewFile ?? "未打开"}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-2">
+                  <span>交互模式</span>
+                  <span className="text-slate-100">
+                    {chatMode === "ask" ? "Ask" : "Command"}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
         <RunStatusCard summary={chatRunSummary} />
         {chatErrorMessage && (
           <div className="mb-3 rounded-lg border border-red-300/25 bg-red-300/[0.05] px-2.5 py-2 text-[11px] text-red-100">
@@ -1803,7 +1932,14 @@ function ChatPanel({
         )}
       </div>
 
-      <div className="border-t border-slate-700/50 px-3 py-2">
+      <div
+        className={cn(
+          "border-t px-3 py-2",
+          layout === "workspace"
+            ? "border-white/[0.08] bg-[#09111a] px-5 py-4"
+            : "border-slate-700/50"
+        )}
+      >
         <ModeSwitcher
           disabled={busy}
           mode={chatMode}

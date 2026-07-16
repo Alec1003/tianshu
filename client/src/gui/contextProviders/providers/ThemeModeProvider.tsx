@@ -7,16 +7,11 @@ import {
   getTianShuTheme,
   type TianShuThemeMode,
 } from "@/gui/theme/tianshuTheme";
-import { readStorageItem, writeStorageItem } from "@/lib/legacyStorage";
+import { writeStorageItem } from "@/lib/legacyStorage";
 
 const STORAGE_KEY = "tianshu.themeMode";
 
 function detectInitialMode(): TianShuThemeMode {
-  if (typeof window === "undefined") return "dark";
-  const stored = readStorageItem(STORAGE_KEY);
-  if (stored === "dark" || stored === "light") return stored;
-  // Default to dark (operations) regardless of OS preference; TianShu is
-  // a tactical platform that favors dark mode out of the box.
   return "dark";
 }
 
@@ -40,11 +35,12 @@ export const ThemeModeProvider = ({
   }, [mode]);
 
   const setMode = useCallback((next: TianShuThemeMode) => {
-    setModeState(next);
+    void next;
+    setModeState("dark");
   }, []);
 
   const toggleMode = useCallback(() => {
-    setModeState((prev) => (prev === "dark" ? "light" : "dark"));
+    setModeState("dark");
   }, []);
 
   const ctx = useMemo(

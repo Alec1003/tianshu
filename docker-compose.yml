@@ -90,6 +90,10 @@ services:
         VITE_ENV: standalone
         VITE_API_SERVER_URL: ""
         VITE_AI_SERVER_URL: ""
+        HTTP_PROXY: "${HTTP_PROXY:-}"
+        HTTPS_PROXY: "${HTTPS_PROXY:-}"
+        ALL_PROXY: "${ALL_PROXY:-}"
+        NO_PROXY: "${NO_PROXY:-localhost,127.0.0.1,server,client}"
     ports:
       - "3002:3002"
     restart: unless-stopped

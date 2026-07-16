@@ -1371,7 +1371,7 @@ export default function SimulationSidebar({
           </div>
         </Section>
 
-        <Section title="自动交战规则" icon={ListChecks}>
+        {false && <Section title="自动交战规则" icon={ListChecks}>
           <div className="space-y-2">
             <DoctrineRow
               description="允许飞机对敌方飞机、设施、舰船和机场执行机会攻击。"
@@ -1394,7 +1394,7 @@ export default function SimulationSidebar({
               label="舰船自动防御"
             />
           </div>
-        </Section>
+        </Section>}
 
         <Section title="指挥入口" icon={MapPin}>
           <div className="space-y-2.5">
@@ -1478,38 +1478,6 @@ export default function SimulationSidebar({
                 description="保存到本地"
                 onClick={onExportScenario}
               />
-            </div>
-            <div className="rounded-xl border border-cyan-300/10 bg-slate-950/35 p-3">
-              <div className="mb-2 flex items-center gap-2 text-[10px] uppercase tracking-[0.24em] text-cyan-300/70">
-                <Sparkles className="size-3" />
-                预设场景
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  className="rounded-lg border border-cyan-300/14 bg-slate-950/45 px-3 py-2 text-left transition-all hover:border-cyan-300/40 hover:bg-cyan-300/8"
-                  onClick={onLoadDemoScenario}
-                  type="button"
-                >
-                  <div className="text-sm font-semibold text-slate-100">
-                    Demo 场景
-                  </div>
-                  <div className="mt-0.5 text-[11px] text-slate-500">
-                    入门演示，少量单位
-                  </div>
-                </button>
-                <button
-                  className="rounded-lg border border-cyan-300/14 bg-slate-950/45 px-3 py-2 text-left transition-all hover:border-cyan-300/40 hover:bg-cyan-300/8"
-                  onClick={onLoadSCSScenario}
-                  type="button"
-                >
-                  <div className="text-sm font-semibold text-slate-100">
-                    南海打击
-                  </div>
-                  <div className="mt-0.5 text-[11px] text-slate-500">
-                    SCS 默认推演
-                  </div>
-                </button>
-              </div>
             </div>
           </div>
         </Section>
@@ -1634,10 +1602,7 @@ export default function SimulationSidebar({
               {snapshot.godMode ? "全域视角" : "阵营视角"}
             </Button>
             <Button
-              className={cn(
-                "justify-start",
-                snapshot.eraserMode && "border-red-300/60 bg-red-500/14"
-              )}
+              className="hidden"
               onClick={onToggleEraser}
               variant={snapshot.eraserMode ? "danger" : "tactical"}
             >
@@ -1678,7 +1643,7 @@ export default function SimulationSidebar({
           </div>
         </Section>
 
-        <Section title="可见对象口径" icon={Target}>
+        {false && <Section title="可见对象口径" icon={Target}>
           <div className="grid grid-cols-2 gap-2">
             <CountTile
               icon={Target}
@@ -1691,7 +1656,7 @@ export default function SimulationSidebar({
               value={totalObjectCount}
             />
           </div>
-        </Section>
+        </Section>}
       </>
     );
   }
@@ -1768,7 +1733,7 @@ export default function SimulationSidebar({
   return (
     <motion.aside
       animate={{ opacity: 1, x: 0 }}
-      className="hidden min-h-0 w-full min-w-0 shrink-0 overflow-hidden border-r border-cyan-300/10 bg-[#050b13]/90 p-4 shadow-[inset_-1px_0_0_rgba(125,211,252,0.03)] backdrop-blur-xl lg:flex lg:flex-col"
+      className="hidden min-h-0 w-full min-w-0 shrink-0 overflow-hidden border-r border-cyan-300/10 bg-[#050b13]/92 p-4 shadow-[inset_-1px_0_0_rgba(125,211,252,0.03),0_24px_64px_rgba(0,0,0,0.24)] backdrop-blur-xl lg:flex lg:flex-col"
       initial={{ opacity: 0, x: -18 }}
       transition={{ duration: 0.35, ease: "easeOut" }}
     >

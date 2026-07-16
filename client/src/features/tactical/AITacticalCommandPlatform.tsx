@@ -63,7 +63,6 @@ import {
 } from "@/lib/legacyStorage";
 import { randomUUID } from "@/utils/generateUUID";
 import AISidebar from "./AISidebar";
-import SimulationInspectorPanel from "./SimulationInspectorPanel";
 import TimelineReplayPanel from "./TimelineReplayPanel";
 import TopTacticalBar from "./TopTacticalBar";
 import SimulationSidebar, {
@@ -76,6 +75,16 @@ import DocPreview from "./DocPreview";
 import AARDialog, { type AARSideEntry } from "./AARDialog";
 import { SIDE_COLOR } from "@/utils/colors";
 import type { SideDoctrine } from "@/game/Doctrine";
+
+type PreviewSurface = "map" | "document";
+
+const tacticalUiVisibility = {
+  showTimelineReplayPanel: false,
+  showAarDialog: false,
+  showTimelineEntry: false,
+  showAdvancedSimulationControls: false,
+  showAarEntry: false,
+} as const;
 
 const railItems: Array<{
   id: SimulationPanelId;
@@ -353,10 +362,11 @@ export default function AITacticalCommandPlatform({
   >(null);
   // AI 侧栏：默认 collapsed；sidebar 顶部 Sparkles 动作与底部 Settings
   // 动作分别打开 chat / settings tab。
-  const [aiSidebarOpen, setAiSidebarOpen] = useState(false);
+  const [aiSidebarOpen, setAiSidebarOpen] = useState(true);
   const [timelinePanelOpen, setTimelinePanelOpen] = useState(false);
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
   const [previewDocFile, setPreviewDocFile] = useState<string | null>(null);
+  const [previewSurface, setPreviewSurface] = useState<PreviewSurface>("map");
   const [showRoutes, setShowRoutes] = useState(false);
   const [showRanges, setShowRanges] = useState(false);
   const [mapSceneMode, setMapSceneMode] = useState<CesiumSceneModeKey>("3d");
@@ -1062,7 +1072,6 @@ export default function AITacticalCommandPlatform({
       : "clamp(18rem, 24vw, 26rem)";
   // 仿真态势面板从地图右侧搬到地图下方后，右栏槽位留给 AI Sidebar；
   // AI Sidebar 展开时加一列，收起时不占列宽。
-  const aiSidebarTrack = "clamp(20rem, 26vw, 28rem)";
 
   // AI command 返回的 scenario 应用回 game；复用现有的 loadScenario
   // 路径，后紧接一次 refreshSnapshot 让 UI 拿到最新单位 / 设施 / 任务。
@@ -1113,6 +1122,20 @@ export default function AITacticalCommandPlatform({
     onRequestSaveAs(captureCurrentScenarioData());
   }, [onRequestSaveAs, captureCurrentScenarioData]);
 
+  const handlePreviewDocument = useCallback((filename?: string | null) => {
+    setPreviewDocFile(filename ?? null);
+    setPreviewSurface("document");
+  }, []);
+
+  const handleOpenMapPreview = useCallback(() => {
+    setPreviewSurface("map");
+  }, []);
+
+  const handleCloseDocumentPreview = useCallback(() => {
+    setPreviewDocFile(null);
+    setPreviewSurface("map");
+  }, []);
+
   const toggleTimelinePanel = useCallback(() => {
     if (!timelinePanelOpen) setAiSidebarOpen(false);
     setTimelinePanelOpen((value) => !value);
@@ -1141,10 +1164,9 @@ export default function AITacticalCommandPlatform({
       className="h-dvh overflow-hidden bg-tactical-bg text-tactical-text lg:grid"
       style={{
         gridTemplateColumns: [
-          "64px",
+          "72px",
           sidebarCollapsed ? "0px" : sidebarTrack,
           "minmax(0,1fr)",
-          aiSidebarOpen ? aiSidebarTrack : "0px",
         ].join(" "),
         gridTemplateRows: "3.5rem minmax(0,1fr)",
       }}
@@ -1258,7 +1280,7 @@ export default function AITacticalCommandPlatform({
             onLoadDemoScenario={handleLoadDemoScenario}
             onLoadSCSScenario={handleLoadSCSScenario}
             previewFile={previewDocFile}
-            onPreview={setPreviewDocFile}
+            onPreview={handlePreviewDocument}
             onImportScenario={handleImportScenario}
             onExportScenario={handleExportScenario}
           />
@@ -1278,7 +1300,7 @@ export default function AITacticalCommandPlatform({
 
       <div
         className="relative z-40 min-w-0"
-        style={{ gridColumn: "3 / 5", gridRow: "1 / 2" }}
+        style={{ gridColumn: "3 / 4", gridRow: "1 / 2" }}
       >
         <TopTacticalBar
           snapshot={snapshot}
@@ -1299,20 +1321,94 @@ export default function AITacticalCommandPlatform({
           onToggleMapSceneMode={() =>
             setMapSceneMode((value) => (value === "3d" ? "2d" : "3d"))
           }
+          uiVisibility={tacticalUiVisibility}
         />
       </div>
 
+      <section
+        className="grid min-h-0 min-w-0"
+        style={{
+          gridColumn: "3 / 4",
+          gridRow: "2 / 3",
+          gridTemplateColumns: [
+            "minmax(0,1fr)",
+            aiSidebarOpen ? "clamp(22rem, 28vw, 32rem)" : "0px",
+          ].join(" "),
+        }}
+      >
       <main
         className="relative isolate z-0 flex min-h-0 min-w-0 flex-col overflow-hidden bg-tactical-bg"
-        style={{ gridColumn: "3 / 4", gridRow: "2 / 3" }}
+        style={{ gridColumn: "1 / 2", gridRow: "1 / 2" }}
       >
-        {previewDocFile ? (
+        <div className="hidden items-center justify-between gap-3 border-b border-white/[0.08] bg-[#071018] px-4 py-3">
+          <div>
+            <div className="text-[10px] uppercase tracking-[0.24em] text-slate-500">
+              Preview Rail
+            </div>
+            <div className="mt-1 text-sm font-semibold text-slate-100">
+              {previewSurface === "document" ? "文档工作台" : "地图工作台"}
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              className={cn(
+                "inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs transition-colors",
+                previewSurface === "map"
+                  ? "border-cyan-300/40 bg-cyan-300/12 text-cyan-100"
+                  : "border-white/[0.08] bg-white/[0.03] text-slate-300 hover:border-cyan-300/25 hover:text-slate-100"
+              )}
+              onClick={handleOpenMapPreview}
+              type="button"
+            >
+              <Map className="size-3.5" />
+              地图
+            </button>
+            <button
+              className={cn(
+                "inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs transition-colors",
+                previewSurface === "document"
+                  ? "border-cyan-300/40 bg-cyan-300/12 text-cyan-100"
+                  : "border-white/[0.08] bg-white/[0.03] text-slate-300 hover:border-cyan-300/25 hover:text-slate-100"
+              )}
+              onClick={() => setPreviewSurface("document")}
+              type="button"
+            >
+              <FileText className="size-3.5" />
+              文档
+            </button>
+          </div>
+        </div>
+        <div className="hidden grid-cols-2 gap-2 border-b border-white/[0.08] bg-[#071018] px-4 py-3 text-xs">
+          <div className="rounded-2xl border border-white/[0.06] bg-white/[0.03] px-3 py-2 text-slate-400">
+            <div className="text-[10px] uppercase tracking-[0.22em] text-slate-500">
+              Surface
+            </div>
+            <div className="mt-1 text-slate-100">
+              {previewSurface === "document" ? "Document" : "Map"}
+            </div>
+          </div>
+          <div className="rounded-2xl border border-white/[0.06] bg-white/[0.03] px-3 py-2 text-slate-400">
+            <div className="text-[10px] uppercase tracking-[0.22em] text-slate-500">
+              Current File
+            </div>
+            <div className="mt-1 truncate text-slate-100">
+              {previewDocFile ?? "No file selected"}
+            </div>
+          </div>
+        </div>
+        {previewSurface === "document" && previewDocFile ? (
           <div className="relative min-h-0 flex-1">
             <DocPreview
               docFolder={scenarioMeta?.doc_folder}
               filename={previewDocFile}
-              onClose={() => setPreviewDocFile(null)}
+              onClose={handleCloseDocumentPreview}
             />
+          </div>
+        ) : previewSurface === "document" ? (
+          <div className="flex min-h-0 flex-1 items-center justify-center px-6">
+            <div className="rounded-[24px] border border-dashed border-white/[0.08] bg-[#0c141d] px-6 py-10 text-center text-sm text-slate-400">
+              从左侧文档区或中央 AI 工作台选择文件后，会在这里打开预览。
+            </div>
           </div>
         ) : (
           <>
@@ -1367,64 +1463,89 @@ export default function AITacticalCommandPlatform({
           现搬到地图列底部，4 个核心卡片在 lg+ 横向 4 列铺开，腾出右侧
           槽位给后续 AI 工具栏。
         */}
-        <SimulationInspectorPanel
-          game={game}
-          runtimeScenarioId={scenarioId}
-          scenarioId={scenarioMeta?.id}
-          snapshot={snapshot}
-        />
       
           </>
         )}
       </main>
 
-      <AISidebar
-        activeTab="chat"
-        onApplyScenario={handleApplyAiScenario}
-        onOpenChange={setAiSidebarOpen}
-        onResumePlay={playSimulation}
-        onSettingsOpenChange={setSettingsModalOpen}
-        onTabChange={() => setAiSidebarOpen(true)}
-        mapBaseLayer={mapBaseLayer}
-        open={aiSidebarOpen}
-        onMapBaseLayerChange={setMapBaseLayer}
-        docFolder={scenarioMeta?.doc_folder}
-        scenarioId={chatScenarioId}
-        settingsOpen={settingsModalOpen}
-        panelClassName="shadow-[-24px_0_70px_rgba(0,0,0,0.35)]"
-        panelStyle={{ gridColumn: "4 / 5", gridRow: "2 / 3" }}
-      />
+      {aiSidebarOpen ? (
+        <AISidebar
+          activeTab="chat"
+          onApplyScenario={handleApplyAiScenario}
+          onOpenChange={setAiSidebarOpen}
+          onOpenDocumentPreview={handlePreviewDocument}
+          onOpenMapPreview={handleOpenMapPreview}
+          onResumePlay={playSimulation}
+          onSettingsOpenChange={setSettingsModalOpen}
+          onTabChange={() => setAiSidebarOpen(true)}
+          mapBaseLayer={mapBaseLayer}
+          open={aiSidebarOpen}
+          onMapBaseLayerChange={setMapBaseLayer}
+          docFolder={scenarioMeta?.doc_folder}
+          previewFile={previewDocFile}
+          previewView={previewSurface}
+          scenarioId={chatScenarioId}
+          settingsOpen={settingsModalOpen}
+          panelClassName="shadow-[0_28px_90px_rgba(0,0,0,0.32)]"
+          panelStyle={{ gridColumn: "2 / 3", gridRow: "1 / 2" }}
+        />
+      ) : (
+        <section
+          className="flex min-h-0 min-w-0 items-center justify-center rounded-[28px] border border-dashed border-white/[0.08] bg-[#08111a] px-8 text-center"
+          style={{ gridColumn: "2 / 3", gridRow: "1 / 2" }}
+        >
+          <div className="max-w-md">
+            <div className="text-[11px] uppercase tracking-[0.28em] text-slate-500">
+              AI Workspace
+            </div>
+            <div className="mt-3 text-2xl font-semibold tracking-tight text-slate-100">
+              中央智能体工作台已隐藏
+            </div>
+            <div className="mt-3 text-sm leading-6 text-slate-400">
+              使用顶部 AI 开关重新打开主对话区。右侧预览与左侧导航不会被重置。
+            </div>
+            <Button className="mt-5" onClick={toggleAiSidebar} variant="tactical">
+              打开 AI 工作台
+            </Button>
+          </div>
+        </section>
+      )}
+      </section>
 
-      <TimelineReplayPanel
-        onClose={() => setTimelinePanelOpen(false)}
-        open={timelinePanelOpen}
-        runtimeScenarioId={scenarioId}
-        scenarioId={scenarioMeta?.id}
-        snapshot={snapshot}
-      />
+      {tacticalUiVisibility.showTimelineReplayPanel && (
+        <TimelineReplayPanel
+          onClose={() => setTimelinePanelOpen(false)}
+          open={timelinePanelOpen}
+          runtimeScenarioId={scenarioId}
+          scenarioId={scenarioMeta?.id}
+          snapshot={snapshot}
+        />
+      )}
 
-      <AARDialog
-        elapsedLabel={formatElapsedHMS(snapshot.elapsedSeconds)}
-        objectiveEvent={game.currentScenario.lastObjectiveDestroyed}
-        onClose={() => setAarOpen(false)}
-        onReset={() => {
-          setAarOpen(false);
-          resetSimulation();
-        }}
-        open={aarOpen}
-        outcome={snapshot.outcome}
-        scenarioName={snapshot.scenarioName}
-        sides={snapshot.sideStats.map<AARSideEntry>((side) => ({
-          id: side.id,
-          name: side.name,
-          colorHex: side.colorHex,
-          score: side.score,
-          aircraft: side.aircraft,
-          ships: side.ships,
-          facilities: side.facilities,
-          airbases: side.airbases,
-        }))}
-      />
+      {tacticalUiVisibility.showAarDialog && (
+        <AARDialog
+          elapsedLabel={formatElapsedHMS(snapshot.elapsedSeconds)}
+          objectiveEvent={game.currentScenario.lastObjectiveDestroyed}
+          onClose={() => setAarOpen(false)}
+          onReset={() => {
+            setAarOpen(false);
+            resetSimulation();
+          }}
+          open={aarOpen}
+          outcome={snapshot.outcome}
+          scenarioName={snapshot.scenarioName}
+          sides={snapshot.sideStats.map<AARSideEntry>((side) => ({
+            id: side.id,
+            name: side.name,
+            colorHex: side.colorHex,
+            score: side.score,
+            aircraft: side.aircraft,
+            ships: side.ships,
+            facilities: side.facilities,
+            airbases: side.airbases,
+          }))}
+        />
+      )}
     </div>
   );
 }

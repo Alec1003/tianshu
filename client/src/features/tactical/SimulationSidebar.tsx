@@ -1768,7 +1768,7 @@ export default function SimulationSidebar({
   return (
     <motion.aside
       animate={{ opacity: 1, x: 0 }}
-      className="hidden min-h-0 w-full min-w-0 shrink-0 overflow-hidden border-r border-cyan-300/10 bg-[#050b13]/90 p-4 shadow-[inset_-1px_0_0_rgba(125,211,252,0.03)] backdrop-blur-xl lg:flex lg:flex-col"
+      className="hidden min-h-0 w-full min-w-0 shrink-0 overflow-hidden border-r border-cyan-300/10 bg-[#050b13]/92 p-4 shadow-[inset_-1px_0_0_rgba(125,211,252,0.03),0_24px_64px_rgba(0,0,0,0.24)] backdrop-blur-xl lg:flex lg:flex-col"
       initial={{ opacity: 0, x: -18 }}
       transition={{ duration: 0.35, ease: "easeOut" }}
     >

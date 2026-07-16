@@ -74,7 +74,6 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { SearchInput } from "@/components/ui/search-input";
 import { StatCard } from "@/components/ui/stat-card";
 import { TabButton, Tabs } from "@/components/ui/tabs";
-import ThemeModeToggle from "@/components/theme/ThemeModeToggle";
 import { Toolbar, ToolbarGroup } from "@/components/ui/toolbar";
 import { useAuth } from "@/features/auth/useAuth";
 import Dba from "@/game/db/Dba";
@@ -386,14 +385,13 @@ function thumbStyle(id: string, status: VisualStatus): CSSProperties {
 export default function ScenarioListPage() {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
-  const unitDb = useContext(UnitDbContext);
 
   const [items, setItems] = useState<ScenarioListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [view, setView] = useState<ViewMode>("grid");
-  const [query, setQuery] = useState("");
   const [activeModule, setActiveModule] = useState<WorkspaceModule>("projects");
+  const [query, setQuery] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const accountRef = useRef<HTMLDivElement | null>(null);
@@ -434,23 +432,10 @@ export default function ScenarioListPage() {
     () => items.filter((item) => item.is_template),
     [items]
   );
-  const unitAssetCount =
-    unitDb.getAircraftDb().length +
-    unitDb.getShipDb().length +
-    unitDb.getFacilityDb().length +
-    unitDb.getAirbaseDb().length +
-    unitDb.getWeaponDb().length;
-
-  const moduleItems = useMemo(() => {
-    if (activeModule === "templates") return templates;
-    if (activeModule === "assets") return [];
-    return myScenarios;
-  }, [activeModule, myScenarios, templates]);
 
   const queryText = query.trim().toLowerCase();
-  const filteredItems = useMemo(() => {
-    if (!queryText) return moduleItems;
-    return moduleItems.filter((item) =>
+  const matchesQuery = useCallback(
+    (item: ScenarioListItem) =>
       [
         item.name,
         item.description,
@@ -462,39 +447,39 @@ export default function ScenarioListPage() {
         .filter(Boolean)
         .join(" ")
         .toLowerCase()
-        .includes(queryText)
-    );
-  }, [moduleItems, queryText]);
+        .includes(queryText),
+    [queryText]
+  );
+  const filteredMyScenarios = useMemo(() => {
+    if (!queryText) return myScenarios;
+    return myScenarios.filter(matchesQuery);
+  }, [matchesQuery, myScenarios, queryText]);
+  const filteredTemplates = useMemo(() => {
+    if (!queryText) return templates;
+    return templates.filter(matchesQuery);
+  }, [matchesQuery, queryText, templates]);
 
-  const activeCopy = MODULE_COPY[activeModule];
-  const activeModuleLabel =
-    MODULES.find((module) => module.id === activeModule)?.label ?? "项目管理";
-  const isProjectWorkspace = activeModule === "projects";
-  const isTemplateWorkspace = activeModule === "templates";
   const shellNavItems = useMemo<AppShellNavItem[]>(
-    () =>
-      MODULES.map((module) => ({
-        id: module.id,
-        label: module.label,
-        caption: module.caption,
-        icon: module.icon,
-        badge:
-          module.id === "projects"
-            ? myScenarios.length
-            : module.id === "templates"
-              ? templates.length
-              : unitAssetCount,
-      })),
-    [myScenarios.length, templates.length, unitAssetCount]
+    () => [
+      {
+        id: "projects",
+        label: "项目管理",
+        caption: "Projects",
+        icon: FolderKanban,
+        badge: myScenarios.length,
+      },
+      {
+        id: "templates",
+        label: "模板中心",
+        caption: "System Scenarios",
+        icon: PackageOpen,
+        badge: templates.length,
+      },
+    ],
+    [myScenarios.length, templates.length]
   );
-  const runningCount = useMemo(
-    () => myScenarios.filter((item) => statusOf(item) === "running").length,
-    [myScenarios]
-  );
-  const completedCount = useMemo(
-    () => myScenarios.filter((item) => statusOf(item) === "completed").length,
-    [myScenarios]
-  );
+
+  const activeModuleCopy = MODULE_COPY[activeModule];
 
   const handleOpen = (id: string) => navigate(`/play/${id}`);
 
@@ -536,36 +521,22 @@ export default function ScenarioListPage() {
     <AppShell
       activeNavItem={activeModule}
       actions={
-        isProjectWorkspace ? (
-          <Button onClick={() => setDialogOpen(true)} type="button">
-            <Plus className="size-4" />
-            新建项目
-          </Button>
-        ) : null
+        <Button onClick={() => setDialogOpen(true)} type="button">
+          <Plus className="size-4" />
+          新建项目
+        </Button>
       }
-      description={activeCopy.subtitle}
-      eyebrow={activeCopy.eyebrow}
+      description={activeModuleCopy.subtitle}
+      eyebrow={activeModuleCopy.eyebrow}
       navItems={shellNavItems}
       onNavItemSelect={(id) => {
-        setActiveModule(id as WorkspaceModule);
-        setQuery("");
+        if (id === "projects" || id === "templates") {
+          setActiveModule(id);
+        }
       }}
-      rightPanel={
-        activeModule === "assets" ? undefined : (
-          <WorkspaceDetailPanel
-            isTemplateSection={isTemplateWorkspace}
-            items={filteredItems}
-            onCreate={
-              isProjectWorkspace ? () => setDialogOpen(true) : undefined
-            }
-            onOpen={handleOpen}
-          />
-        )
-      }
-      title={activeCopy.title}
+      title={activeModuleCopy.title}
       topRight={
         <div className="flex items-center gap-2">
-          <ThemeModeToggle />
           <AccountMenu
             userEmail={user?.email}
             displayName={user?.display_name || user?.email || "Operator"}
@@ -579,147 +550,160 @@ export default function ScenarioListPage() {
       }
     >
       <div className="space-y-4">
-        <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-          <StatCard
-            caption="本地可编辑工作项"
-            icon={FolderKanban}
-            label="自定义项目"
-            tone="cyan"
-            value={myScenarios.length}
-          />
-          <StatCard
-            caption="后端系统模板"
-            icon={PackageOpen}
-            label="系统模板"
-            tone="slate"
-            value={templates.length}
-          />
-          <StatCard
-            caption="平台单位库"
-            icon={Database}
-            label="单位资产"
-            tone="green"
-            value={unitAssetCount}
-          />
-          <StatCard
-            caption={`${completedCount} 已归档`}
-            icon={Activity}
-            label="运行中"
-            tone="amber"
-            value={runningCount}
-          />
-        </div>
-
         {error && (
           <div className="rounded-lg border border-red-400/25 bg-red-500/[0.08] px-3 py-2 text-xs text-red-100">
             {error}
           </div>
         )}
 
+        {activeModule === "projects" && (
         <Card className="p-3">
           <Toolbar className="border-0 bg-transparent p-0">
             <ToolbarGroup>
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
                   <h2 className="text-sm font-semibold text-slate-100">
-                    {activeModuleLabel}
+                    自定义项目
                   </h2>
                   <span className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[11px] text-slate-300">
-                    {activeModule === "assets"
-                      ? unitAssetCount
-                      : filteredItems.length}
+                    {filteredMyScenarios.length}
                   </span>
                 </div>
                 <p className="mt-1 text-xs text-slate-400">
-                  {activeModule === "assets"
-                    ? "管理飞机、舰艇、设施、机场与武器数据。"
-                    : "搜索、筛选并打开推演工作项。"}
+                  搜索、筛选并打开自定义推演项目。
                 </p>
               </div>
             </ToolbarGroup>
             <ToolbarGroup>
-              {activeModule !== "assets" && (
-                <SearchInput
-                  className="w-full sm:w-64"
-                  onChange={(event) => setQuery(event.target.value)}
-                  onClear={() => setQuery("")}
-                  placeholder="搜索名称、状态、描述"
-                  value={query}
-                />
-              )}
-              <select
-                value={activeModule}
-                onChange={(event) => {
-                  setActiveModule(event.target.value as WorkspaceModule);
-                  setQuery("");
-                }}
-                className="h-9 rounded-md border border-tactical-line bg-slate-950/60 px-2.5 text-xs text-slate-300 outline-none focus:border-tactical-active focus-visible:ring-2 focus-visible:ring-tactical-accent/45"
-              >
-                {MODULES.map((module) => (
-                  <option key={module.id} value={module.id}>
-                    {module.label}
-                  </option>
-                ))}
-              </select>
-              {activeModule !== "assets" && (
-                <Tabs>
-                  <TabButton
-                    active={view === "grid"}
-                    onClick={() => setView("grid")}
-                    title="网格视图"
-                  >
-                    <LayoutGrid className="size-4" />
-                  </TabButton>
-                  <TabButton
-                    active={view === "list"}
-                    onClick={() => setView("list")}
-                    title="列表视图"
-                  >
-                    <ListIcon className="size-4" />
-                  </TabButton>
-                </Tabs>
-              )}
+              <SearchInput
+                className="w-full sm:w-64"
+                onChange={(event) => setQuery(event.target.value)}
+                onClear={() => setQuery("")}
+                placeholder="搜索名称、状态、描述"
+                value={query}
+              />
+              <Tabs>
+                <TabButton
+                  active={view === "grid"}
+                  onClick={() => setView("grid")}
+                  title="网格视图"
+                >
+                  <LayoutGrid className="size-4" />
+                </TabButton>
+                <TabButton
+                  active={view === "list"}
+                  onClick={() => setView("list")}
+                  title="列表视图"
+                >
+                  <ListIcon className="size-4" />
+                </TabButton>
+              </Tabs>
             </ToolbarGroup>
           </Toolbar>
 
           <div className="mt-4">
             {loading ? (
               <Skeleton view={view} />
-            ) : activeModule === "assets" ? (
-              <DataAssetWorkspace />
-            ) : filteredItems.length === 0 ? (
+            ) : filteredMyScenarios.length === 0 ? (
               <Empty
-                title={
-                  isTemplateWorkspace ? "暂无匹配模板" : "没有匹配的工作项"
-                }
-                description={
-                  isTemplateWorkspace
-                    ? "调整搜索条件，或等待管理员沉淀新的推演模板。"
-                    : "调整搜索条件，或新建一个推演项目进入战术控制台。"
-                }
-                onAction={
-                  isTemplateWorkspace ? undefined : () => setDialogOpen(true)
-                }
+                title="没有匹配的自定义项目"
+                description="调整搜索条件后重试，或新建一个项目。"
+                onAction={() => setDialogOpen(true)}
               />
             ) : view === "grid" ? (
               <ProjectGrid
-                items={filteredItems}
-                isTemplateSection={isTemplateWorkspace}
+                items={filteredMyScenarios}
                 onOpen={handleOpen}
-                onDuplicate={isTemplateWorkspace ? undefined : handleDuplicate}
-                onDelete={isTemplateWorkspace ? undefined : handleDelete}
+                onDuplicate={handleDuplicate}
+                onDelete={handleDelete}
               />
             ) : (
               <ProjectList
-                items={filteredItems}
-                isTemplateSection={isTemplateWorkspace}
+                items={filteredMyScenarios}
                 onOpen={handleOpen}
-                onDuplicate={isTemplateWorkspace ? undefined : handleDuplicate}
-                onDelete={isTemplateWorkspace ? undefined : handleDelete}
+                onDuplicate={handleDuplicate}
+                onDelete={handleDelete}
               />
             )}
           </div>
         </Card>
+        )}
+
+        {activeModule === "templates" && (
+        <Card className="p-3">
+          <Toolbar className="border-0 bg-transparent p-0">
+            <ToolbarGroup>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <h2 className="text-sm font-semibold text-slate-100">
+                    系统场景
+                  </h2>
+                  <span className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[11px] text-slate-300">
+                    {filteredTemplates.length}
+                  </span>
+                </div>
+                <p className="mt-1 text-xs text-slate-400">
+                  内置系统场景可直接打开，也可复制为个人项目后继续编辑。
+                </p>
+              </div>
+            </ToolbarGroup>
+            <ToolbarGroup>
+              <SearchInput
+                className="w-full sm:w-64"
+                onChange={(event) => setQuery(event.target.value)}
+                onClear={() => setQuery("")}
+                placeholder="搜索名称、状态、描述"
+                value={query}
+              />
+              <Tabs>
+                <TabButton
+                  active={view === "grid"}
+                  onClick={() => setView("grid")}
+                  title="网格视图"
+                >
+                  <LayoutGrid className="size-4" />
+                </TabButton>
+                <TabButton
+                  active={view === "list"}
+                  onClick={() => setView("list")}
+                  title="列表视图"
+                >
+                  <ListIcon className="size-4" />
+                </TabButton>
+              </Tabs>
+            </ToolbarGroup>
+          </Toolbar>
+
+          <div className="mt-4">
+            {loading ? (
+              <Skeleton view={view} />
+            ) : filteredTemplates.length === 0 ? (
+              <Empty
+                title={queryText ? "没有匹配的系统场景" : "暂无系统场景"}
+                description={
+                  queryText
+                    ? "调整搜索条件后重试。"
+                    : "后端系统场景尚未同步到当前列表。"
+                }
+              />
+            ) : view === "grid" ? (
+              <ProjectGrid
+                items={filteredTemplates}
+                onOpen={handleOpen}
+                onDuplicate={handleDuplicate}
+                isTemplateSection
+              />
+            ) : (
+              <ProjectList
+                items={filteredTemplates}
+                onOpen={handleOpen}
+                onDuplicate={handleDuplicate}
+                isTemplateSection
+              />
+            )}
+          </div>
+        </Card>
+        )}
       </div>
 
       {dialogOpen && (
@@ -982,7 +966,7 @@ function ProjectMenu({
         role="menuitem"
       >
         <Eye className="size-3.5 text-cyan-200" />
-        查看详情
+        打开项目
       </button>
       {onDuplicate && (
         <button

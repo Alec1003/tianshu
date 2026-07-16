@@ -94,7 +94,6 @@ const railItems: Array<{
   { id: "command", label: "指挥", icon: Command },
   { id: "simulation", label: "仿真", icon: Crosshair },
   { id: "layers", label: "图层", icon: Layers3 },
-  { id: "assets", label: "单位", icon: Boxes },
   { id: "documents", label: "文档", icon: FileText },
 ];
 
@@ -1205,19 +1204,6 @@ export default function AITacticalCommandPlatform({
 
         <div className="flex flex-col items-center gap-3">
           <Button
-            aria-label={aiSidebarOpen ? "关闭 AI 侧栏" : "打开 AI 侧栏"}
-            className={cn(
-              "size-10",
-              aiSidebarOpen ? "text-slate-100" : "text-slate-300"
-            )}
-            onClick={toggleAiSidebar}
-            size="icon"
-            title="AI 助手"
-            variant={aiSidebarOpen ? "tactical" : "ghost"}
-          >
-            <Sparkles className="size-4" />
-          </Button>
-          <Button
             aria-label={sidebarCollapsed ? "展开左侧栏" : "收起左侧栏"}
             className="size-10"
             onClick={() => setSidebarCollapsed((value) => !value)}
@@ -1229,19 +1215,6 @@ export default function AITacticalCommandPlatform({
             ) : (
               <ChevronLeft className="size-4" />
             )}
-          </Button>
-          <Button
-            aria-label="AI / 系统设置"
-            className={cn(
-              "size-10",
-              settingsModalOpen ? "text-slate-100" : "text-slate-300"
-            )}
-            onClick={() => setSettingsModalOpen((value) => !value)}
-            size="icon"
-            title="AI / 系统设置"
-            variant={settingsModalOpen ? "tactical" : "ghost"}
-          >
-            <Settings className="size-4" />
           </Button>
         </div>
       </motion.nav>

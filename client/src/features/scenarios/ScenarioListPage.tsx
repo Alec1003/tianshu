@@ -389,9 +389,11 @@ export default function ScenarioListPage() {
   const [items, setItems] = useState<ScenarioListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [view, setView] = useState<ViewMode>("grid");
+  const [projectView, setProjectView] = useState<ViewMode>("grid");
+  const [templateView, setTemplateView] = useState<ViewMode>("grid");
   const [activeModule, setActiveModule] = useState<WorkspaceModule>("projects");
-  const [query, setQuery] = useState("");
+  const [projectQuery, setProjectQuery] = useState("");
+  const [templateQuery, setTemplateQuery] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const accountRef = useRef<HTMLDivElement | null>(null);
@@ -433,8 +435,7 @@ export default function ScenarioListPage() {
     [items]
   );
 
-  const queryText = query.trim().toLowerCase();
-  const matchesQuery = useCallback(
+  const buildScenarioSearchText = useCallback(
     (item: ScenarioListItem) =>
       [
         item.name,
@@ -446,18 +447,23 @@ export default function ScenarioListPage() {
       ]
         .filter(Boolean)
         .join(" ")
-        .toLowerCase()
-        .includes(queryText),
-    [queryText]
+        .toLowerCase(),
+    []
   );
+  const projectQueryText = projectQuery.trim().toLowerCase();
+  const templateQueryText = templateQuery.trim().toLowerCase();
   const filteredMyScenarios = useMemo(() => {
-    if (!queryText) return myScenarios;
-    return myScenarios.filter(matchesQuery);
-  }, [matchesQuery, myScenarios, queryText]);
+    if (!projectQueryText) return myScenarios;
+    return myScenarios.filter((item) =>
+      buildScenarioSearchText(item).includes(projectQueryText)
+    );
+  }, [buildScenarioSearchText, myScenarios, projectQueryText]);
   const filteredTemplates = useMemo(() => {
-    if (!queryText) return templates;
-    return templates.filter(matchesQuery);
-  }, [matchesQuery, queryText, templates]);
+    if (!templateQueryText) return templates;
+    return templates.filter((item) =>
+      buildScenarioSearchText(item).includes(templateQueryText)
+    );
+  }, [buildScenarioSearchText, templateQueryText, templates]);
 
   const shellNavItems = useMemo<AppShellNavItem[]>(
     () => [
@@ -474,6 +480,12 @@ export default function ScenarioListPage() {
         caption: "System Scenarios",
         icon: PackageOpen,
         badge: templates.length,
+      },
+      {
+        id: "assets",
+        label: "数据资产",
+        caption: "Data Assets",
+        icon: Database,
       },
     ],
     [myScenarios.length, templates.length]
@@ -521,16 +533,18 @@ export default function ScenarioListPage() {
     <AppShell
       activeNavItem={activeModule}
       actions={
-        <Button onClick={() => setDialogOpen(true)} type="button">
-          <Plus className="size-4" />
-          新建项目
-        </Button>
+        activeModule === "assets" ? undefined : (
+          <Button onClick={() => setDialogOpen(true)} type="button">
+            <Plus className="size-4" />
+            新建项目
+          </Button>
+        )
       }
       description={activeModuleCopy.subtitle}
       eyebrow={activeModuleCopy.eyebrow}
       navItems={shellNavItems}
       onNavItemSelect={(id) => {
-        if (id === "projects" || id === "templates") {
+        if (id === "projects" || id === "templates" || id === "assets") {
           setActiveModule(id);
         }
       }}
@@ -577,22 +591,22 @@ export default function ScenarioListPage() {
             <ToolbarGroup>
               <SearchInput
                 className="w-full sm:w-64"
-                onChange={(event) => setQuery(event.target.value)}
-                onClear={() => setQuery("")}
+                onChange={(event) => setProjectQuery(event.target.value)}
+                onClear={() => setProjectQuery("")}
                 placeholder="搜索名称、状态、描述"
-                value={query}
+                value={projectQuery}
               />
               <Tabs>
                 <TabButton
-                  active={view === "grid"}
-                  onClick={() => setView("grid")}
+                  active={projectView === "grid"}
+                  onClick={() => setProjectView("grid")}
                   title="网格视图"
                 >
                   <LayoutGrid className="size-4" />
                 </TabButton>
                 <TabButton
-                  active={view === "list"}
-                  onClick={() => setView("list")}
+                  active={projectView === "list"}
+                  onClick={() => setProjectView("list")}
                   title="列表视图"
                 >
                   <ListIcon className="size-4" />
@@ -603,14 +617,14 @@ export default function ScenarioListPage() {
 
           <div className="mt-4">
             {loading ? (
-              <Skeleton view={view} />
+              <Skeleton view={projectView} />
             ) : filteredMyScenarios.length === 0 ? (
               <Empty
                 title="没有匹配的自定义项目"
                 description="调整搜索条件后重试，或新建一个项目。"
                 onAction={() => setDialogOpen(true)}
               />
-            ) : view === "grid" ? (
+            ) : projectView === "grid" ? (
               <ProjectGrid
                 items={filteredMyScenarios}
                 onOpen={handleOpen}
@@ -650,22 +664,22 @@ export default function ScenarioListPage() {
             <ToolbarGroup>
               <SearchInput
                 className="w-full sm:w-64"
-                onChange={(event) => setQuery(event.target.value)}
-                onClear={() => setQuery("")}
+                onChange={(event) => setTemplateQuery(event.target.value)}
+                onClear={() => setTemplateQuery("")}
                 placeholder="搜索名称、状态、描述"
-                value={query}
+                value={templateQuery}
               />
               <Tabs>
                 <TabButton
-                  active={view === "grid"}
-                  onClick={() => setView("grid")}
+                  active={templateView === "grid"}
+                  onClick={() => setTemplateView("grid")}
                   title="网格视图"
                 >
                   <LayoutGrid className="size-4" />
                 </TabButton>
                 <TabButton
-                  active={view === "list"}
-                  onClick={() => setView("list")}
+                  active={templateView === "list"}
+                  onClick={() => setTemplateView("list")}
                   title="列表视图"
                 >
                   <ListIcon className="size-4" />
@@ -676,17 +690,17 @@ export default function ScenarioListPage() {
 
           <div className="mt-4">
             {loading ? (
-              <Skeleton view={view} />
+              <Skeleton view={templateView} />
             ) : filteredTemplates.length === 0 ? (
               <Empty
-                title={queryText ? "没有匹配的系统场景" : "暂无系统场景"}
+                title={templateQueryText ? "没有匹配的系统场景" : "暂无系统场景"}
                 description={
-                  queryText
+                  templateQueryText
                     ? "调整搜索条件后重试。"
                     : "后端系统场景尚未同步到当前列表。"
                 }
               />
-            ) : view === "grid" ? (
+            ) : templateView === "grid" ? (
               <ProjectGrid
                 items={filteredTemplates}
                 onOpen={handleOpen}
@@ -704,6 +718,8 @@ export default function ScenarioListPage() {
           </div>
         </Card>
         )}
+
+        {activeModule === "assets" && <DataAssetWorkspace />}
       </div>
 
       {dialogOpen && (

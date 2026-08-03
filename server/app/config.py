@@ -123,6 +123,14 @@ class Settings(BaseSettings):
     llm_model: str = Field(default="", description="Pydantic-AI model ID.")
     llm_api_key: str = Field(default="", description="API key for the LLM provider.")
     llm_base_url: str = Field(default="", description="Optional custom base URL (proxy / local LLM).")
+    agent_backend: str = Field(
+        default="qwenpaw",
+        description="Agent execution backend: pydantic or qwenpaw.",
+    )
+    agent_fallback_enabled: bool = Field(
+        default=False,  # no longer used
+        description="Fall back to the pydantic agent backend when the selected backend fails.",
+    )
     allow_private_model_base_urls: bool = Field(
         default=False,
         description=(

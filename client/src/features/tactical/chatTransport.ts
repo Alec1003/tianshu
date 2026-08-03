@@ -16,6 +16,36 @@ const ERROR_MESSAGE_KEYS = [
   "detail",
 ] as const;
 const ERROR_CONTAINER_KEYS = ["cause", "response", "data", "body"] as const;
+const UTF8_HEADER_PREFIX = "utf8-url:";
+
+function needsHeaderEncoding(value: string): boolean {
+  if (value.startsWith(UTF8_HEADER_PREFIX)) return true;
+
+  for (const char of value) {
+    const code = char.codePointAt(0) ?? 0;
+    if (code > 0xff || code === 0x7f || (code < 0x20 && code !== 0x09)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+export function encodeChatHeaderValue(value: string): string {
+  return needsHeaderEncoding(value)
+    ? `${UTF8_HEADER_PREFIX}${encodeURIComponent(value)}`
+    : value;
+}
+
+function setChatHeader(
+  headers: Record<string, string>,
+  name: string,
+  value: string | undefined
+): void {
+  if (value) {
+    headers[name] = encodeChatHeaderValue(value);
+  }
+}
 
 export function buildChatRequestHeaders({
   chatMode,
@@ -30,27 +60,13 @@ export function buildChatRequestHeaders({
   };
 
   if (token) headers.Authorization = `Bearer ${token}`;
-  if (modelProviderId) {
-    headers["X-TianShu-Model-Provider-Id"] = modelProviderId;
-  }
-  if (modelConfig.provider) {
-    headers["X-TianShu-Model-Provider"] = modelConfig.provider;
-  }
-  if (modelConfig.model) {
-    headers["X-TianShu-Model-Name"] = modelConfig.model;
-  }
-  if (modelConfig.apiKey) {
-    headers["X-TianShu-Model-Api-Key"] = modelConfig.apiKey;
-  }
-  if (modelConfig.baseUrl) {
-    headers["X-TianShu-Model-Base-Url"] = modelConfig.baseUrl;
-  }
-  if (scenarioId) {
-    headers["X-TianShu-Scenario-Id"] = scenarioId;
-  }
-  if (docFolder) {
-    headers["X-TianShu-Doc-Folder"] = docFolder;
-  }
+  setChatHeader(headers, "X-TianShu-Model-Provider-Id", modelProviderId);
+  setChatHeader(headers, "X-TianShu-Model-Provider", modelConfig.provider);
+  setChatHeader(headers, "X-TianShu-Model-Name", modelConfig.model);
+  setChatHeader(headers, "X-TianShu-Model-Api-Key", modelConfig.apiKey);
+  setChatHeader(headers, "X-TianShu-Model-Base-Url", modelConfig.baseUrl);
+  setChatHeader(headers, "X-TianShu-Scenario-Id", scenarioId);
+  setChatHeader(headers, "X-TianShu-Doc-Folder", docFolder);
 
   return headers;
 }

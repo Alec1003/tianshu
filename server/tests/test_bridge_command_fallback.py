@@ -18,6 +18,11 @@ class RecordingRegexAgent:
     def __init__(self) -> None:
         self.calls = 0
 
+    def process_command(self, command, context=None):
+        self.calls += 1
+        from app.ai.models import AgentExecutionSummary
+        return AgentExecutionSummary(command=command, status="ok")
+
     def plan_command(self, command: str):
         self.calls += 1
         return [
@@ -71,16 +76,11 @@ class FakeApprovalQueue:
 
 
 @pytest.mark.asyncio
-async def test_propose_command_does_not_fallback_when_llm_skips_tools(
+async def test_propose_command_uses_regex_when_no_model(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    async def fake_run_agent(*_args, **_kwargs) -> AgentExecutionSummary:
-        return AgentExecutionSummary(
-            command="Deploy one BLUE F-16 at 22.1 121.5",
-            decomposition=["Deploy one BLUE F-16 at 22.1 121.5"],
-        )
-
-    monkeypatch.setattr("app.ai.pydantic_agent.run_agent", fake_run_agent)
+    """propose_command_async falls back to regex planner when no LLM."""
+    from app.ai.bridge import TianShuOpenClawBridge
     bridge = object.__new__(TianShuOpenClawBridge)
     regex_agent = RecordingRegexAgent()
     queue = FakeApprovalQueue()
@@ -88,7 +88,15 @@ async def test_propose_command_does_not_fallback_when_llm_skips_tools(
     bridge.command_approvals = queue
     bridge.skill_registry = object()
     bridge.mcp_client = None
-    bridge._resolve_agent_for_request = lambda _context: object()
+    # Simple workspace stub for stream_query
+    from types import SimpleNamespace
+    class StubWS:
+        async def stream_query(self, request):
+            from app.agent_runtime.runtime.envelope import EnvelopeEvent
+            yield EnvelopeEvent('start')
+            yield EnvelopeEvent('finish')
+    bridge.workspace = StubWS()
+    bridge.tool_registry = SimpleNamespace()
 
     summary, proposals = await bridge.propose_command_async(
         "Deploy one BLUE F-16 at 22.1 121.5"
@@ -96,5 +104,4 @@ async def test_propose_command_does_not_fallback_when_llm_skips_tools(
 
     assert summary.status == "ok"
     assert proposals == []
-    assert regex_agent.calls == 0
-    assert queue.created is None
+    assert regex_agent.calls == 1

@@ -5,6 +5,7 @@ import json
 import logging
 import shlex
 from typing import Any
+from urllib.parse import unquote
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.responses import StreamingResponse
@@ -93,6 +94,7 @@ RUNTIME_SCENARIO_HEADER = "x-tianshu-scenario-id"
 DOC_FOLDER_HEADER = "x-tianshu-doc-folder"
 HEADER_PREFIX = "x-tianshu-"
 LEGACY_HEADER_PREFIX = "x-" + "ai" + "cc" + "-"
+UTF8_HEADER_PREFIX = "utf8-url:"
 
 
 def _legacy_header_name(name: str) -> str:
@@ -102,11 +104,14 @@ def _legacy_header_name(name: str) -> str:
 
 
 def _header_value(request: Request, name: str) -> str:
-    return (
+    value = (
         request.headers.get(name)
         or request.headers.get(_legacy_header_name(name))
         or ""
     )
+    if value.startswith(UTF8_HEADER_PREFIX):
+        return unquote(value[len(UTF8_HEADER_PREFIX) :])
+    return value
 
 
 def _runtime_context_from_request(request: Request) -> str | None:
@@ -1654,39 +1659,33 @@ def _read_chat_mode_from_headers(request: Request) -> str:
     return "ask" if mode == "ask" else "command"
 
 
+
+
+
 @router.post("/chat")
 async def chat(
     request: Request,
     session: AsyncSession = Depends(get_async_session),
     user: User = Depends(current_active_user),
 ) -> StreamingResponse:
-    """Streaming chat endpoint powered by pydantic-ai.
+    return await _chat_with_agent_runtime(request, session, user)
 
-    Accepts Vercel AI SDK compatible request body (messages array).
-    Returns SSE stream of text deltas + tool-invocation chunks that any
-    AI-SDK–compatible frontend (``useChat`` from ``@ai-sdk/react``) can
-    consume out of the box.
 
-    Model override: when the request carries
-    ``X-TianShu-Model-{Provider,Name,Api-Key,Base-Url}`` headers (i.e. the
-    user filled in the sidebar Settings panel) we build a one-off agent
-    so the user-supplied credentials/provider actually drive the stream.
-    Otherwise we fall back to the env-configured ``bridge.pydantic_agent``.
 
-    Falls back to a non-streaming JSON error if no LLM is configured at all.
-    """
-    from pydantic_ai.ui.vercel_ai import VercelAIAdapter  # noqa: PLC0415
-
-    from app.ai.pydantic_agent import (  # noqa: PLC0415
-        AgentDeps,
-        build_agent,
-        can_build_model_override,
+async def _chat_with_agent_runtime(
+    request: Request,
+    session: AsyncSession,
+    user: User,
+) -> StreamingResponse:
+    """QwenPaw-style AgentRuntime chat execution path."""
+    from app.agent_runtime.ai_sdk_adapter import (  # noqa: PLC0415
+        AI_SDK_STREAM_HEADERS,
+        to_ai_sdk_stream,
     )
+    from app.agent_runtime.runtime import AgentRuntimeRequest  # noqa: PLC0415
 
     bridge = await _bridge_for_user_loaded(request, user, session)
     chat_mode = _read_chat_mode_from_headers(request)
-
-    # Per-request model override via headers (set by AI sidebar useChat).
     provider_id, provider, model_name, api_key, base_url = (
         _read_model_override_from_headers(request)
     )
@@ -1700,45 +1699,11 @@ async def chat(
         )
         api_key = stored_api_key
         base_url = stored_base_url
-    per_request_agent = None
-    if can_build_model_override(provider, model_name, api_key, base_url):
-        model_id = f"{provider}:{model_name}"
-        try:
-            per_request_agent = build_agent(
-                model_id=model_id,
-                api_key=api_key,
-                base_url=base_url,
-                enable_tools=chat_mode == "command",
-            )
-        except Exception as exc:  # pragma: no cover - depends on SDK install
-            logger.warning(
-                "chat: per-request agent build failed (%s): %s", model_id, exc
-            )
 
-    fallback_agent = (
-        bridge.pydantic_agent
-        if chat_mode == "command"
-        else getattr(bridge, "pydantic_ask_agent", None)
-    )
-    agent = per_request_agent or fallback_agent
-    if agent is None:
-        return StreamingResponse(
-            iter(
-                [
-                    json.dumps(
-                        {
-                            "error": (
-                                "No LLM configured. Either set TIANSHU_LLM_MODEL + "
-                                "TIANSHU_LLM_API_KEY on the server, or fill the "
-                                "model section in the AI sidebar (Settings)."
-                            )
-                        }
-                    )
-                ]
-            ),
-            status_code=503,
-            media_type="application/json",
-        )
+    body = await request.json()
+    messages = body.get("messages") if isinstance(body, dict) else None
+    if not isinstance(messages, list):
+        messages = []
 
     approval_queue = (
         getattr(bridge, "command_approvals", None)
@@ -1762,7 +1727,7 @@ async def chat(
                     event_type="command.proposed",
                     action="proposal_created",
                     actor=saved.source,
-                    summary=f"命令提案：{saved.command}",
+                    summary=f"Command proposal: {saved.command}",
                     payload=saved.model_dump(mode="json"),
                     runtime=getattr(bridge, "runtime", None),
                     proposal_id=saved.id,
@@ -1772,23 +1737,36 @@ async def chat(
 
         event_loop.call_soon_threadsafe(lambda: event_loop.create_task(_persist()))
 
-    deps = AgentDeps(
-        registry=bridge.skill_registry,
-        chat_mode=chat_mode,
-        approval_queue=approval_queue,
-        proposal_recorder=_record_proposal if approval_queue is not None else None,
-        mcp_client=bridge.mcp_client,
-        session=session,
-        user=user,
+    runtime_request = AgentRuntimeRequest(
+        messages=[message for message in messages if isinstance(message, dict)],
+        user_id=str(getattr(user, "id", "")),
         scenario_id=_runtime_context_from_request(request),
-        doc_folder=_doc_folder_from_request(request),
-        bridge_provider=lambda owner, scenario_ctx=None: _bridge_for_user(
-            request,
-            owner,
-        ),
+        model={
+            "provider_id": provider_id,
+            "provider": provider,
+            "model": model_name,
+            "apiKey": api_key,
+            "baseUrl": base_url,
+        },
+        workspace=getattr(bridge, "workspace", bridge),
+        tool_registry=getattr(bridge, "tool_registry", None),
+        approval_queue=approval_queue,
+        chat_mode=chat_mode,
+        metadata={
+            "backend": "qwenpaw",
+            "proposal_recorder": _record_proposal
+            if approval_queue is not None
+            else None,
+        },
     )
-    return await VercelAIAdapter.dispatch_request(
-        request,
-        agent=agent,
-        deps=deps,
+    workspace = getattr(bridge, "workspace", None)
+    events = (
+        workspace.stream_query(runtime_request)
+        if workspace is not None
+        else bridge.agent_runtime.run(runtime_request)
+    )
+    return StreamingResponse(
+        to_ai_sdk_stream(events),
+        media_type="text/event-stream",
+        headers=AI_SDK_STREAM_HEADERS,
     )

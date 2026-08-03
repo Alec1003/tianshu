@@ -4,7 +4,6 @@ import {
   Activity,
   ChevronDown,
   ChevronRight,
-  Clock3,
   Crosshair,
   Download,
   Edit3,
@@ -164,7 +163,7 @@ const panelMeta: Record<
   simulation: {
     eyebrow: "Simulation",
     title: "仿真控制台",
-    description: "时间、推演状态和回放节奏",
+    description: "推演控制和回放节奏",
   },
   layers: {
     eyebrow: "Map Layers",
@@ -1132,14 +1131,6 @@ export default function SimulationSidebar({
   const currentSideName = currentSide
     ? normalizeSideName(currentSide.name)
     : "未选择";
-  const hostileSides = snapshot.currentSideId
-    ? scenario.sides.filter((side) =>
-        scenario.isHostile(snapshot.currentSideId, side.id)
-      )
-    : [];
-  const hostileSideNames = hostileSides
-    .map((side) => normalizeSideName(side.name))
-    .join(" / ");
   const sideDoctrine =
     scenario.doctrine[snapshot.currentSideId] ??
     scenario.getDefaultSideDoctrine();
@@ -1155,9 +1146,6 @@ export default function SimulationSidebar({
     scenario.facilities.length +
     scenario.airbases.length +
     scenario.weapons.length;
-  const currentSideMissions = scenario.missions.filter(
-    (mission) => mission.sideId === snapshot.currentSideId
-  ).length;
   const allMissions = scenario.missions;
   const selectedSideForEditor = sideEditorState.sideId
     ? scenario.getSide(sideEditorState.sideId)
@@ -1234,73 +1222,98 @@ export default function SimulationSidebar({
     };
   }, [placementMenu]);
 
+  function renderSideRelationshipSection() {
+    return (
+      <Section title="阵营与敌对关系" icon={Satellite}>
+        <div className="space-y-2.5">
+          <button
+            className="box-border block w-full min-w-0 max-w-full rounded-lg border border-dashed border-cyan-300/35 bg-cyan-300/[0.04] px-3 py-2.5 text-center transition-all hover:border-cyan-300/60 hover:bg-cyan-300/10 hover:shadow-hud-cyan"
+            onClick={(event) => openSideEditor(event, null)}
+            type="button"
+          >
+            <div className="flex items-center justify-center gap-2">
+              <Plus className="size-4 text-cyan-200" />
+              <span className="text-sm font-semibold text-cyan-100">
+                新增阵营
+              </span>
+            </div>
+            <div className="mt-0.5 text-[11px] leading-relaxed text-slate-500">
+              创建阵营，并配置敌对、友方和交战规则
+            </div>
+          </button>
+
+          <div className="space-y-2">
+            {scenario.sides.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-cyan-300/12 bg-slate-950/30 px-3 py-4 text-center text-xs text-slate-500">
+                暂无阵营。请先新增一个阵营，再部署单位。
+              </div>
+            ) : (
+              scenario.sides.map((side) => (
+                <SideControlCard
+                  active={side.id === snapshot.currentSideId}
+                  allyCount={scenario.relationships.getAllies(side.id).length}
+                  hostileCount={
+                    scenario.relationships.getHostiles(side.id).length
+                  }
+                  key={side.id}
+                  onEdit={(event) => openSideEditor(event, side.id)}
+                  onSelect={() => {
+                    if (!onSwitchSide) return;
+                    void Promise.resolve(onSwitchSide(side.id)).catch(
+                      () => undefined
+                    );
+                  }}
+                  side={side}
+                  unitCount={countUnitsForSide(scenario, side.id)}
+                />
+              ))
+            )}
+          </div>
+        </div>
+      </Section>
+    );
+  }
+
+  function renderScenarioManagementSection() {
+    return (
+      <Section title="场景管理" icon={FileText}>
+        <div className="space-y-2.5">
+          <div className="rounded-xl border border-cyan-300/10 bg-white/[0.03] p-3 text-xs leading-relaxed text-slate-400">
+            当前场景：
+            <span className="font-semibold text-cyan-100">
+              {scenario.name || "未命名"}
+            </span>
+            。新建或导入会替换当前推演状态，建议先导出留档。
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            <ScenarioActionButton
+              icon={FilePlus}
+              label="新建"
+              description="清空场景"
+              onClick={onNewScenario}
+            />
+            <ScenarioActionButton
+              icon={Upload}
+              label="导入"
+              description="选择 JSON"
+              onClick={onImportScenario}
+            />
+            <ScenarioActionButton
+              icon={Download}
+              label="导出"
+              description="保存到本地"
+              onClick={onExportScenario}
+            />
+          </div>
+        </div>
+      </Section>
+    );
+  }
+
   function renderCommandPanel() {
     return (
       <>
-        <Section title="当前指挥视角" icon={Waves}>
-          <div className="grid grid-cols-2 gap-2">
-            <InfoRow label="当前阵营" value={currentSideName} />
-            <InfoRow
-              label="敌对阵营"
-              tone={hostileSides.length > 0 ? "red" : "green"}
-              value={hostileSideNames || "无"}
-            />
-            <InfoRow label="本方任务" value={currentSideMissions} />
-            <InfoRow
-              label="视角模式"
-              tone={snapshot.godMode ? "amber" : "cyan"}
-              value={snapshot.godMode ? "全域视角" : "阵营视角"}
-            />
-          </div>
-        </Section>
-
-        <Section title="阵营与敌对关系" icon={Satellite}>
-          <div className="space-y-2.5">
-            <button
-              className="box-border block w-full min-w-0 max-w-full rounded-lg border border-dashed border-cyan-300/35 bg-cyan-300/[0.04] px-3 py-2.5 text-center transition-all hover:border-cyan-300/60 hover:bg-cyan-300/10 hover:shadow-hud-cyan"
-              onClick={(event) => openSideEditor(event, null)}
-              type="button"
-            >
-              <div className="flex items-center justify-center gap-2">
-                <Plus className="size-4 text-cyan-200" />
-                <span className="text-sm font-semibold text-cyan-100">
-                  新增阵营
-                </span>
-              </div>
-              <div className="mt-0.5 text-[11px] leading-relaxed text-slate-500">
-                创建阵营，并配置敌对、友方和交战规则
-              </div>
-            </button>
-
-            <div className="space-y-2">
-              {scenario.sides.length === 0 ? (
-                <div className="rounded-lg border border-dashed border-cyan-300/12 bg-slate-950/30 px-3 py-4 text-center text-xs text-slate-500">
-                  暂无阵营。请先新增一个阵营，再部署单位。
-                </div>
-              ) : (
-                scenario.sides.map((side) => (
-                  <SideControlCard
-                    active={side.id === snapshot.currentSideId}
-                    allyCount={scenario.relationships.getAllies(side.id).length}
-                    hostileCount={
-                      scenario.relationships.getHostiles(side.id).length
-                    }
-                    key={side.id}
-                    onEdit={(event) => openSideEditor(event, side.id)}
-                    onSelect={() => {
-                      if (!onSwitchSide) return;
-                      void Promise.resolve(onSwitchSide(side.id)).catch(
-                        () => undefined
-                      );
-                    }}
-                    side={side}
-                    unitCount={countUnitsForSide(scenario, side.id)}
-                  />
-                ))
-              )}
-            </div>
-          </div>
-        </Section>
+        {renderScenarioManagementSection()}
 
         <Section title="单位部署" icon={Route}>
           <div className="space-y-3" data-placement-area>
@@ -1450,42 +1463,6 @@ export default function SimulationSidebar({
   function renderSimulationPanel() {
     return (
       <>
-        <Section title="场景管理" icon={FileText}>
-          <div className="space-y-2.5">
-            <div className="rounded-xl border border-cyan-300/10 bg-white/[0.03] p-3 text-xs leading-relaxed text-slate-400">
-              当前场景：
-              <span className="font-semibold text-cyan-100">
-                {scenario.name || "未命名"}
-              </span>
-              。新建或导入会替换当前推演状态，建议先导出留档。
-            </div>
-            <div className="grid grid-cols-3 gap-2">
-              <ScenarioActionButton
-                icon={FilePlus}
-                label="新建"
-                description="清空场景"
-                onClick={onNewScenario}
-              />
-              <ScenarioActionButton
-                icon={Upload}
-                label="导入"
-                description="选择 JSON"
-                onClick={onImportScenario}
-              />
-              <ScenarioActionButton
-                icon={Download}
-                label="导出"
-                description="保存到本地"
-                onClick={onExportScenario}
-              />
-            </div>
-          </div>
-        </Section>
-
-        <Section title="战况" icon={Trophy}>
-          {renderBattleStatusSection(snapshot)}
-        </Section>
-
         <Section title="推演控制" icon={Activity}>
           <div className="grid grid-cols-4 gap-2">
             <Button
@@ -1570,17 +1547,10 @@ export default function SimulationSidebar({
           </div>
         </Section>
 
-        <Section title="仿真状态" icon={Clock3}>
-          <div className="space-y-2">
-            <InfoRow label="当前时间" value={`${snapshot.currentTime}s`} />
-            <InfoRow
-              label="推演状态"
-              value={runStateLabel(snapshot.runState)}
-            />
-            <InfoRow label="场景任务" value={snapshot.missions} />
-            <InfoRow label="飞行武器" value={snapshot.weapons} />
-          </div>
+        <Section title="战况" icon={Trophy}>
+          {renderBattleStatusSection(snapshot)}
         </Section>
+
       </>
     );
   }
@@ -1588,18 +1558,37 @@ export default function SimulationSidebar({
   function renderLayersPanel() {
     return (
       <>
+        {renderSideRelationshipSection()}
+
         <Section title="视角与可见性" icon={Crosshair}>
           <div className="grid grid-cols-2 gap-2">
             <Button
+              aria-pressed={snapshot.godMode}
               className={cn(
-                "justify-start",
+                "justify-center",
                 snapshot.godMode && "border-cyan-300/60 bg-cyan-300/14"
               )}
-              onClick={onToggleGodMode}
+              onClick={() => {
+                if (!snapshot.godMode) onToggleGodMode();
+              }}
               variant="tactical"
             >
               <Satellite className="size-4" />
-              {snapshot.godMode ? "全域视角" : "阵营视角"}
+              全域视角
+            </Button>
+            <Button
+              aria-pressed={!snapshot.godMode}
+              className={cn(
+                "justify-center",
+                !snapshot.godMode && "border-cyan-300/60 bg-cyan-300/14"
+              )}
+              onClick={() => {
+                if (snapshot.godMode) onToggleGodMode();
+              }}
+              variant="tactical"
+            >
+              <Shield className="size-4" />
+              阵营视角
             </Button>
             <Button
               className="hidden"

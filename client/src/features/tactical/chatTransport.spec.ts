@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildChatRequestHeaders,
+  encodeChatHeaderValue,
   extractChatErrorMessage,
   formatChatError,
 } from "./chatTransport";
@@ -49,6 +50,29 @@ describe("chatTransport", () => {
     expect(headers).toEqual({
       "X-TianShu-Chat-Mode": "ask",
     });
+  });
+
+  it("encodes non-Latin custom header values for browser fetch", () => {
+    const headers = buildChatRequestHeaders({
+      chatMode: "ask",
+      modelConfig: {
+        provider: "custom",
+        model: "通义千问",
+        apiKey: "",
+        baseUrl: "",
+      },
+      docFolder: "战报资料",
+    });
+
+    expect(headers["X-TianShu-Model-Provider"]).toBe("custom");
+    expect(headers["X-TianShu-Model-Name"]).toBe(
+      encodeChatHeaderValue("通义千问")
+    );
+    expect(headers["X-TianShu-Doc-Folder"]).toBe(
+      encodeChatHeaderValue("战报资料")
+    );
+    expect(headers["X-TianShu-Model-Name"]).toMatch(/^utf8-url:/);
+    expect(() => new Headers(headers)).not.toThrow();
   });
 
   it("extracts nested backend error details from wrapped errors", () => {

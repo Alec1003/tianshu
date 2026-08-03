@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import {
   ArrowLeft,
   BrainCircuit,
-  Copy,
   LogOut,
   Save,
   Settings,
@@ -51,7 +50,6 @@ export default function TopTacticalBar({
   scenarioMeta,
   onExit,
   onSave,
-  onRequestSaveAs,
   savingState,
   mapSceneMode,
   onToggleMapSceneMode,
@@ -150,46 +148,33 @@ export default function TopTacticalBar({
       </div>
 
       <div className="flex items-center gap-3">
-        {(onSave || onRequestSaveAs) && (
+        {onSave && !scenarioMeta?.isTemplate && (
           <div className="flex items-center gap-2 border-r border-tactical-line pr-3">
-            {onSave && !scenarioMeta?.isTemplate && (
-              <button
-                className={cn(
-                  "flex items-center gap-1.5 rounded-md border px-3 py-1 font-mono text-[10px] font-bold uppercase tracking-widest transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-tactical-accent/55",
-                  savingState === "saved"
-                    ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
+            <button
+              className={cn(
+                "flex items-center gap-1.5 rounded-md border px-3 py-1 font-mono text-[10px] font-bold uppercase tracking-widest transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-tactical-accent/55",
+                savingState === "saved"
+                  ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
+                  : savingState === "error"
+                    ? "border-red-500/30 bg-red-500/10 text-red-300"
+                    : "border-tactical-active bg-tactical-accent/10 text-slate-100 hover:border-tactical-accent/55 hover:bg-tactical-accent/14"
+              )}
+              disabled={savingState === "saving"}
+              onClick={onSave}
+              title="保存到当前想定"
+              type="button"
+            >
+              <Save className="size-3.5" />
+              <span className="hidden sm:inline">
+                {savingState === "saving"
+                  ? "保存中"
+                  : savingState === "saved"
+                    ? "已保存"
                     : savingState === "error"
-                      ? "border-red-500/30 bg-red-500/10 text-red-300"
-                      : "border-tactical-active bg-tactical-accent/10 text-slate-100 hover:border-tactical-accent/55 hover:bg-tactical-accent/14"
-                )}
-                disabled={savingState === "saving"}
-                onClick={onSave}
-                title="保存到当前想定"
-                type="button"
-              >
-                <Save className="size-3.5" />
-                <span className="hidden sm:inline">
-                  {savingState === "saving"
-                    ? "保存中"
-                    : savingState === "saved"
-                      ? "已保存"
-                      : savingState === "error"
-                        ? "失败"
-                        : "保存"}
-                </span>
-              </button>
-            )}
-            {onRequestSaveAs && (
-              <button
-                className="flex items-center gap-1.5 rounded-md border border-tactical-line bg-white/[0.03] px-3 py-1 text-[10px] font-semibold text-slate-300 transition-colors hover:border-tactical-active hover:bg-tactical-accent/8 hover:text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-tactical-accent/55"
-                onClick={onRequestSaveAs}
-                title="另存为新想定"
-                type="button"
-              >
-                <Copy className="size-3.5" />
-                <span className="hidden sm:inline">另存为</span>
-              </button>
-            )}
+                      ? "失败"
+                      : "保存"}
+              </span>
+            </button>
           </div>
         )}
 

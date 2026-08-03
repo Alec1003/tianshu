@@ -13,7 +13,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Command,
-  Copy,
   Crosshair,
   FileText,
   Layers3,
@@ -327,7 +326,6 @@ export default function AITacticalCommandPlatform({
   scenarioMeta,
   initialScenarioData,
   onSave,
-  onRequestSaveAs,
   onExit,
   onPostAar,
 }: AITacticalCommandPlatformProps = {}) {
@@ -1116,11 +1114,6 @@ export default function AITacticalCommandPlatform({
     }
   }, [onSave, captureCurrentScenarioData]);
 
-  const handleSaveAsClick = useCallback(() => {
-    if (!onRequestSaveAs) return;
-    onRequestSaveAs(captureCurrentScenarioData());
-  }, [onRequestSaveAs, captureCurrentScenarioData]);
-
   const handlePreviewDocument = useCallback((filename?: string | null) => {
     setPreviewDocFile(filename ?? null);
     setPreviewSurface("document");
@@ -1155,7 +1148,7 @@ export default function AITacticalCommandPlatform({
 
   // 是否需要渲染顶部 mini bar（路由模式才显示；standalone 兼容老入口）。
   const showRouterChrome = Boolean(
-    scenarioMeta && (onSave || onRequestSaveAs || onExit)
+    scenarioMeta && (onSave || onExit)
   );
 
   return (
@@ -1284,9 +1277,6 @@ export default function AITacticalCommandPlatform({
           scenarioMeta={scenarioMeta}
           onExit={onExit}
           onSave={onSave ? () => void handleSaveClick() : undefined}
-          onRequestSaveAs={
-            onRequestSaveAs ? () => handleSaveAsClick() : undefined
-          }
           savingState={savingState}
           timelineOpen={timelinePanelOpen}
           onToggleTimeline={toggleTimelinePanel}

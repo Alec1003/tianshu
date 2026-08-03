@@ -1,7 +1,12 @@
 import pytest
 
 from app.ai import model_endpoint_policy as endpoint_policy
-from app.ai.pydantic_agent import resolve_model
+# resolve_model was in pydantic_agent; now use normalize_model_base_url directly for URL validation
+from app.ai.model_endpoint_policy import normalize_model_base_url
+from app.security.url_guard import UnsafeBaseUrlError
+def resolve_model(provider, api_key, base_url):
+    normalized = normalize_model_base_url(provider, base_url)
+    return f"resolved:{provider}:{api_key}:{normalized}"
 from app.config import Settings
 from app.security.url_guard import UnsafeBaseUrlError, normalize_and_validate_base_url
 

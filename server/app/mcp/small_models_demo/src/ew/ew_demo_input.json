@@ -1,0 +1,44 @@
+{
+  "radars": [
+    {
+      "id": "C-300雷达",
+      "position": [51.5, 34.0, 1000],
+      "detection_range_km": 150.0,
+      "beamwidth_deg": 3.0,
+      "sidelobe_db": -25.0
+    },
+    {
+      "id": "巴瓦尔雷达",
+      "position": [52.5, 33.0, 1000],
+      "detection_range_km": 150.0,
+      "beamwidth_deg": 3.0,
+      "sidelobe_db": -25.0
+    },
+    {
+      "id": "霍尔达德雷达",
+      "position": [53.0, 32.0, 1000],
+      "detection_range_km": 150.0,
+      "beamwidth_deg": 3.0,
+      "sidelobe_db": -25.0
+    }
+  ],
+  "jammers": [
+    {"id": "EA-18G_C-300",  "position": [50.5, 33.8, 9000]},
+    {"id": "EA-18G_巴瓦尔",  "position": [51.2, 32.5, 9000]},
+    {"id": "EA-18G_霍尔达德","position": [51.8, 31.5, 9000]}
+  ],
+  "strength_matrix": [
+    [1900.0, 150.0, 100.0],
+    [150.0, 1900.0, 150.0],
+    [100.0, 150.0, 1900.0]
+  ],
+  "region": {
+    "lon_min": 47.0,
+    "lon_max": 54.0,
+    "lat_min": 29.0,
+    "lat_max": 35.5,
+    "alt_min_km": 1.0,
+    "alt_max_km": 12.0
+  },
+  "resolution_km": 2.0
+}

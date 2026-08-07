@@ -10,7 +10,7 @@ import {
 describe("chatTransport", () => {
   it("includes per-request model credentials in chat headers", () => {
     const headers = buildChatRequestHeaders({
-      chatMode: "command",
+      approvalMode: "auto",
       modelConfig: {
         provider: "openai",
         model: "gpt-5",
@@ -18,6 +18,7 @@ describe("chatTransport", () => {
         baseUrl: "https://api.openai.com/v1",
       },
       modelProviderId: "openai-responses",
+      modelConfigId: "openai",
       docFolder: "folder-1",
       scenarioId: "scenario-1",
       token: "jwt-token",
@@ -25,20 +26,22 @@ describe("chatTransport", () => {
 
     expect(headers).toEqual({
       Authorization: "Bearer jwt-token",
-      "X-TianShu-Chat-Mode": "command",
+      "X-TianShu-Approval-Mode": "auto",
+      "X-TianShu-Model-Config-Id": "openai",
       "X-TianShu-Model-Provider-Id": "openai-responses",
       "X-TianShu-Model-Provider": "openai",
       "X-TianShu-Model-Name": "gpt-5",
-      "X-TianShu-Model-Api-Key": "sk-test",
       "X-TianShu-Model-Base-Url": "https://api.openai.com/v1",
       "X-TianShu-Doc-Folder": "folder-1",
       "X-TianShu-Scenario-Id": "scenario-1",
     });
+    // API Key must NEVER appear in chat request headers
+    expect(headers).not.toHaveProperty("X-TianShu-Model-Api-Key");
   });
 
   it("omits empty optional header values", () => {
     const headers = buildChatRequestHeaders({
-      chatMode: "ask",
+      approvalMode: "strict",
       modelConfig: {
         provider: "",
         model: "",
@@ -48,13 +51,13 @@ describe("chatTransport", () => {
     });
 
     expect(headers).toEqual({
-      "X-TianShu-Chat-Mode": "ask",
+      "X-TianShu-Approval-Mode": "strict",
     });
   });
 
   it("encodes non-Latin custom header values for browser fetch", () => {
     const headers = buildChatRequestHeaders({
-      chatMode: "ask",
+      approvalMode: "off",
       modelConfig: {
         provider: "custom",
         model: "通义千问",

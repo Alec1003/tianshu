@@ -1,9 +1,10 @@
 import type { ModelConfig } from "@/features/ai/modelProfiles";
 
 interface BuildChatRequestHeadersOptions {
-  chatMode: "ask" | "command";
+  approvalMode: "strict" | "smart" | "auto" | "off";
   modelConfig: ModelConfig;
   modelProviderId?: string;
+  modelConfigId?: string;
   scenarioId?: string;
   docFolder?: string;
   token?: string | null;
@@ -48,22 +49,25 @@ function setChatHeader(
 }
 
 export function buildChatRequestHeaders({
-  chatMode,
+  approvalMode,
   modelConfig,
   modelProviderId,
+  modelConfigId,
   scenarioId,
   docFolder,
   token,
 }: BuildChatRequestHeadersOptions): Record<string, string> {
   const headers: Record<string, string> = {
-    "X-TianShu-Chat-Mode": chatMode,
+    "X-TianShu-Approval-Mode": approvalMode,
   };
 
   if (token) headers.Authorization = `Bearer ${token}`;
+  // New clients send only the config id — the backend resolves credentials
+  setChatHeader(headers, "X-TianShu-Model-Config-Id", modelConfigId || modelProviderId);
+  // Legacy fallback (provider + model name only, no API key)
   setChatHeader(headers, "X-TianShu-Model-Provider-Id", modelProviderId);
   setChatHeader(headers, "X-TianShu-Model-Provider", modelConfig.provider);
   setChatHeader(headers, "X-TianShu-Model-Name", modelConfig.model);
-  setChatHeader(headers, "X-TianShu-Model-Api-Key", modelConfig.apiKey);
   setChatHeader(headers, "X-TianShu-Model-Base-Url", modelConfig.baseUrl);
   setChatHeader(headers, "X-TianShu-Scenario-Id", scenarioId);
   setChatHeader(headers, "X-TianShu-Doc-Folder", docFolder);

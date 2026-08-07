@@ -27,14 +27,21 @@ class RuntimeSkillTool:
         arguments: dict[str, Any],
         context: ToolContext,
     ) -> dict[str, Any]:
+        effective_arguments = dict(arguments)
+        if self.name == "doc-tools":
+            folder = str(context.metadata.get("doc_folder") or "").strip()
+            if folder:
+                effective_arguments["project_id"] = folder
         if self.readonly:
-            return await _execute_readonly(self.name, arguments, context)
+            return await _execute_readonly(self.name, effective_arguments, context)
 
-        if context.approval_queue is not None:
+        risk_for_skill = getattr(context.approval_queue, "_risk_for_skill", None)
+        risk = risk_for_skill(self.name) if callable(risk_for_skill) else "medium"
+        if context.requires_approval(self.name, risk):
             proposal = context.approval_queue.create_single_step_proposal(
                 command=context.source_command or self.name,
                 skill=self.name,
-                parameters=arguments,
+                parameters=effective_arguments,
                 source="llm_tool",
             )
             if context.proposal_recorder is not None:
@@ -48,7 +55,7 @@ class RuntimeSkillTool:
 
         result = context.skill_registry.execute(
             self.name,
-            arguments,
+            effective_arguments,
             source="agent",
             actor_id=context.user_id,
             scenario_id=context.scenario_id,
@@ -79,6 +86,7 @@ async def _execute_readonly(
             if isinstance(current, dict)
             else "",
             "counts": _scenario_counts(current),
+            "entities": _scenario_entities(current),
         }
 
     if name == "list_runtime_tools":
@@ -100,3 +108,31 @@ def _scenario_counts(current: Any) -> dict[str, int]:
         "missions": len(current.get("missions") or []),
         "obstacles": len(current.get("obstacles") or []),
     }
+
+
+def _scenario_entities(current: Any) -> list[dict[str, Any]]:
+    if not isinstance(current, dict):
+        return []
+    entities: list[dict[str, Any]] = []
+    for entity_type, keys in {
+        "aircraft": ("aircraft",),
+        "ship": ("ships", "ship"),
+        "facility": ("facilities", "facility"),
+        "airbase": ("airbases", "airbase"),
+        "reference_point": ("referencePoints", "reference_points"),
+    }.items():
+        rows: list[Any] = []
+        for key in keys:
+            if isinstance(current.get(key), list):
+                rows.extend(current[key])
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            entities.append({
+                "type": entity_type,
+                "id": row.get("id"),
+                "name": row.get("name") or row.get("className") or row.get("class_name"),
+                "latitude": row.get("latitude"),
+                "longitude": row.get("longitude"),
+            })
+    return entities[:128]

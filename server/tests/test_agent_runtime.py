@@ -17,7 +17,7 @@ class FakeAgent:
     async def reply_stream(self, messages):
         assert messages[0]["role"] == "user"
         yield "hello"
-        yield {"delta": " world"}
+        yield {"type": "text_delta", "delta": " world"}
 
 
 class FakeBuilder:
@@ -42,12 +42,11 @@ async def test_qwenpaw_backend_can_start_agent_runtime():
     ]
 
     assert [event.type for event in events] == [
-        "start",
         "text_delta",
         "text_delta",
         "complete",
     ]
-    assert "".join(event.content for event in events) == "hello world"
+    assert "".join(e.content for e in events if e.type == "text_delta") == "hello world"
 
 
 @pytest.mark.asyncio
@@ -89,10 +88,9 @@ async def test_executor_returns_text_events():
     ]
 
     assert [event.type for event in events] == [
-        "start",
-        "text_delta",
-        "text_delta",
-        "complete",
+        "text",
+        "text",
+        "finish",
     ]
 
 

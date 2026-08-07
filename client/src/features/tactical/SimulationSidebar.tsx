@@ -136,6 +136,7 @@ interface SimulationSidebarProps {
   onLoadDemoScenario: () => void;
   onLoadSCSScenario: () => void;
   docFolder?: string;
+  docRefreshToken?: number;
   previewFile: string | null;
   onPreview: (filename: string) => void;
   onImportScenario: () => void;
@@ -1106,6 +1107,7 @@ export default function SimulationSidebar({
   onImportScenario,
   onExportScenario,
   docFolder,
+  docRefreshToken,
   previewFile,
   onPreview,
 }: SimulationSidebarProps) {
@@ -1276,7 +1278,7 @@ export default function SimulationSidebar({
 
   function renderScenarioManagementSection() {
     return (
-      <Section title="场景管理" icon={FileText}>
+      <Section title="想定管理" icon={FileText}>
         <div className="space-y-2.5">
           <div className="rounded-xl border border-cyan-300/10 bg-white/[0.03] p-3 text-xs leading-relaxed text-slate-400">
             当前场景：
@@ -1654,6 +1656,7 @@ export default function SimulationSidebar({
     return (
       <DocPanel
         docFolder={docFolder}
+        refreshToken={docRefreshToken}
         previewFile={previewFile}
         onPreview={onPreview}
       />

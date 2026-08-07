@@ -253,6 +253,29 @@
     line-height: 1.75;
   }
 
+  /* The card matches Markdown; docx-preview owns the page geometry and
+     original fonts, colors, tables, margins, and page breaks inside it. */
+  .docx-document-card {
+    overflow-x: auto;
+  }
+
+  .docx-document-card .docx-wrapper {
+    background: transparent !important;
+    padding: 0 !important;
+  }
+
+  .docx-document-card .docx-wrapper > section.docx:first-child {
+    margin-top: 0 !important;
+  }
+
+  .docx-document-card .docx-wrapper > section.docx:last-child {
+    margin-bottom: 0 !important;
+  }
+
+  .docx-document-card .docx-preview-container {
+    min-height: 100%;
+  }
+
   .markdown-body h1,
   .markdown-body h2,
   .markdown-body h3,
@@ -413,6 +436,120 @@
     font-size: 0.8125em;
     padding: 0.15em 0.35em;
     color: #e2e8f0;
+  }
+
+  /* QwenPaw-style assistant output: readable Markdown with safe CJK/Latin
+     wrapping and compact tool/status blocks in the tactical chat column. */
+  .ai-chat-markdown {
+    min-width: 0;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    line-height: 1.7;
+  }
+
+  .ai-chat-markdown > :first-child {
+    margin-top: 0;
+  }
+
+  .ai-chat-markdown > :last-child {
+    margin-bottom: 0;
+  }
+
+  .ai-chat-markdown p,
+  .ai-chat-markdown ul,
+  .ai-chat-markdown ol,
+  .ai-chat-markdown blockquote,
+  .ai-chat-markdown pre,
+  .ai-chat-markdown table {
+    margin: 0.45rem 0;
+  }
+
+  .ai-chat-markdown ul,
+  .ai-chat-markdown ol {
+    padding-left: 1.35rem;
+  }
+
+  .ai-chat-markdown li {
+    margin: 0.18rem 0;
+  }
+
+  .ai-chat-markdown ul li {
+    list-style: disc;
+  }
+
+  .ai-chat-markdown ol li {
+    list-style: decimal;
+  }
+
+  .ai-chat-markdown strong {
+    color: #f8fafc;
+    font-weight: 700;
+  }
+
+  .ai-chat-markdown em {
+    color: #cbd5e1;
+  }
+
+  .ai-chat-markdown h1,
+  .ai-chat-markdown h2,
+  .ai-chat-markdown h3,
+  .ai-chat-markdown h4 {
+    color: #f8fafc;
+    font-weight: 700;
+    line-height: 1.35;
+    margin: 0.75rem 0 0.35rem;
+  }
+
+  .ai-chat-markdown h1 { font-size: 0.95rem; }
+  .ai-chat-markdown h2 { font-size: 0.875rem; }
+  .ai-chat-markdown h3,
+  .ai-chat-markdown h4 { font-size: 0.8125rem; }
+
+  .ai-chat-markdown blockquote {
+    border-left: 2px solid rgba(103, 199, 216, 0.65);
+    color: #94a3b8;
+    padding-left: 0.7rem;
+  }
+
+  .ai-chat-markdown code {
+    background: rgba(148, 163, 184, 0.12);
+    border-radius: 0.25rem;
+    color: #dbeafe;
+    font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.9em;
+    padding: 0.08rem 0.25rem;
+  }
+
+  .ai-chat-markdown pre {
+    max-width: 100%;
+    overflow-x: auto;
+    padding: 0.6rem 0.7rem;
+  }
+
+  .ai-chat-markdown pre code {
+    background: transparent;
+    padding: 0;
+    white-space: pre;
+  }
+
+  .ai-chat-markdown table {
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+    border-collapse: collapse;
+    white-space: normal;
+  }
+
+  .ai-chat-markdown th,
+  .ai-chat-markdown td {
+    border: 1px solid rgba(148, 163, 184, 0.18);
+    padding: 0.3rem 0.45rem;
+    text-align: left;
+  }
+
+  .ai-chat-markdown th {
+    color: #f8fafc;
+    font-weight: 700;
   }
 }
 

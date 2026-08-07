@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from typing import Any, Callable
 
 from app.ai.models import SkillDefinition
+from app.ai.doc_generation import generate_document
 from app.tianshu_runtime.runtime import TianShuRuntime
 from app.harness import (
     HarnessAccess,
@@ -408,6 +409,38 @@ class TianShuSkillRegistry:
             )
         )
 
+        # --------------------------- document generation skill ---------------------------
+        self._register(
+            RegisteredSkill(
+                name="doc-tools",
+                description=(
+                    "生成态势报告 / 文档（Word .docx 与 Markdown），保存到 AI_Output "
+                    "目录并返回可下载文件。当用户要求生成报告、文档、简报、总结或导出"
+                    "想定说明时调用。该能力会读取当前实时想定并产出文件，属于写动作，"
+                    "需经治理层审批后执行，审批操作只能在审批界面中完成。"
+                ),
+                parameters={
+                    "report_type": {
+                        "type": "string",
+                        "enum": ["situation", "summary", "brief"],
+                        "default": "situation",
+                        "required": False,
+                    },
+                    "title": {"type": "string", "required": False},
+                    "format": {
+                        "type": "string",
+                        "enum": ["docx", "markdown", "both"],
+                        "default": "docx",
+                        "required": False,
+                    },
+                    "project_id": {"type": "string", "required": False},
+                },
+                func=self._generate_document,
+                access="write",
+                tags=("documents", "report", "doc-tools"),
+            )
+        )
+
     def definitions(self) -> list[SkillDefinition]:
         return [skill.as_definition() for skill in self._skills.values()]
 
@@ -429,6 +462,24 @@ class TianShuSkillRegistry:
             "scenarioId": scenario_id,
             "name": name,
         }
+
+    def _generate_document(
+        self,
+        report_type: str = "situation",
+        title: str = "",
+        format: str = "docx",
+        project_id: str = "",
+        scenario_id: str = "",
+        **kwargs: Any,
+    ) -> dict[str, Any]:
+        return generate_document(
+            self.runtime,
+            report_type=report_type,
+            title=title,
+            format=format,
+            project_id=project_id or scenario_id,
+            scenario_id=scenario_id,
+        )
 
     def execute(
         self,

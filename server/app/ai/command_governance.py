@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import math
 from datetime import UTC, datetime
@@ -43,6 +44,7 @@ ALLOWED_SKILLS = {
     "execute_script_step",
     "control_script_flow",
     "load_scenario_snapshot",
+    "doc-tools",
 }
 
 BLOCKED_SKILLS = {
@@ -732,6 +734,23 @@ class CommandApprovalQueue:
         self.rules = CommandRuleEngine(runtime, registry)
         self._lock = RLock()
         self._proposals: dict[str, CommandProposal] = {}
+        self._approval_waiters: dict[str, list[asyncio.Future[CommandProposal]]] = {}
+        self._mode = "auto"
+
+    def set_mode(self, mode: str) -> None:
+        self._mode = mode if mode in {"strict", "smart", "auto", "off"} else "auto"
+
+    @property
+    def mode(self) -> str:
+        return self._mode
+
+    def should_auto_execute(self, skill: str, risk: str = "medium") -> bool:
+        if self._mode == "off":
+            return True
+        if self._mode == "smart":
+            return risk == "low"
+        # Auto retains TianShu's default: mutating tools are explicitly gated.
+        return False
 
     def create_proposal(
         self,
@@ -776,7 +795,18 @@ class CommandApprovalQueue:
             risk=self._risk_for_skill(skill),
             writes_runtime=True,
         )
-        return self.create_proposal(command=command, steps=[step], source=source)
+        return self.create_proposal(
+            command=command,
+            steps=[step],
+            source=source,
+            plan_metadata={
+                "kind": "approval_action",
+                "reasoning_summary": (
+                    f"已根据当前请求识别为“{step.summary or skill}”，"
+                    "准备调用对应工具；执行前需要人工确认。"
+                ),
+            },
+        )
 
     def list_proposals(
         self,
@@ -794,6 +824,42 @@ class CommandApprovalQueue:
     def get(self, proposal_id: str) -> CommandProposal | None:
         with self._lock:
             return self._proposals.get(proposal_id)
+
+    def find_active_plan_option(
+        self, *, plan_group_key: str, option_key: str
+    ) -> CommandProposal | None:
+        with self._lock:
+            for proposal in self._proposals.values():
+                metadata = proposal.plan_metadata or {}
+                if (
+                    proposal.status == "pending"
+                    and metadata.get("kind") == "tactical_plan_option"
+                    and metadata.get("planGroupKey") == plan_group_key
+                    and metadata.get("optionKey") == option_key
+                ):
+                    return proposal
+        return None
+
+    def cancel_plan_siblings(self, selected: CommandProposal) -> list[CommandProposal]:
+        metadata = selected.plan_metadata or {}
+        group_key = metadata.get("planGroupKey")
+        if not group_key or selected.status not in {"executed", "partial"}:
+            return []
+        cancelled: list[CommandProposal] = []
+        with self._lock:
+            for proposal in self._proposals.values():
+                candidate_metadata = proposal.plan_metadata or {}
+                if (
+                    proposal.id != selected.id
+                    and proposal.status == "pending"
+                    and candidate_metadata.get("kind") == "tactical_plan_option"
+                    and candidate_metadata.get("planGroupKey") == group_key
+                ):
+                    proposal.status = "rejected"
+                    proposal.error = "同一批次已选择其他方案。"
+                    proposal.updated_at = _utc_now()
+                    cancelled.append(proposal)
+        return cancelled
 
     def hydrate(self, proposal: CommandProposal) -> CommandProposal:
         """Put a persisted proposal back into the runtime-local queue."""
@@ -816,7 +882,9 @@ class CommandApprovalQueue:
         self, proposal: CommandProposal, reason: str = ""
     ) -> CommandProposal:
         self.hydrate(proposal)
-        return self.reject(proposal.id, reason=reason)
+        resolved = self.reject(proposal.id, reason=reason)
+        self._notify_resolution(resolved)
+        return resolved
 
     def approve_and_execute(self, proposal_id: str) -> CommandProposal:
         with self._lock:
@@ -873,7 +941,54 @@ class CommandApprovalQueue:
         self, proposal: CommandProposal
     ) -> CommandProposal:
         self.hydrate(proposal)
-        return self.approve_and_execute(proposal.id)
+        resolved = self.approve_and_execute(proposal.id)
+        self._notify_resolution(resolved)
+        return resolved
+
+    async def wait_for_resolution(
+        self, proposal_id: str, *, timeout: float | None = None
+    ) -> CommandProposal:
+        """Pause an agent tool loop until the operator resolves a proposal.
+
+        The HTTP approval endpoint resolves the same future, allowing the
+        original SSE/agent turn to continue with the executed tool result.
+        """
+        with self._lock:
+            proposal = self._proposals.get(proposal_id)
+            if proposal is None:
+                raise ValueError("命令提案不存在或已过期。")
+            if proposal.status in {
+                "approved",
+                "rejected",
+                "executed",
+                "partial",
+                "failed",
+                "blocked",
+            }:
+                return proposal
+
+            loop = asyncio.get_running_loop()
+            future: asyncio.Future[CommandProposal] = loop.create_future()
+            self._approval_waiters.setdefault(proposal_id, []).append(future)
+
+        try:
+            if timeout is None:
+                return await future
+            return await asyncio.wait_for(future, timeout=timeout)
+        finally:
+            with self._lock:
+                waiters = self._approval_waiters.get(proposal_id, [])
+                if future in waiters:
+                    waiters.remove(future)
+                if not waiters:
+                    self._approval_waiters.pop(proposal_id, None)
+
+    def _notify_resolution(self, proposal: CommandProposal) -> None:
+        with self._lock:
+            waiters = self._approval_waiters.pop(proposal.id, [])
+        for future in waiters:
+            if not future.done():
+                future.get_loop().call_soon_threadsafe(future.set_result, proposal)
 
     def _require(self, proposal_id: str) -> CommandProposal:
         proposal = self._proposals.get(proposal_id)

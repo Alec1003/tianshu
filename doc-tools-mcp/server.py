@@ -19,7 +19,7 @@ from mcp.types import (
 )
 from starlette.applications import Starlette
 from starlette.responses import FileResponse, JSONResponse
-from starlette.routing import Route
+from starlette.routing import Mount, Route
 import anyio
 import uvicorn
 
@@ -224,8 +224,10 @@ async def list_resources() -> ListResourcesResult:
 async def main():
     transport = StreamableHTTPServerTransport(mcp_session_id=None)
 
-    async def handle_mcp(request):
-        await transport.handle_request(request.scope, request.receive, request._send)
+    async def handle_mcp(scope, receive, send):
+        # The SDK transport is not itself a callable ASGI application in the
+        # installed MCP version; its method writes the response directly.
+        await transport.handle_request(scope, receive, send)
 
     async def health(request):
         return JSONResponse({"status": "ok"})
@@ -244,8 +246,11 @@ async def main():
 
     app = Starlette(routes=[
         Route("/health", endpoint=health),
-        Route("/", endpoint=handle_mcp, methods=["GET", "POST"]),
         Route("/download/{filename}", endpoint=download_file),
+        # The adapter writes directly to ASGI send() and intentionally returns
+        # None, so mount it as ASGI rather than a Starlette endpoint expecting
+        # a Response.
+        Mount("/", app=handle_mcp),
     ])
 
     async with transport.connect() as (read, write):

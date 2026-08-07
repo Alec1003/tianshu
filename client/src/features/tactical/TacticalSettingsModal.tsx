@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { MouseEvent } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
@@ -41,7 +41,7 @@ const SETTINGS_TABS = [
   },
   {
     id: "skills",
-    label: "AI 工具",
+    label: "Skill 管理",
     icon: Wrench,
     desc: "查看后端工具与自定义提示词",
   },

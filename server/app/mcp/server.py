@@ -239,6 +239,13 @@ mcp = FastMCP(
 )
 
 
+# The bundled small-model planning algorithms share this MCP surface, auth,
+# and HTTP/stdio transports with the native TianShu tools.
+from app.mcp.small_models_demo.bridge import register_small_models_tools  # noqa: E402
+
+register_small_models_tools(mcp)
+
+
 def _mcp_tool_description(description: str | None) -> str:
     if not description:
         return ""

@@ -1,6 +1,7 @@
 ﻿from __future__ import annotations
 
 import logging
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -24,6 +25,11 @@ from app.unit_assets.router import router as unit_assets_router
 from app.unit_assets.seed import seed_system_unit_assets
 
 logger = logging.getLogger(__name__)
+
+# Shared document output root. Must match the directory the doc-tools skill
+# writes to (see app.ai.doc_generation.doc_output_root) so /api/doc/* can serve
+# the generated files. Configurable for local / non-Docker deployments.
+DOC_ROOT = os.environ.get("TIANSHU_DOC_OUTPUT_DIR", "/doc_output")
 
 
 @asynccontextmanager
@@ -104,7 +110,7 @@ def create_app() -> FastAPI:
         from pathlib import Path
         from fastapi.responses import FileResponse, JSONResponse
         folder = doc_folder or scenario_id
-        doc_root = Path("/doc_output")
+        doc_root = Path(DOC_ROOT)
         filepath = doc_root / folder / filename if folder else doc_root / filename
         if not filepath.exists():
             return JSONResponse({"error": "File not found"}, status_code=404)
@@ -115,7 +121,7 @@ def create_app() -> FastAPI:
         from pathlib import Path
         from datetime import datetime
         folder = doc_folder or scenario_id
-        doc_root = Path("/doc_output")
+        doc_root = Path(DOC_ROOT)
         target_dir = doc_root / folder if folder else doc_root
         if not target_dir.exists():
             return {"files": []}
@@ -137,7 +143,7 @@ def create_app() -> FastAPI:
         from fastapi.responses import JSONResponse
         from html import escape
         from docx import Document as DocxDocument
-        doc_root = Path("/doc_output")
+        doc_root = Path(DOC_ROOT)
         filepath = doc_root / scenario_id / filename if scenario_id else doc_root / filename
         if not filepath.exists():
             return JSONResponse({"error": "File not found"}, status_code=404)

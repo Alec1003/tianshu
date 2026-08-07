@@ -1,0 +1,485 @@
+{
+  "scenario": {
+    "name": "route_plan_demo",
+    "platforms": [
+      {
+        "id": "Tel_Nof_F15C_0",
+        "type": "F15C",
+        "class": "aircraft",
+        "base": "Tel_Nof",
+        "position": [
+          47.5,
+          32.5,
+          5000
+        ],
+        "speed": 280,
+        "weapon_speed": 300,
+        "refuel_speed": 250,
+        "range": 400,
+        "range_remaining": 400,
+        "rcs": 1.0,
+        "initial_heading_deg": 65
+      },
+      {
+        "id": "Tel_Nof_F15C_1",
+        "type": "F15C",
+        "class": "aircraft",
+        "base": "Tel_Nof",
+        "position": [
+          47.5,
+          32.5,
+          5000
+        ],
+        "speed": 280,
+        "weapon_speed": 300,
+        "refuel_speed": 250,
+        "range": 2500,
+        "range_remaining": 2500,
+        "rcs": 1.0,
+        "initial_heading_deg": 60
+      },
+      {
+        "id": "Tel_Nof_F15C_4",
+        "type": "F15C",
+        "class": "aircraft",
+        "base": "Tel_Nof",
+        "position": [
+          47.5,
+          32.5,
+          5000
+        ],
+        "speed": 280,
+        "weapon_speed": 300,
+        "refuel_speed": 250,
+        "range": 2500,
+        "range_remaining": 2500,
+        "rcs": 1.0,
+        "initial_heading_deg": 55
+      },
+      {
+        "id": "Tel_Nof_F15C_5",
+        "type": "F15C",
+        "class": "aircraft",
+        "base": "Tel_Nof",
+        "position": [
+          47.5,
+          32.5,
+          5000
+        ],
+        "speed": 280,
+        "weapon_speed": 300,
+        "refuel_speed": 250,
+        "range": 2500,
+        "range_remaining": 2500,
+        "rcs": 1.0,
+        "initial_heading_deg": 62
+      },
+      {
+        "id": "Tel_Nof_F35I_5",
+        "type": "F35I",
+        "class": "aircraft",
+        "base": "Tel_Nof",
+        "position": [
+          47.5,
+          32.5,
+          5000
+        ],
+        "speed": 350,
+        "weapon_speed": 380,
+        "refuel_speed": 320,
+        "range": 2200,
+        "range_remaining": 2200,
+        "rcs": 0.1,
+        "initial_heading_deg": 58
+      },
+      {
+        "id": "Tel_Nof_F35I_6",
+        "type": "F35I",
+        "class": "aircraft",
+        "base": "Tel_Nof",
+        "position": [
+          47.5,
+          32.5,
+          5000
+        ],
+        "speed": 350,
+        "weapon_speed": 380,
+        "refuel_speed": 320,
+        "range": 2200,
+        "range_remaining": 2200,
+        "rcs": 0.1,
+        "initial_heading_deg": 63
+      },
+      {
+        "id": "Hatzerim_F16I_4",
+        "type": "F16I",
+        "class": "aircraft",
+        "base": "Hatzerim",
+        "position": [
+          48.0,
+          29.5,
+          5000
+        ],
+        "speed": 310,
+        "weapon_speed": 340,
+        "refuel_speed": 290,
+        "range": 400,
+        "range_remaining": 400,
+        "rcs": 0.8,
+        "initial_heading_deg": 50
+      },
+      {
+        "id": "Hatzerim_F16I_5",
+        "type": "F16I",
+        "class": "aircraft",
+        "base": "Hatzerim",
+        "position": [
+          48.0,
+          29.5,
+          5000
+        ],
+        "speed": 310,
+        "weapon_speed": 340,
+        "refuel_speed": 290,
+        "range": 2000,
+        "range_remaining": 2000,
+        "rcs": 0.8,
+        "initial_heading_deg": 55
+      },
+      {
+        "id": "Muwaffaq_Salti_F15E_6",
+        "type": "F15E",
+        "class": "aircraft",
+        "base": "Muwaffaq_Salti",
+        "position": [
+          50.5,
+          29.5,
+          5000
+        ],
+        "speed": 300,
+        "weapon_speed": 330,
+        "refuel_speed": 280,
+        "range": 2200,
+        "range_remaining": 2200,
+        "rcs": 0.9,
+        "initial_heading_deg": 40
+      },
+      {
+        "id": "Whiteman_B2A_4",
+        "type": "B2A",
+        "class": "aircraft",
+        "base": "Whiteman",
+        "position": [
+          47.5,
+          35.0,
+          10000
+        ],
+        "speed": 280,
+        "weapon_speed": 310,
+        "refuel_speed": 260,
+        "range": 5000,
+        "range_remaining": 5000,
+        "rcs": 0.001,
+        "initial_heading_deg": 160
+      },
+      {
+        "id": "Whiteman_B2A_6",
+        "type": "B2A",
+        "class": "aircraft",
+        "base": "Whiteman",
+        "position": [
+          47.5,
+          35.0,
+          10000
+        ],
+        "speed": 280,
+        "weapon_speed": 310,
+        "refuel_speed": 260,
+        "range": 400,
+        "range_remaining": 400,
+        "rcs": 0.001,
+        "initial_heading_deg": 165
+      },
+      {
+        "id": "Sea_BlockV_2",
+        "type": "BlockV",
+        "class": "missile",
+        "base": "Sea",
+        "position": [
+          51.5,
+          29.0,
+          100
+        ],
+        "speed": 250,
+        "range": 1600,
+        "rcs": 0.5
+      },
+      {
+        "id": "Sea_BlockV_3",
+        "type": "BlockV",
+        "class": "missile",
+        "base": "Sea",
+        "position": [
+          51.5,
+          29.0,
+          100
+        ],
+        "speed": 250,
+        "range": 1600,
+        "rcs": 0.5
+      },
+      {
+        "id": "Sea_BlockV_7",
+        "type": "BlockV",
+        "class": "missile",
+        "base": "Sea",
+        "position": [
+          51.5,
+          29.0,
+          100
+        ],
+        "speed": 250,
+        "range": 1600,
+        "rcs": 0.5
+      }
+    ],
+    "targets": [
+      {
+        "id": "地下掩体",
+        "position": [
+          53.0,
+          34.5,
+          0
+        ]
+      },
+      {
+        "id": "福尔多核设施",
+        "position": [
+          52.0,
+          33.5,
+          0
+        ]
+      },
+      {
+        "id": "移动弹药库",
+        "position": [
+          50.5,
+          31.0,
+          0
+        ]
+      },
+      {
+        "id": "导弹发射车",
+        "position": [
+          52.5,
+          30.5,
+          0
+        ]
+      },
+      {
+        "id": "C-300防空系统",
+        "position": [
+          51.5,
+          34.0,
+          50
+        ]
+      },
+      {
+        "id": "巴瓦尔-373",
+        "position": [
+          52.5,
+          33.0,
+          50
+        ]
+      },
+      {
+        "id": "霍尔达德-15",
+        "position": [
+          53.0,
+          32.0,
+          50
+        ]
+      },
+      {
+        "id": "伊斯法罕核材料",
+        "position": [
+          51.5,
+          31.5,
+          0
+        ]
+      }
+    ],
+    "threats": [
+      {
+        "id": "C-300雷达",
+        "type": "sphere",
+        "position": [
+          51.5,
+          34.0,
+          1000
+        ],
+        "params": {
+          "radius": 150
+        },
+        "threat_level": 0.95
+      },
+      {
+        "id": "巴瓦尔雷达",
+        "type": "sphere",
+        "position": [
+          52.5,
+          33.0,
+          1000
+        ],
+        "params": {
+          "radius": 150
+        },
+        "threat_level": 0.9
+      },
+      {
+        "id": "霍尔达德雷达",
+        "type": "sphere",
+        "position": [
+          53.0,
+          32.0,
+          1000
+        ],
+        "params": {
+          "radius": 150
+        },
+        "threat_level": 0.8
+      }
+    ],
+    "no_fly_zones": [
+      {
+        "id": "德黑兰空域",
+        "type": "cylinder",
+        "position": [
+          50.0,
+          33.5,
+          0
+        ],
+        "params": {
+          "radius": 25,
+          "height": 25000
+        }
+      }
+    ],
+    "planning": {
+      "grid_resolution_km": 10.0,
+      "altitude_levels": [
+        3000,
+        5000,
+        8000,
+        10000
+      ],
+      "margin_km": 50,
+      "heuristic": "dubins",
+      "bidirectional": true,
+      "edge_samples": 0,
+      "use_heading": true,
+      "threat_weight": 100.0,
+      "distance_weight": 1.0,
+      "direction_weight": 80.0,
+      "turn_weight": 0.0,
+      "stealth_factor": 0.1,
+      "aircraft_turn_radius_km": 0,
+      "missile_turn_radius_km": 6.0,
+      "heading_count": 12,
+      "default_mode": 2,
+      "default_attack_point_radius_km": 50.0,
+      "default_attack_point_up_height_m": 3000.0,
+      "default_attack_point_count": 4,
+      "default_approach_ref_radius_km": 50.0,
+      "default_approach_ref_up_height_m": 0.0,
+      "default_approach_ref_count": 4,
+      "threat_tolerance_ratio": 0.05
+    },
+    "pairs": [
+      {
+        "platform": "Whiteman_B2A_4",
+        "target": "地下掩体",
+        "mode": 5,
+        "attack_point_radius_km": 80
+      },
+      {
+        "platform": "Whiteman_B2A_6",
+        "target": "福尔多核设施",
+        "mode": 5,
+        "attack_point_radius_km": 60
+      },
+      {
+        "platform": "Tel_Nof_F15C_0",
+        "target": "地下掩体",
+        "mode": 5,
+        "attack_point_radius_km": 80
+      },
+      {
+        "platform": "Tel_Nof_F15C_1",
+        "target": "福尔多核设施",
+        "mode": 5,
+        "attack_point_radius_km": 60
+      },
+      {
+        "platform": "Tel_Nof_F35I_5",
+        "target": "C-300防空系统",
+        "mode": 5,
+        "attack_point_radius_km": 50
+      },
+      {
+        "platform": "Tel_Nof_F35I_6",
+        "target": "巴瓦尔-373",
+        "mode": 5,
+        "attack_point_radius_km": 50
+      },
+      {
+        "platform": "Tel_Nof_F15C_4",
+        "target": "C-300防空系统",
+        "mode": 5,
+        "attack_point_radius_km": 50
+      },
+      {
+        "platform": "Tel_Nof_F15C_5",
+        "target": "巴瓦尔-373",
+        "mode": 5,
+        "attack_point_radius_km": 50
+      },
+      {
+        "platform": "Hatzerim_F16I_4",
+        "target": "C-300防空系统",
+        "mode": 5,
+        "attack_point_radius_km": 50
+      },
+      {
+        "platform": "Hatzerim_F16I_5",
+        "target": "巴瓦尔-373",
+        "mode": 5,
+        "attack_point_radius_km": 50
+      },
+      {
+        "platform": "Muwaffaq_Salti_F15E_6",
+        "target": "霍尔达德-15",
+        "mode": 5,
+        "attack_point_radius_km": 50
+      },
+      {
+        "platform": "Sea_BlockV_2",
+        "target": "移动弹药库",
+        "mode": 1
+      },
+      {
+        "platform": "Sea_BlockV_3",
+        "target": "导弹发射车",
+        "mode": 1
+      },
+      {
+        "platform": "Sea_BlockV_7",
+        "target": "伊斯法罕核材料",
+        "mode": 1
+      }
+    ],
+    "jamming": {
+      "pkl": "src/output/ew_demo/ew_fields.pkl"
+    }
+  }
+}

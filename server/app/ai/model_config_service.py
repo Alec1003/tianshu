@@ -23,6 +23,7 @@ class AIModelProviderConfigRead(BaseModel):
     baseUrl: str = ""
     enabled: bool = False
     verified: bool = False
+    isDefault: bool = False
     lastCheckedAt: str | None = None
     customModels: list[dict[str, Any]] = Field(default_factory=list)
     apiKeySet: bool = False
@@ -78,6 +79,7 @@ def _record_to_read(record: AIModelProviderConfig) -> AIModelProviderConfigRead:
         baseUrl=record.base_url,
         enabled=record.enabled,
         verified=record.verified,
+        isDefault=record.is_default,
         lastCheckedAt=record.last_checked_at,
         customModels=list(record.custom_models or []),
         apiKeySet=bool(record.api_key_ciphertext),
@@ -170,3 +172,95 @@ async def resolve_stored_model_credentials(
             base_url.strip() or record.base_url,
         )
     return "", base_url.strip()
+
+
+async def set_default_model_provider(
+    session: AsyncSession,
+    user: User,
+    provider_id: str,
+) -> AIModelProviderConfigRead | None:
+    """Set *provider_id* as the sole default, unsetting any prior default."""
+    normalized = provider_id.strip()
+
+    # Unset any existing default for this user
+    result = await session.execute(
+        select(AIModelProviderConfig).where(
+            AIModelProviderConfig.owner_id == _owner_id(user),
+            AIModelProviderConfig.is_default.is_(True),
+        )
+    )
+    for record in result.scalars().all():
+        record.is_default = False
+
+    # Set the requested one as default
+    target = await get_model_provider_record(session, user, normalized)
+    if target is None:
+        return None
+    target.is_default = True
+    await session.commit()
+    await session.refresh(target)
+    return _record_to_read(target)
+
+
+async def resolve_default_model_config(
+    session: AsyncSession,
+    user: User,
+) -> tuple[str, str, str, str]:
+    """Resolve the default model configuration.
+
+    Returns ``(provider_id, provider, model_name, base_url)`` from the
+    user's default provider config. If no default is set, returns empty
+    strings — callers should fall back to env vars or raise.
+    """
+    result = await session.execute(
+        select(AIModelProviderConfig).where(
+            AIModelProviderConfig.owner_id == _owner_id(user),
+            AIModelProviderConfig.is_default.is_(True),
+            AIModelProviderConfig.enabled.is_(True),
+        )
+    )
+    record = result.scalar_one_or_none()
+    if record is None:
+        return "", "", "", ""
+
+    # Pick the first verified custom model, or any model
+    model_name = ""
+    for m in record.custom_models or []:
+        model_name = str(m.get("id", "") or "").strip()
+        if model_name:
+            break
+
+    return (
+        record.provider_id,
+        record.provider_id,
+        model_name,
+        record.base_url,
+    )
+
+
+async def resolve_model_config_by_id(
+    session: AsyncSession,
+    user: User,
+    provider_id: str,
+) -> tuple[str, str, str, str]:
+    """Resolve a model config by explicit provider_id.
+
+    Returns ``(provider_id, provider, model_name, base_url)`` plus the
+    decrypted api_key is returned separately for security.
+    """
+    record = await get_model_provider_record(session, user, provider_id.strip())
+    if record is None:
+        return "", "", "", ""
+
+    model_name = ""
+    for m in record.custom_models or []:
+        model_name = str(m.get("id", "") or "").strip()
+        if model_name:
+            break
+
+    return (
+        record.provider_id,
+        record.provider_id,
+        model_name,
+        record.base_url,
+    )

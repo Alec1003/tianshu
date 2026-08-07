@@ -1,13 +1,13 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
-import json
 import logging
 from typing import Any
 
 from app.agent_runtime.agents.interface import BaseAgent
-from app.agent_runtime.agents.model_factory import AgentModelConfig
+from app.agent_runtime.agents.model_factory import AgentModelConfig, NoAgentModelConfiguredError
 from app.agent_runtime.agents.lifecycle import AgentLifecycle
-from app.agent_runtime.events import AgentEvent
+from app.agent_runtime.agents.llm_adapter import LLMAdapter
+from app.agent_runtime.agents.tool_loop import ToolLoop
 from app.agent_runtime.tools.base import ToolContext
 
 logger = logging.getLogger(__name__)
@@ -16,13 +16,14 @@ logger = logging.getLogger(__name__)
 class QwenPawTextAgent(BaseAgent):
     """QwenPaw-style agent with native LLM tool-calling via OpenAI-compatible API.
 
-    When a model is configured, native function calling is used: tool schemas
-    are converted to the OpenAI tools format, the LLM decides which tool(s) to
-    call, we execute them through the tool/capability registry, feed the
-    results back, and stream the final text response.
+    Requires a configured model (AgentModelConfig.is_configured == True).
+    Tool schemas are converted to OpenAI tools format; the LLM decides which
+    tool(s) to call, we execute them through the capability/tool registry,
+    feed the results back via a multi-round ToolLoop, and stream the final
+    text response.
 
-    When no model is configured (AgentModelConfig.is_configured is False), the
-    agent falls back to JSON tool-call parsing from the last message.
+    Raises:
+        NoAgentModelConfiguredError: if model_config.is_configured is False.
     """
 
     def __init__(
@@ -36,6 +37,11 @@ class QwenPawTextAgent(BaseAgent):
         capability_registry: Any | None = None,
         lifecycle: AgentLifecycle | None = None,
     ) -> None:
+        if not model_config.is_configured:
+            raise NoAgentModelConfiguredError(
+                "QwenPawTextAgent requires a configured LLM model. "
+                "Use AgentBuilder to create agents with proper model configuration."
+            )
         self.model_config = model_config
         self.system_prompt = system_prompt
         self.workspace_context = workspace_context
@@ -44,6 +50,7 @@ class QwenPawTextAgent(BaseAgent):
         self.tool_context = tool_context
         self.lifecycle = lifecycle or AgentLifecycle()
         self._openai_tools_cache: list[dict[str, Any]] | None = None
+        self._llm_adapter: LLMAdapter | None = None
 
     async def initialize(self) -> None:
         self.lifecycle.initialize()
@@ -56,165 +63,31 @@ class QwenPawTextAgent(BaseAgent):
         self.lifecycle.close()
 
     async def reply_stream(self, messages: list[dict[str, Any]]):
-        # --- JSON tool-call fallback (no model configured) ---
-        if not self.model_config.is_configured:
-            tool_call = self._parse_tool_call(messages)
-            if tool_call is not None:
-                async for event in self._execute_tool_json(tool_call[0], tool_call[1]):
-                    yield event
-                return
-            yield AgentEvent("error", "No LLM configured and no JSON tool call found.")
-            return
-
-        # --- Native tool-calling path ---
-        async for event in self._stream_with_native_tools(messages):
+        async for event in self._run_tool_loop(messages):
             yield event
 
     # ------------------------------------------------------------------
-    # JSON tool-call fallback (kept for backward compatibility)
+    # ToolLoop-based native tool calling
     # ------------------------------------------------------------------
 
-    async def _execute_tool_json(
-        self,
-        tool_name: str,
-        arguments: dict[str, Any],
-    ):
-        yield AgentEvent(
-            "tool_call_start",
-            metadata={"tool": tool_name, "arguments": arguments},
-        )
-        try:
-            result = await self._execute_capability(tool_name, arguments)
-        except Exception as exc:
-            yield AgentEvent(
-                "tool_error",
-                content=str(exc) or exc.__class__.__name__,
-                metadata={"tool": tool_name, "error_type": exc.__class__.__name__},
-            )
-            return
-        yield AgentEvent(
-            "tool_call_end",
-            metadata={"tool": tool_name, "result": result},
-        )
-        yield json.dumps(result, ensure_ascii=False)
-
-    # ------------------------------------------------------------------
-    # Native tool-calling via OpenAI-compatible API
-    # ------------------------------------------------------------------
-
-    async def _stream_with_native_tools(self, messages: list[dict[str, Any]]):
-        client = self._build_client()
-        provider_messages = self._provider_messages(messages)
+    async def _run_tool_loop(self, messages: list[dict[str, Any]]):
         tools = self._get_openai_tools()
+        provider_messages = self._provider_messages(messages)
+        llm = self._get_llm_adapter()
+        loop = ToolLoop(
+            llm_adapter=llm,
+            capability_registry=self.capability_registry,
+            tool_registry=self.tool_registry,
+            tool_context=self.tool_context,
+        )
+        # ToolLoop now yields AgentAction; the AgentExecutor
+        # translates AgentAction -> AgentEvent upstream.
+        async for action in loop.run(provider_messages, tools=tools):
+            yield action
 
-        kwargs: dict[str, Any] = {
-            "model": self.model_config.model,
-            "messages": provider_messages,
-            "stream": True,
-        }
-        if tools:
-            kwargs["tools"] = tools
-            kwargs["tool_choice"] = "auto"
-
-        stream = await client.chat.completions.create(**kwargs)
-
-        tool_calls_by_index: dict[int, dict[str, Any]] = {}
-        finish_reason: str | None = None
-        text_parts: list[str] = []
-
-        async for chunk in stream:
-            choices = getattr(chunk, "choices", None) or []
-            if not choices:
-                continue
-            choice = choices[0]
-            finish_reason = getattr(choice, "finish_reason", None) or finish_reason
-            delta = getattr(choice, "delta", None) or {}
-
-            # Collect tool calls from deltas
-            tool_deltas = getattr(delta, "tool_calls", None) or []
-            for td in tool_deltas:
-                index = getattr(td, "index", 0)
-                if index not in tool_calls_by_index:
-                    tool_calls_by_index[index] = {
-                        "id": getattr(td, "id", "") or "",
-                        "function": {"name": "", "arguments": ""},
-                    }
-                tc = tool_calls_by_index[index]
-                if getattr(td, "id", None):
-                    tc["id"] = td.id
-                fn = getattr(td, "function", None)
-                if fn is not None:
-                    if getattr(fn, "name", None):
-                        tc["function"]["name"] += fn.name
-                    if getattr(fn, "arguments", None):
-                        tc["function"]["arguments"] += fn.arguments
-
-            # Collect text deltas
-            content = getattr(delta, "content", None)
-            if content:
-                text_parts.append(str(content))
-                yield AgentEvent("text_delta", str(content))
-
-        # --- Execute tool calls if the model requested them ---
-        if finish_reason == "tool_calls" and tool_calls_by_index:
-            tool_call_items = sorted(tool_calls_by_index.items(), key=lambda x: x[0])
-            tool_messages: list[dict[str, Any]] = []
-            for _index, tc in tool_call_items:
-                fn_name = tc["function"]["name"]
-                try:
-                    fn_args = json.loads(tc["function"]["arguments"] or "{}")
-                except json.JSONDecodeError:
-                    fn_args = {}
-                yield AgentEvent(
-                    "tool_call_start",
-                    metadata={"tool": fn_name, "arguments": fn_args},
-                )
-                try:
-                    result = await self._execute_capability(fn_name, fn_args)
-                except Exception as exc:
-                    yield AgentEvent(
-                        "tool_error",
-                        content=str(exc) or exc.__class__.__name__,
-                        metadata={"tool": fn_name, "error_type": exc.__class__.__name__},
-                    )
-                    result = {"error": str(exc)}
-                yield AgentEvent(
-                    "tool_call_end",
-                    metadata={"tool": fn_name, "result": result},
-                )
-                tool_messages.append({
-                    "role": "tool",
-                    "tool_call_id": tc["id"],
-                    "content": json.dumps(result, ensure_ascii=False),
-                })
-
-            # Continue: feed tool results back, get final response
-            provider_messages.extend(tool_messages)
-            followup_stream = await client.chat.completions.create(
-                model=self.model_config.model,
-                messages=provider_messages,
-                stream=True,
-            )
-            async for chunk in followup_stream:
-                choices = getattr(chunk, "choices", None) or []
-                if not choices:
-                    continue
-                content = getattr(getattr(choices[0], "delta", None) or {}, "content", None)
-                if content:
-                    yield AgentEvent("text_delta", str(content))
-
-    def _build_client(self) -> Any:
-        try:
-            from openai import AsyncOpenAI  # noqa: PLC0415
-        except Exception as exc:  # pragma: no cover - depends on optional SDK
-            raise RuntimeError("OpenAI-compatible SDK is not installed.") from exc
-
-        kwargs: dict[str, Any] = {}
-        if self.model_config.api_key:
-            kwargs["api_key"] = self.model_config.api_key
-        if self.model_config.effective_base_url:
-            kwargs["base_url"] = self.model_config.effective_base_url
-        return AsyncOpenAI(**kwargs)
+    # ------------------------------------------------------------------
+    # OpenAI tools conversion (cached)
+    # ------------------------------------------------------------------
 
     def _get_openai_tools(self) -> list[dict[str, Any]]:
         """Convert ToolRegistry schemas to OpenAI tools format, cached."""
@@ -238,6 +111,10 @@ class QwenPawTextAgent(BaseAgent):
             })
         self._openai_tools_cache = tools
         return tools
+
+    # ------------------------------------------------------------------
+    # Message construction
+    # ------------------------------------------------------------------
 
     def _provider_messages(self, messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
         provider_messages: list[dict[str, Any]] = [
@@ -270,36 +147,35 @@ class QwenPawTextAgent(BaseAgent):
             hint += f"\nMemory summary:\n{memory_summary}"
         return hint
 
+    # ------------------------------------------------------------------
+    # Execution
+    # ------------------------------------------------------------------
+
     async def _execute_capability(
         self,
         name: str,
         arguments: dict[str, Any],
     ) -> dict[str, Any]:
         if self.capability_registry is not None:
-            return await self.capability_registry.execute(name, arguments, self.tool_context)
-        return await self.tool_registry.execute(name, arguments, self.tool_context)
+            try:
+                return await self.capability_registry.execute(
+                    name, arguments, self.tool_context
+                )
+            except ValueError:
+                logger.debug(
+                    "CapabilityRegistry has no adapter for %s, falling back to ToolRegistry",
+                    name,
+                )
+        if self.tool_registry is not None:
+            return await self.tool_registry.execute(
+                name, arguments, self.tool_context
+            )
+        raise ValueError(f"No registry available to execute tool: {name}")
 
-    @staticmethod
-    def _parse_tool_call(
-        messages: list[dict[str, Any]],
-    ) -> tuple[str, dict[str, Any]] | None:
-        if not messages:
-            return None
-        text = message_text(messages[-1]).strip()
-        if not text:
-            return None
-        try:
-            payload = json.loads(text)
-        except json.JSONDecodeError:
-            return None
-        if not isinstance(payload, dict):
-            return None
-        tool_name = payload.get("tool") or payload.get("tool_name")
-        arguments = payload.get("arguments") or payload.get("args") or {}
-        if not isinstance(tool_name, str) or not tool_name:
-            return None
-        arguments = arguments if isinstance(arguments, dict) else {}
-        return tool_name, arguments
+    def _get_llm_adapter(self) -> LLMAdapter:
+        if self._llm_adapter is None:
+            self._llm_adapter = LLMAdapter(self.model_config)
+        return self._llm_adapter
 
 
 def message_text(message: dict[str, Any]) -> str:

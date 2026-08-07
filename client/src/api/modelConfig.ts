@@ -6,6 +6,7 @@ export interface ServerModelProviderConfig {
   baseUrl: string;
   enabled: boolean;
   verified: boolean;
+  isDefault: boolean;
   lastCheckedAt: string | null;
   customModels: Array<Record<string, unknown>>;
   apiKeySet: boolean;
@@ -41,5 +42,14 @@ export async function saveServerModelProvider(
       method: "PUT",
       json: payload,
     }
+  );
+}
+
+export async function setDefaultModelProvider(
+  providerId: string,
+): Promise<ServerModelProviderConfig> {
+  return apiCall<ServerModelProviderConfig>(
+    `/api/ai/model/providers/${encodeURIComponent(providerId)}/default`,
+    { method: "PUT" }
   );
 }

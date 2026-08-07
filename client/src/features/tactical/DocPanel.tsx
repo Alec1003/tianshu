@@ -11,11 +11,17 @@ interface DocFile {
 
 interface DocPanelProps {
   docFolder?: string;
+  refreshToken?: number;
   onPreview: (filename: string) => void;
   previewFile: string | null;
 }
 
-export default function DocPanel({ docFolder, onPreview, previewFile }: DocPanelProps) {
+export default function DocPanel({
+  docFolder,
+  refreshToken = 0,
+  onPreview,
+  previewFile,
+}: DocPanelProps) {
   const [files, setFiles] = useState<DocFile[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -45,7 +51,7 @@ export default function DocPanel({ docFolder, onPreview, previewFile }: DocPanel
         if (!cancelled) setLoading(false);
       });
     return () => { cancelled = true; };
-  }, [docFolder]);
+  }, [docFolder, refreshToken]);
 
   const formatDate = (iso: string) => {
     try {
@@ -90,7 +96,59 @@ export default function DocPanel({ docFolder, onPreview, previewFile }: DocPanel
     );
   }
 
+  const wordFiles = files.filter((file) => /\.(doc|docx)$/i.test(file.name));
+  const markdownFiles = files.filter((file) => /\.md$/i.test(file.name));
+  const otherFiles = files.filter(
+    (file) => !/\.(doc|docx|md)$/i.test(file.name)
+  );
+
+  const renderFiles = (group: DocFile[]) => (
+    <div className="space-y-1">
+      {group.map((file) => (
+        <button
+          className={cn(
+            "flex w-full items-start gap-2.5 rounded-lg border px-3 py-2.5 text-left text-xs transition-colors",
+            previewFile === file.name
+              ? "border-tactical-active bg-tactical-accent/10 text-slate-100"
+              : "border-transparent text-slate-400 hover:border-tactical-line hover:bg-white/[0.03]"
+          )}
+          key={file.name}
+          onClick={() => onPreview(file.name)}
+          type="button"
+        >
+          <FileText className="mt-0.5 size-4 shrink-0 text-cyan-300/70" />
+          <div className="min-w-0 flex-1">
+            <div className="truncate font-medium text-slate-200">{file.name}</div>
+            <div className="mt-0.5 text-[11px] text-slate-500">
+              {file.size_kb} KB 路 {formatDate(file.modified)}
+            </div>
+          </div>
+        </button>
+      ))}
+    </div>
+  );
+
+  const renderGroup = (title: string, group: DocFile[]) => {
+    if (group.length === 0) return null;
+    return (
+      <section className="space-y-1.5" key={title}>
+        <div className="flex items-center gap-2 px-1 pt-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-200/70">
+          <span>{title}</span>
+          <span className="font-mono text-slate-500">{group.length}</span>
+        </div>
+        {renderFiles(group)}
+      </section>
+    );
+  };
+
   return (
+    <div className="space-y-4">
+      {renderGroup("Word 文档", wordFiles)}
+      {renderGroup("Markdown 文档", markdownFiles)}
+      {renderGroup("其他文件", otherFiles)}
+    </div>
+  );
+  /*
     <div className="space-y-1">
       {files.map((file) => (
         <button
@@ -116,5 +174,5 @@ export default function DocPanel({ docFolder, onPreview, previewFile }: DocPanel
         </button>
       ))}
     </div>
-  );
+  ); */
 }

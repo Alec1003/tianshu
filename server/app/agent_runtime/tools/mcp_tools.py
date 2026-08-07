@@ -34,7 +34,7 @@ class MCPTool:
         arguments: dict[str, Any],
         context: ToolContext,
     ) -> dict[str, Any]:
-        if not self.readonly and context.approval_queue is not None:
+        if not self.readonly and context.requires_approval(self.name, "medium"):
             proposal = context.approval_queue.create_single_step_proposal(
                 command=context.source_command or self.name,
                 skill=self.name,

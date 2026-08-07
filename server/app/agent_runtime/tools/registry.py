@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 from typing import Any
+import logging
 
 from app.agent_runtime.tools.approval_tools import TacticalPlanOptionsTool
 from app.agent_runtime.tools.base import ToolBase, ToolContext
 from app.agent_runtime.tools.mcp_tools import MCPTool
 from app.agent_runtime.tools.runtime_tools import RuntimeSkillTool
+
+logger = logging.getLogger(__name__)
 
 
 class ToolRegistry:
@@ -31,6 +34,15 @@ class ToolRegistry:
     def tools(self) -> list[ToolBase]:
         return list(self._tools.values())
 
+
+    @property
+    def tool_count(self) -> int:
+        return len(self._tools)
+
+    @property
+    def tool_names(self) -> list[str]:
+        return sorted(self._tools.keys())
+
     def schemas(self) -> list[dict[str, Any]]:
         return [
             {
@@ -41,6 +53,23 @@ class ToolRegistry:
             }
             for tool in self.tools()
         ]
+
+    def filter_by_readonly(self) -> "ToolRegistry":
+        filtered = ToolRegistry()
+        for name, tool in self._tools.items():
+            if getattr(tool, "readonly", False):
+                filtered._tools[name] = tool
+        logger.debug(
+            "ToolRegistry.filter_by_readonly: %d -> %d tools",
+            self.tool_count,
+            filtered.tool_count,
+        )
+        return filtered
+
+    def copy(self) -> "ToolRegistry":
+        copied = ToolRegistry()
+        copied._tools = dict(self._tools)
+        return copied
 
     async def load_driver_tools(self, workspace: Any) -> None:
         driver_registry = getattr(workspace, "driver_registry", None)

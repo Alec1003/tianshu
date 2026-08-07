@@ -227,6 +227,7 @@ export const useModelConfigStore = create<ModelConfigStoreState>()(
       hydrateProviderConfigs: (configs) => {
         set((state) => {
           const providerConfigs = { ...state.providerConfigs };
+          let defaultProviderId = "";
           for (const config of configs) {
             if (!config.providerId) continue;
             const current =
@@ -240,6 +241,9 @@ export const useModelConfigStore = create<ModelConfigStoreState>()(
                 apiKey: "",
               }
             );
+            if ((config as any).isDefault) {
+              defaultProviderId = config.providerId!;
+            }
           }
           const activeProfile = state.modelProfiles.find(
             (profile) => profile.id === state.activeModelProfileId
@@ -248,7 +252,21 @@ export const useModelConfigStore = create<ModelConfigStoreState>()(
             activeProfile,
             providerConfigs
           );
-          const next = { providerConfigs, activeModelConfig };
+          // Auto-switch to default provider's first model if none active
+          let nextActiveModelConfig = activeModelConfig;
+          if (defaultProviderId && !activeProfile) {
+            const defaultConfig = providerConfigs[defaultProviderId];
+            const firstModelId = defaultConfig?.customModels?.[0]?.id;
+            if (firstModelId) {
+              nextActiveModelConfig = {
+                provider: providerRuntimeId(defaultProviderId),
+                baseUrl: defaultConfig.baseUrl ?? "",
+                apiKey: "",
+                model: firstModelId,
+              };
+            }
+          }
+          const next = { providerConfigs, activeModelConfig: nextActiveModelConfig };
           syncLegacy({ ...state, ...next });
           return next;
         });

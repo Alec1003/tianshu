@@ -1,0 +1,274 @@
+{
+  "scenario": {
+    "name": "return_demo",
+    "platforms": [
+      {
+        "id": "Tel_Nof_F35I_6",
+        "type": "F35I",
+        "class": "aircraft",
+        "position": [
+          51.9728,
+          33.0424,
+          0.0
+        ],
+        "speed": 350,
+        "range": 500,
+        "range_remaining": 401.3636363636364,
+        "rcs": 0.1,
+        "initial_heading_deg": 90.0
+      },
+      {
+        "id": "Whiteman_B2A_4",
+        "type": "B2A",
+        "class": "aircraft",
+        "position": [
+          52.3034,
+          34.9026,
+          0.0
+        ],
+        "speed": 280,
+        "range": 500,
+        "range_remaining": 455.3,
+        "rcs": 0.001,
+        "initial_heading_deg": 113.0
+      },
+      {
+        "id": "Tel_Nof_F15C_1",
+        "type": "F15C",
+        "class": "aircraft",
+        "position": [
+          51.5241,
+          33.1875,
+          0.0
+        ],
+        "speed": 280,
+        "range": 500,
+        "range_remaining": 419.40000000000003,
+        "rcs": 1.0,
+        "initial_heading_deg": 67.0
+      },
+      {
+        "id": "Whiteman_B2A_6",
+        "type": "B2A",
+        "class": "aircraft",
+        "position": [
+          51.5651,
+          33.1533,
+          0.0
+        ],
+        "speed": 280,
+        "range": 500,
+        "range_remaining": 452.90000000000003,
+        "rcs": 0.001,
+        "initial_heading_deg": 30.0
+      },
+      {
+        "id": "Tel_Nof_F35I_5",
+        "type": "F35I",
+        "class": "aircraft",
+        "position": [
+          50.9648,
+          34.0305,
+          49.6396
+        ],
+        "speed": 350,
+        "range": 500,
+        "range_remaining": 413.6363636363636,
+        "rcs": 0.1,
+        "initial_heading_deg": 90.0
+      },
+      {
+        "id": "Tel_Nof_F15C_0",
+        "type": "F15C",
+        "class": "aircraft",
+        "position": [
+          52.3034,
+          34.9026,
+          0.0
+        ],
+        "speed": 280,
+        "range": 500,
+        "range_remaining": 386.40000000000003,
+        "rcs": 1.0,
+        "initial_heading_deg": 113.0
+      },
+      {
+        "id": "Tel_Nof_F15C_5",
+        "type": "F15C",
+        "class": "aircraft",
+        "position": [
+          51.9728,
+          33.0424,
+          0.0
+        ],
+        "speed": 280,
+        "range": 500,
+        "range_remaining": 413.20000000000005,
+        "rcs": 1.0,
+        "initial_heading_deg": 90.0
+      },
+      {
+        "id": "Tel_Nof_F15C_4",
+        "type": "F15C",
+        "class": "aircraft",
+        "position": [
+          50.9648,
+          34.0305,
+          49.6396
+        ],
+        "speed": 280,
+        "range": 500,
+        "range_remaining": 424.0,
+        "rcs": 1.0,
+        "initial_heading_deg": 90.0
+      },
+      {
+        "id": "Muwaffaq_Salti_F15E_6",
+        "type": "F15E",
+        "class": "aircraft",
+        "position": [
+          52.4779,
+          31.9644,
+          0.0
+        ],
+        "speed": 300,
+        "range": 500,
+        "range_remaining": 420.2272727272727,
+        "rcs": 0.9,
+        "initial_heading_deg": 90.0
+      },
+      {
+        "id": "Hatzerim_F16I_5",
+        "type": "F16I",
+        "class": "aircraft",
+        "position": [
+          51.9712,
+          32.9526,
+          0.0
+        ],
+        "speed": 310,
+        "range": 500,
+        "range_remaining": 356.5,
+        "rcs": 0.8,
+        "initial_heading_deg": 90.0
+      },
+      {
+        "id": "Hatzerim_F16I_4",
+        "type": "F16I",
+        "class": "aircraft",
+        "position": [
+          51.0977,
+          33.7979,
+          0.0
+        ],
+        "speed": 310,
+        "range": 500,
+        "range_remaining": 356.0,
+        "rcs": 0.8,
+        "initial_heading_deg": 30.0
+      }
+    ],
+    "targets": [
+      {
+        "id": "Tel_Nof",
+        "position": [
+          47.5,
+          32.5,
+          0
+        ],
+        "capacity": {
+          "F15C": 10,
+          "F35I": 5,
+          "F16I": 2
+        }
+      },
+      {
+        "id": "Hatzerim",
+        "position": [
+          48.0,
+          29.5,
+          0
+        ],
+        "capacity": {
+          "F16I": 8,
+          "F15C": 2,
+          "F15E": 2
+        }
+      },
+      {
+        "id": "Muwaffaq_Salti",
+        "position": [
+          50.5,
+          29.5,
+          0
+        ],
+        "capacity": {
+          "F15E": 6,
+          "F16I": 2,
+          "F15C": 2
+        }
+      },
+      {
+        "id": "Whiteman",
+        "position": [
+          47.5,
+          35.0,
+          0
+        ],
+        "capacity": {
+          "B2A": 8,
+          "F15C": 2
+        }
+      }
+    ],
+    "threats": [],
+    "no_fly_zones": [
+      {
+        "id": "德黑兰空域",
+        "type": "cylinder",
+        "position": [
+          50.0,
+          33.5,
+          0
+        ],
+        "params": {
+          "radius": 25,
+          "height": 25000
+        }
+      }
+    ],
+    "planning": {
+      "grid_resolution_km": 10.0,
+      "altitude_levels": [
+        3000,
+        5000,
+        8000,
+        10000
+      ],
+      "margin_km": 50,
+      "heuristic": "dubins",
+      "bidirectional": true,
+      "edge_samples": 0,
+      "use_heading": true,
+      "threat_weight": 100.0,
+      "distance_weight": 1.0,
+      "direction_weight": 80.0,
+      "turn_weight": 0.0,
+      "stealth_factor": 0.1,
+      "aircraft_turn_radius_km": 0,
+      "missile_turn_radius_km": 6.0,
+      "heading_count": 12,
+      "default_mode": 2,
+      "default_attack_point_radius_km": 50.0,
+      "default_attack_point_up_height_m": 3000.0,
+      "default_attack_point_count": 4,
+      "default_approach_ref_radius_km": 50.0,
+      "default_approach_ref_up_height_m": 0.0,
+      "default_approach_ref_count": 4,
+      "threat_tolerance_ratio": 0.05
+    },
+    "jamming": {
+      "pkl": "src/output/ew_demo/ew_fields.pkl"
+    }
+  }
+}

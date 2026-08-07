@@ -2,18 +2,22 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any
+import logging
 
 from app.agent_runtime.agents.base import QwenPawTextAgent, last_user_text
 from app.agent_runtime.agents.factory import AgentFactory
 from app.agent_runtime.agents.model_factory import (
     AgentModelConfig,
     ModelFactory,
-    NoAgentModelConfiguredError,
 )
 from app.agent_runtime.agents.prompt import PromptBuilder
 from app.agent_runtime.agents.profile import AgentProfile
+from app.agent_runtime.capabilities.resolver import CapabilityResolver
+from app.agent_runtime.capabilities.selector import DynamicCapabilitySelector, last_user_message_text
 from app.agent_runtime.tools.base import ToolContext
 from app.agent_runtime.tools.registry import ToolRegistry
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -68,17 +72,15 @@ class AgentBuilder:
         profile: AgentProfile | None = None,
     ) -> AgentBuildPlan:
         model_config = self.resolve_model(request, profile)
-        if not model_config.is_configured:
-            raise NoAgentModelConfiguredError(
-                "No LLM configured for qwenpaw backend. Provide request model headers "
-                "or set TIANSHU_LLM_MODEL and credentials."
-            )
+        chat_mode = self._resolve_chat_mode(request)
         tool_registry = self.resolve_tools(request)
         workspace = getattr(request, "workspace", None)
         if workspace is not None:
             await tool_registry.load_driver_tools(workspace)
+        tool_registry = CapabilityResolver.resolve_tools(tool_registry, chat_mode)
+        tool_registry = self._apply_dynamic_selection(tool_registry, request, chat_mode)
         capability_registry = await self.resolve_capabilities(request)
-        return AgentBuildPlan(
+        plan = AgentBuildPlan(
             model_config=model_config,
             system_prompt=self.resolve_prompt(request, profile),
             tool_registry=tool_registry,
@@ -90,6 +92,50 @@ class AgentBuilder:
                 capability_registry,
             ),
         )
+        logger.info(
+            "AgentBuilder.build_plan mode=%s model=%s tools=%d [%s]",
+            chat_mode,
+            model_config.model or "none",
+            tool_registry.tool_count,
+            CapabilityResolver.tool_names_for_log(tool_registry),
+        )
+        return plan
+
+    @staticmethod
+    def _resolve_chat_mode(request: Any) -> str:
+        return "command"
+
+    def _apply_dynamic_selection(
+        self,
+        tool_registry: Any,
+        request: Any,
+        chat_mode: str,
+    ) -> Any:
+        if chat_mode != "command":
+            return tool_registry
+        query = last_user_message_text(getattr(request, "messages", []) or [])
+        if not query:
+            return tool_registry
+        available = tool_registry.tool_names
+        selected_names = DynamicCapabilitySelector.select(
+            query, available, chat_mode
+        )
+        if len(selected_names) >= len(available):
+            return tool_registry
+        filtered = tool_registry.copy()
+        filtered._tools = {
+            name: tool_registry._tools[name]
+            for name in selected_names
+            if name in tool_registry._tools
+        }
+        logger.info(
+            "AgentBuilder dynamic selection: query=%r tools %d -> %d [%s]",
+            query[:80],
+            tool_registry.tool_count,
+            filtered.tool_count,
+            ", ".join(selected_names) if len(selected_names) <= 10 else f"{len(selected_names)} tools",
+        )
+        return filtered
 
     def resolve_model(
         self,
@@ -165,7 +211,10 @@ class AgentBuilder:
             proposal_recorder=(getattr(request, "metadata", {}) or {}).get(
                 "proposal_recorder"
             ),
-            metadata=getattr(request, "metadata", {}) or {},
+            metadata={
+                **(getattr(request, "metadata", {}) or {}),
+                "approval_mode": getattr(request, "approval_mode", "auto") or "auto",
+            },
         )
 
     # Backward-compatible helper names used by older tests and call sites.

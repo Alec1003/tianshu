@@ -169,12 +169,16 @@ export default function DocPreview({
           </div>
         )}
 
-        {/* DOCX rendered content */}
+        {/* DOCX rendered content: the outer card matches Markdown, while the
+            inner docx-preview pages retain their original Word layout. */}
         <div
-          ref={docxContainerRef}
-          className="docx-preview-container mx-auto px-4 py-4"
+          className="w-full max-w-4xl px-6 py-6 xl:px-8"
           style={{ display: loading || error || isMd ? "none" : "block" }}
-        />
+        >
+          <div className="docx-document-card rounded-[20px] border border-white/[0.06] bg-[#0c1118] px-2 py-2 shadow-[0_24px_60px_rgba(0,0,0,0.24)]">
+            <div ref={docxContainerRef} className="docx-preview-container" />
+          </div>
+        </div>
       </div>
     </div>
   );

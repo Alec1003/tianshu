@@ -4,8 +4,8 @@
 - Single FastAPI process.
 - No extra OpenClaw gateway process and no extra OpenClaw-only port.
 - 天枢平台 native simulation functions are wrapped as Skills and called in-process.
-- External MCP support is client-only: 天枢平台 connects to operator-configured MCP
-  servers and lets the LLM call their tools, but domain tools live outside 天枢平台.
+- External MCP support is client-only for operator-configured third-party servers;
+  the bundled tactical planning tools below run in-process on the same TianShu MCP.
 
 ## Directory
 - `app/main.py`: FastAPI app entry.
@@ -15,6 +15,7 @@
 - `app/ai/skill_registry.py`: Skill definitions and registration.
 - `app/ai/mcp_client.py`: external MCP client for stdio / Streamable HTTP servers.
 - `app/ai/bridge.py`: Unified OpenClaw bridge module.
+- `app/mcp/small_models_demo/`: copied small-model planning algorithms and MCP source.
 - `app/tianshu_runtime/runtime.py`: Native engine runtime adapter (calls `gym/blade` in-process).
 
 ## Install
@@ -83,7 +84,18 @@ Protocol](https://modelcontextprotocol.io) 暴露给任意 MCP 客户端
 
 ### Capabilities
 
-**27 tools + 2 resources + 1 resource template**，分为两组：
+Native scenario/runtime tools plus **13 bundled planning tools** + 2 resources + 1 resource template，分为三组：
+
+#### Bundled small-model planning tools（13 tools）
+- `wta` / `wta_allcost` / `wta_mincost`
+- `cep_match` / `monte_carlo`
+- `route_attack` / `route_mode1` / `route_mode2` / `route_mode3` / `route_mode4`
+- `route_return` / `route_refuel` / `route_coverage`
+
+The algorithms are copied under `app/mcp/small_models_demo/` and are registered on the
+same stdio and Streamable HTTP MCP server. Their generated result JSON files default to
+`TIANSHU_USER_DATA_DIR/small_models_demo`; override with
+`TIANSHU_SMALL_MODELS_OUTPUT_DIR` when needed.
 
 #### A. DB scenarios组（静态快照、面向持久化，12 tools）
 

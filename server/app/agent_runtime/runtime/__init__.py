@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass, field
@@ -7,6 +7,7 @@ from typing import Any
 from app.agent_runtime.agents.builder import AgentBuilder
 from app.agent_runtime.context.manager import ContextManager
 from app.agent_runtime.events import AgentEvent
+from app.agent_runtime.runtime.runtime_event import RuntimeEvent
 from app.agent_runtime.executor import AgentExecutor
 from app.agent_runtime.runtime.envelope import Envelope, EnvelopeEvent
 from app.agent_runtime.runtime.hook_registry import HookRegistry
@@ -28,6 +29,7 @@ class AgentRuntimeRequest:
     agent_context: Any | None = None
     prompt_context: str = ""
     chat_mode: str = "command"
+    approval_mode: str = "auto"
     metadata: dict[str, Any] = field(default_factory=dict)
 
 
@@ -75,7 +77,10 @@ class TianShuRuntimeOrchestrator:
             self._mark_agent_running(agent)
             saw_error = False
             async for event in self.executor.run(agent, request.messages):
-                envelope_event = self.envelope.from_agent_event(event)
+                if isinstance(event, RuntimeEvent):
+                    envelope_event = self.envelope.from_runtime_event(event)
+                else:
+                    envelope_event = self.envelope.from_agent_event(event)
                 if envelope_event is not None:
                     if envelope_event.type == "error":
                         saw_error = True

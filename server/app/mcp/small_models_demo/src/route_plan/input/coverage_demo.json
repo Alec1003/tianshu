@@ -1,0 +1,50 @@
+{
+  "scenario": {
+    "name": "coverage_demo",
+
+    "platforms": [
+      {"id": "Whiteman_Recon_1",  "type": "B2A",  "class": "aircraft", "position": [47.5, 35.0, 10000], "speed": 280, "range": 5000, "detection_radius_km": 12.0},
+      {"id": "Tel_Nof_Recon_1",   "type": "F35I", "class": "aircraft", "position": [47.5, 32.5, 5000],  "speed": 350, "range": 2200, "detection_radius_km": 8.0},
+      {"id": "Hatzerim_Recon_1",  "type": "F16I", "class": "aircraft", "position": [48.0, 29.5, 5000],  "speed": 310, "range": 2000, "detection_radius_km": 5.0},
+      {"id": "Muwaffaq_Recon_1",  "type": "F15E", "class": "aircraft", "position": [50.5, 29.5, 5000],  "speed": 300, "range": 2200, "detection_radius_km": 6.0}
+    ],
+
+    "targets": [
+      {"id": "西北侦察区",
+        "boundary": [
+          [51.5, 33.0], [51.5, 35.5], [50.5, 35.6],
+          [49.5, 35.3], [49.4, 34.5], [49.2, 33.0]
+        ]
+      },
+      {"id": "东北侦察区",
+        "boundary": [
+          [51.5, 33.0], [51.5, 35.5], [52.5, 35.4],
+          [53.5, 35.2], [53.8, 34.0], [53.8, 33.0]
+        ]
+      },
+      {"id": "西南侦察区",
+        "boundary": [
+          [51.5, 33.0], [49.2, 33.0], [49.3, 32.0],
+          [49.5, 30.8], [50.5, 30.6], [51.5, 30.5]
+        ]
+      },
+      {"id": "东南侦察区",
+        "boundary": [
+          [51.5, 33.0], [53.8, 33.0], [53.6, 32.0],
+          [53.5, 31.0], [52.5, 30.6], [51.5, 30.5]
+        ]
+      }
+    ],
+
+    "no_fly_zones": [
+      {"id": "德黑兰空域", "type": "cylinder", "position": [50.0, 33.5, 0], "params": {"radius": 25, "height": 25000}}
+    ],
+
+    "pairs": [
+      {"platform": "Whiteman_Recon_1",  "target": "西北侦察区"},
+      {"platform": "Tel_Nof_Recon_1",   "target": "东北侦察区"},
+      {"platform": "Hatzerim_Recon_1",  "target": "西南侦察区"},
+      {"platform": "Muwaffaq_Recon_1",  "target": "东南侦察区"}
+    ]
+  }
+}

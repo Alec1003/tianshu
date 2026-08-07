@@ -11,7 +11,11 @@ from app.agent_runtime.agents.model_factory import (
 )
 from app.agent_runtime.agents.prompt import PromptBuilder, PromptManager, QWENPAW_TEXT_PROMPT
 from app.agent_runtime.agents.profile import AgentProfile
+from app.agent_runtime.agents.llm_adapter import LLMAdapter, LLMResponse
+from app.agent_runtime.agents.tool_loop import ToolLoop, MAX_TOOL_ITERATIONS
+from app.agent_runtime.agents.tool_schema import ToolCall, ToolCallNormalizer
 from app.agent_runtime.agents.registry import AgentRegistry
+from app.agent_runtime.agents.prompt import PromptBuilder, PromptManager, QWENPAW_TEXT_PROMPT, QWENPAW_COMMAND_PROMPT
 
 __all__ = [
     "AgentBuildPlan",
@@ -31,4 +35,11 @@ __all__ = [
     "PromptManager",
     "QWENPAW_TEXT_PROMPT",
     "QwenPawTextAgent",
+    "ToolCall",
+    "ToolCallNormalizer",
+    "LLMAdapter",
+    "LLMResponse",
+    "MAX_TOOL_ITERATIONS",
+    "QWENPAW_COMMAND_PROMPT",
+    "ToolLoop",
 ]

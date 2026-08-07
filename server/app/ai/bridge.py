@@ -110,25 +110,24 @@ class TianShuOpenClawBridge:
         async for event in self.workspace.stream_query(runtime_request):
             if not isinstance(event, EnvelopeEvent):
                 continue
-            if event.type in {"start", "finish", "text_delta", "text"}:
+            if event.type in {"start", "finish", "text"}:
                 continue
             if event.type == "error":
                 has_error = True
                 summary.error = summary.error or event.content
                 continue
-            if event.type in {"tool_call_start", "tool_call_end", "tool_error"}:
+            if event.type == "tool_call":
+                # A tool invocation started; the result arrives as a
+                # separate "tool_result" event which carries the output.
+                continue
+            if event.type == "tool_result":
                 md = event.metadata or {}
-                skill_name = str(md.get("tool") or md.get("capability") or "unknown")
-                if event.type == "tool_call_start":
-                    continue
-                if event.type == "tool_error":
-                    has_error = True
-                    summary.skill_calls.append(SkillExecutionResult(
-                        skill=skill_name, status="error",
-                        parameters=md.get("arguments", {}),
-                        error=event.content or str(md.get("error_type", "")),
-                    ))
-                    continue
+                skill_name = str(
+                    event.content
+                    or md.get("tool")
+                    or md.get("capability")
+                    or "unknown"
+                )
                 has_results = True
                 output_val = md.get("result")
                 summary.skill_calls.append(SkillExecutionResult(

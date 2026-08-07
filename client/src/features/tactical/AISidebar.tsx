@@ -32,7 +32,7 @@ import {
   AlertTriangle,
   ChevronDown,
   ChevronRight,
-  CheckCircle2,
+  CircleOff,
   Loader2,
   MessageSquare,
   Plus,
@@ -52,6 +52,8 @@ import {
   isToolOrDynamicToolUIPart,
   type UIMessage,
 } from "ai";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 import {
   approveCommandProposal,
@@ -102,7 +104,7 @@ import {
 } from "./chatTransport";
 
 export type AISidebarTab = "chat" | "settings";
-type AIChatMode = "ask" | "command";
+type ApprovalMode = "strict" | "smart" | "auto" | "off";
 export type MCPServerTransport = "stdio" | "sse" | "http";
 type MCPServerStatus = "unknown" | "validating" | "online" | "error";
 
@@ -170,18 +172,6 @@ export interface ModelCheckResponse {
   error?: string | null;
 }
 
-interface ToolRunSnapshot {
-  toolName: string;
-  state: string;
-}
-
-interface ChatRunSummary {
-  label: string;
-  detail: string;
-  tone: "idle" | "running" | "done" | "error";
-  tools: ToolRunSnapshot[];
-}
-
 const PLAN_OPTIONS_TOOL_NAME = "propose_tactical_plan_options";
 
 interface AISidebarProps {
@@ -216,6 +206,7 @@ interface AISidebarProps {
   previewFile?: string | null;
   onOpenMapPreview?: () => void;
   onOpenDocumentPreview?: (filename?: string | null) => void;
+  onDocumentGenerated?: () => void;
 }
 
 const STORAGE_KEY = {
@@ -234,6 +225,9 @@ const LEGACY_PLATFORM_PREFIX = "ai" + "cc";
 const LEGACY_BUILTIN_MCP_ENDPOINT = `stdio://local-${LEGACY_PLATFORM_PREFIX}-mcp`;
 const BUILTIN_MCP_STATUS_MESSAGE = "内置 MCP 由后端运行环境管理。";
 
+const DOC_TOOLS_MCP_NAME = "doc-tools-mcp";
+const DOC_TOOLS_MCP_ENDPOINT = "http://doc-tools-mcp:3010/";
+
 const DEFAULT_MCP_SERVERS: MCPServerConfig[] = [
   {
     id:
@@ -250,20 +244,21 @@ const DEFAULT_MCP_SERVERS: MCPServerConfig[] = [
   },
 ];
 
-const QUICK_COMMANDS: string[] = [
-  "开始推演并运行 3 步",
-  "在 22.1, 121.5 部署一架蓝方 F-16",
-  "暂停推演并查看战况",
-];
-const LEGACY_ASK_MODE_GUARD =
-  "Ask mode: answer, analyze, or plan only. Do not execute scenario-changing tools.";
-
 function stripLegacyModeGuard(text: string): string {
   return text
-    .split(LEGACY_ASK_MODE_GUARD)
-    .join("")
+    .replace(
+      /(?:Ask mode|ask mode)[^\n.]*\.?|如您希望减少审批往返[^\n。]*[。.]?/gi,
+      ""
+    )
     .replace(/\n{3,}/g, "\n\n")
     .trim();
+}
+
+function stripDocumentApprovalNotice(text: string): string {
+  return text.replace(
+    /[，,]?\s*审批通过后(?:才)?可下载[。.]?/g,
+    "，已自动同步至文档中心。"
+  );
 }
 
 function sanitizeLegacyModeGuards(messages: UIMessage[]): UIMessage[] {
@@ -337,10 +332,39 @@ function toolDefinitionsFromExternal(
 ): MCPToolDefinition[] {
   return tools.map((tool) => ({
     name: tool.name,
-    description: compactToolDescription(tool.description),
+    description: chineseMcpToolDescription(tool.name, tool.description),
     inputSchema: tool.inputSchema,
     outputSchema: tool.outputSchema,
   }));
+}
+
+const MCP_TOOL_DESCRIPTIONS_ZH: Record<string, string> = {
+  create_document: "创建文档。",
+  open_document: "打开已有文档。",
+  add_paragraph: "向文档添加段落。",
+  add_table: "向文档添加表格。",
+  create_docx: "创建保留 Word 结构与排版的文档。",
+  save_file: "将 Markdown、文本或其他文件保存到当前项目文档中心。",
+  list_documents: "列出当前项目已经生成的文档。",
+  monte_carlo: "运行蒙特卡洛验证，评估当前兵力分配方案。",
+  route_attack: "根据平台与目标组合的作战模式规划攻击路线。",
+  route_model1: "规划直接攻击路线。",
+  route_model2: "规划多角度攻击路线。",
+  route_model3: "规划发射区域攻击路线。",
+  route_model4: "通过航路点规划隐蔽渗透攻击路线。",
+  route_return: "规划平台返回基地的路线。",
+  route_refuel: "规划航迹上的空中加油点。",
+  route_coverage: "规划多平台对多边形区域的曲线覆盖路线。",
+};
+
+function chineseMcpToolDescription(name: string, description?: string): string {
+  const shortName = name.split("__").pop()?.split(".").pop() ?? name;
+  return (
+    MCP_TOOL_DESCRIPTIONS_ZH[shortName] ||
+    (description && /[\u4e00-\u9fff]/.test(description)
+      ? compactToolDescription(description)
+      : `执行“${shortName}”工具操作。`)
+  );
 }
 
 function validationTraceMessage(
@@ -389,6 +413,25 @@ function includesLegacyPlatformText(text: string | undefined): boolean {
 
 function normalizeMcpServerConfig(server: MCPServerConfig): MCPServerConfig {
   const endpoint = server.endpoint?.trim() || "";
+  const looksLikeBrokenDocTools =
+    (server.name || "").toLowerCase().includes("doc-tools") ||
+    endpoint.toLowerCase().includes("doc-tools") ||
+    (server.command || "").toLowerCase().includes("doc-tools") ||
+    (server.args || []).some((arg) => arg.toLowerCase().includes("doc-tools"));
+  if (looksLikeBrokenDocTools) {
+    return {
+      ...server,
+      name: DOC_TOOLS_MCP_NAME,
+      endpoint: DOC_TOOLS_MCP_ENDPOINT,
+      transport: "http",
+      command: "",
+      args: [],
+      url: DOC_TOOLS_MCP_ENDPOINT,
+      status: "unknown",
+      statusMessage: "文档工具服务已切换为内置 Streamable HTTP MCP。",
+      tools: [],
+    };
+  }
   const legacyManagedName =
     (server.name || "").trim().toLowerCase() ===
       `${LEGACY_PLATFORM_PREFIX} mcp` &&
@@ -483,16 +526,6 @@ function getToolName(part: unknown): string {
       : "tool";
 }
 
-function getToolRunSnapshot(part: unknown): ToolRunSnapshot {
-  const p = part as {
-    state?: string;
-  };
-  return {
-    toolName: getToolName(part),
-    state: p.state ?? "unknown",
-  };
-}
-
 function completedPlanToolSignature(messages: UIMessage[]): string | null {
   for (
     let messageIndex = messages.length - 1;
@@ -508,10 +541,37 @@ function completedPlanToolSignature(messages: UIMessage[]): string | null {
     ) {
       const part = message.parts[partIndex];
       if (!isToolOrDynamicToolUIPart(part)) continue;
-      const p = part as { state?: string };
+      const p = part as { state?: string; output?: unknown };
       if (p.state !== "output-available") continue;
       if (getToolName(part) !== PLAN_OPTIONS_TOOL_NAME) continue;
-      return `${message.id}:${partIndex}:${p.state}`;
+      let outputSignature = "";
+      try {
+        outputSignature = JSON.stringify(p.output ?? "").slice(0, 240);
+      } catch {
+        outputSignature = String(p.output ?? "");
+      }
+      return `${message.id}:${partIndex}:${p.state}:${outputSignature}`;
+    }
+  }
+  return null;
+}
+
+function completedDocumentToolSignature(messages: UIMessage[]): string | null {
+  for (let messageIndex = messages.length - 1; messageIndex >= 0; messageIndex -= 1) {
+    const message = messages[messageIndex];
+    if (message.role !== "assistant") continue;
+    for (let partIndex = message.parts.length - 1; partIndex >= 0; partIndex -= 1) {
+      const part = message.parts[partIndex];
+      if (!isToolOrDynamicToolUIPart(part) || getToolName(part) !== "doc-tools") continue;
+      const p = part as { state?: string; output?: unknown };
+      if (p.state !== "output-available") continue;
+      let outputSignature = "";
+      try {
+        outputSignature = JSON.stringify(p.output ?? "").slice(0, 240);
+      } catch {
+        outputSignature = String(p.output ?? "");
+      }
+      return `${message.id}:${partIndex}:${p.state}:${outputSignature}`;
     }
   }
   return null;
@@ -561,6 +621,20 @@ function planProposalIdsForMessage(message: UIMessage): string[] {
   return [...ids];
 }
 
+function proposalIdsForMessages(messages: UIMessage[]): string[] {
+  const ids = new Set<string>();
+  for (const message of messages) {
+    for (const part of message.parts) {
+      if (!isToolOrDynamicToolUIPart(part)) continue;
+      const toolPart = part as { output?: unknown };
+      for (const id of collectProposalIdsFromOutput(toolPart.output)) {
+        ids.add(id);
+      }
+    }
+  }
+  return [...ids];
+}
+
 function messageHasVisibleContent(message: UIMessage): boolean {
   return message.parts.some((part) => {
     if (isTextUIPart(part)) return Boolean(part.text);
@@ -578,75 +652,6 @@ function formatChatError(error: Error): string {
     return "No LLM is configured. Fill API Key in AI 模型配置中心, or set TIANSHU_LLM_MODEL and TIANSHU_LLM_API_KEY in the server environment.";
   }
   return message;
-}
-
-function summarizeChatRun(
-  messages: UIMessage[],
-  busy: boolean,
-  hasError: boolean
-): ChatRunSummary {
-  if (hasError) {
-    return {
-      label: "Run failed",
-      detail: "Check the latest assistant response or model settings",
-      tone: "error",
-      tools: [],
-    };
-  }
-
-  const lastAssistant = [...messages]
-    .reverse()
-    .find((message) => message.role === "assistant");
-  const tools =
-    lastAssistant?.parts
-      .filter((part) => isToolOrDynamicToolUIPart(part))
-      .map(getToolRunSnapshot) ?? [];
-  const completed = tools.filter(
-    (tool) => tool.state === "output-available"
-  ).length;
-  const failed = tools.some((tool) => tool.state === "output-error");
-  const runningTool = tools.find(
-    (tool) => tool.state !== "output-available" && tool.state !== "output-error"
-  );
-
-  if (busy && tools.length > 0) {
-    return {
-      label: "Running tools",
-      detail: `${completed}/${tools.length} tasks done${
-        runningTool ? ` · ${runningTool.toolName}` : ""
-      }`,
-      tone: "running",
-      tools,
-    };
-  }
-
-  if (busy) {
-    return {
-      label: "Thinking",
-      detail: "Waiting for assistant response",
-      tone: "running",
-      tools,
-    };
-  }
-
-  if (tools.length > 0) {
-    return {
-      label: failed ? "Tasks finished with errors" : "Tasks complete",
-      detail: `${completed}/${tools.length} tasks done`,
-      tone: failed ? "error" : "done",
-      tools,
-    };
-  }
-
-  return {
-    label: messages.length > 0 ? "Ready for follow-up" : "No active run",
-    detail:
-      messages.length > 0
-        ? "Ask another question or issue a command"
-        : "Start by asking about the current scenario",
-    tone: "idle",
-    tools,
-  };
 }
 
 export default function AISidebar({
@@ -669,6 +674,7 @@ export default function AISidebar({
   previewFile,
   onOpenMapPreview,
   onOpenDocumentPreview,
+  onDocumentGenerated,
 }: AISidebarProps) {
   const navigate = useNavigate();
   const modelConfig = useModelConfigStore((state) => state.activeModelConfig);
@@ -720,13 +726,16 @@ export default function AISidebar({
 
   // —— 聊天 / 流式状态 ——
   const [commandInput, setCommandInput] = useState("");
-  const [chatMode, setChatMode] = useState<AIChatMode>("command");
+  const [approvalMode, setApprovalMode] = useState<ApprovalMode>("auto");
   const [commandProposals, setCommandProposals] = useState<CommandProposal[]>(
     []
   );
   const [proposalBusyId, setProposalBusyId] = useState<string | null>(null);
   const [proposalError, setProposalError] = useState<string | null>(null);
+  const [executingPlanLabel, setExecutingPlanLabel] = useState<string | null>(null);
   const chatLogRef = useRef<HTMLDivElement | null>(null);
+  const conversationProposalIdsRef = useRef<Set<string>>(new Set());
+  const autoApprovedDocumentProposalIdsRef = useRef<Set<string>>(new Set());
 
   // headers 函数需要读最新 modelConfig，但 transport 有状态不能重建；
   // 用 ref 告诉 headers（）去拿最新值，避免重建 transport 丢失消息。
@@ -750,11 +759,10 @@ export default function AISidebar({
   useEffect(() => {
     docFolderRef.current = docFolder;
   }, [docFolder]);
-  const chatModeRef = useRef<AIChatMode>(chatMode);
+  const approvalModeRef = useRef<ApprovalMode>(approvalMode);
   useEffect(() => {
-    chatModeRef.current = chatMode;
-  }, [chatMode]);
-  const lastSubmittedModeRef = useRef<AIChatMode>("command");
+    approvalModeRef.current = approvalMode;
+  }, [approvalMode]);
 
   const transport = useMemo(
     () =>
@@ -763,9 +771,13 @@ export default function AISidebar({
         headers: () => {
           const token = getStoredToken();
           return buildChatRequestHeaders({
-            chatMode: chatModeRef.current,
+            approvalMode: approvalModeRef.current,
             modelConfig: modelConfigRef.current,
             modelProviderId: modelProviderIdRef.current,
+            // The backend uses this as the provider-config identity.  The
+            // selected model itself is sent separately below; using the
+            // provider id here keeps custom profiles resolvable.
+            modelConfigId: modelProviderIdRef.current,
             docFolder: docFolderRef.current,
             scenarioId: scenarioIdRef.current,
             token,
@@ -785,15 +797,14 @@ export default function AISidebar({
   } = useChat({ transport });
 
   const busy = status === "submitted" || status === "streaming";
-  const chatRunSummary = useMemo(
-    () => summarizeChatRun(messages, busy, Boolean(chatError)),
-    [messages, busy, chatError]
-  );
-
   const refreshCommandProposals = useCallback(async (): Promise<void> => {
     try {
       const payload = await listCommandProposals();
-      setCommandProposals(payload.proposals);
+      setCommandProposals(
+        payload.proposals.filter((proposal) =>
+          conversationProposalIdsRef.current.has(proposal.id)
+        )
+      );
       setProposalError(null);
     } catch (error) {
       setProposalError(
@@ -807,6 +818,17 @@ export default function AISidebar({
       void refreshCommandProposals();
     }
   }, [open, refreshCommandProposals]);
+
+  // A gated agent turn stays open while the backend waits for approval. Poll
+  // the persisted queue during that wait so the approval card appears before
+  // the stream resumes; this does not change the backend execution flow.
+  useEffect(() => {
+    if (!open || !busy) return;
+    const timer = window.setInterval(() => {
+      void refreshCommandProposals();
+    }, 500);
+    return () => window.clearInterval(timer);
+  }, [busy, open, refreshCommandProposals]);
 
   // ─── 按 scenario 隔离 chat 历史 ─────────────────────────────────────────
   // 设计：localStorage key = `tianshu.ai.messages.v2:<scenarioId>`。
@@ -841,6 +863,10 @@ export default function AISidebar({
       }
     }
     // 切换后：读新 scenario 的历史
+    conversationProposalIdsRef.current.clear();
+    autoApprovedDocumentProposalIdsRef.current.clear();
+    setCommandProposals([]);
+    setProposalError(null);
     const next = sanitizeLegacyModeGuards(
       safeLoad<UIMessage[]>(messagesKeyFor(scenarioId), [])
     );
@@ -856,6 +882,18 @@ export default function AISidebar({
     safeSave(messagesKeyFor(scenarioId), messages);
   }, [messages, scenarioId]);
 
+  useEffect(() => {
+    const proposalIds = proposalIdsForMessages(messages);
+    const newProposalIds = proposalIds.filter(
+      (id) => !conversationProposalIdsRef.current.has(id)
+    );
+    if (newProposalIds.length === 0) return;
+    for (const id of newProposalIds) {
+      conversationProposalIdsRef.current.add(id);
+    }
+    void refreshCommandProposals();
+  }, [messages, refreshCommandProposals]);
+
   // 流结束后：
   //   1) 拉一次 runtime scenario，应用到 game（让 AI 改的单位/任务可见）。
   //   2) 扫描最后一条 assistant 消息的工具调用：如果最终生命周期工具是
@@ -865,6 +903,7 @@ export default function AISidebar({
   // 只在 “busy → ready” 转换时触发一次，避免初始化 / 错误后乱拉。
   const wasBusyRef = useRef(false);
   const lastPlanToolSignatureRef = useRef<string | null>(null);
+  const lastDocumentToolSignatureRef = useRef<string | null>(null);
   useEffect(() => {
     if (busy) {
       wasBusyRef.current = true;
@@ -872,7 +911,6 @@ export default function AISidebar({
     }
     if (!wasBusyRef.current) return;
     wasBusyRef.current = false;
-    if (lastSubmittedModeRef.current !== "command") return;
     const shouldRefreshRuntime = status === "ready";
     // 找最近一条 assistant 消息，扫它的 tool 调用决定推演意图。
     // ai-sdk v5 的 tool part 有两种形态：
@@ -927,6 +965,13 @@ export default function AISidebar({
         }
       }
       await refreshCommandProposals();
+      // Proposal persistence is scheduled from the streaming request.  Do a
+      // short follow-up refresh so the approval card is visible even when
+      // the stream finishes just before the database write is committed.
+      for (const delay of [250, 750]) {
+        await new Promise((resolve) => window.setTimeout(resolve, delay));
+        await refreshCommandProposals();
+      }
     })();
   }, [
     busy,
@@ -937,9 +982,22 @@ export default function AISidebar({
     status,
   ]);
 
+  useEffect(() => {
+    if (!onDocumentGenerated || busy) return;
+    const signature = completedDocumentToolSignature(messages);
+    if (
+      !signature ||
+      signature === lastDocumentToolSignatureRef.current
+    ) {
+      return;
+    }
+    lastDocumentToolSignatureRef.current = signature;
+    onDocumentGenerated();
+  }, [busy, messages, onDocumentGenerated]);
+
   // —— 设置表单局部状态 ——
   useEffect(() => {
-    if (!open || lastSubmittedModeRef.current !== "command") return;
+    if (!open) return;
     const signature = completedPlanToolSignature(messages);
     if (!signature || signature === lastPlanToolSignatureRef.current) return;
     lastPlanToolSignatureRef.current = signature;
@@ -959,8 +1017,12 @@ export default function AISidebar({
     }
     wasBusyRef.current = false;
     lastPlanToolSignatureRef.current = null;
+    lastDocumentToolSignatureRef.current = null;
+    conversationProposalIdsRef.current.clear();
+    autoApprovedDocumentProposalIdsRef.current.clear();
     setCommandInput("");
     setProposalError(null);
+    setCommandProposals([]);
     setMessages([]);
     removeStorageItem(messagesKeyFor(scenarioId));
   }, [busy, scenarioId, setMessages, stop]);
@@ -1122,8 +1184,6 @@ export default function AISidebar({
       const trimmed = text.trim();
       if (!trimmed || busy) return;
       onTabChange("chat");
-      const submittedMode = chatModeRef.current;
-      lastSubmittedModeRef.current = submittedMode;
       const messageText = [buildCustomSkillPrompt(activeCustomSkills), trimmed]
         .filter(Boolean)
         .join("\n\n");
@@ -1132,9 +1192,9 @@ export default function AISidebar({
     [activeCustomSkills, busy, onTabChange, sendMessage]
   );
 
-  const handleChatModeChange = useCallback((mode: AIChatMode): void => {
-    chatModeRef.current = mode;
-    setChatMode(mode);
+  const handleApprovalModeChange = useCallback((mode: ApprovalMode): void => {
+    approvalModeRef.current = mode;
+    setApprovalMode(mode);
   }, []);
 
   const onSubmitChat = (event: FormEvent<HTMLFormElement>): void => {
@@ -1147,6 +1207,15 @@ export default function AISidebar({
 
   const handleApproveProposal = useCallback(
     async (proposalId: string): Promise<void> => {
+      const selected = commandProposals.find((proposal) => proposal.id === proposalId);
+      const selectedMetadata = selected ? planMetadata(selected) : null;
+      if (selectedMetadata?.kind === "tactical_plan_option") {
+        setExecutingPlanLabel(
+          selectedMetadata.optionIndex
+            ? `方案${String.fromCharCode(64 + selectedMetadata.optionIndex)}`
+            : selectedMetadata.label || "方案"
+        );
+      }
       setProposalBusyId(proposalId);
       setProposalError(null);
       try {
@@ -1162,6 +1231,12 @@ export default function AISidebar({
         ) {
           await onResumePlay();
         }
+        if (selected && isDocumentProposal(selected)) {
+          // Document tools are non-interactive from the user's perspective:
+          // once the backend has executed the tool, refresh Document Center
+          // immediately instead of presenting a second download/approval step.
+          onDocumentGenerated?.();
+        }
         await refreshCommandProposals();
       } catch (error) {
         setProposalError(
@@ -1171,7 +1246,13 @@ export default function AISidebar({
         setProposalBusyId(null);
       }
     },
-    [onApplyScenario, onResumePlay, refreshCommandProposals]
+    [
+      commandProposals,
+      onApplyScenario,
+      onDocumentGenerated,
+      onResumePlay,
+      refreshCommandProposals,
+    ]
   );
 
   const handleRejectProposal = useCallback(
@@ -1191,6 +1272,20 @@ export default function AISidebar({
     },
     [refreshCommandProposals]
   );
+
+  useEffect(() => {
+    const pendingDocuments = commandProposals.filter(
+      (proposal) =>
+        proposal.status === "pending" &&
+        isDocumentProposal(proposal) &&
+        !autoApprovedDocumentProposalIdsRef.current.has(proposal.id)
+    );
+    if (pendingDocuments.length === 0) return;
+    for (const proposal of pendingDocuments) {
+      autoApprovedDocumentProposalIdsRef.current.add(proposal.id);
+      void handleApproveProposal(proposal.id);
+    }
+  }, [commandProposals, handleApproveProposal]);
 
   // activeMcpServers are still managed in settings; external MCP runtime
   // connections are configured server-side through TIANSHU_EXTERNAL_MCP_SERVERS.
@@ -1363,9 +1458,7 @@ export default function AISidebar({
   useEffect(() => {
     if (builtinMcpToolsLoadAttemptedRef.current) return;
     const builtinServers = mcpServers.filter(
-      (server) =>
-        isManagedRuntimeMcpPlaceholder(server) &&
-        (server.status !== "online" || (server.tools?.length ?? 0) === 0)
+      (server) => isManagedRuntimeMcpPlaceholder(server)
     );
     if (builtinServers.length === 0) return;
     builtinMcpToolsLoadAttemptedRef.current = true;
@@ -1668,18 +1761,17 @@ export default function AISidebar({
               <ChatPanel
                 chatLogRef={chatLogRef}
                 chatError={chatError}
-                chatRunSummary={chatRunSummary}
-                chatMode={chatMode}
+                approvalMode={approvalMode}
                 commandInput={commandInput}
                 commandProposals={commandProposals}
                 proposalBusyId={proposalBusyId}
                 proposalError={proposalError}
+                executingPlanLabel={executingPlanLabel}
                 messages={messages}
                 onApproveProposal={(id) => void handleApproveProposal(id)}
-                onChatModeChange={handleChatModeChange}
+                onApprovalModeChange={handleApprovalModeChange}
                 onCommandInputChange={setCommandInput}
                 onOpenModelSettings={() => navigate("/ai-models")}
-                onQuickCommand={sendChat}
                 onRejectProposal={(id) => void handleRejectProposal(id)}
                 onSubmit={onSubmitChat}
                 layout={layout}
@@ -1738,20 +1830,19 @@ interface ChatPanelProps {
   messages: UIMessage[];
   chatLogRef: React.MutableRefObject<HTMLDivElement | null>;
   chatError?: Error;
-  chatRunSummary: ChatRunSummary;
   layout: "sidebar" | "workspace";
-  chatMode: AIChatMode;
+  approvalMode: ApprovalMode;
   commandInput: string;
   commandProposals: CommandProposal[];
   proposalBusyId: string | null;
   proposalError: string | null;
+  executingPlanLabel: string | null;
   busy: boolean;
   stop: () => void;
   onApproveProposal: (proposalId: string) => void;
-  onChatModeChange: (mode: AIChatMode) => void;
+  onApprovalModeChange: (mode: ApprovalMode) => void;
   onCommandInputChange: (next: string) => void;
   onOpenModelSettings: () => void;
-  onQuickCommand: (cmd: string) => void;
   onRejectProposal: (proposalId: string) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   previewView: "map" | "document";
@@ -1764,20 +1855,19 @@ function ChatPanel({
   messages,
   chatLogRef,
   chatError,
-  chatRunSummary,
   layout,
-  chatMode,
+  approvalMode,
   commandInput,
   commandProposals,
   proposalBusyId,
   proposalError,
+  executingPlanLabel,
   busy,
   stop,
   onApproveProposal,
-  onChatModeChange,
+  onApprovalModeChange,
   onCommandInputChange,
   onOpenModelSettings,
-  onQuickCommand,
   onRejectProposal,
   onSubmit,
   previewView,
@@ -1786,10 +1876,6 @@ function ChatPanel({
   onOpenDocumentPreview,
 }: ChatPanelProps) {
   const chatErrorMessage = chatError ? formatChatTransportError(chatError) : "";
-  const proposalById = useMemo(
-    () => new Map(commandProposals.map((proposal) => [proposal.id, proposal])),
-    [commandProposals]
-  );
   const latestUserMessageId = useMemo(
     () =>
       [...messages].reverse().find((message) => message.role === "user")?.id,
@@ -1816,7 +1902,8 @@ function ChatPanel({
                 以对话驱动推演、方案生成和运行时操作。
               </div>
               <div className="mt-3 max-w-2xl text-sm leading-6 text-slate-400">
-                中央对话区负责主交互，右侧工作台负责地图、文档和结果预览。现有 Runtime 与后端链路保持不变。
+                中央对话区负责主交互，右侧工作台负责地图、文档和结果预览。现有
+                Runtime 与后端链路保持不变。
               </div>
               <div className="mt-4 flex flex-wrap gap-2">
                 <button
@@ -1863,17 +1950,10 @@ function ChatPanel({
                     {previewFile ?? "未打开"}
                   </span>
                 </div>
-                <div className="flex items-center justify-between rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-2">
-                  <span>交互模式</span>
-                  <span className="text-slate-100">
-                    {chatMode === "ask" ? "Ask" : "Command"}
-                  </span>
-                </div>
               </div>
             </div>
           </div>
         )}
-        <RunStatusCard summary={chatRunSummary} />
         {chatErrorMessage && (
           <div className="mb-3 rounded-lg border border-red-300/25 bg-red-300/[0.05] px-2.5 py-2 text-[11px] text-red-100">
             <div className="flex items-start gap-2">
@@ -1902,35 +1982,39 @@ function ChatPanel({
           </div>
         ) : (
           messages.map((m) => {
-            const attachedProposals = planProposalIdsForMessage(m)
-              .map((id) => proposalById.get(id))
-              .filter((proposal): proposal is CommandProposal =>
-                Boolean(proposal)
-              );
-            if (
-              !messageHasVisibleContent(m) &&
-              attachedProposals.length === 0
-            ) {
-              return null;
-            }
+            if (!messageHasVisibleContent(m)) return null;
             return (
               <div className="space-y-1" key={m.id}>
                 <MessageBlock message={m} />
                 {busy && m.id === latestUserMessageId ? (
                   <ThinkingBubble />
                 ) : null}
-                <ApprovalQueuePanel
-                  busyId={proposalBusyId}
-                  error={null}
-                  onApprove={onApproveProposal}
-                  onReject={onRejectProposal}
-                  proposals={attachedProposals}
-                />
               </div>
             );
           })
         )}
       </div>
+
+      {(proposalError ||
+        commandProposals.some((proposal) =>
+          !isDocumentProposal(proposal) &&
+          ["pending", "failed"].includes(proposal.status)
+        )) && (
+        <div className="max-h-[38vh] shrink-0 overflow-y-auto border-t border-cyan-300/15 bg-[#08121b] px-3 py-2">
+          {executingPlanLabel && proposalBusyId && (
+            <div className="mb-2 rounded-lg border border-cyan-300/20 bg-cyan-300/[0.05] px-2.5 py-2 text-[11px] text-cyan-100">
+              正在执行{executingPlanLabel}
+            </div>
+          )}
+          <ApprovalQueuePanel
+            busyId={proposalBusyId}
+            error={proposalError}
+            onApprove={onApproveProposal}
+            onReject={onRejectProposal}
+            proposals={commandProposals}
+          />
+        </div>
+      )}
 
       <div
         className={cn(
@@ -1940,24 +2024,6 @@ function ChatPanel({
             : "border-slate-700/50"
         )}
       >
-        <ModeSwitcher
-          disabled={busy}
-          mode={chatMode}
-          onModeChange={onChatModeChange}
-        />
-        <div className="mb-2 flex flex-wrap gap-1">
-          {chatMode === "command" &&
-            QUICK_COMMANDS.map((cmd) => (
-              <button
-                className="rounded-md border border-slate-700/50 bg-slate-800/50 px-2 py-0.5 text-[10px] text-slate-400 transition-colors hover:border-slate-600/50 hover:bg-slate-700/50 hover:text-slate-200"
-                key={cmd}
-                onClick={() => onQuickCommand(cmd)}
-                type="button"
-              >
-                {cmd}
-              </button>
-            ))}
-        </div>
         <form className="flex flex-col gap-2" onSubmit={onSubmit}>
           <textarea
             className={TEXTAREA_CLASS}
@@ -1968,11 +2034,7 @@ function ChatPanel({
                 event.currentTarget.form?.requestSubmit();
               }
             }}
-            placeholder={
-              chatMode === "ask"
-                ? "查询当前想定，不改变场景..."
-                : "输入将改变场景的推演指令..."
-            }
+            placeholder="输入将改变场景的推演指令..."
             value={commandInput}
             rows={2}
           />
@@ -1983,36 +2045,36 @@ function ChatPanel({
                 disabled={busy}
                 onOpenSettings={onOpenModelSettings}
               />
-              <span className="hidden truncate sm:inline">
-                {busy
-                  ? "Stop to cancel"
-                  : chatMode === "ask"
-                    ? "Ask mode"
-                    : "Command mode"}
-              </span>
             </div>
-            {busy ? (
-              <Button
-                className="h-6 gap-1 px-2 text-[10px]"
-                onClick={() => stop()}
-                size="sm"
-                type="button"
-                variant="danger"
-              >
-                <Square className="size-2.5" />
-                Stop
-              </Button>
-            ) : (
-              <Button
-                className="h-6 gap-1 px-2 text-[10px]"
-                disabled={!commandInput.trim()}
-                size="sm"
-                type="submit"
-              >
-                <Send className="size-3" />
-                Send
-              </Button>
-            )}
+            <div className="flex items-center gap-1.5">
+              <ApprovalModeSwitcher
+                disabled={busy}
+                mode={approvalMode}
+                onModeChange={onApprovalModeChange}
+              />
+              {busy ? (
+                <Button
+                  className="h-6 gap-1 px-2 text-[10px]"
+                  onClick={() => stop()}
+                  size="sm"
+                  type="button"
+                  variant="danger"
+                >
+                  <Square className="size-2.5" />
+                  Stop
+                </Button>
+              ) : (
+                <Button
+                  className="h-6 gap-1 px-2 text-[10px]"
+                  disabled={!commandInput.trim()}
+                  size="sm"
+                  type="submit"
+                >
+                  <Send className="size-3" />
+                  Send
+                </Button>
+              )}
+            </div>
           </div>
         </form>
       </div>
@@ -2028,6 +2090,9 @@ interface PlanCardMetadata {
   advantages?: string[];
   risks?: string[];
   optionIndex?: number;
+  reasoningSummary?: string;
+  planGroupKey?: string;
+  optionKey?: string;
 }
 
 function stringList(value: unknown): string[] {
@@ -2048,7 +2113,26 @@ function planMetadata(proposal: CommandProposal): PlanCardMetadata {
     risks: stringList(raw.risks),
     optionIndex:
       typeof raw.optionIndex === "number" ? raw.optionIndex : undefined,
+    reasoningSummary:
+      typeof raw.reasoning_summary === "string"
+        ? raw.reasoning_summary
+        : undefined,
+    planGroupKey:
+      typeof raw.planGroupKey === "string" ? raw.planGroupKey : undefined,
+    optionKey: typeof raw.optionKey === "string" ? raw.optionKey : undefined,
   };
+}
+
+function isDocumentProposal(proposal: CommandProposal): boolean {
+  return proposal.steps.some((step) => {
+    const skill = step.skill.toLowerCase();
+    return (
+      skill.includes("doc-tools") ||
+      skill.includes("create_docx") ||
+      skill.includes("create_document") ||
+      skill.includes("save_file")
+    );
+  });
 }
 
 function skillLabel(skill: string): string {
@@ -2095,11 +2179,41 @@ function ApprovalQueuePanel({
   onReject: (proposalId: string) => void;
 }) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const visible = proposals
-    .filter((proposal) =>
-      ["pending", "blocked", "failed"].includes(proposal.status)
-    )
-    .slice(0, 4);
+  const [dialogProposal, setDialogProposal] = useState<CommandProposal | null>(
+    null
+  );
+  const active = proposals.filter(
+    (proposal) =>
+      !isDocumentProposal(proposal) &&
+      ["pending", "failed"].includes(proposal.status)
+  );
+  const planGroups = active
+    .slice()
+    .sort((left, right) => right.created_at.localeCompare(left.created_at))
+    .map(planMetadata)
+    .filter((metadata) => metadata.kind === "tactical_plan_option");
+  const latestPlanGroup = planGroups
+    .map((metadata) => metadata.planGroupKey)
+    .filter((value): value is string => Boolean(value))[0];
+  const seenPlanKeys = new Set<string>();
+  const visible = active
+    .filter((proposal) => {
+      const metadata = planMetadata(proposal);
+      if (metadata.kind !== "tactical_plan_option") return true;
+      if (latestPlanGroup && metadata.planGroupKey !== latestPlanGroup) {
+        return false;
+      }
+      const key = `${metadata.planGroupKey ?? ""}:${metadata.optionKey ?? metadata.optionIndex ?? metadata.title ?? proposal.id}`;
+      if (seenPlanKeys.has(key)) return false;
+      seenPlanKeys.add(key);
+      return true;
+    })
+    .sort((left, right) => {
+      const leftIndex = planMetadata(left).optionIndex ?? 999;
+      const rightIndex = planMetadata(right).optionIndex ?? 999;
+      return leftIndex - rightIndex;
+    })
+    .slice(0, 8);
 
   if (visible.length === 0 && !error) return null;
 
@@ -2124,15 +2238,15 @@ function ApprovalQueuePanel({
           "待审批命令";
         const description =
           metadata.description ||
-          proposal.steps
-            .map((step) => step.source_text || step.summary || step.skill)
-            .filter(Boolean)
-            .join(" / ");
-        const badge =
-          metadata.label ||
-          (isPlan && metadata.optionIndex
-            ? `方案 ${metadata.optionIndex}`
-            : proposal.source);
+          proposal.command ||
+          proposal.steps[0]?.source_text ||
+          proposal.steps[0]?.summary ||
+          "待审批操作";
+        const planBadge =
+          isPlan && metadata.optionIndex
+            ? `方案 ${String.fromCharCode(64 + metadata.optionIndex)}`
+            : undefined;
+        const badge = planBadge || metadata.label || "审批任务";
         return (
           <div
             className={cn(
@@ -2193,14 +2307,19 @@ function ApprovalQueuePanel({
                       </span>
                     </div>
                   </div>
-                  <span className="shrink-0 rounded border border-white/10 px-1.5 py-0.5 font-mono text-[9px] uppercase opacity-65">
-                    {proposal.source}
-                  </span>
                 </div>
 
                 <div className="mt-2 line-clamp-2 text-[10px] leading-relaxed text-slate-300/85">
                   {description || proposal.adjudication.summary}
                 </div>
+
+                {false && (
+                  <div className="mt-2 rounded-md border border-cyan-300/15 bg-cyan-300/[0.035] px-2 py-1.5 text-[10px] leading-relaxed text-cyan-100/85">
+                    <div className="mb-0.5 text-[9px] font-medium uppercase tracking-[0.14em] text-cyan-200/70">
+                    </div>
+                    {metadata.reasoningSummary || description || proposal.adjudication.summary}
+                  </div>
+                )}
 
                 {expanded && (
                   <div className="mt-3 space-y-2 border-t border-white/10 pt-2">
@@ -2235,7 +2354,7 @@ function ApprovalQueuePanel({
                         </div>
                       </div>
                     )}
-                    <div className="space-y-1">
+                    {false && <div className="space-y-1">
                       {proposal.steps.map((step, index) => (
                         <div
                           className="rounded-md border border-white/10 bg-black/18 px-2 py-1.5"
@@ -2270,7 +2389,7 @@ function ApprovalQueuePanel({
                           )}
                         </div>
                       ))}
-                    </div>
+                    </div>}
                   </div>
                 )}
 
@@ -2290,8 +2409,13 @@ function ApprovalQueuePanel({
                 >
                   <Button
                     className="h-6 px-2 text-[10px]"
-                    disabled={busy}
-                    onClick={() => onReject(proposal.id)}
+                    disabled={["executed", "partial", "rejected"].includes(
+                      proposal.status
+                    )}
+                    onClick={() => {
+                      onReject(proposal.id);
+                      setDialogProposal(null);
+                    }}
                     size="sm"
                     type="button"
                     variant="ghost"
@@ -2300,12 +2424,15 @@ function ApprovalQueuePanel({
                   </Button>
                   <Button
                     className="h-6 px-2 text-[10px]"
-                    disabled={blocked || busy}
-                    onClick={() => onApprove(proposal.id)}
+                    disabled={blocked}
+                    onClick={() => {
+                      onApprove(proposal.id);
+                      setDialogProposal(null);
+                    }}
                     size="sm"
                     type="button"
                   >
-                    {busy ? "执行中" : "审批执行"}
+                    {busy ? "执行中" : "通过"}
                   </Button>
                 </div>
               </div>
@@ -2313,107 +2440,238 @@ function ApprovalQueuePanel({
           </div>
         );
       })}
+      {dialogProposal && (
+        <div
+          className="fixed inset-0 z-[80] flex items-center justify-center bg-black/65 p-4"
+          role="presentation"
+          onClick={() => setDialogProposal(null)}
+        >
+          <div
+            className="w-full max-w-md rounded-xl border border-cyan-200/20 bg-[#11151d] p-4 text-xs text-slate-200 shadow-2xl"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="approval-dialog-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-start gap-2">
+              <ShieldAlert className="mt-0.5 size-4 shrink-0 text-amber-300" />
+              <div className="min-w-0 flex-1">
+                <div
+                  id="approval-dialog-title"
+                  className="font-semibold text-slate-50"
+                >
+                  审批确认
+                </div>
+                <div className="mt-1 text-[11px] text-slate-400">
+                  {dialogProposal.command ||
+                    String(
+                      dialogProposal.plan_metadata?.title || "待处理命令提案"
+                    )}
+                </div>
+              </div>
+              <button
+                aria-label="关闭审批对话框"
+                className="rounded p-1 text-slate-500 hover:bg-white/10 hover:text-slate-200"
+                onClick={() => setDialogProposal(null)}
+                type="button"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+            <div className="mt-3 max-h-48 space-y-1.5 overflow-y-auto rounded-lg border border-white/10 bg-black/20 p-2 text-[10px]">
+              {dialogProposal.steps.map((step, index) => (
+                <div key={step.id}>
+                  {index + 1}. {step.summary || skillLabel(step.skill)} ·{" "}
+                  {parameterPreview(step.parameters)}
+                </div>
+              ))}
+            </div>
+            <div className="mt-3 flex justify-end gap-2">
+              <Button
+                className="h-7 px-3 text-[10px]"
+                disabled={busyId === dialogProposal.id}
+                onClick={() => {
+                  const id = dialogProposal.id;
+                  setDialogProposal(null);
+                  onReject(id);
+                }}
+                size="sm"
+                type="button"
+                variant="danger"
+              >
+                驳回
+              </Button>
+              <Button
+                className="h-7 px-3 text-[10px]"
+                disabled={
+                  busyId === dialogProposal.id ||
+                  dialogProposal.status === "blocked"
+                }
+                onClick={() => {
+                  const id = dialogProposal.id;
+                  setDialogProposal(null);
+                  onApprove(id);
+                }}
+                size="sm"
+                type="button"
+                variant="default"
+              >
+                通过
+              </Button>
+              <Button
+                className="h-7 px-3 text-[10px]"
+                onClick={() => setDialogProposal(null)}
+                size="sm"
+                type="button"
+                variant="ghost"
+              >
+                取消
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-function ModeSwitcher({
+function approvalModeLabel(mode: ApprovalMode): string {
+  return {
+    strict: "严格模式",
+    smart: "智能模式",
+    auto: "自动模式",
+    off: "关闭模式",
+  }[mode];
+}
+
+function approvalModeDescription(mode: ApprovalMode): string {
+  return {
+    strict: "所有变更工具调用均需审批，安全级别最高",
+    smart: "低风险工具自动批准，中高风险工具需要审批",
+    auto: "变更工具默认进入审批流程（默认）",
+    off: "关闭人工审批，由 Agent 自动执行；规则校验仍然生效",
+  }[mode];
+}
+
+function approvalModeIcon(mode: ApprovalMode) {
+  return {
+    strict: ShieldAlert,
+    smart: Sparkles,
+    auto: ShieldCheck,
+    off: CircleOff,
+  }[mode];
+}
+
+function approvalModeTone(mode: ApprovalMode): string {
+  return {
+    strict: "text-amber-300",
+    smart: "text-yellow-300",
+    auto: "text-sky-300",
+    off: "text-emerald-400",
+  }[mode];
+}
+
+function ApprovalModeSwitcher({
   disabled,
   mode,
   onModeChange,
 }: {
   disabled: boolean;
-  mode: AIChatMode;
-  onModeChange: (mode: AIChatMode) => void;
+  mode: ApprovalMode;
+  onModeChange: (mode: ApprovalMode) => void;
 }) {
-  const modes: Array<{ label: string; value: AIChatMode }> = [
-    { label: "Ask", value: "ask" },
-    { label: "Command", value: "command" },
-  ];
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const modes: ApprovalMode[] = ["strict", "smart", "auto", "off"];
+  const currentIcon = approvalModeIcon(mode);
+  const CurrentIcon = currentIcon;
+
+  useEffect(() => {
+    if (!open) return;
+
+    const closeOnOutsideClick = (event: MouseEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", closeOnOutsideClick);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("mousedown", closeOnOutsideClick);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [open]);
 
   return (
-    <div className="mb-2 flex items-center justify-between gap-2 text-[10px] text-slate-500">
-      <div className="inline-flex rounded-md border border-slate-700/50 bg-slate-900/50 p-0.5">
-        {modes.map((item) => (
-          <button
-            className={cn(
-              "rounded px-2 py-0.5 transition-colors",
-              mode === item.value
-                ? "bg-slate-700/70 text-slate-100"
-                : "text-slate-500 hover:text-slate-300",
-              disabled && "cursor-not-allowed opacity-50"
-            )}
-            disabled={disabled}
-            key={item.value}
-            onClick={() => onModeChange(item.value)}
-            type="button"
-          >
-            {item.label}
-          </button>
-        ))}
-      </div>
-      <span className="truncate">
-        {mode === "ask" ? "Explain and plan" : "Commands require approval"}
-      </span>
-    </div>
-  );
-}
+    <div className="relative" ref={rootRef}>
+      <button
+        aria-expanded={open}
+        aria-haspopup="listbox"
+        aria-label={`审批模式：${approvalModeLabel(mode)}`}
+        className={cn(
+          "inline-flex h-6 max-w-[8.5rem] items-center gap-1 rounded border px-1.5 text-[10px] transition-colors",
+          "border-slate-700/70 bg-slate-900/90 text-slate-200 hover:border-slate-500",
+          "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-sky-400/70",
+          disabled && "cursor-not-allowed opacity-50"
+        )}
+        disabled={disabled}
+        onClick={() => setOpen((value) => !value)}
+        type="button"
+      >
+        <CurrentIcon className={cn("size-3", approvalModeTone(mode))} />
+        <span className="truncate">{approvalModeLabel(mode)}</span>
+        <ChevronDown
+          className={cn(
+            "size-3 shrink-0 transition-transform",
+            open && "rotate-180"
+          )}
+        />
+      </button>
 
-function RunStatusCard({ summary }: { summary: ChatRunSummary }) {
-  const icon =
-    summary.tone === "running" ? (
-      <Loader2 className="mt-0.5 size-3 animate-spin" />
-    ) : summary.tone === "done" ? (
-      <CheckCircle2 className="mt-0.5 size-3" />
-    ) : summary.tone === "error" ? (
-      <AlertTriangle className="mt-0.5 size-3" />
-    ) : (
-      <Sparkles className="mt-0.5 size-3" />
-    );
-
-  return (
-    <div
-      className={cn(
-        "mb-3 rounded-lg border px-2.5 py-2 text-[11px]",
-        summary.tone === "running" &&
-          "border-blue-300/20 bg-blue-300/[0.04] text-blue-100",
-        summary.tone === "done" &&
-          "border-emerald-300/20 bg-emerald-300/[0.04] text-emerald-100",
-        summary.tone === "error" &&
-          "border-red-300/25 bg-red-300/[0.05] text-red-100",
-        summary.tone === "idle" &&
-          "border-slate-700/50 bg-slate-900/40 text-slate-300"
-      )}
-    >
-      <div className="flex items-start gap-2">
-        {icon}
-        <div className="min-w-0 flex-1">
-          <div className="font-medium">{summary.label}</div>
-          <div className="mt-0.5 truncate text-[10px] opacity-70">
-            {summary.detail}
-          </div>
-        </div>
-      </div>
-      {summary.tools.length > 0 && (
-        <details className="mt-2">
-          <summary className="cursor-pointer text-[10px] opacity-70">
-            {summary.tools.length} tool call
-            {summary.tools.length > 1 ? "s" : ""}
-          </summary>
-          <div className="mt-1 space-y-1">
-            {summary.tools.map((tool, idx) => (
-              <div
-                className="flex items-center justify-between gap-2 rounded bg-black/20 px-2 py-1 font-mono text-[10px] text-slate-300"
-                key={`${tool.toolName}-${idx}`}
+      {open && (
+        <div
+          aria-label="审批模式选项"
+          className="absolute bottom-full right-0 z-50 mb-2 w-[min(20rem,calc(100vw-2rem))] rounded-lg border border-slate-700/80 bg-[#111923] p-1 shadow-[0_12px_32px_rgba(0,0,0,0.45)]"
+          role="listbox"
+        >
+          {modes.map((item) => {
+            const Icon = approvalModeIcon(item);
+            const selected = item === mode;
+            return (
+              <button
+                aria-selected={selected}
+                className={cn(
+                  "flex w-full items-start gap-2 rounded-md px-2 py-1.5 text-left transition-colors",
+                  selected ? "bg-slate-800/90" : "hover:bg-slate-800/60",
+                  "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-sky-400/70"
+                )}
+                key={item}
+                onClick={() => {
+                  onModeChange(item);
+                  setOpen(false);
+                }}
+                role="option"
+                type="button"
               >
-                <span className="truncate">{tool.toolName}</span>
-                <span className="shrink-0 uppercase text-slate-500">
-                  {tool.state}
+                <Icon
+                  className={cn(
+                    "mt-0.5 size-3.5 shrink-0",
+                    approvalModeTone(item)
+                  )}
+                />
+                <span className="min-w-0">
+                  <span className="block text-[10px] font-medium leading-4 text-slate-100">
+                    {approvalModeLabel(item)}
+                  </span>
+                  <span className="block text-[9px] leading-3.5 text-slate-400">
+                    {approvalModeDescription(item)}
+                  </span>
                 </span>
-              </div>
-            ))}
-          </div>
-        </details>
+              </button>
+            );
+          })}
+        </div>
       )}
     </div>
   );
@@ -2432,7 +2690,9 @@ function ThinkingBubble() {
 
 function MessageBlock({ message }: { message: UIMessage }) {
   const isUser = message.role === "user";
-  const showInlineToolDetails: boolean = false;
+  // Tool calls remain available to the chat transport and approval flow, but
+  // their raw input/output JSON is intentionally hidden from the conversation UI.
+  const showInlineToolDetails = false;
   const hasVisibleContent = messageHasVisibleContent(message);
 
   if (!hasVisibleContent) return null;
@@ -2459,9 +2719,18 @@ function MessageBlock({ message }: { message: UIMessage }) {
       >
         {message.parts.map((part, idx) => {
           if (isTextUIPart(part)) {
-            return (
+            const displayText = isUser
+              ? part.text
+              : stripDocumentApprovalNotice(part.text);
+            return isUser ? (
               <div key={idx} className="whitespace-pre-wrap leading-relaxed">
-                {part.text}
+                {displayText}
+              </div>
+            ) : (
+              <div className="ai-chat-markdown" key={idx}>
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                  {displayText}
+                </ReactMarkdown>
               </div>
             );
           }

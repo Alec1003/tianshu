@@ -470,6 +470,13 @@ async def approve_command_proposal(
             proposal,
             scenario_id=_runtime_context_from_request(request),
         )
+        for sibling in queue.cancel_plan_siblings(proposal):
+            await save_command_proposal(
+                session,
+                user,
+                sibling,
+                scenario_id=_runtime_context_from_request(request),
+            )
         await save_runtime_state(
             session,
             user,
@@ -1632,7 +1639,31 @@ async def save_model_provider(
     return await upsert_model_provider_config(session, user, provider_id, payload)
 
 
+@router.put(
+    "/model/providers/{provider_id}/default",
+    response_model=AIModelProviderConfigRead,
+)
+async def set_default_model_provider_endpoint(
+    provider_id: str,
+    session: AsyncSession = Depends(get_async_session),
+    user: User = Depends(current_active_user),
+) -> AIModelProviderConfigRead:
+    from app.ai.model_config_service import set_default_model_provider
+
+    result = await set_default_model_provider(session, user, provider_id)
+    if result is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Provider {provider_id} not found.",
+        )
+    return result
+
+
 # ─── S4: Streaming Chat (Pydantic AI) ─────────────────────────────────────────
+
+
+def _read_model_config_id_header(request: Request) -> str:
+    return _header_value(request, "x-tianshu-model-config-id").strip()
 
 
 def _read_model_override_from_headers(
@@ -1640,10 +1671,8 @@ def _read_model_override_from_headers(
 ) -> tuple[str, str, str, str, str]:
     """Pull per-request model override fields from custom headers.
 
-    The AI sidebar sends ``X-TianShu-Model-{Provider,Name,Api-Key,Base-Url}``
-    whenever the user has filled in a model config. Empty / missing
-    headers fall back to "" so the caller can decide between override and
-    the env-configured global agent.
+    Kept for backward compatibility — newer clients should send
+    ``X-TianShu-Model-Config-Id`` instead.
     """
     return (
         _header_value(request, "x-tianshu-model-provider-id").strip(),
@@ -1654,9 +1683,9 @@ def _read_model_override_from_headers(
     )
 
 
-def _read_chat_mode_from_headers(request: Request) -> str:
-    mode = (_header_value(request, "x-tianshu-chat-mode") or "command").strip().lower()
-    return "ask" if mode == "ask" else "command"
+def _read_approval_mode_from_headers(request: Request) -> str:
+    mode = (_header_value(request, "x-tianshu-approval-mode") or "auto").strip().lower()
+    return mode if mode in {"strict", "smart", "auto", "off"} else "auto"
 
 
 
@@ -1677,7 +1706,21 @@ async def _chat_with_agent_runtime(
     session: AsyncSession,
     user: User,
 ) -> StreamingResponse:
-    """QwenPaw-style AgentRuntime chat execution path."""
+    """AgentRuntime chat execution that resolves model config from DB first.
+
+    Priority (highest first):
+        1. ``X-TianShu-Model-Config-Id`` header  → DB lookup by provider_id
+        2. DB default model (is_default=True)
+        3. Legacy ``X-TianShu-Model-Provider`` headers + DB credentials
+        4. Environment variables (TIANSHU_LLM_MODEL etc.)
+        5. MODEL_NOT_CONFIGURED structured error
+    """
+    from app.ai.model_config_service import (  # noqa: PLC0415
+        decrypt_model_api_key,
+        resolve_default_model_config,
+        resolve_model_config_by_id,
+        resolve_stored_model_credentials,
+    )
     from app.agent_runtime.ai_sdk_adapter import (  # noqa: PLC0415
         AI_SDK_STREAM_HEADERS,
         to_ai_sdk_stream,
@@ -1685,31 +1728,93 @@ async def _chat_with_agent_runtime(
     from app.agent_runtime.runtime import AgentRuntimeRequest  # noqa: PLC0415
 
     bridge = await _bridge_for_user_loaded(request, user, session)
-    chat_mode = _read_chat_mode_from_headers(request)
-    provider_id, provider, model_name, api_key, base_url = (
-        _read_model_override_from_headers(request)
-    )
+    chat_mode = "command"
+    approval_mode = _read_approval_mode_from_headers(request)
+    doc_folder = _doc_folder_from_request(request)
+    approval_queue = getattr(bridge, "command_approvals", None)
+    if approval_queue is not None:
+        approval_queue.set_mode(approval_mode)
+
+    # ── priority 1: explicit model config id ───────────────────────────
+    config_id = _read_model_config_id_header(request)
+    provider = ""
+    model_name = ""
+    api_key = ""
+    base_url = ""
+
+    if config_id:
+        _, provider, model_name, base_url = await resolve_model_config_by_id(
+            session, user, config_id
+        )
+        # A provider config can contain several model profiles.  The config
+        # id selects credentials, while this header selects the active model.
+        requested_model = _header_value(request, "x-tianshu-model-name").strip()
+        if requested_model:
+            model_name = requested_model
+
+    # ── priority 2: DB default ────────────────────────────────────────
+    if not provider:
+        _, provider, model_name, base_url = await resolve_default_model_config(
+            session, user
+        )
+
+    # ── priority 3: legacy headers + DB credentials ───────────────────
+    if not provider:
+        legacy_id, legacy_provider, legacy_model, legacy_key, legacy_url = (
+            _read_model_override_from_headers(request)
+        )
+        provider = legacy_provider or ""
+        model_name = legacy_model or ""
+        api_key = legacy_key or ""
+        base_url = legacy_url or ""
+        if provider and not api_key:
+            api_key, base_url = await resolve_stored_model_credentials(
+                session,
+                user,
+                provider_id=legacy_id,
+                provider=legacy_provider,
+                base_url=legacy_url,
+            )
+
+    # ── resolve api_key if not yet available ──────────────────────────
     if provider and not api_key:
-        stored_api_key, stored_base_url = await resolve_stored_model_credentials(
+        api_key, _ = await resolve_stored_model_credentials(
             session,
             user,
-            provider_id=provider_id,
+            provider_id=config_id or provider,
             provider=provider,
             base_url=base_url,
         )
-        api_key = stored_api_key
-        base_url = stored_base_url
+
+    # ── priority 4: env vars ──────────────────────────────────────────
+    if not provider:
+        from app.config import get_settings  # noqa: PLC0415
+        settings = get_settings()
+        env_provider, _, env_model = settings.llm_model.partition(":")
+        provider = env_provider.strip() or ""
+        model_name = env_model or settings.llm_model or ""
+        api_key = settings.llm_api_key or ""
+        base_url = settings.llm_base_url or ""
+
+    # ── priority 5: MODEL_NOT_CONFIGURED ──────────────────────────────
+    if not provider or not model_name:
+        error_resp = {
+            "code": "MODEL_NOT_CONFIGURED",
+            "errorText": (
+                "尚未选择可用模型，请前往模型配置中心完成配置并设为默认模型。"
+            ),
+        }
+        return Response(
+            content=json.dumps(error_resp),
+            status_code=status.HTTP_400_BAD_REQUEST,
+            media_type="application/json",
+        )
 
     body = await request.json()
     messages = body.get("messages") if isinstance(body, dict) else None
     if not isinstance(messages, list):
         messages = []
 
-    approval_queue = (
-        getattr(bridge, "command_approvals", None)
-        if chat_mode == "command"
-        else None
-    )
     event_loop = asyncio.get_running_loop()
 
     def _record_proposal(proposal):
@@ -1742,7 +1847,6 @@ async def _chat_with_agent_runtime(
         user_id=str(getattr(user, "id", "")),
         scenario_id=_runtime_context_from_request(request),
         model={
-            "provider_id": provider_id,
             "provider": provider,
             "model": model_name,
             "apiKey": api_key,
@@ -1752,8 +1856,10 @@ async def _chat_with_agent_runtime(
         tool_registry=getattr(bridge, "tool_registry", None),
         approval_queue=approval_queue,
         chat_mode=chat_mode,
+        approval_mode=approval_mode,
         metadata={
             "backend": "qwenpaw",
+            "doc_folder": doc_folder or "",
             "proposal_recorder": _record_proposal
             if approval_queue is not None
             else None,

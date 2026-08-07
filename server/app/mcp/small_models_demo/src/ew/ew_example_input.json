@@ -1,0 +1,35 @@
+{
+  "radars": [
+    {
+      "id": "E2Dradar",
+      "position": [123.0, 28, 9000],
+      "detection_range_km": 100.0,
+      "beamwidth_deg": 3.0,
+      "sidelobe_db": -25.0
+    },
+    {
+      "id": "E2Dradar2",
+      "position": [124.0, 30.1, 9000],
+      "detection_range_km": 100.0,
+      "beamwidth_deg": 3.0,
+      "sidelobe_db": -25.0
+    }
+  ],
+  "jammers": [
+    {"position": [121.5, 28, 7000]},
+    {"position": [123, 27, 7000]}
+  ],
+  "strength_matrix": [
+    [400.0, 300],
+    [300.0, 400]
+  ],
+  "region": {
+    "lon_min": 120.0,
+    "lon_max": 125.5,
+    "lat_min": 26.5,
+    "lat_max": 31.5,
+    "alt_min_km": 1.0,
+    "alt_max_km": 12.0
+  },
+  "resolution_km": 2.0
+}

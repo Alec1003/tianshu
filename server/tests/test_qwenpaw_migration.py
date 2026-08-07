@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from types import SimpleNamespace
 from unittest.mock import MagicMock
@@ -98,38 +98,6 @@ def test_qwenpaw_agent_build_client(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_qwenpaw_agent_json_tool_call_fallback():
-    agent = make_agent(
-        model_config=AgentModelConfig(provider="", model="", api_key="", base_url="")
-    )
-    events = [
-        event
-        async for event in agent.reply_stream([
-            {"role": "user", "content": '{"tool":"whoami","arguments":{}}'}
-        ])
-    ]
-    types = [e.type for e in events if isinstance(e, AgentEvent)]
-    assert "tool_call_start" in types
-    assert "tool_call_end" in types
-
-
-@pytest.mark.asyncio
-async def test_qwenpaw_agent_no_model_no_json():
-    agent = make_agent(
-        model_config=AgentModelConfig(provider="", model="", api_key="", base_url="")
-    )
-    events = [
-        event
-        async for event in agent.reply_stream([
-            {"role": "user", "content": "hello"}
-        ])
-    ]
-    assert any(
-        isinstance(e, AgentEvent) and e.type == "error" for e in events
-    )
-
-
-@pytest.mark.asyncio
 async def test_qwenpaw_agent_provider_messages():
     agent = make_agent()
     msgs = agent._provider_messages([
@@ -140,28 +108,6 @@ async def test_qwenpaw_agent_provider_messages():
     assert msgs[0]["role"] == "system"
     assert msgs[-2]["role"] == "user"
     assert msgs[-1]["role"] == "assistant"
-
-
-@pytest.mark.asyncio
-async def test_qwenpaw_agent_parse_tool_call():
-    result = QwenPawTextAgent._parse_tool_call([
-        {"role": "user", "content": '{"tool":"deploy_aircraft","arguments":{"lat":22}}'}
-    ])
-    assert result == ("deploy_aircraft", {"lat": 22})
-
-
-def test_qwenpaw_agent_parse_tool_call_invalid_json():
-    result = QwenPawTextAgent._parse_tool_call([
-        {"role": "user", "content": "not json"}
-    ])
-    assert result is None
-
-
-def test_qwenpaw_agent_parse_tool_call_no_tool_field():
-    result = QwenPawTextAgent._parse_tool_call([
-        {"role": "user", "content": '{"other": "value"}'}
-    ])
-    assert result is None
 
 
 # ---------------------------------------------------------------------------

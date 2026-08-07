@@ -363,6 +363,7 @@ export default function AITacticalCommandPlatform({
   const [timelinePanelOpen, setTimelinePanelOpen] = useState(false);
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
   const [previewDocFile, setPreviewDocFile] = useState<string | null>(null);
+  const [docRefreshToken, setDocRefreshToken] = useState(0);
   const [previewSurface, setPreviewSurface] = useState<PreviewSurface>("map");
   const [showRoutes, setShowRoutes] = useState(false);
   const [showRanges, setShowRanges] = useState(false);
@@ -1119,6 +1120,10 @@ export default function AITacticalCommandPlatform({
     setPreviewSurface("document");
   }, []);
 
+  const handleDocumentGenerated = useCallback(() => {
+    setDocRefreshToken((value) => value + 1);
+  }, []);
+
   const handleOpenMapPreview = useCallback(() => {
     setPreviewSurface("map");
   }, []);
@@ -1246,6 +1251,7 @@ export default function AITacticalCommandPlatform({
             onLoadDemoScenario={handleLoadDemoScenario}
             onLoadSCSScenario={handleLoadSCSScenario}
             previewFile={previewDocFile}
+            docRefreshToken={docRefreshToken}
             onPreview={handlePreviewDocument}
             onImportScenario={handleImportScenario}
             onExportScenario={handleExportScenario}
@@ -1437,6 +1443,7 @@ export default function AITacticalCommandPlatform({
           onApplyScenario={handleApplyAiScenario}
           onOpenChange={setAiSidebarOpen}
           onOpenDocumentPreview={handlePreviewDocument}
+          onDocumentGenerated={handleDocumentGenerated}
           onOpenMapPreview={handleOpenMapPreview}
           onResumePlay={playSimulation}
           onSettingsOpenChange={setSettingsModalOpen}

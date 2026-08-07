@@ -19,7 +19,7 @@ RUN sed -i \
 
 # install python deps first for layer caching
 COPY server/requirements.txt /tmp/requirements.txt
-RUN pip install -i https://pypi.tuna.tsinghua.edu.cn/simple \
+RUN pip install -i https://pypi.org/simple \
     -r /tmp/requirements.txt \
     shapely==2.0.6 \
     watchfiles==0.24.0

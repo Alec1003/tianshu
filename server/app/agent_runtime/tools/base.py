@@ -19,6 +19,12 @@ class ToolContext:
     proposal_recorder: Callable[[Any], None] | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
 
+    def requires_approval(self, skill: str, risk: str = "medium") -> bool:
+        if self.approval_queue is None:
+            return False
+        policy = getattr(self.approval_queue, "should_auto_execute", None)
+        return not policy(skill, risk) if callable(policy) else True
+
 
 class ToolBase(Protocol):
     name: str

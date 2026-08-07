@@ -54,6 +54,7 @@ class AIModelProviderConfig(Base):
     api_key_ciphertext: Mapped[str] = mapped_column(Text, default="", nullable=False)
     enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    is_default: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     last_checked_at: Mapped[str | None] = mapped_column(String(64), nullable=True)
     custom_models: Mapped[list] = mapped_column(
         MODEL_CONFIG_JSON,
